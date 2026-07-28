@@ -141,12 +141,13 @@ class Client extends Model
             return 'returned';
         }
 
-        // 2. Picked up stage (when booking is explicitly marked picked_up or out)
-        if ($bookingsList->contains('status', 'picked_up') || $bookingsList->contains('status', 'out')) {
+        // 2. Picked up stage (when booking is marked picked_up/out OR when all fittings are completed)
+        $hasCompletedFittings = $fittingsList->count() > 0 && $fittingsList->every('status', 'completed');
+        if ($bookingsList->contains('status', 'picked_up') || $bookingsList->contains('status', 'out') || $hasCompletedFittings) {
             return 'picked_up';
         }
 
-        // 3. Fitting stage (when fittings exist for the bride)
+        // 3. Fitting stage (when fittings exist for the bride, e.g. scheduled or in progress)
         if ($fittingsList->count() > 0) {
             return 'fitting';
         }

@@ -300,9 +300,21 @@ class ClientController extends Controller
                 break;
 
             case 'end_fitting':
-                $fittings = $client->fittings()->where('fittings.status', '!=', 'completed')->get();
-                foreach ($fittings as $f) {
-                    $f->update(['status' => 'completed']);
+                $fittings = $client->fittings()->get();
+                if ($fittings->count() === 0) {
+                    $booking = $client->bookings()->latest()->first();
+                    if ($booking) {
+                        Fitting::create([
+                            'booking_id' => $booking->id,
+                            'fitting_date' => now()->toDateString(),
+                            'status' => 'completed',
+                            'additional_notes' => 'تم إنهاء البروفات وتحويل العروس لمرحلة الاستلام',
+                        ]);
+                    }
+                } else {
+                    foreach ($fittings as $f) {
+                        $f->update(['status' => 'completed']);
+                    }
                 }
                 break;
 
