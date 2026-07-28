@@ -8,35 +8,41 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('dresses', function (Blueprint $table) {
-            if (Schema::hasColumn('dresses', 'status') && Schema::hasColumn('dresses', 'category_id')) {
-                $table->index(['status', 'category_id']);
-            }
-            if (Schema::hasColumn('dresses', 'collection_id')) {
-                $table->index(['collection_id']);
-            }
-            if (Schema::hasColumn('dresses', 'designer_id')) {
-                $table->index(['designer_id']);
-            }
-        });
+        try {
+            Schema::table('dresses', function (Blueprint $table) {
+                if (Schema::hasColumn('dresses', 'status') && Schema::hasColumn('dresses', 'category_id')) {
+                    try { $table->index(['status', 'category_id']); } catch (\Throwable $e) {}
+                }
+                if (Schema::hasColumn('dresses', 'collection_id')) {
+                    try { $table->index(['collection_id']); } catch (\Throwable $e) {}
+                }
+                if (Schema::hasColumn('dresses', 'designer_id')) {
+                    try { $table->index(['designer_id']); } catch (\Throwable $e) {}
+                }
+            });
+        } catch (\Throwable $e) {}
 
-        Schema::table('bookings', function (Blueprint $table) {
-            if (Schema::hasColumn('bookings', 'booking_date') && Schema::hasColumn('bookings', 'status')) {
-                $table->index(['booking_date', 'status']);
-            }
-            if (Schema::hasColumn('bookings', 'client_id')) {
-                $table->index(['client_id']);
-            }
-        });
+        try {
+            Schema::table('bookings', function (Blueprint $table) {
+                if (Schema::hasColumn('bookings', 'booking_date') && Schema::hasColumn('bookings', 'status')) {
+                    try { $table->index(['booking_date', 'status']); } catch (\Throwable $e) {}
+                }
+                if (Schema::hasColumn('bookings', 'client_id')) {
+                    try { $table->index(['client_id']); } catch (\Throwable $e) {}
+                }
+            });
+        } catch (\Throwable $e) {}
 
-        Schema::table('visits', function (Blueprint $table) {
-            if (Schema::hasColumn('visits', 'visit_date') && Schema::hasColumn('visits', 'status')) {
-                $table->index(['visit_date', 'status']);
-            }
-            if (Schema::hasColumn('visits', 'client_id')) {
-                $table->index(['client_id']);
-            }
-        });
+        try {
+            Schema::table('visits', function (Blueprint $table) {
+                if (Schema::hasColumn('visits', 'visit_date') && Schema::hasColumn('visits', 'status')) {
+                    try { $table->index(['visit_date', 'status']); } catch (\Throwable $e) {}
+                }
+                if (Schema::hasColumn('visits', 'client_id')) {
+                    try { $table->index(['client_id']); } catch (\Throwable $e) {}
+                }
+            });
+        } catch (\Throwable $e) {}
     }
 
     public function down(): void
