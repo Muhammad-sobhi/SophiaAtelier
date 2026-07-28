@@ -1,0 +1,18 @@
+.section{background:var(--color-bg-ivory)}
+.layout{display:grid;grid-template-columns:340px 1fr;gap:60px;align-items:center}
+.leftCol{display:flex;flex-direction:column;gap:20px;align-items:flex-start}
+.eyebrow{font-family:var(--font-body);font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--color-text-muted)}
+.heading{font-family:var(--font-heading);font-size:clamp(34px,4.5vw,52px);font-weight:400;color:var(--color-text);line-height:1.15}
+.paragraph{font-family:var(--font-body);font-size:13px;line-height:1.75;color:var(--color-text-light);max-width:320px}
+.viewBtn{display:inline-block;padding:12px 24px;border:1px solid var(--color-text);font-family:var(--font-body);font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--color-text);transition:all var(--transition-base);margin-top:8px}
+.viewBtn:hover{background:var(--color-accent);border-color:var(--color-accent);color:white}
+.cardsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.card{text-decoration:none;display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px}
+.archFrame{position:relative;border-radius:180px 180px var(--radius-sm) var(--radius-sm);overflow:hidden;aspect-ratio:3/4.5;width:100%;background:var(--color-secondary)}
+.image{width:100%;height:100%;object-fit:cover;transition:transform .8s cubic-bezier(.25,.46,.45,.94)}
+.card:hover .image{transform:scale(1.06)}
+.cardMeta{display:flex;flex-direction:column;gap:4px}
+.collectionName{font-family:var(--font-heading);font-size:22px;font-weight:500;color:var(--color-text)}
+.tagline{font-family:var(--font-body);font-size:11px;color:var(--color-text-muted);letter-spacing:0.5px}
+@media(max-width:1100px){.layout{grid-template-columns:1fr;gap:40px}.leftCol{align-items:center;text-align:center}.paragraph{max-width:500px}}
+@media(max-width:768px){.cardsGrid{grid-template-columns:1fr;max-width:320px;margin:0 auto}}

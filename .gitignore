@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js
+sophia/.next/
+sophia/out/
+
+# Dashboard build
+dashboard/dist/
+
+# Backend / Laravel
+backend/vendor/
+backend/.env
+backend/storage/*.key
+backend/storage/app/public/*
+!backend/storage/app/public/.gitignore
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/logs/*
+
+# Environment variables
+.env
+.env.local
+.env.production
+*.env
+
+# IDE / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

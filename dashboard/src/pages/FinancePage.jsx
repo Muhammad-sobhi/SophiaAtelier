@@ -1,0 +1,708 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api-client';
+import {
+  DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
+  X, FileText, Image as ImageIcon, Plus, CreditCard, Banknote,
+  Smartphone, Building2, Wallet, ChevronRight, Filter } from
+'lucide-react';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const paymentMethodKeys = ['cash', 'credit_card', 'instapay', 'vodafone_cash', 'bank_transfer'];
+
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  // handles DD-MM-YYYY format from our formatter
+  if (parts[0].length === 2) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+};
+
+const formatDateStr = (dateStr) => {
+  if (!dateStr) return '-';
+  try {
+    const clean = dateStr.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length !== 3) return dateStr;
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    if (isNaN(d.getTime())) return dateStr;
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+  } catch {return dateStr;}
+};
+
+const paymentMethodLabels = {
+  'instapay': 'إنستاباي',
+  'vodafone cash': 'فودافون كاش',
+  'vodafone_cash': 'فودافون كاش',
+  'bank transfer': 'تحويل بنكي',
+  'bank_transfer': 'تحويل بنكي',
+  'credit_card': 'فيزا / كارت',
+  'cash': 'نقدي (كاش)'
+};
+
+const categoryLabels = {
+  'shop': 'مبيعات وحجوزات المحل',
+  'operational': 'المشتريات والرواتب',
+  'utilities': 'المرافق والخدمات العامة',
+  'other': 'مصروفات أخرى',
+  'deposit': 'مقدم حجز فستان',
+  'balance': 'باقي مستحقات الحجز',
+  'fitting_fee': 'رسوم تجربة (قياس)',
+  'salary': 'رواتب موظفين',
+  'cleaning': 'مصاريف تنظيف',
+  'purchase': 'مشتريات فساتين وخامات',
+  'maintenance': 'مصاريف صيانة'
+};
+
+const pmIcons = {
+  'cash': Banknote, 'credit_card': CreditCard, 'instapay': Smartphone, 'vodafone_cash': Smartphone,
+  'bank_transfer': Building2
+};
+
+export default function FinancePage() {
+  const [allTransactions, setAllTransactions] = useState([]);
+  const [selectedTx, setSelectedTx] = useState(null);
+  const [activeTab, setActiveTab] = useState('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activePaymentFilter, setActivePaymentFilter] = useState(null);
+
+  // Date range filter
+  const [filterStart, setFilterStart] = useState('');
+  const [filterEnd, setFilterEnd] = useState('');
+
+  // New Transaction Form state
+  const [newDesc, setNewDesc] = useState('');
+  const [newType, setNewType] = useState('مصروف');
+  const [newCategory, setNewCategory] = useState('other');
+  const [newAmount, setNewAmount] = useState('');
+  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newPaymentMethod, setNewPaymentMethod] = useState('cash');
+  const [newReceiptImage, setNewReceiptImage] = useState(null);
+
+  // Numeric totals
+  const [totals, setTotals] = useState({ revenue: 0, expenses: 0 });
+
+  const buildQS = useCallback(() => {
+    const p = { per_page: '500' };
+    if (filterStart) p.start_date = filterStart;
+    if (filterEnd) p.end_date = filterEnd;
+    return new URLSearchParams(p).toString();
+  }, [filterStart, filterEnd]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const qs = buildQS();
+      const [revRes, expRes] = await Promise.all([
+      apiClient.get(`/revenues?${qs}`),
+      apiClient.get(`/expenses?${qs}`)]
+      );
+
+      const revList = Array.isArray(revRes) ? revRes : revRes.data || [];
+      const expList = Array.isArray(expRes) ? expRes : expRes.data || [];
+
+      const revenueTxs = revList.map((r) => {
+        const val = parseFloat(r.amount || 0);
+        return {
+          id: `revenue-${r.id}`,
+          desc: r.notes || `دفعة مالية (${r.type || 'other'})`,
+          type: val >= 0 ? 'إيراد' : 'مرتجع',
+          category: 'shop',
+          rawAmount: val,
+          amount: val >= 0 ? `+${val.toLocaleString()} ج.م` : `-${Math.abs(val).toLocaleString()} ج.م`,
+          date: formatDateStr(r.payment_date || ''),
+          isRevenue: true,
+          paymentMethod: (r.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
+          clientName: r.booking?.client?.name,
+          receiptImage: r.receipt_url
+        };
+      });
+
+      const expenseTxs = expList.map((e) => {
+        let mappedCat = 'other';
+        if (e.category === 'salary' || e.category === 'purchase') mappedCat = 'operational';else
+        if (e.category === 'cleaning' || e.category === 'maintenance') mappedCat = 'utilities';
+        return {
+          id: `expense-${e.id}`,
+          desc: e.description || `مصروف (${e.category || 'other'})`,
+          type: 'مصروف',
+          category: mappedCat,
+          rawAmount: parseFloat(e.amount || 0),
+          amount: `-${parseFloat(e.amount || 0).toLocaleString()} ج.م`,
+          date: formatDateStr(e.date || ''),
+          isRevenue: false,
+          paymentMethod: (e.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
+          receiptImage: e.receipt_url
+        };
+      });
+
+      const combined = [...revenueTxs, ...expenseTxs];
+      combined.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
+      setAllTransactions(combined);
+
+      let revSum = 0,expSum = 0;
+      combined.forEach((t) => {if (t.isRevenue) revSum += t.rawAmount;else expSum += t.rawAmount;});
+      setTotals({ revenue: revSum, expenses: expSum });
+    } catch (e) {
+      console.error('Failed to load finance data:', e);
+    }
+  }, [buildQS]);
+
+  useEffect(() => {loadData();}, [loadData]);
+
+  const handleAddTransactionSubmit = async (e) => {
+    e.preventDefault();
+    if (!newDesc.trim() || !newAmount.trim()) return;
+
+    const amountVal = parseFloat(newAmount);
+    const isRevenue = newType === 'إيراد';
+
+    try {
+      if (isRevenue) {
+        await apiClient.post('/revenues', {
+          type: newCategory === 'shop' ? 'deposit' : 'other',
+          amount: amountVal,
+          payment_method: newPaymentMethod,
+          payment_date: newDate,
+          notes: newDesc,
+          receipt_image: newReceiptImage
+        });
+      } else {
+        let backendCat = 'other';
+        if (newCategory === 'operational') backendCat = 'purchase';else
+        if (newCategory === 'utilities') backendCat = 'maintenance';
+
+        await apiClient.post('/expenses', {
+          category: backendCat,
+          amount: amountVal,
+          description: newDesc,
+          date: newDate,
+          payment_method: newPaymentMethod,
+          receipt_image: newReceiptImage
+        });
+      }
+
+      loadData();
+      setIsModalOpen(false);
+
+      setNewDesc('');
+      setNewType('مصروف');
+      setNewCategory('other');
+      setNewAmount('');
+      setNewDate(new Date().toISOString().split('T')[0]);
+      setNewPaymentMethod('cash');
+      setNewReceiptImage(null);
+    } catch (e) {
+      console.error('Failed to add transaction:', e);
+    }
+  };
+
+  const handleReceiptUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewReceiptImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Payment method breakdown
+  const paymentBreakdown = paymentMethodKeys.map((key) => {
+    const methods = [key, key.replace('_', ' ')];
+    const txs = allTransactions.filter((t) => methods.includes(t.paymentMethod));
+    const income = txs.filter((t) => t.isRevenue).reduce((s, t) => s + t.rawAmount, 0);
+    const outcome = txs.filter((t) => !t.isRevenue).reduce((s, t) => s + t.rawAmount, 0);
+    return { key, label: paymentMethodLabels[key] || key, income, outcome, count: txs.length };
+  });
+
+  // Filter transactions based on active tab AND active payment filter
+  const filteredTransactions = allTransactions.filter((t) => {
+    const tabOk = activeTab === 'all' || t.category === activeTab;
+    const methodOk = !activePaymentFilter ||
+    [activePaymentFilter, activePaymentFilter.replace('_', ' ')].includes(t.paymentMethod);
+    return tabOk && methodOk;
+  });
+
+  const net = totals.revenue - totals.expenses;
+  const summaryCards = [
+  { label: 'إجمالي الإيرادات', value: `${totals.revenue.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
+  { label: 'إجمالي المصروفات', value: `${totals.expenses.toLocaleString()} ج.م`, icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
+  { label: 'الرصيد الصافي', value: `${net.toLocaleString()} ج.م`, icon: DollarSign, colorClass: net >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: net >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
+  { label: 'عدد المعاملات', value: `${allTransactions.length} معاملة`, icon: Shield, colorClass: 'text-cyan-600', bgClass: 'bg-cyan-50' }];
+
+
+  return (
+    <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 text-right pb-12" dir="rtl">
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
+        <div>
+          <h1 className="text-lg sm:text-xl font-extrabold text-slate-800">المركز المالي والحسابات</h1>
+          <p className="text-xs text-slate-400 font-bold mt-0.5">مراقبة المقبوضات وصافي الأرباح وإدارة المصروفات التشغيلية.</p>
+        </div>
+        <button onClick={() => setIsModalOpen(true)}
+        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-md shadow-indigo-600/10 active:scale-95 cursor-pointer w-full sm:w-auto">
+          <Plus size={16} /><span>إضافة معاملة مالية</span>
+        </button>
+      </div>
+
+      {/* Date Range Filter */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shadow-xs flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Filter size={15} className="text-indigo-500" />
+          <span className="text-xs font-extrabold text-slate-600">فلتر بالتاريخ:</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <label className="text-[10px] font-extrabold text-slate-400">من</label>
+            <input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)}
+            className="w-full sm:w-auto px-2.5 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700" />
+          </div>
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <label className="text-[10px] font-extrabold text-slate-400">إلى</label>
+            <input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)}
+            className="w-full sm:w-auto px-2.5 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700" />
+          </div>
+          {(filterStart || filterEnd) &&
+          <button onClick={() => {setFilterStart('');setFilterEnd('');}}
+          className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-extrabold bg-rose-50 text-rose-500 border border-rose-100 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer">
+              <X size={12} /> مسح
+            </button>
+          }
+        </div>
+        {(filterStart || filterEnd) &&
+        <span className="text-[10px] font-extrabold text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 self-start sm:self-auto">
+            {allTransactions.length} معاملة
+          </span>
+        }
+      </div>
+
+      {/* KPI Cards (2 Columns on Mobile, 4 Columns on Desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 flex-shrink-0">
+        {summaryCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 border border-slate-50 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_12px_40px_rgba(79,70,229,0.05)] transition-all duration-300">
+              <div className="flex items-center gap-2.5 mb-2 sm:mb-3.5">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center ${card.bgClass} ${card.colorClass}`}>
+                  <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
+                </div>
+              </div>
+              <div className={`text-sm sm:text-xl font-extrabold ${card.colorClass} truncate`}>{card.value}</div>
+              <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-1 truncate">{card.label}</div>
+            </div>);
+
+        })}
+      </div>
+
+      {/* Payment Method Breakdown */}
+      {paymentBreakdown.length > 0 &&
+      <div className="flex-shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <Wallet size={15} className="text-indigo-500" />
+            <h2 className="text-xs font-extrabold text-slate-700">تفصيل وسائل الدفع</h2>
+            <span className="text-[9px] font-bold text-slate-400 hidden sm:inline">— اضغط لعرض معاملات وسيلة بعينها</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+            {paymentBreakdown.map((pm) => {
+            const Icon = pmIcons[pm.key] || Wallet;
+            const isActive = activePaymentFilter === pm.key;
+            return (
+              <button key={pm.key} onClick={() => setActivePaymentFilter(isActive ? null : pm.key)}
+              className={`text-right p-3 sm:p-4 rounded-2xl border transition-all duration-300 cursor-pointer w-full ${
+              isActive ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' :
+              'bg-white border-slate-100 hover:border-indigo-200 hover:shadow-sm'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center ${isActive ? 'bg-white/20' : 'bg-slate-50'}`}>
+                      <Icon size={14} className={isActive ? 'text-white' : 'text-indigo-500'} />
+                    </div>
+                    {isActive && <X size={13} className="text-white/70" />}
+                  </div>
+                  <p className={`text-[10px] font-extrabold mb-1.5 ${isActive ? 'text-white/80' : 'text-slate-500'}`}>{pm.label}</p>
+                  <p className={`text-xs sm:text-sm font-extrabold ${isActive ? 'text-white' : 'text-emerald-600'}`}>
+                    +{pm.income.toLocaleString()} ج.م
+                  </p>
+                  {pm.outcome > 0 &&
+                <p className={`text-[9px] font-bold ${isActive ? 'text-white/70' : 'text-rose-500'}`}>
+                      -{pm.outcome.toLocaleString()} ج.م
+                    </p>
+                }
+                  <p className={`text-[8.5px] mt-1 font-bold ${isActive ? 'text-white/60' : 'text-slate-400'}`}>{pm.count} معاملة</p>
+                </button>);
+
+          })}
+          </div>
+          {activePaymentFilter &&
+        <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+                عرض: {paymentMethodLabels[activePaymentFilter] || activePaymentFilter} ({filteredTransactions.length} معاملة)
+              </span>
+              <button onClick={() => setActivePaymentFilter(null)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline cursor-pointer">
+                عرض الكل
+              </button>
+            </div>
+        }
+        </div>
+      }
+
+      {/* Section Filter Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none flex-shrink-0 -mx-1 px-1">
+        {[
+        { id: 'all', label: 'الكل' }, { id: 'shop', label: 'مبيعات وحجوزات' },
+        { id: 'operational', label: 'المشتريات والرواتب' }, { id: 'utilities', label: 'المرافق والخدمات' },
+        { id: 'other', label: 'مصروفات أخرى' }].
+        map((tab) =>
+        <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+        className={`px-3.5 py-2 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-300 cursor-pointer whitespace-nowrap ${
+        activeTab === tab.id ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15' :
+        'bg-white border border-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+            {tab.label}
+          </button>
+        )}
+      </div>
+
+      {/* Transaction Log Table & Mobile Cards */}
+      <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.015)] border border-slate-50 overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-50 flex items-center justify-between">
+          <h3 className="text-xs font-extrabold text-slate-800">
+            {activePaymentFilter ? `معاملات ${paymentMethodLabels[activePaymentFilter] || activePaymentFilter}` :
+            activeTab === 'all' ? 'سجل كافة المعاملات المالية' : `سجل: ${categoryLabels[activeTab]}`}
+          </h3>
+          <span className="text-[10px] font-bold text-slate-400">{filteredTransactions.length} قيد</span>
+        </div>
+        {filteredTransactions.length === 0 ?
+        <div className="p-8 text-center text-xs font-bold text-slate-400">لا توجد قيود مالية مسجلة في هذا القسم بعد.</div> :
+        <>
+          {/* Mobile Cards View (Visible on screens < md) */}
+          <div className="block md:hidden p-3 space-y-2.5">
+            {filteredTransactions.map((t) => (
+              <div
+                key={t.id}
+                onClick={() => setSelectedTx(t)}
+                className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3.5 flex flex-col gap-2 active:bg-indigo-50/30 transition-all cursor-pointer"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
+                  <span className={`text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {t.amount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold pt-1 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 bg-white border border-slate-150 rounded-md font-extrabold text-slate-600">
+                      {categoryLabels[t.category] || '-'}
+                    </span>
+                    <span>{paymentMethodLabels[t.paymentMethod] || 'نقدي'}</span>
+                  </div>
+                  <span className="font-mono">{t.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View (Visible on screens >= md) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-100/70">
+                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">الوصف</th>
+                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">التصنيف</th>
+                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">وسيلة الدفع</th>
+                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">المبلغ</th>
+                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">التاريخ</th>
+                  <th className="px-5 py-4 text-xs text-left"><SlidersHorizontal size={13} className="text-slate-400 inline" /></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((t) =>
+              <tr key={t.id} onClick={() => setSelectedTx(t)}
+              className="border-b border-slate-50 last:border-0 hover:bg-indigo-50/20 transition-all duration-200 cursor-pointer">
+                    <td className="px-5 py-3.5 text-xs font-bold text-slate-800 max-w-[200px] truncate">{t.desc}</td>
+                    <td className="px-5 py-3.5">
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-extrabold text-slate-650">
+                        {categoryLabels[t.category] || '-'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500 font-semibold whitespace-nowrap">
+                      {paymentMethodLabels[t.paymentMethod] || 'نقدي'}
+                    </td>
+                    <td className={`px-5 py-3.5 text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {t.amount}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500 font-semibold whitespace-nowrap">{t.date}</td>
+                    <td className="px-5 py-3.5 text-left">
+                      <ChevronRight size={14} className="text-slate-300 inline-block" />
+                    </td>
+                  </tr>
+              )}
+              </tbody>
+            </table>
+          </div>
+        </>
+        }
+      </div>
+
+      {/* Transaction details popup */}
+      {selectedTx &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh] text-right">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="text-sm font-extrabold text-slate-800">بيانات المعاملة المالية بالتفصيل</h3>
+              <button
+              onClick={() => setSelectedTx(null)}
+              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+              
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto flex-grow scrollbar-thin">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs font-semibold text-slate-700">
+                <div className="col-span-2">
+                  <span className="text-[10px] font-extrabold text-slate-400 block">وصف العملية</span>
+                  <span className="text-xs font-bold text-slate-700 mt-1 block">{selectedTx.desc}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-slate-400 block">نوع المعاملة</span>
+                  <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg border w-fit block mt-1 ${
+                selectedTx.isRevenue && selectedTx.rawAmount >= 0 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`
+                }>
+                    {selectedTx.type}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-slate-400 block">التصنيف</span>
+                  <span className="text-xs font-bold text-slate-600 mt-1 block">
+                    {categoryLabels[selectedTx.category] || categoryLabels['other']}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-slate-400 block">تاريخ العملية</span>
+                  <span className="text-xs font-semibold text-slate-600 mt-1 block">{selectedTx.date}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-slate-400 block">طريقة الدفع</span>
+                  <span className="text-xs font-extrabold text-indigo-600 mt-1 block">
+                    {paymentMethodLabels[selectedTx.paymentMethod || 'cash'] || 'نقدي (كاش)'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-slate-400 block">المبلغ</span>
+                  <span className={`text-xs font-extrabold mt-1 block ${selectedTx.isRevenue && selectedTx.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {selectedTx.amount}
+                  </span>
+                </div>
+              </div>
+              {/* Receipt photo preview if available */}
+              <div className="space-y-2">
+                <span className="text-xs font-extrabold text-slate-600 block">إيصال الدفع المرفق للمعاملة</span>
+                {selectedTx.receiptImage ?
+              <div className="border border-slate-100 rounded-3xl overflow-hidden shadow-sm max-h-[300px] flex items-center justify-center bg-slate-50 relative group">
+                    <img
+                  src={selectedTx.receiptImage.startsWith('http') || selectedTx.receiptImage.startsWith('data:') ?
+                  selectedTx.receiptImage :
+                  `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${selectedTx.receiptImage.replace(/^(storage\/|public\/)/, '')}`}
+                  alt="إيصال الدفع المعاملة"
+                  className="w-full h-full object-contain max-h-[280px]" />
+                
+                    <a
+                  href={selectedTx.receiptImage}
+                  download={`tx-receipt-${selectedTx.id}.png`}
+                  className="absolute bottom-3 right-3 bg-black/70 hover:bg-black/90 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all">
+                  
+                      <FileText size={12} /> تحميل إيصال المعاملة
+                    </a>
+                  </div> :
+
+              <div className="border border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-2 bg-slate-50/50">
+                    <ImageIcon size={28} className="text-slate-300" />
+                    <span className="text-xs font-bold">لا يوجد إيصال دفع مرفق</span>
+                    <span className="text-[10px]">المعاملة تمت نقداً (كاش) أو لم يتم رفع إيصال رقمي لها بعد.</span>
+                  </div>
+              }
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+              <button
+              onClick={() => setSelectedTx(null)}
+              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer">
+              
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      {/* Add Manual Transaction Modal */}
+      {isModalOpen &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="text-sm font-extrabold text-slate-800">إضافة معاملة مالية جديدة</h3>
+              <button
+              onClick={() => setIsModalOpen(false)}
+              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+              
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTransactionSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
+              {/* Description */}
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-600">الوصف المعاملة</label>
+                <input
+                type="text"
+                required
+                placeholder="مثال: فاتورة صيانة المحل أو دفعة مبيعات"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
+              
+              </div>
+
+              {/* Type and Category */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">نوع المعاملة</label>
+                  <select
+                  value={newType}
+                  onChange={(e) => setNewType(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                  
+                    <option value="مصروف">مصروف (سحب/تكلفة)</option>
+                    <option value="إيراد">إيراد (مقبوضات)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">قسم / تصنيف المعاملة</label>
+                  <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                  
+                    <option value="shop">مبيعات وحجوزات المحل</option>
+                    <option value="operational">المشتريات والرواتب</option>
+                    <option value="utilities">المرافق والخدمات</option>
+                    <option value="other">مصروفات أخرى</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Amount & Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">المبلغ (ج.م)</label>
+                  <input
+                  type="number"
+                  required
+                  placeholder="مثال: 500"
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
+                
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">التاريخ</label>
+                  <input
+                  type="date"
+                  required
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
+                
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-600">طريقة السداد / الدفع</label>
+                <select
+                value={newPaymentMethod}
+                onChange={(e) => setNewPaymentMethod(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                
+                  <option value="credit_card">فيزا / كارت</option>
+                  <option value="instapay">إنستاباي (InstaPay)</option>
+                  <option value="vodafone_cash">فودافون كاش</option>
+                  <option value="bank_transfer">تحويل بنكي</option>
+                  <option value="cash">نقدي (كاش)</option>
+                </select>
+              </div>
+
+              {/* Upload Receipt */}
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-600 block">إرفاق صورة الإيصال (اختياري)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleReceiptUpload}
+                  className="hidden"
+                  id="finance-file-input" />
+                
+                  <label
+                  htmlFor="finance-file-input"
+                  className="flex-grow px-4 py-2.5 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1.5 transition-all">
+                  
+                    <CreditCard size={14} />
+                    <span>{newReceiptImage ? 'تغيير صورة الإيصال المرفقة' : 'رفع إيصال'}</span>
+                  </label>
+                  {newReceiptImage &&
+                <button
+                  type="button"
+                  onClick={() => setNewReceiptImage(null)}
+                  className="p-2.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-2xl hover:bg-rose-100/60 transition-all cursor-pointer">
+                  
+                      <X size={14} />
+                    </button>
+                }
+                </div>
+                {newReceiptImage &&
+              <div className="border border-slate-100 rounded-2xl overflow-hidden max-h-[120px] flex items-center justify-center bg-slate-50">
+                    <img src={newReceiptImage} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[110px]" />
+                  </div>
+              }
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
+                <button
+                type="submit"
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-sm">
+                
+                  حفظ المعاملة
+                </button>
+                <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
+                
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      }
+    </div>);
+
+}

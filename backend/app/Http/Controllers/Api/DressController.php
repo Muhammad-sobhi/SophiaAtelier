@@ -1,0 +1,253 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Dress;
+use App\Models\DressImage;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class DressController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Dress::with(['category', 'collection', 'designer', 'images'])->withCount('bookings');
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($categoryId = $request->input('category_id')) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($collectionId = $request->input('collection_id')) {
+            $query->where('collection_id', $collectionId);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        return response()->json($query->latest()->paginate($request->input('per_page', 15)));
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'name_ar' => 'nullable|string|max:255',
+            'category_id' => 'required|exists:categories,id',
+            'collection_id' => 'nullable|exists:collections,id',
+            'designer_id' => 'required|exists:designers,id',
+            'description' => 'nullable|string',
+            'description_ar' => 'nullable|string',
+            'purchase_price' => 'nullable|numeric|min:0',
+            'rental_price' => 'nullable|numeric|min:0',
+            'trying_fee' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:available,out,maintenance,cleaning',
+            'size' => 'nullable|string|max:20',
+            'color' => 'nullable|string|max:50',
+            'fabric' => 'nullable|string|max:100',
+            'fabric_ar' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+            'accessories' => 'nullable|array',
+            'new_collection' => 'nullable|boolean',
+        ]);
+
+        $dress = Dress::create($validated);
+
+        if ($request->has('accessories')) {
+            foreach ($request->input('accessories') as $accName) {
+                if (trim($accName)) {
+                    $dress->accessories()->create([
+                        'name' => trim($accName),
+                        'quantity' => 1
+                    ]);
+                }
+            }
+        }
+
+        // Auto-create an expense record for the dress purchase price
+        if (!empty($validated['purchase_price']) && $validated['purchase_price'] > 0) {
+            \App\Models\Expense::create([
+                'category'    => 'purchase',
+                'amount'      => $validated['purchase_price'],
+                'description' => 'شراء فستان: ' . $dress->name,
+                'date'        => now()->toDateString(),
+            ]);
+        }
+
+        return response()->json($dress->load(['category', 'collection', 'designer', 'accessories']), 201);
+    }
+
+    public function show(Dress $dress)
+    {
+        $dress->load([
+            'category', 
+            'collection',
+            'designer', 
+            'images', 
+            'accessories', 
+            'bookings' => function($q) {
+                $q->where('status', '!=', 'cancelled')->with('client');
+            }
+        ]);
+
+        return response()->json($dress);
+    }
+
+    public function update(Request $request, Dress $dress): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'name_ar' => 'nullable|string|max:255',
+            'category_id' => 'sometimes|required|exists:categories,id',
+            'collection_id' => 'nullable|exists:collections,id',
+            'designer_id' => 'sometimes|required|exists:designers,id',
+            'description' => 'nullable|string',
+            'description_ar' => 'nullable|string',
+            'purchase_price' => 'nullable|numeric|min:0',
+            'rental_price' => 'nullable|numeric|min:0',
+            'trying_fee' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:available,out,maintenance,cleaning',
+            'size' => 'nullable|string|max:20',
+            'color' => 'nullable|string|max:50',
+            'fabric' => 'nullable|string|max:100',
+            'fabric_ar' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+            'accessories' => 'nullable|array',
+            'new_collection' => 'nullable|boolean',
+        ]);
+
+        $dress->update($validated);
+
+        if ($request->has('accessories')) {
+            $dress->accessories()->delete();
+            foreach ($request->input('accessories') as $accName) {
+                if (trim($accName)) {
+                    $dress->accessories()->create([
+                        'name' => trim($accName),
+                        'quantity' => 1
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($dress->load(['category', 'collection', 'designer', 'accessories']));
+    }
+
+    public function destroy(Dress $dress): JsonResponse
+    {
+        $dress->delete();
+
+        return response()->json(['message' => 'Dress deleted']);
+    }
+
+    /**
+     * Upload up to 4 images for a dress.
+     * POST /api/dresses/{dress}/images
+     * Body: multipart/form-data with field "images[]"
+     */
+    public function uploadImages(Request $request, Dress $dress): JsonResponse
+    {
+        $request->validate([
+            'images' => 'required|array|max:4',
+            'images.*' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        $existing = $dress->images()->count();
+        if ($existing >= 4) {
+            return response()->json(['message' => 'الحد الأقصى للصور هو 4 لكل فستان'], 422);
+        }
+
+        $uploaded = [];
+        $isFirst = $existing === 0;
+
+        foreach ($request->file('images') as $index => $file) {
+            if ($existing + $index >= 4) break;
+
+            $path = $file->store('dresses', 'public');
+            $image = $dress->images()->create([
+                'image_path' => $path,
+                'is_primary' => ($isFirst && $index === 0),
+            ]);
+
+            $uploaded[] = [
+                'id' => $image->id,
+                'url' => Storage::disk('public')->url($path),
+                'is_primary' => $image->is_primary,
+            ];
+        }
+
+        return response()->json(['images' => $uploaded], 201);
+    }
+
+    /**
+     * Delete a single dress image.
+     * DELETE /api/dresses/{dress}/images/{image}
+     */
+    public function deleteImage(Dress $dress, DressImage $image): JsonResponse
+    {
+        if ($image->dress_id !== $dress->id) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        Storage::disk('public')->delete($image->image_path);
+        $image->delete();
+
+        return response()->json(['message' => 'Image deleted']);
+    }
+
+    /**
+     * PUT /api/dresses/{dress}/stage-action
+     * Perform a dress lifecycle action: mark_booked, mark_dry_clean, mark_ready, cancel_booking
+     */
+    public function stageAction(Request $request, Dress $dress): JsonResponse
+    {
+        $action = $request->input('action');
+
+        switch ($action) {
+            case 'mark_booked':
+                $dress->update(['status' => 'booked']);
+                break;
+
+            case 'mark_out':
+                $dress->update(['status' => 'out']);
+                break;
+
+            case 'mark_dry_clean':
+                $dress->update(['status' => 'dry_clean']);
+                break;
+
+            case 'mark_ready':
+                $dress->update(['status' => 'available']);
+                break;
+
+            case 'cancel_booking':
+                $dress->update(['status' => 'available']);
+                break;
+
+            default:
+                return response()->json(['message' => 'Unknown action'], 400);
+        }
+
+        // Compute lifecycle stage
+        $stage = 'ready';
+        if (in_array($dress->status, ['cleaning', 'dry_clean'])) {
+            $stage = 'dry_clean';
+        } elseif (in_array($dress->status, ['booked', 'out'])) {
+            $stage = 'booked';
+        } elseif ($dress->status === 'maintenance') {
+            $stage = 'dry_clean';
+        }
+
+        return response()->json([
+            'message' => 'Action completed',
+            'current_stage' => $stage,
+            'status' => $dress->status,
+        ]);
+    }
+}

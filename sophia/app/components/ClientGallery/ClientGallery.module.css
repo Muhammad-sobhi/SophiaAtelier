@@ -1,0 +1,181 @@
+/* ==========================================
+   CLIENT GALLERY — Bride Image Slider
+   ========================================== */
+
+.section {
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+/* ---------- Header ---------- */
+.header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  display: block;
+  margin-bottom: 16px;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 3.5vw, 42px);
+  font-weight: 400;
+  color: var(--color-text);
+  margin-bottom: 12px;
+}
+
+.subtitle {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text-light);
+  line-height: 1.6;
+}
+
+/* ---------- Carousel ---------- */
+.carouselWrap {
+  position: relative;
+  padding: 0 var(--container-padding);
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+
+.track {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 10px 0;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- Cards ---------- */
+.card {
+  flex: 0 0 calc(25% - 15px);
+  min-width: 260px;
+  scroll-snap-align: start;
+}
+
+.imageWrap {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  cursor: pointer;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.imageWrap:hover .image {
+  transform: scale(1.05);
+}
+
+/* Name overlay — appears on hover */
+.nameOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 30px 20px 20px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.imageWrap:hover .nameOverlay {
+  opacity: 1;
+}
+
+.clientName {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 500;
+  color: white;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- Floating Arrows ---------- */
+.arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid var(--color-border);
+}
+
+.arrow:hover {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 24px rgba(200, 169, 106, 0.3);
+}
+
+.leftArrow {
+  left: calc(var(--container-padding) - 24px);
+}
+
+.rightArrow {
+  right: calc(var(--container-padding) - 24px);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .card {
+    flex: 0 0 calc(33.333% - 14px);
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .card {
+    flex: 0 0 calc(50% - 10px);
+    min-width: 200px;
+  }
+
+  .arrow {
+    width: 40px;
+    height: 40px;
+  }
+
+  .leftArrow {
+    left: 10px;
+  }
+
+  .rightArrow {
+    right: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    flex: 0 0 85%;
+  }
+}

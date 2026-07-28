@@ -1,0 +1,12 @@
+.section{background:var(--color-bg-ivory)}
+.inner{text-align:center;max-width:600px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:16px}
+.eyebrow{font-family:var(--font-body);font-size:12px;font-weight:500;letter-spacing:4px;text-transform:uppercase;color:var(--color-accent)}
+.heading{font-family:var(--font-heading);font-size:clamp(28px,3.5vw,40px);font-weight:400;color:var(--color-text)}
+.subtitle{font-family:var(--font-body);font-size:14px;color:var(--color-text-light);line-height:1.7}
+.form{display:flex;gap:0;width:100%;margin-top:12px;border:1px solid var(--color-border);border-radius:var(--radius-full);overflow:hidden;background:white;transition:border-color var(--transition-fast)}
+.form:focus-within{border-color:var(--color-accent)}
+.input{flex:1;padding:16px 24px;border:none;outline:none;font-family:var(--font-body);font-size:14px;color:var(--color-text);background:transparent}
+.input::placeholder{color:var(--color-text-muted)}
+.submitBtn{display:flex;align-items:center;gap:8px;padding:16px 28px;background:var(--color-accent);color:white;font-family:var(--font-body);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;transition:background var(--transition-fast);white-space:nowrap}
+.submitBtn:hover{background:var(--color-text)}
+@media(max-width:500px){.form{flex-direction:column;border-radius:var(--radius-md)}.submitBtn{justify-content:center;padding:14px}}

@@ -1,0 +1,240 @@
+/* ==========================================
+   REVIEWS — Testimonial Carousel
+   ========================================== */
+
+.section {
+  background: var(--color-bg-ivory);
+}
+
+.inner {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* ---------- Header ---------- */
+.header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  display: block;
+  margin-bottom: 16px;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 3.5vw, 42px);
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+/* ---------- Review Wrapper ---------- */
+.reviewWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ---------- Card ---------- */
+.card {
+  flex: 1;
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 48px 52px;
+  text-align: center;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04);
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quoteIcon {
+  color: var(--color-accent);
+  opacity: 0.3;
+  margin-bottom: 20px;
+}
+
+/* ---------- Stars ---------- */
+.stars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+/* ---------- Text ---------- */
+.text {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.75;
+  color: var(--color-text);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ---------- Divider ---------- */
+.divider {
+  width: 50px;
+  height: 1px;
+  background: var(--color-accent);
+  margin: 28px auto;
+  opacity: 0.5;
+}
+
+/* ---------- Author ---------- */
+.author {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-accent), #d4b87a);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.authorInfo {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.5px;
+}
+
+.location {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.dress {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-accent);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* ---------- Arrows ---------- */
+.arrow {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid var(--color-border);
+}
+
+.arrow:hover {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 24px rgba(200, 169, 106, 0.3);
+}
+
+/* ---------- Dots ---------- */
+.dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 36px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-border);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.dot:hover {
+  background: var(--color-accent);
+  opacity: 0.6;
+}
+
+.activeDot {
+  background: var(--color-accent);
+  width: 24px;
+  border-radius: 99px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .card {
+    padding: 32px 24px;
+  }
+
+  .text {
+    font-size: 16px;
+  }
+
+  .arrow {
+    width: 40px;
+    height: 40px;
+  }
+
+  .reviewWrap {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .arrow {
+    display: none;
+  }
+
+  .reviewWrap {
+    gap: 0;
+  }
+}

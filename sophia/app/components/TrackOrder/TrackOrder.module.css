@@ -1,0 +1,677 @@
+/* ============================================
+   TRACK ORDER PAGE — EXACT MOCKUP STYLES
+   ============================================ */
+
+.page {
+  width: 100%;
+  background-color: #FFFFFF;
+  color: #333333;
+  font-family: var(--font-body);
+}
+
+/* ─── Shared ─── */
+.sectionLabel {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #7A7267;
+  text-transform: uppercase;
+  margin-bottom: 30px;
+}
+
+/* ============================================
+   1. YOUR ORDER PROGRESS
+   ============================================ */
+.progressSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 32px 40px;
+}
+
+/* Horizontal stepper */
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 32px;
+}
+
+.stepCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Connector line between circles */
+.connector {
+  position: absolute;
+  top: 22px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background-color: #E2DDD5;
+  z-index: 0;
+}
+
+.connectorFilled {
+  background-color: #C1A268;
+}
+
+/* Step circle */
+.stepCircle {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.stepCompleted {
+  background-color: #C1A268;
+  color: #FFFFFF;
+}
+
+.stepCurrent {
+  background-color: #5C4A2F;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(92, 74, 47, 0.15);
+}
+
+.stepUpcoming {
+  background-color: transparent;
+  border: 1.5px solid #CCC5BA;
+  color: #9E9688;
+}
+
+.stepLabel {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  text-align: center;
+  color: #4A4640;
+  margin-top: 10px;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+.stepDate {
+  font-family: var(--font-body);
+  font-size: 9px;
+  color: #9E9688;
+  margin-top: 4px;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  padding-top: 16px;
+  border-top: 1px solid #F0ECE6;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: #7A7267;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legendCompleted {
+  background-color: #C1A268;
+}
+
+.legendCurrent {
+  background-color: #5C4A2F;
+}
+
+.legendUpcoming {
+  background-color: transparent;
+  border: 1.5px solid #CCC5BA;
+}
+
+/* ============================================
+   2. BEHIND THE SCENES
+   ============================================ */
+.btsSection {
+  background-color: #F6F3EE;
+  padding: 50px 32px 60px;
+}
+
+.btsSection .sectionLabel {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.btsGrid {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.btsCard {
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.btsCard:hover {
+  transform: translateY(-4px);
+}
+
+.btsImageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.35 / 1;
+  overflow: hidden;
+}
+
+.btsImage {
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.5s ease;
+}
+
+.btsCard:hover .btsImage {
+  transform: scale(1.05);
+}
+
+.btsOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 30%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.btsCardContent {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px;
+  z-index: 2;
+}
+
+.btsTitle {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 400;
+  color: #FFFFFF;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.btsDesc {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.btsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #FFFFFF;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* ============================================
+   3. NEXT APPOINTMENT + ORDER UPDATES
+   ============================================ */
+.detailsSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 32px 60px;
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+/* ── Appointment Card ── */
+.appointmentCard {
+  background-color: #FFFFFF;
+  border: 1px solid #EDE9E2;
+  border-radius: 16px;
+  padding: 36px 32px;
+}
+
+.cardLabel {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  color: #9E9688;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.appointmentHeading {
+  font-family: var(--font-heading);
+  font-size: 38px;
+  font-weight: 300;
+  color: #2B2928;
+  line-height: 1.15;
+  margin-bottom: 28px;
+  font-style: italic;
+}
+
+.appointmentMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.metaIcon {
+  color: #C1A268;
+  flex-shrink: 0;
+}
+
+.stylistAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #2B2928;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metaTitle {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: #9E9688;
+  letter-spacing: 0.5px;
+}
+
+.metaValue {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: #2B2928;
+  margin-top: 2px;
+}
+
+.appointmentActions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.rescheduleBtn {
+  padding: 12px 22px;
+  background-color: #C1A268;
+  border: none;
+  border-radius: 4px;
+  color: #FFFFFF;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.rescheduleBtn:hover {
+  background-color: #A88B56;
+}
+
+.directionsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background-color: transparent;
+  border: 1px solid #CCC5BA;
+  border-radius: 4px;
+  color: #4A4640;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.directionsBtn:hover {
+  border-color: #2B2928;
+  color: #2B2928;
+}
+
+/* ── Updates Card ── */
+.updatesCard {
+  background-color: #FFFFFF;
+  border: 1px solid #EDE9E2;
+  border-radius: 16px;
+  padding: 36px 32px;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 110px 30px 1fr;
+  gap: 0 16px;
+  min-height: 90px;
+}
+
+/* Left date column */
+.timelineDate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-top: 2px;
+}
+
+.timelineDateText {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: #4A4640;
+}
+
+.timelineTime {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: #9E9688;
+  margin-top: 2px;
+}
+
+/* Center dot column */
+.timelineDotCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.timelineDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #CCC5BA;
+  flex-shrink: 0;
+  margin-top: 4px;
+  z-index: 1;
+}
+
+.timelineDotActive {
+  background-color: #C1A268;
+  box-shadow: 0 0 0 4px rgba(193, 162, 104, 0.2);
+}
+
+.timelineLine {
+  width: 2px;
+  flex: 1;
+  background-color: #EDE9E2;
+  margin-top: 4px;
+}
+
+/* Right content column */
+.timelineContent {
+  padding-bottom: 20px;
+}
+
+.timelineTitle {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 400;
+  color: #2B2928;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.timelineDesc {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: #7A7267;
+  line-height: 1.5;
+}
+
+/* ============================================
+   4. BRIDAL CONCIERGE BANNER
+   ============================================ */
+.conciergeSection {
+  padding: 0 32px 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.conciergeBanner {
+  display: grid;
+  grid-template-columns: 0.45fr 1fr;
+  background-color: #2B2928;
+  border-radius: 20px;
+  overflow: hidden;
+  min-height: 260px;
+}
+
+.conciergeImageWrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+}
+
+.conciergeImage {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.conciergeContent {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 48px;
+}
+
+.conciergeEyebrow {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #C1A268;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.conciergeHeading {
+  font-family: var(--font-heading);
+  font-size: 36px;
+  font-weight: 300;
+  color: #FFFFFF;
+  margin-bottom: 10px;
+}
+
+.conciergeText {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.55;
+  margin-bottom: 28px;
+  max-width: 460px;
+}
+
+.conciergeButtons {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.conciergeBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  background-color: #C1A268;
+  border: none;
+  border-radius: 4px;
+  color: #FFFFFF;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.conciergeBtnPrimary:hover {
+  background-color: #A88B56;
+}
+
+.conciergeBtnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #FFFFFF;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.conciergeBtnOutline:hover {
+  border-color: #FFFFFF;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+  .stepper {
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+  }
+
+  .stepCol {
+    flex: 0 0 auto;
+    width: 100px;
+  }
+
+  .connector {
+    display: none;
+  }
+
+  .detailsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .conciergeBanner {
+    grid-template-columns: 1fr;
+  }
+
+  .conciergeImageWrap {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .btsGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .appointmentHeading {
+    font-size: 30px;
+  }
+
+  .conciergeHeading {
+    font-size: 28px;
+  }
+
+  .conciergeButtons {
+    flex-direction: column;
+  }
+
+  .appointmentActions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timelineItem {
+    grid-template-columns: 80px 24px 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .progressSection,
+  .detailsSection,
+  .conciergeSection {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .btsSection {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .appointmentCard,
+  .updatesCard {
+    padding: 24px 20px;
+  }
+
+  .conciergeContent {
+    padding: 28px 20px;
+  }
+}
