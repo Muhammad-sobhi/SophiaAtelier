@@ -43,9 +43,9 @@ function CollectionsContent() {
   const [gridCols, setGridCols] = useState(3);
 
   const sortOptions = [
-    { label: t.collections.all, value: 'featured' },
-    { label: t.collections.priceLow, value: 'price-asc' },
-    { label: t.collections.priceHigh, value: 'price-desc' },
+    { label: t.collections.allCategories || 'All', value: 'featured' },
+    { label: t.collections.sortPriceLow || 'Price: Low to High', value: 'price-asc' },
+    { label: t.collections.sortPriceHigh || 'Price: High to Low', value: 'price-desc' },
   ];
 
   useEffect(() => {

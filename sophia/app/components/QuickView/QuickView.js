@@ -7,7 +7,7 @@ import { useStore } from '../../context/StoreContext';
 import styles from './QuickView.module.css';
 
 export default function QuickView() {
-  const { quickViewProduct: product, closeQuickView, addToCart, toggleWishlist, isWishlisted, t } = useStore();
+  const { quickViewProduct: product, closeQuickView, addToCart, toggleWishlist, isWishlisted, t, lang } = useStore();
   const [qty, setQty] = useState(1);
   const [selectedSize, setSelectedSize] = useState('6');
   const [selectedColor, setSelectedColor] = useState('Ivory');
