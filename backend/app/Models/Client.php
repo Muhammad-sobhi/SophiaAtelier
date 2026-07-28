@@ -127,7 +127,7 @@ class Client extends Model
 
     /**
      * Compute the bride's current stage in her journey:
-     * visit -> fitting -> booking -> picked_up -> returned
+     * 1. Visit -> 2. Booking -> 3. Fitting -> 4. Picked Up -> 5. Returned
      */
     public function getCurrentStageAttribute(): string
     {
@@ -136,31 +136,27 @@ class Client extends Model
         $visitsList = $this->relationLoaded('visits') ? $this->visits : $this->visits()->get();
         $fittingsList = $this->relationLoaded('fittings') ? $this->fittings : $this->fittings()->get();
 
-        // 1. Returned stage
+        // 1. Returned stage (when booking is marked returned)
         if ($bookingsList->contains('status', 'returned')) {
             return 'returned';
         }
 
-        // 2. Picked up stage (explicit status picked_up/out OR dress status out OR all fittings completed)
-        $latestBooking = $bookingsList->sortByDesc('id')->first();
-        $isDressOut = $latestBooking && $latestBooking->dress && $latestBooking->dress->status === 'out';
-        $hasCompletedFittings = $fittingsList->count() > 0 && $fittingsList->every('status', 'completed');
-
-        if ($bookingsList->contains('status', 'picked_up') || $bookingsList->contains('status', 'out') || $isDressOut || $hasCompletedFittings) {
+        // 2. Picked up stage (when booking is explicitly marked picked_up or out)
+        if ($bookingsList->contains('status', 'picked_up') || $bookingsList->contains('status', 'out')) {
             return 'picked_up';
         }
 
-        // 3. Fitting stage (if uncompleted fittings exist)
-        if ($fittingsList->where('status', '!=', 'completed')->count() > 0) {
+        // 3. Fitting stage (when fittings exist for the bride)
+        if ($fittingsList->count() > 0) {
             return 'fitting';
         }
 
-        // 4. Booking stage (if confirmed booking exists)
+        // 4. Booking stage (when booking is confirmed by staff)
         if ($bookingsList->contains('status', 'confirmed')) {
             return 'booking';
         }
 
-        // 5. Default initial stage for new clients / website visit requests
+        // 5. Default stage: Visit (for all new website leads & appointment requests)
         return 'visit';
     }
 }
