@@ -101,4 +101,11 @@ class NotificationController extends Controller
 
         return response()->json(['message' => 'All notifications marked as read']);
     }
+
+    public function deleteAll(): JsonResponse
+    {
+        Notification::query()->delete();
+
+        return response()->json(['message' => 'All notifications deleted']);
+    }
 }

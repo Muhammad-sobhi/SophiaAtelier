@@ -3,7 +3,7 @@
 .leftCol{display:flex;flex-direction:column;gap:20px;align-items:flex-start}
 .eyebrow{font-family:var(--font-body);font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--color-text-muted)}
 .heading{font-family:var(--font-heading);font-size:clamp(34px,4.5vw,52px);font-weight:400;color:var(--color-text);line-height:1.15}
-.paragraph{font-family:var(--font-body);font-size:13px;line-height:1.75;color:var(--color-text-light);max-width:320px}
+.paragraph{font-family:var(--font-heading);font-size:18px;font-weight:400;line-height:1.6;color:var(--color-text-light);max-width:360px}
 .viewBtn{display:inline-block;padding:12px 24px;border:1px solid var(--color-text);font-family:var(--font-body);font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--color-text);transition:all var(--transition-base);margin-top:8px}
 .viewBtn:hover{background:var(--color-accent);border-color:var(--color-accent);color:white}
 .cardsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Bell, Clock, Check, AlertCircle, Menu } from 'lucide-react';
+import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
 
@@ -167,11 +167,30 @@ export function Header({ onMenuClick }) {
 
   const markAllRead = async () => {
     try {
-      await apiClient.post('/notifications/mark-all-read', {});
+      await apiClient.post('/notifications/read-all', {});
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch {
-      // If API fails, update locally
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    }
+  };
+
+  const deleteNotification = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await apiClient.delete(`/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    }
+  };
+
+  const deleteAllNotifications = async () => {
+    if (!window.confirm('هل أنت تأكد من حذف جميع التنبيهات؟')) return;
+    try {
+      await apiClient.delete('/notifications/delete-all');
+      setNotifications([]);
+    } catch {
+      setNotifications([]);
     }
   };
 
@@ -335,71 +354,94 @@ export function Header({ onMenuClick }) {
           ),
 
 
-          isNotifOpen && /*#__PURE__*/
-          _jsxDEV("div", { className: "absolute left-0 mt-2.5 w-80 bg-white rounded-3xl border border-slate-100 shadow-xl z-50 overflow-hidden py-1 animate-fade-in", children: [/*#__PURE__*/
-            _jsxDEV("div", { className: "flex items-center justify-between px-4.5 py-3 border-b border-slate-50 bg-slate-50/50", children: [/*#__PURE__*/
-              _jsxDEV("span", { className: "text-xs font-extrabold text-slate-800", children: ["التنبيهات (", unreadCount, ")"] }, void 0, true),
-              unreadCount > 0 && /*#__PURE__*/
-              _jsxDEV("button", {
-                onClick: markAllRead,
-                className: "text-[10px] text-indigo-600 hover:text-indigo-700 font-extrabold cursor-pointer", children:
-                "تحديد الكل كمقروء" }, void 0, false
+          isNotifOpen && (
+            <div className="absolute left-0 mt-2.5 w-84 bg-white rounded-3xl border border-slate-100 shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50 bg-slate-50/50">
+                <span className="text-xs font-extrabold text-slate-800">
+                  التنبيهات ({unreadCount})
+                </span>
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-700 font-extrabold cursor-pointer"
+                    >
+                      قراءة الكل
+                    </button>
+                  )}
+                  {filteredNotifications.length > 0 && (
+                    <button
+                      onClick={deleteAllNotifications}
+                      className="text-[10px] text-rose-600 hover:text-rose-700 font-extrabold cursor-pointer flex items-center gap-0.5"
+                    >
+                      <Trash2 size={11} />
+                      مسح الكل
+                    </button>
+                  )}
+                </div>
+              </div>
 
-              )] }, void 0, true
-
-            ), /*#__PURE__*/
-
-            _jsxDEV("div", { className: "max-h-[320px] overflow-y-auto divide-y divide-slate-50 scrollbar-thin", children:
-              filteredNotifications.length > 0 ?
-              filteredNotifications.map((notif) => {
-                const ts = typeStyles[notif.type] || typeStyles['info'];
-                const IconComponent = ts.icon;
-                return (/*#__PURE__*/
-                  _jsxDEV("div", {
-
-                    onClick: async () => {
-                      if (!notif.read) {
-                        await toggleNotifStatus(notif.id);
-                      }
-                      if (notif.page) {
-                        navigate(notif.page);
-                      }
-                      setIsNotifOpen(false);
-                    },
-                    className: `p-3.5 flex items-start gap-3 hover:bg-slate-50/50 transition-colors cursor-pointer ${
-                    notif.read ? 'opacity-60' : 'bg-indigo-50/5'}`, children: [/*#__PURE__*/
-
-
-                    _jsxDEV("div", { className: `w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${ts.bg} ${ts.color}`, children: /*#__PURE__*/
-                      _jsxDEV(IconComponent, { size: 14 }, void 0, false) }, void 0, false
-                    ), /*#__PURE__*/
-                    _jsxDEV("div", { className: "flex-grow min-w-0", children: [/*#__PURE__*/
-                      _jsxDEV("div", { className: "flex items-center justify-between gap-2", children: [/*#__PURE__*/
-                        _jsxDEV("p", { className: "text-[11px] font-extrabold text-slate-700 truncate", children: notif.title }, void 0, false),
-                        !notif.read && /*#__PURE__*/_jsxDEV("span", { className: "w-1.5 h-1.5 rounded-full bg-indigo-600 flex-shrink-0" }, void 0, false)] }, void 0, true
-                      ), /*#__PURE__*/
-                      _jsxDEV("p", { className: "text-[10px] text-slate-400 font-semibold mt-0.5 leading-relaxed truncate", children: notif.desc }, void 0, false),
-                      notif.originalType === 'pickup_reminder' && /*#__PURE__*/
-                      _jsxDEV("button", {
-                        onClick: (e) => sendWhatsAppReminder(e, notif),
-                        className: "mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start", children: /*#__PURE__*/
-
-                        _jsxDEV("span", { children: "إرسال تذكير واتساب" }, void 0, false) }, void 0, false
-                      ), /*#__PURE__*/
-
-                      _jsxDEV("span", { className: "text-[8px] text-slate-400 font-bold mt-1.5 flex items-center gap-1", children: [/*#__PURE__*/
-                        _jsxDEV(Clock, { size: 10 }, void 0, false), " ", notif.time] }, void 0, true
-                      )] }, void 0, true
-                    )] }, notif.id, true
-                  ));
-
-              }) : /*#__PURE__*/
-
-              _jsxDEV("div", { className: "p-8 text-center text-slate-400 text-[11px] font-bold", children: "لا توجد تنبيهات جديدة حالياً" }, void 0, false
-
-              ) }, void 0, false
-
-            )] }, void 0, true
+              <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-50 scrollbar-thin">
+                {filteredNotifications.length > 0 ? (
+                  filteredNotifications.map((notif) => {
+                    const ts = typeStyles[notif.type] || typeStyles['info'];
+                    const IconComponent = ts.icon;
+                    return (
+                      <div
+                        key={notif.id}
+                        onClick={async () => {
+                          if (!notif.read) {
+                            await toggleNotifStatus(notif.id);
+                          }
+                          if (notif.page) {
+                            navigate(notif.page);
+                          }
+                          setIsNotifOpen(false);
+                        }}
+                        className={`p-3.5 flex items-start gap-3 hover:bg-slate-50/50 transition-colors cursor-pointer relative group ${
+                          notif.read ? 'opacity-60' : 'bg-indigo-50/5'
+                        }`}
+                      >
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${ts.bg} ${ts.color}`}>
+                          <IconComponent size={14} />
+                        </div>
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-extrabold text-slate-700 truncate">{notif.title}</p>
+                            <div className="flex items-center gap-1.5">
+                              {!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 flex-shrink-0"></span>}
+                              <button
+                                onClick={(e) => deleteNotification(e, notif.id)}
+                                className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-rose-50"
+                                title="حذف الإشعار"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-relaxed truncate">{notif.desc}</p>
+                          {notif.originalType === 'pickup_reminder' && (
+                            <button
+                              onClick={(e) => sendWhatsAppReminder(e, notif)}
+                              className="mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start"
+                            >
+                              <span>إرسال تذكير واتساب</span>
+                            </button>
+                          )}
+                          <span className="text-[8px] text-slate-400 font-bold mt-1.5 flex items-center gap-1">
+                            <Clock size={10} /> {notif.time}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center text-slate-400 text-[11px] font-bold">
+                    لا توجد تنبيهات جديدة حالياً
+                  </div>
+                )}
+              </div>
+            </div>
           )] }, void 0, true
 
         ),

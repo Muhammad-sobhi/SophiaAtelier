@@ -1,25 +1,211 @@
-.navbar{position:fixed;top:0;left:0;right:0;z-index:1000;height:95px;display:flex;align-items:center;transition:all .5s cubic-bezier(.25,.46,.45,.94);background:transparent}
-.navbar.scrolled{height:80px;background:rgba(248,245,240,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 1px 20px rgba(0,0,0,.04)}
-.navInner{width:100%;max-width:var(--container-max);margin:0 auto;padding:0 var(--container-padding);display:flex;align-items:center;justify-content:space-between}
-.logo{display:flex;align-items:center;z-index:10}
-.logoImage{height:75px;width:auto;object-fit:contain;transition:height var(--transition-base);filter:drop-shadow(0 2px 4px rgba(0,0,0,.1))}
-.scrolled .logoImage{height:60px}
-.navLinks{display:flex;align-items:center;gap:40px}
-.navLink{font-family:var(--font-body);font-size:12px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--color-text);position:relative;padding:4px 0;transition:color var(--transition-fast)}
-.navLink::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:1px;background:var(--color-accent);transition:width var(--transition-base)}
-.navLink:hover{color:var(--color-accent)}
-.navLink:hover::after{width:100%}
-.navIcons{display:flex;align-items:center;gap:20px}
-.iconBtn{position:relative;display:flex;align-items:center;justify-content:center;color:var(--color-text);transition:color var(--transition-fast),transform var(--transition-fast);padding:6px}
-.iconBtn:hover{color:var(--color-accent);transform:scale(1.1)}
-.badge{position:absolute;top:-2px;right:-6px;min-width:18px;height:18px;padding:0 4px;background:var(--color-accent);color:white;font-size:10px;font-weight:600;border-radius:99px;display:flex;align-items:center;justify-content:center}
-.menuToggle{display:none;color:var(--color-text);z-index:1001;padding:6px}
-.mobileOverlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(248,245,240,.98);backdrop-filter:blur(30px);opacity:0;visibility:hidden;transition:opacity .4s ease,visibility .4s ease}
-.mobileOverlay.mobileOpen{opacity:1;visibility:visible}
-.mobileMenu{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:40px}
-.mobileLinks{display:flex;flex-direction:column;align-items:center;gap:28px}
-.mobileLink{font-family:var(--font-heading);font-size:28px;font-weight:400;color:var(--color-text);letter-spacing:2px;transition:color var(--transition-fast)}
-.mobileLink:hover{color:var(--color-accent)}
-.mobileIcons{display:flex;gap:32px;margin-top:20px}
-@media(max-width:900px){.navLinks{display:none}.navIcons{display:none}.menuToggle{display:flex}.mobileOverlay{display:block}}
-@media(max-width:480px){.logoImage{height:55px}.scrolled .logoImage{height:46px}}
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: 95px;
+    display: flex;
+    align-items: center;
+    transition: all .5s cubic-bezier(.25, .46, .45, .94);
+    background: transparent
+}
+
+.navbar.scrolled {
+    height: 80px;
+    background: rgba(248, 245, 240, .95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 1px 20px rgba(0, 0, 0, .04)
+}
+
+.navInner {
+    width: 100%;
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 var(--container-padding);
+    display: flex;
+    align-items: center;
+    justify-content: space-between
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    z-index: 10;
+
+}
+
+.logoImage {
+    height: 125px;
+    width: auto;
+    object-fit: contain;
+    transition: height var(--transition-base);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .1))
+}
+
+.scrolled .logoImage {
+    height: 75px
+}
+
+.navLinks {
+    display: flex;
+    align-items: center;
+    gap: 40px
+}
+
+.navLink {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--color-text);
+    position: relative;
+    padding: 4px 0;
+    transition: color var(--transition-fast)
+}
+
+.navLink::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: var(--color-accent);
+    transition: width var(--transition-base)
+}
+
+.navLink:hover {
+    color: var(--color-accent)
+}
+
+.navLink:hover::after {
+    width: 100%
+}
+
+.navIcons {
+    display: flex;
+    align-items: center;
+    gap: 20px
+}
+
+.iconBtn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text);
+    transition: color var(--transition-fast), transform var(--transition-fast);
+    padding: 6px
+}
+
+.iconBtn:hover {
+    color: var(--color-accent);
+    transform: scale(1.1)
+}
+
+.badge {
+    position: absolute;
+    top: -2px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    background: var(--color-accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.menuToggle {
+    display: none;
+    color: var(--color-text);
+    z-index: 1001;
+    padding: 6px
+}
+
+.mobileOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(248, 245, 240, .98);
+    backdrop-filter: blur(30px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .4s ease, visibility .4s ease
+}
+
+.mobileOverlay.mobileOpen {
+    opacity: 1;
+    visibility: visible
+}
+
+.mobileMenu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 40px
+}
+
+.mobileLinks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px
+}
+
+.mobileLink {
+    font-family: var(--font-heading);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--color-text);
+    letter-spacing: 2px;
+    transition: color var(--transition-fast)
+}
+
+.mobileLink:hover {
+    color: var(--color-accent)
+}
+
+.mobileIcons {
+    display: flex;
+    gap: 32px;
+    margin-top: 20px
+}
+
+@media(max-width:900px) {
+    .navLinks {
+        display: none
+    }
+
+    .navIcons {
+        display: none
+    }
+
+    .menuToggle {
+        display: flex
+    }
+
+    .mobileOverlay {
+        display: block
+    }
+}
+
+@media(max-width:480px) {
+    .logoImage {
+        height: 55px
+    }
+
+    .scrolled .logoImage {
+        height: 46px
+    }
+}

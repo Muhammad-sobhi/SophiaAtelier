@@ -1,4 +1,4 @@
-import { Cormorant_Garamond, Montserrat } from "next/font/google";
+import { Cormorant_Garamond, Montserrat, Charm, Darker_Grotesque } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "./context/StoreContext";
 import QuickView from "./components/QuickView/QuickView";
@@ -21,12 +21,31 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
+const charm = Charm({
+  variable: "--font-charm",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+});
+
+const darkerGrotesque = Darker_Grotesque({
+  variable: "--font-darker-grotesque",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
+});
+
 export const metadata = {
   title: "Sophia Dresses | Luxury Wedding Dresses by Menna Hassan",
   description:
     "Discover breathtaking wedding dresses at Sophia Dresses. Handcrafted bridal couture featuring elegant ball gowns, mermaid dresses, and minimalist designs. Book your private consultation today.",
   keywords:
     "wedding dresses, bridal gowns, luxury bridal, Sophia Dresses, Menna Hassan, ball gown, mermaid dress, A-line wedding dress",
+  icons: {
+    icon: "/images/headlogo.png",
+    shortcut: "/images/headlogo.png",
+    apple: "/images/headlogo.png",
+  },
   openGraph: {
     title: "Sophia Dresses | Luxury Wedding Dresses",
     description: "Where Elegance Meets Eternity — Discover breathtaking bridal couture.",
@@ -37,7 +56,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${cormorant.variable} ${montserrat.variable}`}>
+      <body className={`${cormorant.variable} ${montserrat.variable} ${charm.variable} ${darkerGrotesque.variable}`}>
         <StoreProvider>
           {children}
           <QuickView />

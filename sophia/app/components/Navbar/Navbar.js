@@ -37,7 +37,7 @@ export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, ca
         <div className={styles.navInner}>
           <Link href="/" className={styles.logo}>
             <Image
-              src="/images/logo.png"
+              src={scrolled ? "/images/goldenlogo.png" : "/images/whitelogo.png"}
               alt="Sophia Dresses"
               width={220}
               height={85}

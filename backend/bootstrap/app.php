@@ -18,5 +18,36 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
+            if ($request->is('api/*') || $request->wantsJson()) {
+                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                    return response()->json([
+                        'message' => 'بيانات غير صالحة',
+                        'errors' => $e->errors(),
+                    ], 422);
+                }
+
+                if ($e instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+                    return response()->json([
+                        'message' => 'العنصر المطلوب غير موجود',
+                    ], 404);
+                }
+
+                if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                    return response()->json([
+                        'message' => 'غير مصرح للوصول',
+                    ], 401);
+                }
+
+                \Illuminate\Support\Facades\Log::error('API Error: ' . $e->getMessage(), [
+                    'exception' => $e,
+                    'url' => $request->fullUrl(),
+                ]);
+
+                return response()->json([
+                    'message' => 'حدث خطأ في النظام، يرجى المحاولة لاحقاً',
+                    'error' => config('app.debug') ? $e->getMessage() : null,
+                ], 500);
+            }
+        });
     })->create();

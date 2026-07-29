@@ -110,8 +110,8 @@ class ClientController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:50',
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
+            'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'email' => 'nullable|email',
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
@@ -137,8 +137,8 @@ class ClientController extends Controller
     public function update(Request $request, Client $client): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'phone' => 'nullable|string|max:50',
+            'name' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
+            'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'email' => 'nullable|email',
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',

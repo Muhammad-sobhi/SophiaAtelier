@@ -81,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/delete-all', [NotificationController::class, 'deleteAll']);
 
     Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
 

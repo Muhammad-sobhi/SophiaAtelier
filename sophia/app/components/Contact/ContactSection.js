@@ -116,7 +116,7 @@ export default function ContactSection() {
 
             {/* Right Form & Contact Details Section */}
             <div className={styles.rightContent} data-animate="slide-right">
-              <span className={styles.eyebrow}>GET IN TOUCH</span>
+              <span className={styles.eyebrow}>{t.contact.eyebrow}</span>
               <h2 className={styles.heading}>{t.contact.title}</h2>
               <p className={styles.subtext}>{t.contact.subtitle}</p>
 
@@ -195,10 +195,10 @@ export default function ContactSection() {
                         <option value="" disabled hidden>
                           {t.contact.subjectPlaceholder}
                         </option>
-                        <option value="Book an Appointment">Book an Appointment</option>
-                        <option value="Styling Consultation">Styling Consultation</option>
-                        <option value="Custom Dress Design">Custom Dress Design</option>
-                        <option value="General Inquiry">General Inquiry</option>
+                        <option value="Book an Appointment">{t.contact.subjectOptions?.appointment}</option>
+                        <option value="Styling Consultation">{t.contact.subjectOptions?.consultation}</option>
+                        <option value="Custom Dress Design">{t.contact.subjectOptions?.customDesign}</option>
+                        <option value="General Inquiry">{t.contact.subjectOptions?.general}</option>
                       </select>
                     </div>
 
@@ -243,7 +243,7 @@ export default function ContactSection() {
             {/* Right Cursive Quote */}
             <div className={styles.quoteBox}>
               <p className={styles.quoteText}>
-                “Every love story is beautiful, let us dress yours.”
+                {t.contact.quote}
               </p>
               <div className={styles.ornamentLine}>
                 <span className={styles.diamond} />

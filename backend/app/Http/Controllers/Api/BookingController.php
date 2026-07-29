@@ -188,10 +188,10 @@ class BookingController extends Controller
     {
         $validated = $request->validate([
             'client_id' => 'nullable|integer|exists:clients,id',
-            'client_name' => 'nullable|string|max:255',
-            'client_phone' => 'nullable|string|max:50',
+            'client_name' => ['nullable', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
+            'client_phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'client_email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:50',
+            'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'email' => 'nullable|email|max:255',
             'client_address' => 'nullable|string',
             'client_city' => 'nullable|string|max:100',
@@ -272,55 +272,68 @@ class BookingController extends Controller
             }
         }
 
-        // 2. Create the Visit record to start the journey from the visit stage
-        $dressesList = [];
-        if ($dressId) $dressesList[] = \App\Models\Dress::find($dressId)->name ?? '';
-        if ($dress2Id) $dressesList[] = \App\Models\Dress::find($dress2Id)->name ?? '';
-        if ($dress3Id) $dressesList[] = \App\Models\Dress::find($dress3Id)->name ?? '';
-        $dressesStr = implode(', ', array_filter($dressesList));
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            // 2. Create the Visit record to start the journey from the visit stage
+            $dressesList = [];
+            if ($dressId) $dressesList[] = \App\Models\Dress::find($dressId)->name ?? '';
+            if ($dress2Id) $dressesList[] = \App\Models\Dress::find($dress2Id)->name ?? '';
+            if ($dress3Id) $dressesList[] = \App\Models\Dress::find($dress3Id)->name ?? '';
+            $dressesStr = implode(', ', array_filter($dressesList));
 
-        $visitNotes = trim(($validated['notes'] ?? '') . " | الفساتين المهتمة بها: " . $dressesStr);
+            $visitNotes = trim(($validated['notes'] ?? '') . " | الفساتين المهتمة بها: " . $dressesStr);
 
-        $visit = \App\Models\Visit::create([
-            'client_id' => $client->id,
-            'visit_date' => $bookingDate,
-            'status' => 'pending', // Waiting for staff confirmation
-            'source' => 'website',
-            'notes' => $visitNotes,
-            'time_slot' => $timeSlot,
-        ]);
+            $visit = \App\Models\Visit::create([
+                'client_id' => $client->id,
+                'visit_date' => $bookingDate,
+                'status' => 'pending', // Waiting for staff confirmation
+                'source' => 'website',
+                'notes' => $visitNotes,
+                'time_slot' => $timeSlot,
+            ]);
 
-        $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+            $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
 
-        // Also create a pending booking record so it can be confirmed later in stage 2
-        $booking = Booking::create([
-            'client_id' => $client->id,
-            'dress_id' => $dressId,
-            'dress_2_id' => $dress2Id,
-            'dress_3_id' => $dress3Id,
-            'booking_date' => $bookingDate,
-            'event_date' => $eventDate,
-            'status' => 'pending',
-            'total_amount' => $validated['total_amount'] ?? 0,
-            'notes' => $validated['notes'],
-            'payment_method' => $validated['payment_method'] ?? null,
-            'receipt_path' => $receiptPath,
-        ]);
+            // Also create a pending booking record so it can be confirmed later in stage 2
+            $booking = Booking::create([
+                'client_id' => $client->id,
+                'dress_id' => $dressId,
+                'dress_2_id' => $dress2Id,
+                'dress_3_id' => $dress3Id,
+                'booking_date' => $bookingDate,
+                'event_date' => $eventDate,
+                'status' => 'pending',
+                'total_amount' => $validated['total_amount'] ?? 0,
+                'notes' => $validated['notes'],
+                'payment_method' => $validated['payment_method'] ?? null,
+                'receipt_path' => $receiptPath,
+            ]);
 
-        // Create new booking notification
-        \App\Models\Notification::create([
-            'type' => 'new_appointment',
-            'title' => 'طلب موعد زيارة جديد من الموقع',
-            'message' => 'تم إرسال طلب موعد زيارة جديد من العروس: ' . $client->name . ' لفترة: ' . ($validated['time_slot'] ?? 'غير محدد'),
-            'related_type' => 'booking',
-            'related_id' => $booking->id
-        ]);
+            // Create new booking notification
+            \App\Models\Notification::create([
+                'type' => 'new_appointment',
+                'title' => 'طلب موعد زيارة جديد من الموقع',
+                'message' => 'تم إرسال طلب موعد زيارة جديد من العروس: ' . $client->name . ' لفترة: ' . ($validated['time_slot'] ?? 'غير محدد'),
+                'related_type' => 'booking',
+                'related_id' => $booking->id
+            ]);
 
-        return response()->json([
-            'message' => 'Appointment request received successfully',
-            'client' => $client,
-            'visit' => $visit,
-            'booking' => $booking
-        ], 201);
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json([
+                'message' => 'Appointment request received successfully',
+                'client' => $client,
+                'visit' => $visit,
+                'booking' => $booking
+            ], 201);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Error creating public booking: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'حدث خطأ أثناء حفظ طلب الموعد، يرجى المحاولة مرة أخرى',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
     }
 }

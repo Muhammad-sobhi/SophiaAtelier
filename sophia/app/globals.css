@@ -23,6 +23,8 @@
   /* Fonts (set via next/font CSS variables) */
   --font-heading: var(--font-cormorant), 'Cormorant Garamond', Georgia, serif;
   --font-body: var(--font-montserrat), 'Montserrat', -apple-system, sans-serif;
+  --font-charm: var(--font-charm), 'Charm', cursive;
+  --font-darker: var(--font-darker-grotesque), 'Darker Grotesque', sans-serif;
 
   /* Spacing */
   --container-max: 1440px;
