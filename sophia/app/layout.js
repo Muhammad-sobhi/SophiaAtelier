@@ -1,4 +1,4 @@
-import { Cormorant_Garamond, Montserrat, Charm, Darker_Grotesque } from "next/font/google";
+import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "./context/StoreContext";
 import QuickView from "./components/QuickView/QuickView";
@@ -18,20 +18,6 @@ const montserrat = Montserrat({
   variable: "--font-montserrat",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-});
-
-const charm = Charm({
-  variable: "--font-charm",
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  display: "swap",
-});
-
-const darkerGrotesque = Darker_Grotesque({
-  variable: "--font-darker-grotesque",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
   display: "swap",
 });
 
@@ -56,7 +42,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${cormorant.variable} ${montserrat.variable} ${charm.variable} ${darkerGrotesque.variable}`}>
+      <body className={`${cormorant.variable} ${montserrat.variable}`}>
         <StoreProvider>
           {children}
           <QuickView />
