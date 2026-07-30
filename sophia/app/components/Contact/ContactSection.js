@@ -29,8 +29,8 @@ export default function ContactSection() {
     },
     {
       icon: Clock,
-      title: t.contact.hours,
-      content: 'Mon – Sat: 10:00 AM – 8:00 PM\nSun: By Appointment',
+      title: t.contact.hours || 'Working Hours',
+      content: t.contact.hoursVal || '7 Days a Week: 01:00 PM – 08:30 PM',
     },
   ];
 

@@ -136,7 +136,8 @@ export const translations = {
       phone: 'Phone',
       email: 'Email',
       address: 'Studio Address',
-      hours: 'Mon – Sat: 01:00 PM – 8:30 PM\nSun: By Appointment',
+      hours: 'Working Hours',
+      hoursVal: '7 Days a Week: 01:00 PM – 08:30 PM',
       eyebrow: 'GET IN TOUCH',
       subjectOptions: {
         appointment: 'Book an Appointment',
@@ -329,7 +330,8 @@ export const translations = {
       phone: 'الهاتف',
       email: 'البريد الإلكتروني',
       address: 'عنوان الأتيليه',
-      hours: 'من الإثنين إلى السبت: 01:00 مساءً – 8:30 مساءً\nالأحد: بموعد مسبق',
+      hours: 'مواعيد العمل',
+      hoursVal: 'طوال أيام الأسبوع: من 01:00 مساءً حتى 08:30 مساءً',
       eyebrow: 'تواصل معنا',
       subjectOptions: {
         appointment: 'حجز موعد زيارة',
