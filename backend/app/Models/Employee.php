@@ -15,6 +15,8 @@ class Employee extends Model
         'password', 'address', 'id_number', 'id_image', 'permissions'
     ];
 
+    protected $hidden = ['password', 'id_number', 'id_image'];
+
     protected function casts(): array
     {
         return [
@@ -45,13 +47,8 @@ class Employee extends Model
                 }
                 $user->name = $employee->name;
                 
-                // Hash the password if it's new or has changed
-                if ($employee->wasChanged('password') || !$user->exists) {
-                    // Check if password is already hashed (starts with $2y$)
-                    $user->password = str_starts_with($employee->password, '$2y$') 
-                        ? $employee->password 
-                        : \Illuminate\Support\Facades\Hash::make($employee->password);
-                }
+                // Password is already hashed by the controller
+                $user->password = $employee->password;
                 
                 // Determine role from permissions
                 $user->role = (is_array($employee->permissions) && in_array('*', $employee->permissions)) ? 'admin' : 'staff';

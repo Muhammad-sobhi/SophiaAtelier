@@ -24,12 +24,17 @@ class EmployeeController extends Controller
             'salary' => 'nullable|numeric|min:0',
             'hire_date' => 'nullable|date',
             'notes' => 'nullable|string',
-            'password' => 'nullable|string',
+            'password' => 'nullable|string|min:6',
             'address' => 'nullable|string',
             'id_number' => 'nullable|string',
             'id_image' => 'nullable|string',
             'permissions' => 'nullable|array',
         ]);
+
+        // Hash password before storing
+        if (!empty($validated['password'])) {
+            $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        }
 
         $employee = Employee::create($validated);
 
@@ -53,12 +58,19 @@ class EmployeeController extends Controller
             'salary' => 'nullable|numeric|min:0',
             'hire_date' => 'nullable|date',
             'notes' => 'nullable|string',
-            'password' => 'nullable|string',
+            'password' => 'nullable|string|min:6',
             'address' => 'nullable|string',
             'id_number' => 'nullable|string',
             'id_image' => 'nullable|string',
             'permissions' => 'nullable|array',
         ]);
+
+        // Hash password before storing
+        if (!empty($validated['password'])) {
+            $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
 
         $employee->update($validated);
 

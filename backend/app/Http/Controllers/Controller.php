@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
+
 abstract class Controller
 {
     public static function saveReceipt($request, $fieldName = 'receipt')
@@ -26,8 +28,16 @@ abstract class Controller
                 if ($data === false) {
                     return null;
                 }
+
+                // Validate actual content MIME type (not just the user-supplied header)
+                $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                $detectedMime = $finfo->buffer($data);
+                $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!in_array($detectedMime, $allowedMimes)) {
+                    return null;
+                }
                 
-                $fileName = 'payments/' . uniqid() . '.' . $type;
+                $fileName = 'payments/' . Str::random(40) . '.' . $type;
                 \Illuminate\Support\Facades\Storage::disk('public')->put($fileName, $data);
                 return $fileName;
             }
@@ -35,3 +45,4 @@ abstract class Controller
         return null;
     }
 }
+

@@ -7,9 +7,13 @@ Route::get('/', function () {
 });
 
 Route::get('/storage/{path}', function ($path) {
-    $fullPath = storage_path('app/public/' . $path);
-    if (!file_exists($fullPath)) {
+    $basePath = realpath(storage_path('app/public'));
+    $fullPath = realpath(storage_path('app/public/' . $path));
+
+    // Prevent path traversal — resolved path must stay inside base directory
+    if (!$fullPath || !$basePath || !str_starts_with($fullPath, $basePath . DIRECTORY_SEPARATOR)) {
         abort(404);
     }
+
     return response()->file($fullPath);
 })->where('path', '.*');

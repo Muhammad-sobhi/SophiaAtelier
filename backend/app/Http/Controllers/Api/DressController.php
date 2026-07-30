@@ -28,7 +28,8 @@ class DressController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->where('name', 'like', "%{$search}%");
+            $cleanSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where('name', 'like', "%{$cleanSearch}%");
         }
 
         return response()->json($query->latest()->paginate($request->input('per_page', 15)));

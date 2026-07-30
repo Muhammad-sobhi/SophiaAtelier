@@ -41,8 +41,8 @@ class ClientController extends Controller
     {
         $request->validate([
             'client_id' => 'nullable|integer',
-            'phone' => 'nullable|string',
-            'email' => 'nullable|string',
+            'phone' => 'nullable|string|min:7',
+            'email' => 'nullable|email',
         ]);
 
         $clientId = $request->input('client_id');
@@ -177,8 +177,21 @@ class ClientController extends Controller
      */
     public function stageAction(Request $request, Client $client): JsonResponse
     {
-        $action = $request->input('action');
+        $request->validate([
+            'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned',
+            'dress_id' => 'nullable|integer|exists:dresses,id',
+            'fitting_date' => 'nullable|date',
+            'fitting_time' => 'nullable|string|max:20',
+            'event_date' => 'nullable|date',
+            'total_amount' => 'nullable|numeric|min:0',
+            'deposit_amount' => 'nullable|numeric|min:0',
+            'insurance_amount' => 'nullable|numeric|min:0',
+            'trying_fee' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|string|max:50',
+            'notes' => 'nullable|string|max:1000',
+        ]);
 
+        $action = $request->input('action');
         switch ($action) {
             case 'confirm_visit':
                 $visit = $client->visits()->latest()->first();

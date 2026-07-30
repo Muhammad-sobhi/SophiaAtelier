@@ -26,11 +26,11 @@ use Illuminate\Support\Facades\Route;
 // Rate-limited login route
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
-// Public routes
+// Public routes (rate-limited)
 Route::post('/public/register-client', [ClientController::class, 'store'])->middleware('throttle:5,1');
-Route::post('/public/find-client', [ClientController::class, 'findClient']);
-Route::post('/public/bookings', [BookingController::class, 'publicStore']);
-Route::post('/public/contact-messages', [\App\Http\Controllers\Api\ContactMessageController::class, 'publicStore']);
+Route::post('/public/find-client', [ClientController::class, 'findClient'])->middleware('throttle:10,1');
+Route::post('/public/bookings', [BookingController::class, 'publicStore'])->middleware('throttle:5,1');
+Route::post('/public/contact-messages', [\App\Http\Controllers\Api\ContactMessageController::class, 'publicStore'])->middleware('throttle:5,1');
 Route::get('/public/fully-booked-slots', [VisitController::class, 'getFullyBookedSlots']);
 Route::get('/public/reviews', [ReviewController::class, 'publicIndex']);
 Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
@@ -51,7 +51,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Calendar — merged visits + bookings
     Route::get('/calendar/events', [CalendarController::class, 'events']);
 
-    Route::get('/clients/export/csv', [ClientController::class, 'exportCsv']);
     Route::apiResource('clients', ClientController::class);
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
 
@@ -67,23 +66,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('fittings', FittingController::class);
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('reviews', ReviewController::class);
-    Route::apiResource('employees', EmployeeController::class);
 
-    // Attendance & Payroll
-    Route::post('/attendance/bulk', [AttendanceController::class, 'bulkStore']);
-    Route::apiResource('attendance', AttendanceController::class);
+    // Attendance (read-only for staff)
+    Route::get('/attendance', [AttendanceController::class, 'index']);
+    Route::get('/attendance/{attendance}', [AttendanceController::class, 'show']);
     Route::apiResource('leave-requests', LeaveRequestController::class);
-    Route::put('/leave-requests/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus']);
-    Route::get('/payroll/summary', [PayrollController::class, 'summary']);
 
-    Route::apiResource('revenues', RevenueController::class);
-    Route::apiResource('expenses', ExpenseController::class);
     Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/delete-all', [NotificationController::class, 'deleteAll']);
-
-    Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
 
     Route::apiResource('contact-messages', \App\Http\Controllers\Api\ContactMessageController::class)->only(['index', 'destroy']);
     Route::post('/contact-messages/{id}/read', [\App\Http\Controllers\Api\ContactMessageController::class, 'markAsRead']);
@@ -102,6 +94,25 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::get('/dashboard/executive', [DashboardController::class, 'executive']);
+
+    // Employee management — admin only
+    Route::apiResource('employees', EmployeeController::class);
+
+    // Finance & Payroll — admin only
+    Route::apiResource('revenues', RevenueController::class);
+    Route::apiResource('expenses', ExpenseController::class);
+    Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
+    Route::get('/clients/export/csv', [ClientController::class, 'exportCsv']);
+
+    // Attendance management — admin only
+    Route::post('/attendance/bulk', [AttendanceController::class, 'bulkStore']);
+    Route::post('/attendance', [AttendanceController::class, 'store']);
+    Route::put('/attendance/{attendance}', [AttendanceController::class, 'update']);
+    Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
+    Route::put('/leave-requests/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus']);
+    Route::get('/payroll/summary', [PayrollController::class, 'summary']);
+
+    // Reports — admin only
     Route::get('/reports/sales', [ReportController::class, 'sales']);
     Route::get('/reports/conversion', [ReportController::class, 'conversion']);
     Route::get('/reports/top-dresses', [ReportController::class, 'topDresses']);

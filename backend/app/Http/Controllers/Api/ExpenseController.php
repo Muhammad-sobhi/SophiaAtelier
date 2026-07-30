@@ -25,7 +25,7 @@ class ExpenseController extends Controller
             $query->where('date', '<=', $endDate);
         }
 
-        return response()->json($query->latest('date')->paginate($request->input('per_page', 500)));
+        return response()->json($query->latest('date')->paginate(min((int) $request->input('per_page', 50), 100)));
     }
 
     public function store(Request $request): JsonResponse

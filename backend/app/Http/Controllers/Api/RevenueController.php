@@ -25,7 +25,7 @@ class RevenueController extends Controller
             $query->where('payment_date', '<=', $endDate);
         }
 
-        return response()->json($query->latest('payment_date')->paginate($request->input('per_page', 500)));
+        return response()->json($query->latest('payment_date')->paginate(min((int) $request->input('per_page', 50), 100)));
     }
 
     public function store(Request $request): JsonResponse
