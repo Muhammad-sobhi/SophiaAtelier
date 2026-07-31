@@ -1,18 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    qualities: [75, 95],
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'http',
-        hostname: 'localhost',
-        port: '8000',
-        pathname: '/storage/**',
+        hostname: '**',
       },
       {
         protocol: 'https',
-        hostname: 'api.sophiadresses.cloud',
-        pathname: '/storage/**',
+        hostname: '**',
       },
     ],
   },

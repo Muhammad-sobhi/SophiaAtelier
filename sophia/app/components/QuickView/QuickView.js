@@ -87,27 +87,28 @@ export default function QuickView() {
           {/* Details Col */}
           <div className={styles.detailCol}>
             <h2 className={styles.name}>{(lang === 'ar' && product.name_ar ? product.name_ar : product.name)?.toUpperCase()}</h2>
-            <p className={styles.price}>{product.price}</p>
+            
+            {product.code && (
+              <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#6366f1', margin: '4px 0 12px 0' }}>
+                {lang === 'ar' ? `كود الفستان: #${product.code}` : `Dress Code: #${product.code}`}
+              </p>
+            )}
+
+            {product.price ? <p className={styles.price}>{product.price}</p> : null}
 
             <p className={styles.desc}>
-              {product.description || 'Exquisite gown handcrafted with intricate details and timeless elegance.'}
+              {lang === 'ar' && product.description_ar ? product.description_ar : (product.description || 'Exquisite gown handcrafted with intricate details and timeless elegance.')}
             </p>
 
-            {/* Size */}
+            {/* Weight / Size */}
             <div className={styles.optionGroup}>
               <div className={styles.sizeHeader}>
-                <label className={styles.optionLabel}>{t.bestSellers.size}</label>
+                <label className={styles.optionLabel}>
+                  {lang === 'ar' ? 'الوزن المناسب للفستان:' : 'Suitable Weight:'}
+                </label>
               </div>
-              <div className={styles.sizeGrid}>
-                {sizes.map((s) => (
-                  <button
-                    key={s}
-                    className={`${styles.sizeBox} ${selectedSize === s ? styles.selectedSize : ''}`}
-                    onClick={() => setSelectedSize(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
+              <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'inline-block', fontSize: '14px', fontWeight: '700', color: '#334155' }}>
+                {lang === 'ar' ? (product.weightTextAr || product.weightTextEn || '40kg up to 55kg') : (product.weightTextEn || product.weightTextAr || '40kg up to 55kg')}
               </div>
             </div>
 

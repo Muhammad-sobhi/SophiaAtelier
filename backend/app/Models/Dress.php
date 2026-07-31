@@ -13,8 +13,8 @@ class Dress extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'name', 'name_ar', 'category_id', 'collection_id', 'designer_id', 'description', 'description_ar',
-        'purchase_price', 'rental_price', 'trying_fee', 'status', 'size',
+        'code', 'name', 'name_ar', 'category_id', 'collection_id', 'designer_id', 'description', 'description_ar',
+        'purchase_price', 'rental_price', 'trying_fee', 'status', 'size', 'weight_from', 'weight_to',
         'color', 'fabric', 'fabric_ar', 'notes', 'new_collection',
     ];
 
@@ -23,6 +23,8 @@ class Dress extends Model
         return [
             'purchase_price' => 'decimal:2',
             'rental_price' => 'decimal:2',
+            'weight_from' => 'integer',
+            'weight_to' => 'integer',
             'new_collection' => 'boolean',
         ];
     }

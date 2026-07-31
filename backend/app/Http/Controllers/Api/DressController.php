@@ -38,6 +38,7 @@ class DressController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -49,7 +50,9 @@ class DressController extends Controller
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:available,out,maintenance,cleaning',
-            'size' => 'nullable|string|max:20',
+            'size' => 'nullable|string|max:50',
+            'weight_from' => 'nullable|integer|min:0',
+            'weight_to' => 'nullable|integer|min:0',
             'color' => 'nullable|string|max:50',
             'fabric' => 'nullable|string|max:100',
             'fabric_ar' => 'nullable|string|max:100',
@@ -81,7 +84,7 @@ class DressController extends Controller
             ]);
         }
 
-        return response()->json($dress->load(['category', 'collection', 'designer', 'accessories']), 201);
+        return response()->json($dress->load(['category', 'collection', 'designer', 'images', 'accessories']), 201);
     }
 
     public function show(Dress $dress)
@@ -103,6 +106,7 @@ class DressController extends Controller
     public function update(Request $request, Dress $dress): JsonResponse
     {
         $validated = $request->validate([
+            'code' => 'nullable|string|max:50',
             'name' => 'sometimes|required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',
@@ -114,7 +118,9 @@ class DressController extends Controller
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:available,out,maintenance,cleaning',
-            'size' => 'nullable|string|max:20',
+            'size' => 'nullable|string|max:50',
+            'weight_from' => 'nullable|integer|min:0',
+            'weight_to' => 'nullable|integer|min:0',
             'color' => 'nullable|string|max:50',
             'fabric' => 'nullable|string|max:100',
             'fabric_ar' => 'nullable|string|max:100',

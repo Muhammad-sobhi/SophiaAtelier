@@ -32,23 +32,39 @@ export async function fetchDresses() {
     if (!res.ok) return [];
     const data = await res.json();
     const dresses = data.data || data;
-    return dresses.map((d) => ({
-      id: d.id,
-      name: d.name,
-      name_ar: d.name_ar,
-      price: `$${parseFloat(d.rental_price || d.purchase_price || 0).toLocaleString()}`,
-      priceNum: parseFloat(d.rental_price || d.purchase_price || 0),
-      image: d.images && d.images.length > 0 ? getStorageUrl(d.images[0].image_path) : '/images/product-1.png',
-      images: d.images && d.images.length > 0 ? d.images.map((img) => getStorageUrl(img.image_path)) : ['/images/product-1.png'],
-      badge: d.new_collection ? 'New' : '',
-      category: d.category?.name || 'All',
-      collection: d.collection?.name || '',
-      description: d.description || '',
-      sizes: d.size ? d.size.split(',').map((s) => s.trim()) : ['XS', 'S', 'M', 'L', 'XL'],
-      colors: d.color ? d.color.split(',').map((c) => c.trim()) : ['Ivory', 'Champagne', 'Blush'],
-      rating: 5.0,
-      reviews: 10,
-    }));
+    return dresses.map((d) => {
+      const weightTextEn = (d.weight_from !== null && d.weight_from !== undefined) || (d.weight_to !== null && d.weight_to !== undefined)
+        ? `${d.weight_from || 0}kg up to ${d.weight_to || 0}kg`
+        : (d.size || '');
+
+      const weightTextAr = (d.weight_from !== null && d.weight_from !== undefined) || (d.weight_to !== null && d.weight_to !== undefined)
+        ? `من ${d.weight_from || 0} كجم إلى ${d.weight_to || 0} كجم`
+        : (d.size || '');
+
+      return {
+        id: d.id,
+        code: d.code || '',
+        name: d.name,
+        name_ar: d.name_ar,
+        price: '', // Rent prices hidden on website as requested
+        priceNum: 0,
+        image: d.images && d.images.length > 0 ? getStorageUrl(d.images[0].image_path) : '/images/product-1.png',
+        images: d.images && d.images.length > 0 ? d.images.map((img) => getStorageUrl(img.image_path)) : ['/images/product-1.png'],
+        badge: d.new_collection ? 'New' : '',
+        category: d.category?.name || 'All',
+        collection: d.collection?.name || '',
+        description: d.description || '',
+        description_ar: d.description_ar || '',
+        weight_from: d.weight_from,
+        weight_to: d.weight_to,
+        weightTextEn: weightTextEn,
+        weightTextAr: weightTextAr,
+        sizes: [weightTextEn || weightTextAr || 'Standard'],
+        colors: d.color ? d.color.split(',').map((c) => c.trim()) : ['Ivory', 'Champagne', 'Blush'],
+        rating: 5.0,
+        reviews: 10,
+      };
+    });
   } catch (e) {
     console.error('Failed to fetch dresses:', e);
     return [];
