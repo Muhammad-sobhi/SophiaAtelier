@@ -289,35 +289,7 @@ export default function DressesPage() {
     setDeleteConfirm(null);
   };
 
-  const resetForm = () => {
-    imagePreviewUrls.forEach((url) => {
-      if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
-    });
-    if (newCategoryImagePreview && newCategoryImagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(newCategoryImagePreview);
-    }
-    setNewName('');
-    setNewNameAr('');
-    setNewDescription('');
-    setNewDescriptionAr('');
-    setNewFabric('');
-    setNewFabricAr('');
-    setNewDesigner('');
-    setNewPurchasePrice('');
-    setNewRentalCost('');
-    setNewTryingFee('');
-    setNewSize('');
-    setNewColor('');
-    setNewNewCollection(false);
-    setSelectedCollectionId('');
-    setIsAddingNewCategory(false);
-    setNewCategoryName('');
-    setNewCategoryImageFile(null);
-    setNewCategoryImagePreview('');
-    setDressImages([]);
-    setImagePreviewUrls([]);
-    setAccessories(['']);
-  };
+
 
   const handleAutoTranslateName = async () => {
     if (newName.trim()) {
