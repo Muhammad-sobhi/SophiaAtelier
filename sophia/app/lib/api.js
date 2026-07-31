@@ -18,12 +18,25 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 
 export function getStorageUrl(path) {
   if (!path) return '/images/product-1.png';
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  const baseUrl = API_BASE.replace('/api', '');
-  if (path.startsWith('/storage/')) return `${baseUrl}${path}`;
-  if (path.startsWith('storage/')) return `${baseUrl}/${path}`;
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  return `${baseUrl}/storage${cleanPath}`;
+  if (typeof path === 'object') {
+    path = path.image_path || path.image || path.url || '';
+  }
+  if (!path || typeof path !== 'string') return '/images/product-1.png';
+
+  if (path.startsWith('blob:')) return path;
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && path.startsWith('http://')) {
+      return path.replace('http://', 'https://');
+    }
+    return path;
+  }
+
+  const cleanPath = path.replace(/^\/?(storage\/)?/, '');
+  const fullUrl = `${API_BASE}/storage/${cleanPath}`;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fullUrl.startsWith('http://')) {
+    return fullUrl.replace('http://', 'https://');
+  }
+  return fullUrl;
 }
 
 export async function fetchDresses() {

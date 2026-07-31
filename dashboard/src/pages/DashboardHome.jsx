@@ -10,7 +10,7 @@ import {
   X,
   CreditCard } from
 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { BrideJourneyCard } from '@/components/BrideJourneyCard';
 import { DressLifecycleCard } from '@/components/DressLifecycleCard';
 
@@ -392,9 +392,7 @@ export default function DashboardPage() {
           <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-visible sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none">
             {filteredDresses.map((d) => {
               const isActive = selectedDressId === d.id;
-              const imageUrl = d.image_path
-                ? `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${d.image_path}`
-                : null;
+              const imageUrl = getStorageUrl(d.image_path || d.images?.[0]?.image_path);
               const stageColors = {
                 'ready': 'border-emerald-500 bg-emerald-50',
                 'booked': 'border-blue-500 bg-blue-50',

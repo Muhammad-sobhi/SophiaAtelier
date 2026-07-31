@@ -8,6 +8,11 @@ function clearAuth() {
 
 export function getStorageUrl(path) {
   if (!path) return null;
+  if (typeof path === 'object') {
+    path = path.image_path || path.image || path.url || '';
+  }
+  if (!path || typeof path !== 'string') return null;
+
   if (path.startsWith('blob:')) return path;
   if (path.startsWith('http://') || path.startsWith('https://')) {
     if (typeof window !== 'undefined' && window.location.protocol === 'https:' && path.startsWith('http://')) {
@@ -15,9 +20,9 @@ export function getStorageUrl(path) {
     }
     return path;
   }
-  const baseUrl = API_BASE.replace('/api', '');
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const fullUrl = cleanPath.startsWith('/storage/') ? `${baseUrl}${cleanPath}` : `${baseUrl}/storage${cleanPath}`;
+
+  const cleanPath = path.replace(/^\/?(storage\/)?/, '');
+  const fullUrl = `${API_BASE}/storage/${cleanPath}`;
   if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fullUrl.startsWith('http://')) {
     return fullUrl.replace('http://', 'https://');
   }

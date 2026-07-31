@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
 import { Search, Plus, X, Trash2, Edit3, Layers, Image as ImageIcon, Languages } from 'lucide-react';
 
@@ -65,7 +65,7 @@ export default function CollectionsPage() {
     setTaglineAr(col.tagline_ar || '');
     setDescription(col.description || '');
     setImageFile(null);
-    setImagePreview(col.image ? `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${col.image}` : '');
+    setImagePreview(col.image ? getStorageUrl(col.image) : '');
     setIsModalOpen(true);
   };
 
@@ -172,9 +172,7 @@ export default function CollectionsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto p-1">
             {filteredCollections.map((col) => {
-              const imageUrl = col.image
-                ? `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${col.image}`
-                : null;
+              const imageUrl = col.image ? getStorageUrl(col.image) : null;
               return (
                 <div key={col.id} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                   <div>

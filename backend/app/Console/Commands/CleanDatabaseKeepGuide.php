@@ -78,6 +78,9 @@ class CleanDatabaseKeepGuide extends Command
                     if (in_array($col, $financeColumns)) {
                         $updateData[$col] = 0;
                     }
+                    if (in_array($col, ['image_path', 'image'])) {
+                        $updateData[$col] = null;
+                    }
                 }
 
                 if (!empty($updateData)) {
