@@ -48,7 +48,7 @@ class CleanDatabaseKeepGuide extends Command
             'deduction'
         ];
 
-        $tables = DB::connection()->getDoctrineSchemaManager()->listTableNames();
+        $tables = Schema::getTableListing();
 
         foreach ($tables as $table) {
             if (in_array($table, $preserveTables)) {
