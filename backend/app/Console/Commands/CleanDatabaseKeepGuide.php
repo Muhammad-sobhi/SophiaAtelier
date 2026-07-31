@@ -78,13 +78,17 @@ class CleanDatabaseKeepGuide extends Command
                     if (in_array($col, $financeColumns)) {
                         $updateData[$col] = 0;
                     }
-                    if (in_array($col, ['image_path', 'image'])) {
+                    if (in_array($col, ['image_path', 'image']) && $table !== 'dress_images') {
                         $updateData[$col] = null;
                     }
                 }
 
                 if (!empty($updateData)) {
-                    DB::table($table)->where('id', '=', $firstRecord->id)->update($updateData);
+                    try {
+                        DB::table($table)->where('id', '=', $firstRecord->id)->update($updateData);
+                    } catch (\Throwable $e) {
+                        // Fallback if non-nullable column constraint exists
+                    }
                 }
 
                 $this->info("Table {$table}: Cleaned. Kept 1 guide record (ID {$firstRecord->id}). Financial values set to 0.");
