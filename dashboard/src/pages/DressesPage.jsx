@@ -580,7 +580,7 @@ export default function DressesPage() {
                                 <option key={c.id} value={c.id}>{c.name} {c.name_ar ? `(${c.name_ar})` : ''}</option>
                               ))}
                             </select>
-                            {selectedCategoryId && categories.length > 1 && (
+                            {selectedCategoryId && (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteCategory(selectedCategoryId)}
