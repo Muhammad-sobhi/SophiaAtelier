@@ -36,7 +36,19 @@ class ClientGalleryController extends Controller
             'sort_order' => 'nullable|integer',
         ]);
 
+        // Ensure directory exists
+        $storagePath = storage_path('app/public/client-gallery');
+        if (!is_dir($storagePath)) {
+            mkdir($storagePath, 0755, true);
+        }
+
         $path = $request->file('image')->store('client-gallery', 'public');
+
+        // Ensure file is readable
+        $fullPath = storage_path('app/public/' . $path);
+        if (file_exists($fullPath)) {
+            @chmod($fullPath, 0644);
+        }
 
         $item = ClientGallery::create([
             'client_name' => $validated['client_name'],
@@ -57,11 +69,25 @@ class ClientGalleryController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
+        // Remove file object from validated data
+        unset($validated['image']);
+
         if ($request->hasFile('image')) {
             if ($clientGallery->image_path) {
                 Storage::disk('public')->delete($clientGallery->image_path);
             }
+
+            $storagePath = storage_path('app/public/client-gallery');
+            if (!is_dir($storagePath)) {
+                mkdir($storagePath, 0755, true);
+            }
+
             $validated['image_path'] = $request->file('image')->store('client-gallery', 'public');
+
+            $fullPath = storage_path('app/public/' . $validated['image_path']);
+            if (file_exists($fullPath)) {
+                @chmod($fullPath, 0644);
+            }
         }
 
         $clientGallery->update($validated);

@@ -170,6 +170,12 @@ class DressController extends Controller
             return response()->json(['message' => 'الحد الأقصى للصور هو 4 لكل فستان'], 422);
         }
 
+        // Ensure storage directory exists
+        $storagePath = storage_path('app/public/dresses');
+        if (!is_dir($storagePath)) {
+            mkdir($storagePath, 0755, true);
+        }
+
         $uploaded = [];
         $isFirst = $existing === 0;
 
@@ -177,6 +183,13 @@ class DressController extends Controller
             if ($existing + $index >= 4) break;
 
             $path = $file->store('dresses', 'public');
+
+            // Ensure the file is readable
+            $fullPath = storage_path('app/public/' . $path);
+            if (file_exists($fullPath)) {
+                @chmod($fullPath, 0644);
+            }
+
             $image = $dress->images()->create([
                 'image_path' => $path,
                 'is_primary' => ($isFirst && $index === 0),

@@ -37,7 +37,22 @@ class CollectionController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
+            // Ensure directory exists
+            $storagePath = storage_path('app/public/collections');
+            if (!is_dir($storagePath)) {
+                mkdir($storagePath, 0755, true);
+            }
+
             $validated['image'] = $request->file('image')->store('collections', 'public');
+
+            // Ensure file is readable
+            $fullPath = storage_path('app/public/' . $validated['image']);
+            if (file_exists($fullPath)) {
+                @chmod($fullPath, 0644);
+            }
+        } else {
+            // Remove image key if no file was uploaded (it would be null)
+            unset($validated['image']);
         }
 
         $collection = Collection::create($validated);
@@ -67,7 +82,20 @@ class CollectionController extends Controller
             if ($collection->image) {
                 Storage::disk('public')->delete($collection->image);
             }
+
+            $storagePath = storage_path('app/public/collections');
+            if (!is_dir($storagePath)) {
+                mkdir($storagePath, 0755, true);
+            }
+
             $validated['image'] = $request->file('image')->store('collections', 'public');
+
+            $fullPath = storage_path('app/public/' . $validated['image']);
+            if (file_exists($fullPath)) {
+                @chmod($fullPath, 0644);
+            }
+        } else {
+            unset($validated['image']);
         }
 
         $collection->update($validated);

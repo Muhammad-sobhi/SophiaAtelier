@@ -33,9 +33,24 @@ class CategoryController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
+        // Remove file object from validated data — we save the path instead
+        unset($validated['image']);
+
         if ($request->hasFile('image')) {
+            // Ensure directory exists
+            $storagePath = storage_path('app/public/categories');
+            if (!is_dir($storagePath)) {
+                mkdir($storagePath, 0755, true);
+            }
+
             $path = $request->file('image')->store('categories', 'public');
             $validated['image_path'] = $path;
+
+            // Ensure file is readable
+            $fullPath = storage_path('app/public/' . $path);
+            if (file_exists($fullPath)) {
+                @chmod($fullPath, 0644);
+            }
         }
 
         $category = Category::create($validated);
@@ -60,9 +75,22 @@ class CategoryController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
+        // Remove file object from validated data
+        unset($validated['image']);
+
         if ($request->hasFile('image')) {
+            $storagePath = storage_path('app/public/categories');
+            if (!is_dir($storagePath)) {
+                mkdir($storagePath, 0755, true);
+            }
+
             $path = $request->file('image')->store('categories', 'public');
             $validated['image_path'] = $path;
+
+            $fullPath = storage_path('app/public/' . $path);
+            if (file_exists($fullPath)) {
+                @chmod($fullPath, 0644);
+            }
         }
 
         $category->update($validated);
