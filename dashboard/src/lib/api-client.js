@@ -6,6 +6,24 @@ function clearAuth() {
   window.dispatchEvent(new Event('auth-change'));
 }
 
+export function getStorageUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('blob:')) return path;
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && path.startsWith('http://')) {
+      return path.replace('http://', 'https://');
+    }
+    return path;
+  }
+  const baseUrl = API_BASE.replace('/api', '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const fullUrl = cleanPath.startsWith('/storage/') ? `${baseUrl}${cleanPath}` : `${baseUrl}/storage${cleanPath}`;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fullUrl.startsWith('http://')) {
+    return fullUrl.replace('http://', 'https://');
+  }
+  return fullUrl;
+}
+
 class ApiClient {
   getHeaders() {
     const headers = {

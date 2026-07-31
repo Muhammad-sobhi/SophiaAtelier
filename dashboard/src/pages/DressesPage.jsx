@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
 import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages } from 'lucide-react';
 
@@ -267,9 +267,7 @@ export default function DressesPage() {
 
     // Prepopulate images
     if (dress.images && dress.images.length > 0) {
-      setImagePreviewUrls(dress.images.map((img) =>
-      `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${img.image_path}`
-      ));
+      setImagePreviewUrls(dress.images.map((img) => getStorageUrl(img.image_path)).filter(Boolean));
     } else {
       setImagePreviewUrls([]);
     }
@@ -431,9 +429,7 @@ export default function DressesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1 animate-fade-in">
             {filteredDresses.map((dress) => {
               const actions = getActionsForDress(dress);
-              const imageUrl = dress.images?.[0]?.image_path ?
-              `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${dress.images[0].image_path}` :
-              null;
+              const imageUrl = dress.images?.[0]?.image_path ? getStorageUrl(dress.images[0].image_path) : null;
 
               return (
                 <div
@@ -538,421 +534,424 @@ export default function DressesPage() {
       </div>
 
       {/* Add/Edit Dress Modal */}
-      {isModalOpen &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-sm font-extrabold text-slate-800">
                 {editingDress ? 'تعديل بيانات الفستان بالكتالوج' : 'إضافة فستان زفاف جديد للكتالوج'}
               </h3>
               <button
-              onClick={() => {setIsModalOpen(false);setEditingDress(null);}}
-              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-655 transition-colors cursor-pointer">
-              
+                type="button"
+                onClick={() => { setIsModalOpen(false); setEditingDress(null); }}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleAddDressSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
-              {/* Dress Code + Category & Collection Selector */}
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600 block">كود الفستان (Dress Code)</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: DR-101 أو SOPHIA-01"
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
+            <form onSubmit={handleAddDressSubmit} className="flex flex-col flex-grow overflow-hidden text-right">
+              <div className="p-6 space-y-4 overflow-y-auto flex-grow scrollbar-thin">
+                {/* Dress Code + Category & Collection Selector */}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600 block">كود الفستان (Dress Code)</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: DR-101 أو SOPHIA-01"
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-600 block">التصنيف</label>
+                      <div className="flex items-center gap-2">
+                        {!isAddingNewCategory ? (
+                          <>
+                            <select
+                              value={selectedCategoryId}
+                              onChange={(e) => setSelectedCategoryId(e.target.value)}
+                              className="flex-grow px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                            >
+                              {categories.map((c) => (
+                                <option key={c.id} value={c.id}>{c.name} {c.name_ar ? `(${c.name_ar})` : ''}</option>
+                              ))}
+                            </select>
+                            {selectedCategoryId && categories.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCategory(selectedCategoryId)}
+                                className="p-2.5 bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-100 rounded-2xl transition-all cursor-pointer flex-shrink-0"
+                                title="حذف هذا التصنيف"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setIsAddingNewCategory(true)}
+                              className="px-3 py-2.5 bg-indigo-50 border border-indigo-150 text-indigo-600 rounded-2xl text-[10px] font-bold hover:bg-indigo-100/50 transition-all flex-shrink-0 cursor-pointer"
+                            >
+                              جديد+
+                            </button>
+                          </>
+                        ) : (
+                          <div className="w-full space-y-2 bg-indigo-50/40 p-2.5 rounded-2xl border border-indigo-100/70">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                required
+                                placeholder="اسم التصنيف الجديد"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                className="flex-grow px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => { setIsAddingNewCategory(false); setNewCategoryName(''); setNewCategoryImageFile(null); setNewCategoryImagePreview(''); }}
+                                className="px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-bold hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer"
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              {newCategoryImagePreview && (
+                                <img src={newCategoryImagePreview} alt="Category preview" className="w-9 h-9 rounded-lg object-cover border border-indigo-200 flex-shrink-0" />
+                              )}
+                              <label className="text-[10px] font-extrabold text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all">
+                                📷 {newCategoryImageFile ? 'تغيير صورة التصنيف' : 'اختيار صورة للتصنيف'}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                      setNewCategoryImageFile(e.target.files[0]);
+                                      setNewCategoryImagePreview(URL.createObjectURL(e.target.files[0]));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-600 block">التشكيلة (Collection)</label>
+                      <select
+                        value={selectedCollectionId}
+                        onChange={(e) => setSelectedCollectionId(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      >
+                        <option value="">بدون تشكيلة</option>
+                        {collections.map((col) => (
+                          <option key={col.id} value={col.id}>{col.name} {col.name_ar ? `(${col.name_ar})` : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dress Name Fields (EN & AR) + Auto-Translate */}
+                <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-2xl border border-slate-100 relative">
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-extrabold text-slate-600">Dress Name (English)</label>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Celestial Rose"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-extrabold text-slate-600">اسم الفستان (بالعربية)</label>
+                      <button
+                        type="button"
+                        onClick={handleAutoTranslateName}
+                        disabled={isTranslating}
+                        className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <Languages size={12} />
+                        <span>{isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية ⚡'}</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="مثال: سليستيال روز"
+                      value={newNameAr}
+                      onChange={(e) => setNewNameAr(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                {/* Description Fields (EN & AR) */}
+                <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">Description (English)</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. A-line wedding gown with rose gold embroidery"
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-extrabold text-slate-600">الوصف (بالعربية)</label>
+                      <button
+                        type="button"
+                        onClick={handleAutoTranslateDesc}
+                        disabled={isTranslating}
+                        className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <Languages size={12} />
+                        <span>{isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية ⚡'}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      rows={2}
+                      placeholder="مثال: فستان بقصة A وتطريز ذهبي وردي فاخر"
+                      value={newDescriptionAr}
+                      onChange={(e) => setNewDescriptionAr(e.target.value)}
+                      className="w-full px-4 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Designer, Weight Range, Color */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">الديزاينر / المصمم</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثال: زهير مراد"
+                      value={newDesigner}
+                      onChange={(e) => setNewDesigner(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600 block">الوزن المناسب للفستان</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        placeholder="الوزن من (كجم)"
+                        value={newWeightFrom}
+                        onChange={(e) => setNewWeightFrom(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      />
+                      <input
+                        type="number"
+                        placeholder="إلى وزن (كجم)"
+                        value={newWeightTo}
+                        onChange={(e) => setNewWeightTo(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600 block">التصنيف</label>
-                    <div className="flex items-center gap-2">
-                      {!isAddingNewCategory ? (
-                        <>
-                          <select
-                            value={selectedCategoryId}
-                            onChange={(e) => setSelectedCategoryId(e.target.value)}
-                            className="flex-grow px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                          >
-                            {categories.map((c) => (
-                              <option key={c.id} value={c.id}>{c.name} {c.name_ar ? `(${c.name_ar})` : ''}</option>
-                            ))}
-                          </select>
-                          {selectedCategoryId && categories.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCategory(selectedCategoryId)}
-                              className="p-2.5 bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-100 rounded-2xl transition-all cursor-pointer flex-shrink-0"
-                              title="حذف هذا التصنيف"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setIsAddingNewCategory(true)}
-                            className="px-3 py-2.5 bg-indigo-50 border border-indigo-150 text-indigo-600 rounded-2xl text-[10px] font-bold hover:bg-indigo-100/50 transition-all flex-shrink-0 cursor-pointer"
-                          >
-                            جديد+
-                          </button>
-                        </>
-                      ) : (
-                        <div className="w-full space-y-2 bg-indigo-50/40 p-2.5 rounded-2xl border border-indigo-100/70">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              required
-                              placeholder="اسم التصنيف الجديد"
-                              value={newCategoryName}
-                              onChange={(e) => setNewCategoryName(e.target.value)}
-                              className="flex-grow px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => { setIsAddingNewCategory(false); setNewCategoryName(''); setNewCategoryImageFile(null); setNewCategoryImagePreview(''); }}
-                              className="px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-bold hover:bg-slate-50 transition-all flex-shrink-0 cursor-pointer"
-                            >
-                              إلغاء
-                            </button>
-                          </div>
+                    <label className="text-xs font-extrabold text-slate-600">اللون</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="أبيض / Ivory"
+                      value={newColor}
+                      onChange={(e) => setNewColor(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
 
-                          <div className="flex items-center gap-2 pt-1">
-                            {newCategoryImagePreview && (
-                              <img src={newCategoryImagePreview} alt="Category preview" className="w-9 h-9 rounded-lg object-cover border border-indigo-200 flex-shrink-0" />
-                            )}
-                            <label className="text-[10px] font-extrabold text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all">
-                              📷 {newCategoryImageFile ? 'تغيير صورة التصنيف' : 'اختيار صورة للتصنيف'}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                  if (e.target.files?.[0]) {
-                                    setNewCategoryImageFile(e.target.files[0]);
-                                    setNewCategoryImagePreview(URL.createObjectURL(e.target.files[0]));
-                                  }
-                                }}
-                                className="hidden"
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                {/* Fabric Fields (EN & AR) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">Fabric (English)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Satin, Tulle, Silk"
+                      value={newFabric}
+                      onChange={(e) => setNewFabric(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">القماش (بالعربية)</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: ساتان، تول، حرير"
+                      value={newFabricAr}
+                      onChange={(e) => setNewFabricAr(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                {/* Prices & Fees */}
+                <div className="grid grid-cols-3 gap-4 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600 block">تكلفة الشراء</label>
+                    <input
+                      type="text"
+                      placeholder="15000"
+                      value={newPurchasePrice}
+                      onChange={(e) => setNewPurchasePrice(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600 block">التشكيلة (Collection)</label>
-                    <select
-                      value={selectedCollectionId}
-                      onChange={(e) => setSelectedCollectionId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                    >
-                      <option value="">بدون تشكيلة</option>
-                      {collections.map((col) => (
-                        <option key={col.id} value={col.id}>{col.name} {col.name_ar ? `(${col.name_ar})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dress Name Fields (EN & AR) + Auto-Translate */}
-              <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-2xl border border-slate-100 relative">
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold text-slate-600">Dress Name (English)</label>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Celestial Rose"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold text-slate-600">اسم الفستان (بالعربية)</label>
-                    <button
-                      type="button"
-                      onClick={handleAutoTranslateName}
-                      disabled={isTranslating}
-                      className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
-                    >
-                      <Languages size={12} />
-                      <span>{isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية ⚡'}</span>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="مثال: سليستيال روز"
-                    value={newNameAr}
-                    onChange={(e) => setNewNameAr(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                </div>
-              </div>
-
-              {/* Description Fields (EN & AR) */}
-              <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">Description (English)</label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. A-line wedding gown with rose gold embroidery"
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 resize-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold text-slate-600">الوصف (بالعربية)</label>
-                    <button
-                      type="button"
-                      onClick={handleAutoTranslateDesc}
-                      disabled={isTranslating}
-                      className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
-                    >
-                      <Languages size={12} />
-                      <span>{isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية ⚡'}</span>
-                    </button>
-                  </div>
-                  <textarea
-                    rows={2}
-                    placeholder="مثال: فستان بقصة A وتطريز ذهبي وردي فاخر"
-                    value={newDescriptionAr}
-                    onChange={(e) => setNewDescriptionAr(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 resize-none"
-                  />
-                </div>
-              </div>
-
-              {/* Designer, Weight Range (Weight from / up to Weight), Color */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">الديزاينر / المصمم</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="مثال: زهير مراد"
-                    value={newDesigner}
-                    onChange={(e) => setNewDesigner(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600 block">الوزن المناسب للفستان</label>
-                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs font-extrabold text-slate-600 block">تكلفة الإيجار</label>
                     <input
-                      type="number"
-                      placeholder="الوزن من (كجم)"
-                      value={newWeightFrom}
-                      onChange={(e) => setNewWeightFrom(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      type="text"
+                      placeholder="3500"
+                      value={newRentalCost}
+                      onChange={(e) => setNewRentalCost(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600 block">رسوم التجربة</label>
                     <input
-                      type="number"
-                      placeholder="إلى وزن (كجم)"
-                      value={newWeightTo}
-                      onChange={(e) => setNewWeightTo(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      type="text"
+                      placeholder="500"
+                      value={newTryingFee}
+                      onChange={(e) => setNewTryingFee(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">اللون</label>
+                {/* New Collection Checkbox */}
+                <div className="flex items-center gap-2 py-1 text-right bg-amber-50/50 p-3 rounded-2xl border border-amber-100/60">
                   <input
-                    type="text"
-                    required
-                    placeholder="أبيض / Ivory"
-                    value={newColor}
-                    onChange={(e) => setNewColor(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    type="checkbox"
+                    id="new_collection"
+                    checked={newNewCollection}
+                    onChange={(e) => setNewNewCollection(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
                   />
-                </div>
-              </div>
-
-              {/* Fabric Fields (EN & AR) */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">Fabric (English)</label>
-                  <input
-                  type="text"
-                  placeholder="e.g. Satin, Tulle, Silk"
-                  value={newFabric}
-                  onChange={(e) => setNewFabric(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">القماش (بالعربية)</label>
-                  <input
-                  type="text"
-                  placeholder="مثال: ساتان، تول، حرير"
-                  value={newFabricAr}
-                  onChange={(e) => setNewFabricAr(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">تكلفة الشراء</label>
-                  <input
-                  type="text"
-                  required
-                  placeholder="15000"
-                  value={newPurchasePrice}
-                  onChange={(e) => setNewPurchasePrice(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
+                  <label htmlFor="new_collection" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
+                    ✨ هذا الفستان جزء من التشكيلة الجديدة (New Collection)
+                  </label>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">تكلفة الإيجار</label>
-                  <input
-                  type="text"
-                  required
-                  placeholder="3500"
-                  value={newRentalCost}
-                  onChange={(e) => setNewRentalCost(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">رسوم التجربة</label>
-                  <input
-                  type="text"
-                  placeholder="500"
-                  value={newTryingFee}
-                  onChange={(e) => setNewTryingFee(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
-                </div>
-              </div>
-
-              {/* New Collection Checkbox */}
-              <div className="flex items-center gap-2 py-1 text-right">
-                <input
-                type="checkbox"
-                id="new_collection"
-                checked={newNewCollection}
-                onChange={(e) => setNewNewCollection(e.target.checked)}
-                className="w-4 h-4 text-indigo-650 border-slate-200 rounded-md focus:ring-indigo-500 cursor-pointer" />
-              
-                <label htmlFor="new_collection" className="text-xs font-black text-slate-700 cursor-pointer select-none">
-                  ✨ هذا الفستان جزء من التشكيلة الجديدة (New Collection)
-                </label>
-              </div>
-
-              {/* Dynamic Accessories Section */}
-              <div className="space-y-2 text-right">
-                <label className="text-xs font-extrabold text-slate-600 block">الإكسسوارات والملحقات</label>
-                <div className="space-y-2">
-                  {accessories.map((acc, idx) =>
-                <div key={idx} className="flex items-center gap-2">
-                      <input
-                    type="text"
-                    placeholder="مثال: طرحة طويلة مطرزة"
-                    value={acc}
-                    onChange={(e) => handleAccessoryChange(idx, e.target.value)}
-                    className="flex-grow px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                  
-                      {accessories.length > 1 &&
+                {/* Dynamic Accessories Section */}
+                <div className="space-y-2 text-right">
+                  <label className="text-xs font-extrabold text-slate-600 block">الإكسسوارات والملحقات</label>
+                  <div className="space-y-2">
+                    {accessories.map((acc, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="مثال: طرحة طويلة مطرزة"
+                          value={acc}
+                          onChange={(e) => handleAccessoryChange(idx, e.target.value)}
+                          className="flex-grow px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                        />
+                        {accessories.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAccessory(idx)}
+                            className="p-2.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-2xl hover:bg-rose-100/60 transition-all cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => handleRemoveAccessory(idx)}
-                    className="p-2.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-2xl hover:bg-rose-100/60 transition-all cursor-pointer">
-                    
-                          <Trash2 size={14} />
-                        </button>
-                  }
-                    </div>
-                )}
+                    onClick={handleAddAccessory}
+                    className="mt-1 flex items-center gap-1 px-3 py-1.5 border border-indigo-150 hover:bg-indigo-50/50 text-indigo-600 rounded-xl text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    <Plus size={10} />
+                    <span>إضافة إكسسوار+</span>
+                  </button>
                 </div>
-                <button
-                type="button"
-                onClick={handleAddAccessory}
-                className="mt-1 flex items-center gap-1 px-3 py-1.5 border border-indigo-150 hover:bg-indigo-50/50 text-indigo-600 rounded-xl text-[10px] font-bold transition-all cursor-pointer">
-                
-                  <Plus size={10} />
-                  <span>إضافة إكسسوار+</span>
-                </button>
-              </div>
 
-              {/* Image Zone (up to 4 images) */}
-              <div className="space-y-2 text-right">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-extrabold text-slate-600">صور الفستان (حتى 4 صور)</label>
-                  <span className="text-[10px] font-semibold text-slate-400">{imagePreviewUrls.length}/4</span>
-                </div>
-                {imagePreviewUrls.length > 0 &&
-              <div className="grid grid-cols-4 gap-2">
-                    {imagePreviewUrls.map((url, idx) =>
-                <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
-                        <img src={url} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
-                        {idx === 0 &&
-                  <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full">رئيسية</span>
-                  }
-                        <button
-                    type="button"
-                    onClick={() => handleRemoveImage(idx)}
-                    className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer">
-                    
-                          <X size={10} />
-                        </button>
-                      </div>
-                )}
+                {/* Image Zone (up to 4 images) */}
+                <div className="space-y-2 text-right">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-slate-600">صور الفستان (حتى 4 صور)</label>
+                    <span className="text-[10px] font-semibold text-slate-400">{imagePreviewUrls.length}/4</span>
                   </div>
-              }
-                {imagePreviewUrls.length < 4 &&
-              <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
-                    <Plus size={16} className="text-indigo-500" />
-                    <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صور الفستان</span>
-                    <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleImageSelect} />
-                
-                  </label>
-              }
+                  {imagePreviewUrls.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2">
+                      {imagePreviewUrls.map((url, idx) => (
+                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+                          <img src={url} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
+                          {idx === 0 && (
+                            <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full">رئيسية</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {imagePreviewUrls.length < 4 && (
+                    <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
+                      <Plus size={16} className="text-indigo-500" />
+                      <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صور الفستان</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageSelect}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
+              {/* Pinned Modal Footer */}
+              <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0 flex items-center gap-3">
                 <button
-                type="submit"
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="submit"
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-md shadow-indigo-600/10 active:scale-95"
+                >
                   حفظ الفستان بالكتالوج
                 </button>
                 <button
-                type="button"
-                onClick={() => {setIsModalOpen(false);setEditingDress(null);}}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="button"
+                  onClick={() => { setIsModalOpen(false); setEditingDress(null); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+                >
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm?.isOpen &&

@@ -247,23 +247,23 @@ export default function CartDrawer() {
                 </div>
 
                 {/* 4. BOUTIQUE VISIT RULES ACKNOWLEDGEMENT */}
-                <div style={{ background: '#fcf8f2', border: '1px solid #f0e6d6', borderRadius: '12px', padding: '12px 14px', marginTop: '4px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#854d0e', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertCircle size={14} /> BOUTIQUE VISIT RULES (شروط وقواعد الزيارة)
+                <div style={{ background: '#fcf8f2', border: '1.5px solid #eab308', borderRadius: '14px', padding: '16px 18px', marginTop: '6px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#854d0e', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={18} /> BOUTIQUE VISIT RULES (شروط وقواعد الزيارة)
                   </div>
-                  <ul style={{ fontSize: '11px', color: '#555', margin: '0 0 10px 0', paddingLeft: '16px', lineHeight: '1.6' }}>
+                  <ul style={{ fontSize: '14px', fontWeight: '600', color: '#334155', margin: '0 0 12px 0', paddingLeft: '20px', lineHeight: '1.8' }}>
                     <li>مسموح بدخول فردين فقط مع العروسة (Ladies only)</li>
                     <li>الدخول بأولوية الحضور</li>
                     <li>ممنوع اصطحاب الأطفال</li>
                   </ul>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: '700', color: '#111', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: '800', color: '#0f172a', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={rulesAccepted}
                       onChange={(e) => setRulesAccepted(e.target.checked)}
-                      style={{ width: '16px', height: '16px', accentColor: '#c8a96a', cursor: 'pointer' }}
+                      style={{ width: '18px', height: '18px', accentColor: '#ca8a04', cursor: 'pointer' }}
                     />
-                    I have read and agree to all boutique visit rules
+                    {lang === 'ar' ? 'قرأت ووافقت على كافة شروط وقواعد الزيارة' : 'I have read and agree to all boutique visit rules'}
                   </label>
                 </div>
               </div>
