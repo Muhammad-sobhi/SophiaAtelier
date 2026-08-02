@@ -11,7 +11,7 @@ class BookingController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Booking::with(['client', 'dress', 'dress2', 'dress3', 'fittings']);
+        $query = Booking::whereHas('client')->with(['client', 'dress', 'dress2', 'dress3', 'fittings']);
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);

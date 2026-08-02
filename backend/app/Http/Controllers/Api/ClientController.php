@@ -166,6 +166,13 @@ class ClientController extends Controller
 
     public function destroy(Client $client): JsonResponse
     {
+        // Delete related visits, bookings, and fittings associated with this bride
+        $client->visits()->delete();
+        $client->bookings()->each(function ($booking) {
+            $booking->fittings()->delete();
+            $booking->delete();
+        });
+
         $client->delete();
 
         return response()->json(['message' => 'Client deleted']);

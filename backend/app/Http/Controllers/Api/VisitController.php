@@ -11,7 +11,7 @@ class VisitController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Visit::with('client');
+        $query = Visit::whereHas('client')->with('client');
 
         if ($clientId = $request->input('client_id')) {
             $query->where('client_id', $clientId);

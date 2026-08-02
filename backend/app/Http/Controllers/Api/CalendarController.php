@@ -20,7 +20,7 @@ class CalendarController extends Controller
         $endDate = $request->input('end_date', now()->endOfMonth()->toDateString());
 
         // Fetch visits in date range
-        $visits = Visit::with(['client.bookings.dress', 'client.bookings.dress2', 'client.bookings.dress3'])
+        $visits = Visit::whereHas('client')->with(['client.bookings.dress', 'client.bookings.dress2', 'client.bookings.dress3'])
             ->whereBetween('visit_date', [$startDate, $endDate])
             ->get()
             ->map(function ($visit) {
@@ -65,7 +65,7 @@ class CalendarController extends Controller
             });
 
         // Fetch bookings in date range (by booking_date or event_date)
-        $bookings = Booking::with(['client.visits', 'dress', 'dress2', 'dress3'])
+        $bookings = Booking::whereHas('client')->with(['client.visits', 'dress', 'dress2', 'dress3'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->whereBetween('booking_date', [$startDate, $endDate])
                   ->orWhereBetween('event_date', [$startDate, $endDate]);
