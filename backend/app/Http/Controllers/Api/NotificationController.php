@@ -46,7 +46,8 @@ class NotificationController extends Controller
                         continue;
                     }
 
-                    $exists = Notification::where('type', 'pickup_reminder')
+                    $exists = Notification::withTrashed()
+                        ->where('type', 'pickup_reminder')
                         ->where('related_type', 'booking')
                         ->where('related_id', $booking->id)
                         ->whereDate('created_at', $todayStr)
