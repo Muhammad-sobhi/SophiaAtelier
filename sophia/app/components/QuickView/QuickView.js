@@ -32,9 +32,11 @@ export default function QuickView() {
 
   const displayName = isAr ? (product.name_ar || product.name) : (product.name || product.name_ar);
   const displayDesc = isAr ? (product.description_ar || product.description) : (product.description || product.description_ar);
-  const displayFabric = isAr ? (product.fabric_ar || product.fabric) : (product.fabric || product.fabric_ar);
   const displayCategory = isAr ? (product.category_ar || product.category) : (product.category || product.category_ar);
   const displayCollection = isAr ? (product.collection_ar || product.collection) : (product.collection || product.collection_ar);
+  const displayDesigner = isAr ? (product.designer_ar || product.designer) : (product.designer || product.designer_ar);
+  const displayFabric = isAr ? (product.fabric_ar || product.fabric) : (product.fabric || product.fabric_ar);
+  const displayColor = isAr ? (product.color_ar || product.color) : (product.color || product.color_ar);
   const formatWeight = (p, isArabic) => {
     if (p?.weight_from && p?.weight_to) {
       return isArabic ? `من ${p.weight_from} كجم إلى ${p.weight_to} كجم` : `${p.weight_from}kg up to ${p.weight_to}kg`;
@@ -131,16 +133,16 @@ export default function QuickView() {
             <h2 className={styles.name}>{displayName}</h2>
 
             {/* Collection & Designer Sub-info */}
-            {(displayCollection || product.designer) && (
+            {(displayCollection || displayDesigner) && (
               <div className={styles.subMeta}>
                 {displayCollection && (
                   <span className={styles.subMetaItem}>
                     <strong>{isAr ? 'التشكيلة:' : 'Collection:'}</strong> {displayCollection}
                   </span>
                 )}
-                {product.designer && (
+                {displayDesigner && (
                   <span className={styles.subMetaItem}>
-                    <strong>{isAr ? 'المصمم:' : 'Designer:'}</strong> {product.designer}
+                    <strong>{isAr ? 'المصمم:' : 'Designer:'}</strong> {displayDesigner}
                   </span>
                 )}
               </div>
@@ -172,15 +174,15 @@ export default function QuickView() {
             {/* Attributes / Details Grid */}
             <div className={styles.specGrid}>
               {/* Color */}
-              {product.color && (
+              {displayColor && (
                 <div className={styles.specItem}>
                   <div className={styles.specHeader}>
                     <Palette size={14} className={styles.specIcon} />
                     <span className={styles.specLabel}>{isAr ? 'اللون' : 'COLOR'}</span>
                   </div>
                   <div className={styles.specValueGroup}>
-                    <span className={styles.colorDot} style={{ backgroundColor: getSwatchColor(product.color) }} />
-                    <span className={styles.specValue}>{product.color}</span>
+                    <span className={styles.colorDot} style={{ backgroundColor: getSwatchColor(displayColor) }} />
+                    <span className={styles.specValue}>{displayColor}</span>
                   </div>
                 </div>
               )}

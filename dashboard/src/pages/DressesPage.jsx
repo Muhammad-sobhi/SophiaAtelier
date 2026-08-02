@@ -28,6 +28,7 @@ export default function DressesPage() {
   const [newFabric, setNewFabric] = useState('');
   const [newFabricAr, setNewFabricAr] = useState('');
   const [newDesigner, setNewDesigner] = useState('');
+  const [newDesignerAr, setNewDesignerAr] = useState('');
   const [newPurchasePrice, setNewPurchasePrice] = useState('');
   const [newRentalCost, setNewRentalCost] = useState('');
   const [newTryingFee, setNewTryingFee] = useState('');
@@ -35,6 +36,7 @@ export default function DressesPage() {
   const [newWeightFrom, setNewWeightFrom] = useState('');
   const [newWeightTo, setNewWeightTo] = useState('');
   const [newColor, setNewColor] = useState('');
+  const [newColorAr, setNewColorAr] = useState('');
   const [newNewCollection, setNewNewCollection] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
 
@@ -55,6 +57,7 @@ export default function DressesPage() {
     setNewFabric('');
     setNewFabricAr('');
     setNewDesigner('');
+    setNewDesignerAr('');
     setNewPurchasePrice('');
     setNewRentalCost('');
     setNewTryingFee('');
@@ -62,6 +65,7 @@ export default function DressesPage() {
     setNewWeightFrom('');
     setNewWeightTo('');
     setNewColor('');
+    setNewColorAr('');
     setNewNewCollection(false);
     setIsAddingNewCategory(false);
     setNewCategoryName('');
@@ -131,15 +135,33 @@ export default function DressesPage() {
 
     // 1. Resolve or Create Designer
     let designerId = null;
-    const matchedDesigner = designers.find((d) => d.name?.toLowerCase() === newDesigner.trim().toLowerCase());
+    const designerNameEn = newDesigner.trim() || newDesignerAr.trim() || '';
+    const designerNameArVal = newDesignerAr.trim() || newDesigner.trim() || '';
+
+    const matchedDesigner = designers.find((d) => 
+      (d.name && d.name.toLowerCase() === designerNameEn.toLowerCase()) || 
+      (d.name_ar && d.name_ar.toLowerCase() === designerNameArVal.toLowerCase())
+    );
+
     if (matchedDesigner) {
       designerId = matchedDesigner.id;
-    } else if (newDesigner.trim()) {
+      if (newDesignerAr.trim() && matchedDesigner.name_ar !== newDesignerAr.trim()) {
+        try {
+          await apiClient.put(`/designers/${matchedDesigner.id}`, {
+            name: matchedDesigner.name || designerNameEn,
+            name_ar: newDesignerAr.trim()
+          });
+        } catch (err) {
+          console.error('Failed to update designer name_ar:', err);
+        }
+      }
+    } else if (designerNameEn) {
       try {
         const desRes = await apiClient.post('/designers', {
-          name: newDesigner.trim(),
+          name: designerNameEn,
+          name_ar: designerNameArVal,
           phone: '000',
-          email: `${newDesigner.trim().replace(/\s+/g, '').toLowerCase()}@atelier-designer.com`
+          email: `${designerNameEn.replace(/\s+/g, '').toLowerCase()}@atelier-designer.com`
         });
         designerId = desRes.id || desRes.data?.id;
       } catch (err) {
@@ -199,6 +221,7 @@ export default function DressesPage() {
         weight_from: wFrom,
         weight_to: wTo,
         color: newColor,
+        color_ar: newColorAr || newColor,
         accessories: validAccs,
         new_collection: newNewCollection ? 1 : 0
       };
@@ -245,7 +268,9 @@ export default function DressesPage() {
     setNewDescriptionAr(dress.description_ar || dress.description || '');
     setNewFabric(dress.fabric || 'Satin');
     setNewFabricAr(dress.fabric_ar || 'ساتان');
-    setNewDesigner(typeof dress.designer === 'object' ? dress.designer?.name || '' : dress.designer || '');
+    const desObj = typeof dress.designer === 'object' ? dress.designer : null;
+    setNewDesigner(desObj?.name || (typeof dress.designer === 'string' ? dress.designer : ''));
+    setNewDesignerAr(desObj?.name_ar || desObj?.name || (typeof dress.designer === 'string' ? dress.designer : ''));
     setNewPurchasePrice(dress.purchase_price ? dress.purchase_price.toString() : '');
     setNewRentalCost(dress.rental_price ? dress.rental_price.toString() : '');
     setNewTryingFee(dress.trying_fee ? dress.trying_fee.toString() : '');
@@ -253,6 +278,7 @@ export default function DressesPage() {
     setNewWeightFrom(dress.weight_from !== null && dress.weight_from !== undefined ? dress.weight_from.toString() : '');
     setNewWeightTo(dress.weight_to !== null && dress.weight_to !== undefined ? dress.weight_to.toString() : '');
     setNewColor(dress.color || 'White');
+    setNewColorAr(dress.color_ar || dress.color || 'أوف وايت');
     setNewNewCollection(dress.new_collection === true || dress.new_collection === 1 || dress.new_collection === '1');
     setSelectedCategoryId(dress.category_id ? dress.category_id.toString() : '');
     setSelectedCollectionId(dress.collection_id ? dress.collection_id.toString() : '');
@@ -313,6 +339,34 @@ export default function DressesPage() {
       setIsTranslating(true);
       const translated = await autoTranslateText(newDescriptionAr, 'ar', 'en');
       setNewDescription(translated);
+      setIsTranslating(false);
+    }
+  };
+
+  const handleAutoTranslateDesigner = async () => {
+    if (newDesigner.trim()) {
+      setIsTranslating(true);
+      const translated = await autoTranslateText(newDesigner, 'en', 'ar');
+      setNewDesignerAr(translated);
+      setIsTranslating(false);
+    } else if (newDesignerAr.trim()) {
+      setIsTranslating(true);
+      const translated = await autoTranslateText(newDesignerAr, 'ar', 'en');
+      setNewDesigner(translated);
+      setIsTranslating(false);
+    }
+  };
+
+  const handleAutoTranslateColor = async () => {
+    if (newColor.trim()) {
+      setIsTranslating(true);
+      const translated = await autoTranslateText(newColor, 'en', 'ar');
+      setNewColorAr(translated);
+      setIsTranslating(false);
+    } else if (newColorAr.trim()) {
+      setIsTranslating(true);
+      const translated = await autoTranslateText(newColorAr, 'ar', 'en');
+      setNewColor(translated);
       setIsTranslating(false);
     }
   };
@@ -733,51 +787,95 @@ export default function DressesPage() {
                   </div>
                 </div>
 
-                {/* Designer, Weight Range, Color */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Designer Fields (EN & AR) + Auto-Translate */}
+                <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-2xl border border-slate-100 relative">
                   <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600">الديزاينر / المصمم</label>
+                    <label className="text-xs font-extrabold text-slate-600">Designer Name (English)</label>
                     <input
                       type="text"
-                      required
-                      placeholder="مثال: زهير مراد"
+                      placeholder="e.g. Monique Lhuillier"
                       value={newDesigner}
                       onChange={(e) => setNewDesigner(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600 block">الوزن المناسب للفستان</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        placeholder="الوزن من (كجم)"
-                        value={newWeightFrom}
-                        onChange={(e) => setNewWeightFrom(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                      />
-                      <input
-                        type="number"
-                        placeholder="إلى وزن (كجم)"
-                        value={newWeightTo}
-                        onChange={(e) => setNewWeightTo(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                      />
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-extrabold text-slate-600">اسم المصمم (بالعربية)</label>
+                      <button
+                        type="button"
+                        onClick={handleAutoTranslateDesigner}
+                        disabled={isTranslating}
+                        className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <Languages size={12} />
+                        <span>{isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية ⚡'}</span>
+                      </button>
                     </div>
+                    <input
+                      type="text"
+                      placeholder="مثال: إسراء القصاص / زهير مراد"
+                      value={newDesignerAr}
+                      onChange={(e) => setNewDesignerAr(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Weight Range */}
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600 block">الوزن المناسب للفستان</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      placeholder="الوزن من (كجم)"
+                      value={newWeightFrom}
+                      onChange={(e) => setNewWeightFrom(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                    <input
+                      type="number"
+                      placeholder="إلى وزن (كجم)"
+                      value={newWeightTo}
+                      onChange={(e) => setNewWeightTo(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                {/* Color Fields (EN & AR) + Auto-Translate */}
+                <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-2xl border border-slate-100 relative">
                   <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600">اللون</label>
+                    <label className="text-xs font-extrabold text-slate-600">Color (English)</label>
                     <input
                       type="text"
-                      required
-                      placeholder="أبيض / Ivory"
+                      placeholder="e.g. Off White, Champagne"
                       value={newColor}
                       onChange={(e) => setNewColor(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-extrabold text-slate-600">اللون (بالعربية)</label>
+                      <button
+                        type="button"
+                        onClick={handleAutoTranslateColor}
+                        disabled={isTranslating}
+                        className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <Languages size={12} />
+                        <span>{isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية ⚡'}</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="مثال: أوف وايت / شامبين"
+                      value={newColorAr}
+                      onChange={(e) => setNewColorAr(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
                   </div>
                 </div>

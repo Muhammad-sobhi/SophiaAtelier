@@ -15,7 +15,7 @@ class Dress extends Model
     protected $fillable = [
         'code', 'name', 'name_ar', 'category_id', 'collection_id', 'designer_id', 'description', 'description_ar',
         'purchase_price', 'rental_price', 'trying_fee', 'status', 'size', 'weight_from', 'weight_to',
-        'color', 'fabric', 'fabric_ar', 'notes', 'new_collection',
+        'color', 'color_ar', 'fabric', 'fabric_ar', 'notes', 'new_collection',
     ];
 
     protected function casts(): array

@@ -18,6 +18,7 @@ class DesignerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'name_ar' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email',
             'notes' => 'nullable|string',
@@ -39,6 +40,7 @@ class DesignerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'name_ar' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email',
             'notes' => 'nullable|string',

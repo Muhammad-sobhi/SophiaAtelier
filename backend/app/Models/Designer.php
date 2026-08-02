@@ -10,7 +10,7 @@ class Designer extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'phone', 'email', 'notes'];
+    protected $fillable = ['name', 'name_ar', 'phone', 'email', 'notes'];
 
     public function dresses(): HasMany
     {
