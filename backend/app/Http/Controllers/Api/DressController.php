@@ -13,7 +13,7 @@ class DressController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Dress::with(['category', 'collection', 'designer', 'images'])->withCount('bookings');
+        $query = Dress::with(['category', 'collection', 'designer', 'images', 'accessories'])->withCount('bookings');
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);

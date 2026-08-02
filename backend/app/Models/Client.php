@@ -12,12 +12,19 @@ class Client extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'phone', 'email', 'address', 'city', 'source', 'notes', 'image_path'];
+    protected $fillable = ['name', 'phone', 'email', 'address', 'city', 'source', 'wedding_date', 'notes', 'image_path'];
 
     protected $appends = ['visits_count', 'total_bookings', 'current_stage', 'latest_visit_date', 'latest_visit_time', 'latest_dress_name', 'latest_dress_trying_fee', 'wedding_date'];
 
     public function getWeddingDateAttribute(): ?string
     {
+        if (!empty($this->attributes['wedding_date'])) {
+            try {
+                return \Carbon\Carbon::parse($this->attributes['wedding_date'])->format('Y-m-d');
+            } catch (\Exception $e) {
+                return explode(' ', $this->attributes['wedding_date'])[0];
+            }
+        }
         $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('id')->first() : $this->bookings()->latest()->first();
         if (!$booking || empty($booking->event_date)) return null;
         try {

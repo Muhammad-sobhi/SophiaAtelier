@@ -68,6 +68,7 @@ export default function BridesPage() {
   const [newPhone, setNewPhone] = useState('');
   const [newSource, setNewSource] = useState('انستقرام');
   const [newVisitDate, setNewVisitDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newWeddingDate, setNewWeddingDate] = useState('');
   const [newNote, setNewNote] = useState('');
   const [selectedModels, setSelectedModels] = useState([]);
 
@@ -163,7 +164,7 @@ export default function BridesPage() {
         current_stage: c.current_stage || 'visit',
         image_path: c.image_path,
         date: c.created_at ? new Date(c.created_at).toISOString().split('T')[0] : '--',
-        wedding_date: c.bookings?.[0]?.event_date || '',
+        wedding_date: c.wedding_date || c.bookings?.[0]?.event_date || '',
         bookings: c.bookings || [],
         visits: c.visits || [],
         latest_visit_date: c.latest_visit_date || c.visits?.[0]?.visit_date || '',
@@ -326,6 +327,9 @@ export default function BridesPage() {
       fd.append('city', newCity);
       fd.append('address', newCity);
       fd.append('source', mappedSource);
+      if (newWeddingDate) {
+        fd.append('wedding_date', newWeddingDate);
+      }
       fd.append('notes', newNote);
       if (brideImage) {
         fd.append('image', brideImage);
@@ -357,6 +361,7 @@ export default function BridesPage() {
     setNewCity(b.city || 'القاهرة');
     setNewPhone(b.phone || '');
     setNewSource(b.source || 'انستقرام');
+    setNewWeddingDate(b.wedding_date || '');
     setNewNote(b.notes || '');
     if (b.image_path) {
       setImagePreviewUrl(`${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${b.image_path}`);
@@ -384,6 +389,9 @@ export default function BridesPage() {
       fd.append('city', newCity);
       fd.append('address', newCity);
       fd.append('source', mappedSource);
+      if (newWeddingDate) {
+        fd.append('wedding_date', newWeddingDate);
+      }
       fd.append('notes', newNote);
       if (brideImage) {
         fd.append('image', brideImage);
@@ -405,6 +413,7 @@ export default function BridesPage() {
     setNewPhone('');
     setNewSource('انستقرام');
     setNewVisitDate(new Date().toISOString().split('T')[0]);
+    setNewWeddingDate('');
     setNewNote('');
     setSelectedModels([]);
     setBrideImage(null);
@@ -769,6 +778,12 @@ export default function BridesPage() {
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
+                <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+              </div>
+
               {/* Dress Selection */}
               {availableDresses.length > 0 &&
             <div className="space-y-1.5">
@@ -880,18 +895,25 @@ export default function BridesPage() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
-                <select value={newSource} onChange={(e) => setNewSource(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
-                  <option value="انستقرام">انستقرام</option>
-                  <option value="فيسبوك">فيسبوك</option>
-                  <option value="تيك توك">تيك توك</option>
-                  <option value="إحالة">إحالة / توصية</option>
-                  <option value="موقع">الموقع الإلكتروني</option>
-                  <option value="واتساب">واتساب</option>
-                  <option value="أخرى">أخرى</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
+                  <select value={newSource} onChange={(e) => setNewSource(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    <option value="انستقرام">انستقرام</option>
+                    <option value="فيسبوك">فيسبوك</option>
+                    <option value="تيك توك">تيك توك</option>
+                    <option value="إحالة">إحالة / توصية</option>
+                    <option value="موقع">الموقع الإلكتروني</option>
+                    <option value="واتساب">واتساب</option>
+                    <option value="أخرى">أخرى</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
+                  <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                </div>
               </div>
 
               <div className="space-y-1">

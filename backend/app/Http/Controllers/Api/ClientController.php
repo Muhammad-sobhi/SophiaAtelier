@@ -116,6 +116,7 @@ class ClientController extends Controller
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
             'source' => 'nullable|in:instagram,website,referral,walkin,whatsapp',
+            'wedding_date' => 'nullable|date',
             'notes' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
@@ -143,6 +144,7 @@ class ClientController extends Controller
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
             'source' => 'nullable|in:instagram,website,referral,walkin,whatsapp',
+            'wedding_date' => 'nullable|date',
             'notes' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
