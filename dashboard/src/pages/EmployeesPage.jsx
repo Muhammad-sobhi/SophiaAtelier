@@ -19,6 +19,8 @@ import { Plus, Phone, DollarSign, Mail, Lock, MapPin, CreditCard, Image, X, Tras
 const AVAILABLE_PAGES = [
 { path: '/dashboard/brides', label: 'العرائس' },
 { path: '/dashboard/dresses', label: 'الفساتين' },
+{ path: '/dashboard/collections', label: 'التشكيلات' },
+{ path: '/dashboard/client-gallery', label: 'معرض العملاء' },
 { path: '/dashboard/visits', label: 'الزيارات' },
 { path: '/dashboard/bookings', label: 'الحجوزات' },
 { path: '/dashboard/fittings', label: 'القياسات' },
@@ -26,7 +28,11 @@ const AVAILABLE_PAGES = [
 { path: '/dashboard/finance', label: 'المالية' },
 { path: '/dashboard/employees', label: 'الموظفين' },
 { path: '/dashboard/attendance', label: 'الحضور والرواتب' },
-{ path: '/dashboard/reports', label: 'التقارير' }];
+{ path: '/dashboard/reports', label: 'التقارير' },
+{ path: '/dashboard/whatsapp-templates', label: 'قوالب الرسائل' },
+{ path: '/dashboard/contact-messages', label: 'رسائل تواصل معنا' },
+{ path: '/dashboard/reviews', label: 'آراء العملاء' },
+{ path: '/dashboard/faqs', label: 'الأسئلة الشائعة' }];
 
 
 export default function EmployeesPage() {

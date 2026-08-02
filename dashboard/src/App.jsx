@@ -19,6 +19,7 @@ const FittingsPage = lazy(() => import('./pages/FittingsPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const ReviewsPage = lazy(() => import('./pages/ReviewsPage'));
+const FaqsPage = lazy(() => import('./pages/FaqsPage'));
 const TasksPage = lazy(() => import('./pages/TasksPage'));
 const VisitsPage = lazy(() => import('./pages/VisitsPage'));
 const WhatsappTemplatesPage = lazy(() => import('./pages/WhatsappTemplatesPage'));
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
+            <Route path="faqs" element={<FaqsPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="visits" element={<VisitsPage />} />
             <Route path="whatsapp-templates" element={<WhatsappTemplatesPage />} />

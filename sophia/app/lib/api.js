@@ -127,3 +127,14 @@ export async function fetchPublicGallery() {
     return [];
   }
 }
+
+export async function fetchPublicFaqs() {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}/public/faqs`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) {
+    console.error('Failed to fetch public faqs:', e);
+    return [];
+  }
+}

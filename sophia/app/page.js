@@ -9,6 +9,7 @@ import NewCollection from './components/NewCollection/NewCollection';
 import DreamDress from './components/Appointment/Appointment';
 import ClientGallery from './components/ClientGallery/ClientGallery';
 import Reviews from './components/Reviews/Reviews';
+import Faq from './components/Faq/Faq';
 import Footer from './components/Footer/Footer';
 import { useStore } from './context/StoreContext';
 
@@ -45,6 +46,7 @@ export default function Home() {
       <DreamDress />
       <ClientGallery />
       <Reviews />
+      <Faq />
       <Footer />
     </>
   );

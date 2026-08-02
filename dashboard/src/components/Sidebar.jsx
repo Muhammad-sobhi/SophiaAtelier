@@ -16,6 +16,7 @@ import {
   Mail,
   Clock,
   Star,
+  HelpCircle,
   Layers,
   Image as ImageIcon } from
 'lucide-react';
@@ -35,7 +36,8 @@ const menuItems = [
 { icon: BarChart3, label: 'التقارير', path: '/dashboard/reports' },
 { icon: MessageSquare, label: 'قوالب الرسائل', path: '/dashboard/whatsapp-templates' },
 { icon: Mail, label: 'رسائل تواصل معنا', path: '/dashboard/contact-messages' },
-{ icon: Star, label: 'آراء العملاء', path: '/dashboard/reviews' }];
+{ icon: Star, label: 'آراء العملاء', path: '/dashboard/reviews' },
+{ icon: HelpCircle, label: 'الأسئلة الشائعة', path: '/dashboard/faqs' }];
 
 
 export function Sidebar({ onClose }) {
@@ -84,7 +86,7 @@ export function Sidebar({ onClose }) {
     if (currentUser.role === 'admin' || currentUser.permissions?.includes('*')) {
       return true;
     }
-    if (item.path === '/dashboard') {
+    if (item.path === '/dashboard' || item.path === '/dashboard/faqs') {
       return true;
     }
     return currentUser.permissions?.includes(item.path);
@@ -113,8 +115,8 @@ export function Sidebar({ onClose }) {
         }
       </div>
 
-      {/* Navigation - Clean padding, no scrollbar, full text size */}
-      <nav className="flex-1 px-3 py-2 overflow-hidden flex flex-col justify-evenly">
+      {/* Navigation - Vertical scroll enabled when items exceed height */}
+      <nav className="flex-1 px-3 py-2 overflow-y-auto min-h-0">
         <ul className="space-y-1">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
@@ -124,7 +126,7 @@ export function Sidebar({ onClose }) {
                 <Link
                   to={item.path}
                   onClick={() => onClose && onClose()}
-                  className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-xs font-bold ${
+                  className={`relative flex items-center gap-3 px-3.5 py-2 rounded-xl transition-all duration-200 text-xs font-bold ${
                   isActive ?
                   'bg-indigo-50/90 text-indigo-600 shadow-xs' :
                   'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`

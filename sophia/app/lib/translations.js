@@ -191,6 +191,11 @@ export const translations = {
       eyebrow: 'TESTIMONIALS',
       title: 'What Our Brides Say',
     },
+    faq: {
+      eyebrow: 'FAQ',
+      title: 'Common Questions, Beautifully Answered',
+      subtitle: 'Everything you need to know about our gowns, services, and your experience.',
+    },
   },
 
   ar: {
@@ -384,6 +389,11 @@ export const translations = {
     reviews: {
       eyebrow: 'آراء العرائس',
       title: 'ماذا تقول عرائسنا عنا',
+    },
+    faq: {
+      eyebrow: 'الأسئلة الشائعة',
+      title: 'أسئلة شائعة، بإجابات واضحة',
+      subtitle: 'كل ما تحتاجين معرفته عن فساتيننا، خدماتنا، وتجربتك معنا.',
     },
   },
 };

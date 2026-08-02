@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\RevenueController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\VisitController;
+use App\Http\Controllers\Api\FaqController;
 use Illuminate\Support\Facades\Route;
 
 // Rate-limited login route
@@ -36,6 +37,7 @@ Route::get('/public/reviews', [ReviewController::class, 'publicIndex']);
 Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
 Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionController::class, 'publicIndex']);
 Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryController::class, 'publicIndex']);
+Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
 Route::get('/dresses', [DressController::class, 'index']);
 Route::get('/dresses/{dress}', [DressController::class, 'show']);
 
@@ -147,6 +149,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('fittings', FittingController::class);
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('reviews', ReviewController::class);
+    Route::apiResource('faqs', FaqController::class);
 
     // Attendance (read-only for staff)
     Route::get('/attendance', [AttendanceController::class, 'index']);
