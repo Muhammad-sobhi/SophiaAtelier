@@ -92,7 +92,7 @@ export default function Faq() {
         {/* Left Side Visual Hero Box */}
         <div
           className={styles.leftBox}
-          style={{ backgroundImage: `url('/images/hero-1.png')` }}
+          style={{ backgroundImage: `url('/images/faq.png')` }}
         >
           <div className={styles.overlay} />
           <div className={styles.leftContent}>
