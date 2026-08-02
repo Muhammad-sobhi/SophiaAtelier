@@ -40,6 +40,12 @@ class NotificationController extends Controller
                 
                 // If pickup date is today or tomorrow (or event_date is tomorrow)
                 if ($pickupDateStr === $tomorrowStr || $pickupDateStr === $todayStr || $eventDt->toDateString() === $tomorrowStr) {
+                    
+                    // Check if dismissed/deleted by user today
+                    if (\Illuminate\Support\Facades\Cache::get("dismissed_pickup_reminder_{$booking->id}_{$todayStr}")) {
+                        continue;
+                    }
+
                     $exists = Notification::where('type', 'pickup_reminder')
                         ->where('related_type', 'booking')
                         ->where('related_id', $booking->id)
@@ -82,6 +88,17 @@ class NotificationController extends Controller
 
     public function destroy(Notification $notification): JsonResponse
     {
+        $todayStr = now()->toDateString();
+        if ($notification->type === 'pickup_reminder' || $notification->related_type === 'booking') {
+            if ($notification->related_id) {
+                \Illuminate\Support\Facades\Cache::put(
+                    "dismissed_pickup_reminder_{$notification->related_id}_{$todayStr}",
+                    true,
+                    now()->addDays(2)
+                );
+            }
+        }
+
         $notification->delete();
 
         return response()->json(['message' => 'Notification deleted']);
@@ -104,6 +121,20 @@ class NotificationController extends Controller
 
     public function deleteAll(): JsonResponse
     {
+        $todayStr = now()->toDateString();
+        $notifications = Notification::all();
+        foreach ($notifications as $notification) {
+            if ($notification->type === 'pickup_reminder' || $notification->related_type === 'booking') {
+                if ($notification->related_id) {
+                    \Illuminate\Support\Facades\Cache::put(
+                        "dismissed_pickup_reminder_{$notification->related_id}_{$todayStr}",
+                        true,
+                        now()->addDays(2)
+                    );
+                }
+            }
+        }
+
         Notification::query()->delete();
 
         return response()->json(['message' => 'All notifications deleted']);
