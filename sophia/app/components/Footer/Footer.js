@@ -6,11 +6,12 @@ import { Phone, MapPin, ExternalLink } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import styles from './Footer.module.css';
 
-const EXACT_MAP_URL = "https://www.google.com/maps?ll=30.047744,31.445114&z=15&t=m&hl=en-US&gl=US&mapclient=embed&q=30%C2%B002%2751.9%22N+31%C2%B026%2742.4%22E+30.047744,+31.445114@30.047744,31.445114";
+const EXACT_MAP_URL = "https://maps.app.goo.gl/RUyaQk3v1rZR4gVC6";
 const EMBED_MAP_SRC = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3454.14856417757!2d31.445114!3d30.047744!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzDCsDAyJzUxLjkiTiAzMcKwMjYnNDIuNCJF!5e0!3m2!1sen!2seg!4v1700000000000!5m2!1sen!2seg";
 
 export default function Footer() {
-  const { t } = useStore();
+  const { t, lang } = useStore();
+  const isAr = lang === 'ar';
 
   const navigateLinks = [
     { label: t.nav.home, href: '/' },
@@ -86,7 +87,7 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* Col 4: Visit Us & Compact Map */}
+        {/* Col 4: Visit Us & Luxury Gold Framed Map */}
         <div className={styles.visitCol}>
           <h4 className={styles.colHeader}>{t.footer.visitUs}</h4>
 
@@ -106,28 +107,42 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Embedded Google Map */}
-            <div className={styles.mapContainer}>
+            {/* Custom Luxury Gold Framed Interactive Map Card */}
+            <a
+              href={EXACT_MAP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.luxuryMapCard}
+              title={isAr ? "افتح الموقع في خرائط جوجل" : "Open in Google Maps"}
+            >
+              {/* Map Background Tile */}
               <iframe
                 title="Sophia Dresses Boutique Location"
                 src={EMBED_MAP_SRC}
                 width="100%"
-                height="95"
-                style={{ border: 0, borderRadius: '6px' }}
-                allowFullScreen=""
+                height="100%"
+                className={styles.mapIframe}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
-              <a
-                href={EXACT_MAP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.mapOverlayBtn}
-              >
-                <span>{t.footer.openMaps}</span>
-                <ExternalLink size={10} />
-              </a>
-            </div>
+
+              {/* Top Glassmorphism Status Badge */}
+              <div className={styles.mapBadge}>
+                <span className={styles.mapBadgeTitle}>SOPHIA DRESSES</span>
+                <span className={styles.mapBadgeStatus}>{isAr ? 'مفتوح الآن 📍' : 'OPEN NOW 📍'}</span>
+              </div>
+
+              {/* Custom Center Gold Pin Marker */}
+              <div className={styles.mapPinWrap}>
+                <div className={styles.goldPin}>
+                  <div className={styles.goldPinInner}>
+                    <span className={styles.pinLogoText}>SD</span>
+                  </div>
+                </div>
+                <div className={styles.pinShadow} />
+                <span className={styles.pinAddressLabel}>{isAr ? 'التجمع الأول - الياسمين 2' : 'Al-Yasmeen 2, Villa 161'}</span>
+              </div>
+            </a>
           </div>
         </div>
       </div>
