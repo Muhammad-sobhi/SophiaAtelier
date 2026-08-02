@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { DressLifecycleCard } from './DressLifecycleCard';
-import { Plus, ChevronLeft, ChevronRight, Gem, Sparkles } from 'lucide-react';import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
+import { Plus, ChevronLeft, ChevronRight, Gem, Sparkles } from 'lucide-react';
 
 export function DressChipStrip({ onAddDress, compact = false }) {
   const [dresses, setDresses] = useState([]);
@@ -45,76 +45,61 @@ export function DressChipStrip({ onAddDress, compact = false }) {
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-  return (/*#__PURE__*/
-    _jsxDEV("div", {
-      className: "space-y-3", children: [/*#__PURE__*/
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+            <Gem size={14} className="text-violet-600" />
+          </div>
+          <h3 className="text-xs font-extrabold text-slate-800">الفساتين</h3>
+          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{dresses.length}</span>
+        </div>
 
-      _jsxDEV("div", {
-        className: "flex items-center justify-between", children: [/*#__PURE__*/
-        _jsxDEV("div", {
-          className: "flex items-center gap-2", children: [/*#__PURE__*/
-          _jsxDEV("div", {
-            className: "w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center", children: /*#__PURE__*/
-            _jsxDEV(Gem, { size: 14, className: "text-violet-600" }, void 0, false)
-          }, void 0, false
-          ), /*#__PURE__*/
-          _jsxDEV("h3", { className: "text-xs font-extrabold text-slate-800", children: "الفساتين" }, void 0, false), /*#__PURE__*/
-          _jsxDEV("span", { className: "text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full", children: dresses.length }, void 0, false)]
-        }, void 0, true
-        ), /*#__PURE__*/
-        _jsxDEV("div", {
-          className: "flex items-center gap-1.5", children: [/*#__PURE__*/
-          _jsxDEV("button", {
-            onClick: () => scroll('right'), className: "w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer", children: /*#__PURE__*/
-            _jsxDEV(ChevronRight, { size: 12 }, void 0, false)
-          }, void 0, false
-          ), /*#__PURE__*/
-          _jsxDEV("button", {
-            onClick: () => scroll('left'), className: "w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer", children: /*#__PURE__*/
-            _jsxDEV(ChevronLeft, { size: 12 }, void 0, false)
-          }, void 0, false
-          ),
-          onAddDress && /*#__PURE__*/
-          _jsxDEV("button", {
-            onClick: onAddDress,
-            className: "flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm", children: [/*#__PURE__*/
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => scroll('right')}
+            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer"
+          >
+            <ChevronRight size={12} />
+          </button>
+          <button
+            onClick={() => scroll('left')}
+            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer"
+          >
+            <ChevronLeft size={12} />
+          </button>
+          {onAddDress && (
+            <button
+              onClick={onAddDress}
+              className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+            >
+              <Plus size={12} />
+              <span>إضافة فستان</span>
+            </button>
+          )}
+        </div>
+      </div>
 
-            _jsxDEV(Plus, { size: 12 }, void 0, false), /*#__PURE__*/
-            _jsxDEV("span", { children: "إضافة فستان" }, void 0, false)]
-          }, void 0, true
-          )]
-        }, void 0, true
-
-        )]
-      }, void 0, true
-      ), /*#__PURE__*/
-
-
-      _jsxDEV("div", {
-        className: "relative", children: /*#__PURE__*/
-        _jsxDEV("div", {
-          ref: scrollRef,
-          className: "flex gap-2 overflow-x-auto scrollbar-none pb-1 scroll-smooth",
-          style: { scrollbarWidth: 'none' }, children:
-
-          loading ? /*#__PURE__*/
-          _jsxDEV("div", {
-            className: "flex gap-2", children:
-            [1, 2, 3, 4].map((i) => /*#__PURE__*/
-            _jsxDEV("div", { className: "w-32 h-12 rounded-xl bg-slate-100 animate-pulse flex-shrink-0" }, i, false)
-            )
-          }, void 0, false
-          ) :
-          dresses.length === 0 ? /*#__PURE__*/
-          _jsxDEV("div", { className: "text-[10px] text-slate-400 font-bold py-2", children: "لا توجد فساتين مسجلة بعد" }, void 0, false) :
-
-          dresses.map((dress) => {
-            const isSelected = selectedDressId === dress.id;
-            const stageColor = stageColors[dress.current_stage] || 'bg-slate-50 border-slate-200 text-slate-600';
-
-            const imgUrl = dress.image_path ?
-            `${apiBaseUrl.replace('/api', '')}/storage/${dress.image_path}` :
-            null;
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          className="flex gap-2 overflow-x-auto scrollbar-none pb-1 scroll-smooth"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {loading ? (
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="w-32 h-12 rounded-xl bg-slate-100 animate-pulse flex-shrink-0" />
+              ))}
+            </div>
+          ) : dresses.length === 0 ? (
+            <div className="text-[10px] text-slate-400 font-bold py-2">لا توجد فساتين مسجلة بعد</div>
+          ) : (
+            dresses.map((dress) => {
+              const isSelected = selectedDressId === dress.id;
+              const stageColor = stageColors[dress.current_stage] || 'bg-slate-50 border-slate-200 text-slate-600';
+              const imgUrl = getStorageUrl(dress?.image_path || dress?.images?.[0]?.image_path || dress?.images?.[0] || dress);
 
             return (/*#__PURE__*/
               _jsxDEV("button", {

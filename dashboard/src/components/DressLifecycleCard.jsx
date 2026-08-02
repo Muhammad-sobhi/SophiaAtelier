@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { CheckCircle2, ShoppingBag, Sparkles, DollarSign, Ruler } from 'lucide-react';
 
 const DRESS_STAGES = [
@@ -52,9 +52,7 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
 
   const actions = getActions();
 
-  const imageUrl = dress?.image_path
-    ? `${(apiBaseUrl || import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${dress.image_path}`
-    : null;
+  const imageUrl = getStorageUrl(dress?.image_path || dress?.images?.[0]?.image_path || dress?.images?.[0] || dress);
 
   const renderColumn = (stageId, label, colorClasses) => {
     const isActive = dress?.current_stage === stageId;
