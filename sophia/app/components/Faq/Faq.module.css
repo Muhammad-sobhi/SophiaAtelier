@@ -182,19 +182,15 @@
 }
 
 .accordionBody {
-  padding: 0 20px 14px 48px;
+  padding-top: 0;
+  padding-bottom: 14px;
+  padding-inline-start: 48px;
+  padding-inline-end: 20px;
   animation: fadeIn 0.3s ease-in-out;
-}
-
-:global([dir="rtl"]) .accordionBody {
-  padding: 0 48px 14px 20px;
 }
 
 @media (max-width: 768px) {
   .accordionBody {
-    padding: 0 14px 12px 14px;
-  }
-  :global([dir="rtl"]) .accordionBody {
     padding: 0 14px 12px 14px;
   }
 }
