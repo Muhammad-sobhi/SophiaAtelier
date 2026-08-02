@@ -280,9 +280,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         if (t) {
           message = t.body.
           replace(/\{\{client_name\}\}/g, bride.name).
+          replace(/\{\{wedding_date\}\}/g, bride.wedding_date || visitDate).
           replace(/\{\{visit_date\}\}/g, visitDate).
           replace(/\{\{visit_time\}\}/g, visitTime).
-          replace(/\{\{dress_line\}\}/g, dress ? `\n• *فستان الزفاف:* ${dress.name}` : '');
+          replace(/\{\{dress_line\}\}/g, dress ? `${dress.name}` : '');
         }
       } catch (err) {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
@@ -446,9 +447,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
           if (t) {
             message = t.body.
             replace(/\{\{client_name\}\}/g, freshBride.name).
+            replace(/\{\{wedding_date\}\}/g, freshBride.wedding_date || visitDate).
             replace(/\{\{visit_date\}\}/g, visitDate).
             replace(/\{\{visit_time\}\}/g, visitTime).
-            replace(/\{\{dress_line\}\}/g, freshBride.latest_dress_name ? `\n• *فستان الزفاف:* ${freshBride.latest_dress_name}` : '');
+            replace(/\{\{dress_line\}\}/g, freshBride.latest_dress_name ? `${freshBride.latest_dress_name}` : '');
           }
         } catch (err) {
           console.error('Failed to fetch whatsapp template, using fallback:', err);

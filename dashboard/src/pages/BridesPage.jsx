@@ -273,9 +273,10 @@ export default function BridesPage() {
         if (t) {
           message = t.body.
           replace(/\{\{client_name\}\}/g, selectedBrideForBooking.name).
+          replace(/\{\{wedding_date\}\}/g, selectedBrideForBooking.wedding_date || visitDate).
           replace(/\{\{visit_date\}\}/g, visitDate).
           replace(/\{\{visit_time\}\}/g, visitTime).
-          replace(/\{\{dress_line\}\}/g, dress ? `\n• *فستان الزفاف:* ${dress.name}` : '');
+          replace(/\{\{dress_line\}\}/g, dress ? `${dress.name}` : '');
         }
       } catch (err) {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
