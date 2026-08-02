@@ -328,10 +328,10 @@ export default function DashboardPage() {
 
       {/* 3. Bride Journey Section (Slim Avatar Selector + Natural Height Journey Card) */}
       <div className="grid grid-cols-12 gap-4 flex-shrink-0">
-        {/* Bride Avatars Selector (Horizontal on Mobile, Vertical on Desktop) */}
-        <div className="col-span-12 sm:col-span-2 lg:col-span-1 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center overflow-visible">
-          <span className="text-[9px] font-black text-slate-400 mb-2">العرائس</span>
-          <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-visible sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none">
+        {/* Bride Avatars Selector (Horizontal on Mobile, Vertical on Desktop with scrollbar) */}
+        <div className="col-span-12 sm:col-span-2 lg:col-span-1 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[380px] sm:max-h-[440px]">
+          <span className="text-[9px] font-black text-slate-400 mb-2 flex-shrink-0">العرائس</span>
+          <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none flex-grow min-h-0">
             {filteredBrides.map((b, idx) => {
               const isActive = selectedBrideId === b.id;
               const avatar = b.image_path
@@ -384,12 +384,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 4. Dress Journey Section (Slim Cubes Selector + Natural Height Dress Card) */}
+      {/* 4. Dress Journey Section (Slim Cubes Selector + Scrollbar + Natural Height Dress Card) */}
       <div className="grid grid-cols-12 gap-4 flex-shrink-0">
-        {/* Dress Cubes Selector (Horizontal on Mobile, Vertical on Desktop) */}
-        <div className="col-span-12 sm:col-span-2 lg:col-span-1 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center overflow-visible">
-          <span className="text-[9px] font-black text-slate-400 mb-2">الفساتين</span>
-          <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-visible sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none">
+        {/* Dress Cubes Selector (Horizontal on Mobile, Vertical on Desktop with scrollbar) */}
+        <div className="col-span-12 sm:col-span-2 lg:col-span-1 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[380px] sm:max-h-[440px]">
+          <span className="text-[9px] font-black text-slate-400 mb-2 flex-shrink-0">الفساتين</span>
+          <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none flex-grow min-h-0">
             {filteredDresses.map((d) => {
               const isActive = selectedDressId === d.id;
               const imageUrl = getStorageUrl(d.image_path || d.images?.[0]?.image_path);
