@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { DressLifecycleCard } from './DressLifecycleCard';
-import { Plus, ChevronLeft, ChevronRight, Gem, Sparkles } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Gem, Sparkles, Search, X } from 'lucide-react';
 
 export function DressChipStrip({ onAddDress, compact = false }) {
   const [dresses, setDresses] = useState([]);
   const [selectedDressId, setSelectedDressId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef(null);
 
@@ -14,7 +15,7 @@ export function DressChipStrip({ onAddDress, compact = false }) {
       const data = await apiClient.get('/dashboard/dresses-summary');
       const list = Array.isArray(data) ? data : data.data || [];
       setDresses(list);
-      if (list.length > 0) {
+      if (list.length > 0 && !selectedDressId) {
         setSelectedDressId(list[0].id);
       }
     } catch (e) {
@@ -35,6 +36,15 @@ export function DressChipStrip({ onAddDress, compact = false }) {
     }
   };
 
+  const filteredDresses = dresses.filter((d) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const nameMatch = d.name?.toLowerCase().includes(q);
+    const codeMatch = d.code?.toString().toLowerCase().includes(q);
+    const designerMatch = (typeof d.designer === 'object' ? d.designer?.name : d.designer)?.toLowerCase().includes(q);
+    return nameMatch || codeMatch || designerMatch;
+  });
+
   const selectedDress = dresses.find((d) => d.id === selectedDressId);
 
   const stageColors = {
@@ -47,37 +57,59 @@ export function DressChipStrip({ onAddDress, compact = false }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
             <Gem size={14} className="text-violet-600" />
           </div>
-          <h3 className="text-xs font-extrabold text-slate-800">الفساتين</h3>
-          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{dresses.length}</span>
+          <h3 className="text-xs font-extrabold text-slate-800">رحلة الفستان</h3>
+          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{filteredDresses.length} / {dresses.length}</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => scroll('right')}
-            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer"
-          >
-            <ChevronRight size={12} />
-          </button>
-          <button
-            onClick={() => scroll('left')}
-            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer"
-          >
-            <ChevronLeft size={12} />
-          </button>
-          {onAddDress && (
+        {/* Search Bar & Actions */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 sm:w-48">
+            <input
+              type="text"
+              placeholder="ابحث عن فستان أو كود..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-7 pr-7 py-1 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:bg-white transition-all"
+            />
+            <Search size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1">
             <button
-              onClick={onAddDress}
-              className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+              onClick={() => scroll('right')}
+              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer"
             >
-              <Plus size={12} />
-              <span>إضافة فستان</span>
+              <ChevronRight size={12} />
             </button>
-          )}
+            <button
+              onClick={() => scroll('left')}
+              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-all cursor-pointer"
+            >
+              <ChevronLeft size={12} />
+            </button>
+            {onAddDress && (
+              <button
+                onClick={onAddDress}
+                className="flex items-center gap-1 px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+              >
+                <Plus size={12} />
+                <span>إضافة</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -93,63 +125,59 @@ export function DressChipStrip({ onAddDress, compact = false }) {
                 <div key={i} className="w-32 h-12 rounded-xl bg-slate-100 animate-pulse flex-shrink-0" />
               ))}
             </div>
-          ) : dresses.length === 0 ? (
-            <div className="text-[10px] text-slate-400 font-bold py-2">لا توجد فساتين مسجلة بعد</div>
+          ) : filteredDresses.length === 0 ? (
+            <div className="text-[10px] text-slate-400 font-bold py-2">
+              {searchQuery ? 'لا توجد نتائج تطابق بحثك' : 'لا توجد فساتين مسجلة بعد'}
+            </div>
           ) : (
-            dresses.map((dress) => {
+            filteredDresses.map((dress) => {
               const isSelected = selectedDressId === dress.id;
               const stageColor = stageColors[dress.current_stage] || 'bg-slate-50 border-slate-200 text-slate-600';
               const imgUrl = getStorageUrl(dress?.image_path || dress?.images?.[0]?.image_path || dress?.images?.[0] || dress);
 
-            return (/*#__PURE__*/
-              _jsxDEV("button", {
+              return (
+                <button
+                  key={dress.id}
+                  onClick={() => setSelectedDressId(isSelected ? null : dress.id)}
+                  className={`flex-shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[10px] font-extrabold transition-all duration-300 cursor-pointer ${
+                    isSelected
+                      ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200 scale-105'
+                      : `${stageColor} hover:shadow-sm hover:scale-[1.02]`
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border ${isSelected ? 'border-white/30' : 'border-slate-200'}`}>
+                    {imgUrl ? (
+                      <img src={imgUrl} alt={dress.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className={`w-full h-full flex items-center justify-center ${isSelected ? 'bg-white/10' : 'bg-slate-50'}`}>
+                        <Sparkles size={12} className={isSelected ? 'text-white/60' : 'text-slate-300'} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="whitespace-nowrap">{dress.name}</span>
+                    {dress.code && (
+                      <span className={`text-[8px] font-bold ${isSelected ? 'text-violet-200' : 'text-slate-400'}`}>
+                        #{dress.code}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
 
-                onClick: () => setSelectedDressId(isSelected ? null : dress.id),
-                className: `flex-shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[10px] font-extrabold transition-all duration-300 cursor-pointer ${isSelected ?
-                'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200 scale-105' :
-                `${stageColor} hover:shadow-sm hover:scale-[1.02]`}`, children: [/*#__PURE__*/
-
-
-
-                _jsxDEV("div", {
-                  className: `w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border ${isSelected ? 'border-white/30' : 'border-slate-200'}`, children:
-
-                  imgUrl ? /*#__PURE__*/
-                  _jsxDEV("img", { src: imgUrl, alt: dress.name, className: "w-full h-full object-cover" }, void 0, false) : /*#__PURE__*/
-
-                  _jsxDEV("div", {
-                    className: `w-full h-full flex items-center justify-center ${isSelected ? 'bg-white/10' : 'bg-slate-50'}`, children: /*#__PURE__*/
-                    _jsxDEV(Sparkles, { size: 12, className: isSelected ? 'text-white/60' : 'text-slate-300' }, void 0, false)
-                  }, void 0, false
-                  )
-                }, void 0, false
-
-                ), /*#__PURE__*/
-                _jsxDEV("span", { className: "whitespace-nowrap", children: dress.name }, void 0, false)]
-              }, dress.id, true
-              ));
-
-          })
-        }, void 0, false
-
-        )
-      }, void 0, false
-      ),
-
-
-      selectedDress && /*#__PURE__*/
-      _jsxDEV("div", {
-        className: "transition-all duration-500 animate-fade-in", children: /*#__PURE__*/
-        _jsxDEV(DressLifecycleCard, {
-          dress: selectedDress,
-          onStageUpdate: fetchDresses,
-          apiBaseUrl: apiBaseUrl
-        }, void 0, false
-        )
-      }, void 0, false
-      )]
-    }, void 0, true
-
-    ));
-
+      {selectedDress && (
+        <div className="transition-all duration-500 animate-fade-in">
+          <DressLifecycleCard
+            dress={selectedDress}
+            onStageUpdate={fetchDresses}
+            apiBaseUrl={apiBaseUrl}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
