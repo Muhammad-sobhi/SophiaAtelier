@@ -241,6 +241,8 @@ export default function DashboardPage() {
         setSelectedBrideId(filteredBrides[0].id);
       }
     }
+  }, [brideSearch, filteredBrides]);
+
   const filteredDresses = dresses.filter((d) => {
     if (!dressSearch.trim()) return true;
     const q = dressSearch.toLowerCase().trim();
