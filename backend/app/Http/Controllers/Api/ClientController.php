@@ -17,8 +17,10 @@ class ClientController extends Controller
     public function index(Request $request)
     {
         $query = Client::withCount(['visits', 'bookings'])->with([
-            'visits' => function ($q) { $q->latest(); },
-            'bookings' => function ($q) { $q->latest(); },
+            'visits' => function ($q) {
+                $q->latest(); },
+            'bookings' => function ($q) {
+                $q->latest(); },
             'bookings.dress.accessories',
             'bookings.dress2.accessories',
             'bookings.dress3.accessories',
@@ -30,7 +32,7 @@ class ClientController extends Controller
             $cleanSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
             $query->where(function ($q) use ($cleanSearch) {
                 $q->where('name', 'like', "%{$cleanSearch}%")
-                  ->orWhere('phone', 'like', "%{$cleanSearch}%");
+                    ->orWhere('phone', 'like', "%{$cleanSearch}%");
             });
         }
 
@@ -66,16 +68,16 @@ class ClientController extends Controller
 
         if ($phone && $email) {
             $cleanPhone = preg_replace('/[^\d]/', '', $phone);
-            $query->where(function($q) use ($phone, $cleanPhone, $email) {
+            $query->where(function ($q) use ($phone, $cleanPhone, $email) {
                 $q->where('phone', $phone)
-                  ->orWhere('phone', 'LIKE', "%{$cleanPhone}%")
-                  ->orWhere('email', $email);
+                    ->orWhere('phone', 'LIKE', "%{$cleanPhone}%")
+                    ->orWhere('email', $email);
             });
         } elseif ($phone) {
             $cleanPhone = preg_replace('/[^\d]/', '', $phone);
-            $query->where(function($q) use ($phone, $cleanPhone) {
+            $query->where(function ($q) use ($phone, $cleanPhone) {
                 $q->where('phone', $phone)
-                  ->orWhere('phone', 'LIKE', "%{$cleanPhone}%");
+                    ->orWhere('phone', 'LIKE', "%{$cleanPhone}%");
             });
         } elseif ($email) {
             $query->where('email', $email);
@@ -95,8 +97,10 @@ class ClientController extends Controller
     public function show(Client $client): JsonResponse
     {
         $client->loadMissing([
-            'visits' => function ($q) { $q->latest(); },
-            'bookings' => function ($q) { $q->latest(); },
+            'visits' => function ($q) {
+                $q->latest(); },
+            'bookings' => function ($q) {
+                $q->latest(); },
             'bookings.dress.accessories',
             'bookings.dress2.accessories',
             'bookings.dress3.accessories',
@@ -222,7 +226,7 @@ class ClientController extends Controller
                 $booking = $client->bookings()->latest()->first();
                 $dressId = $request->input('dress_id') ?: ($booking ? $booking->dress_id : 1);
                 $fittingDate = $request->input('fitting_date', now()->addDays(3)->toDateString());
-                
+
                 // Check if dress is booked/out on the proposed fitting date
                 $conflict = \App\Models\Booking::isDressOutOnDate($dressId, $fittingDate, $client->id);
                 if ($conflict) {
@@ -244,7 +248,7 @@ class ClientController extends Controller
                 } else {
                     $booking->update(['dress_id' => $dressId]);
                 }
-                
+
                 Fitting::create([
                     'booking_id' => $booking->id,
                     'fitting_date' => $request->input('fitting_date', now()->addDays(3)->toDateString()),
@@ -277,10 +281,10 @@ class ClientController extends Controller
                     $booking = new \App\Models\Booking();
                     $booking->client_id = $client->id;
                 }
-                
+
                 $dressId = $request->input('dress_id');
                 $eventDate = $request->input('event_date', $client->wedding_date);
-                
+
                 // Validate availability
                 $conflict = \App\Models\Booking::checkDressAvailability(
                     $client->id,
@@ -288,7 +292,7 @@ class ClientController extends Controller
                     $eventDate,
                     $booking->id
                 );
-                
+
                 if ($conflict) {
                     return response()->json([
                         'message' => "هذا الفستان غير متوفر في هذه الفترة: {$conflict}"
@@ -362,7 +366,7 @@ class ClientController extends Controller
                     if ($booking->dress) {
                         $booking->dress->update(['status' => 'dry_clean']);
                     }
-                    
+
                     // Log negative revenue for insurance refund using the SAME payment method used when collecting insurance
                     $insuranceAmount = floatval($booking->insurance_amount ?: 500);
                     if ($insuranceAmount > 0) {
@@ -370,7 +374,7 @@ class ClientController extends Controller
                             ->where('notes', 'like', '%تأمين%')
                             ->latest()
                             ->first();
-                        
+
                         $paymentMethod = $insuranceRev ? $insuranceRev->payment_method : 'cash';
 
                         \App\Models\Revenue::create([
@@ -400,26 +404,26 @@ class ClientController extends Controller
     public function exportCsv(Request $request)
     {
         $headers = [
-            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-type" => "text/csv; charset=UTF-8",
             "Content-Disposition" => "attachment; filename=previous_brides_" . date('Y-m-d') . ".csv",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
         ];
 
         $columns = ['ID', 'Name', 'Phone', 'Email', 'City', 'Address', 'Source', 'Notes', 'Wedding Date', 'Created At'];
 
-        $callback = function() use($columns) {
+        $callback = function () use ($columns) {
             $file = fopen('php://output', 'w');
-            
+
             // Add UTF-8 BOM for Excel Arabic compatibility
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
             fputcsv($file, $columns);
 
-            Client::whereHas('bookings', function($q) {
+            Client::whereHas('bookings', function ($q) {
                 $q->where('status', 'returned');
-            })->chunk(100, function($clients) use ($file) {
+            })->chunk(100, function ($clients) use ($file) {
                 foreach ($clients as $client) {
                     $latestBooking = $client->bookings()->latest()->first();
                     $weddingDate = $latestBooking ? $latestBooking->event_date : '';
@@ -457,19 +461,6 @@ class ClientController extends Controller
 
         \DB::beginTransaction();
         try {
-            // Delete old broken excel_import records before re-importing clean data
-            $oldExcelClients = Client::where('source', 'excel_import')->orWhere('source', 'walkin')->whereHas('bookings', function($q) {
-                $q->where('notes', 'like', '%استيراد%');
-            })->get();
-
-            foreach ($oldExcelClients as $oldClient) {
-                foreach ($oldClient->bookings as $b) {
-                    \App\Models\Revenue::where('booking_id', $b->id)->delete();
-                    $b->forceDelete();
-                }
-                $oldClient->forceDelete();
-            }
-
             foreach ($rows as $index => $row) {
                 // Key fields matching the columns
                 $brideName = trim($row['bride_name'] ?? $row['اسم العروسه'] ?? $row[0] ?? '');
@@ -497,25 +488,36 @@ class ClientController extends Controller
                 // Normalize Arabic city names (e.g., "الجيزه" -> "الجيزة", "القاهره" -> "القاهرة")
                 if (!empty($city)) {
                     $city = str_replace(['ه', 'أ', 'إ', 'آ'], ['ة', 'ا', 'ا', 'ا'], $city);
-                    if (str_contains($city, 'جيز')) $city = 'الجيزة';
-                    if (str_contains($city, 'قاهر')) $city = 'القاهرة';
-                    if (str_contains($city, 'منصور')) $city = 'المنصورة';
-                    if (str_contains($city, 'اسكندر') || str_contains($city, 'إسكندر')) $city = 'الإسكندرية';
-                    if (str_contains($city, 'منوف')) $city = 'المنوفية';
-                    if (str_contains($city, 'اسماعيل') || str_contains($city, 'إسماعيل')) $city = 'الإسماعيلية';
-                    if (str_contains($city, 'سويف')) $city = 'بني سويف';
-                    if (str_contains($city, 'شرق')) $city = 'الشرقية';
-                    if (str_contains($city, 'غري')) $city = 'الغربية';
-                    if (str_contains($city, 'سويس')) $city = 'السويس';
+                    if (str_contains($city, 'جيز'))
+                        $city = 'الجيزة';
+                    if (str_contains($city, 'قاهر'))
+                        $city = 'القاهرة';
+                    if (str_contains($city, 'منصور'))
+                        $city = 'المنصورة';
+                    if (str_contains($city, 'اسكندر') || str_contains($city, 'إسكندر'))
+                        $city = 'الإسكندرية';
+                    if (str_contains($city, 'منوف'))
+                        $city = 'المنوفية';
+                    if (str_contains($city, 'اسماعيل') || str_contains($city, 'إسماعيل'))
+                        $city = 'الإسماعيلية';
+                    if (str_contains($city, 'سويف'))
+                        $city = 'بني سويف';
+                    if (str_contains($city, 'شرق'))
+                        $city = 'الشرقية';
+                    if (str_contains($city, 'غري'))
+                        $city = 'الغربية';
+                    if (str_contains($city, 'سويس'))
+                        $city = 'السويس';
                 }
 
                 // Helper to clean and format dates (handles 29\4, 29/4, 2\8, 2026-04-29, extra spaces and arabic digits)
                 $parseDate = function ($dateVal) {
-                    if (empty($dateVal)) return null;
+                    if (empty($dateVal))
+                        return null;
                     try {
                         // Convert Eastern Arabic numerals to Western Arabic
-                        $westernDigits = ['0','1','2','3','4','5','6','7','8','9'];
-                        $easternDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+                        $westernDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+                        $easternDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
                         $str = str_replace($easternDigits, $westernDigits, trim($dateVal));
 
                         // Match day and month pattern e.g., 2\8, 2/8, 02-08, 2.8
@@ -593,10 +595,14 @@ class ClientController extends Controller
 
                 // Build notes from extra dates, sales, notes
                 $notesArr = [];
-                if ($formattedPickupDate) $notesArr[] = "يوم الاستلام: " . $formattedPickupDate;
-                if ($formattedReturnDate) $notesArr[] = "يوم التسليم: " . $formattedReturnDate;
-                if ($salesPerson) $notesArr[] = "السيلز: " . $salesPerson;
-                if ($extraNotes) $notesArr[] = "ملاحظات: " . $extraNotes;
+                if ($formattedPickupDate)
+                    $notesArr[] = "يوم الاستلام: " . $formattedPickupDate;
+                if ($formattedReturnDate)
+                    $notesArr[] = "يوم التسليم: " . $formattedReturnDate;
+                if ($salesPerson)
+                    $notesArr[] = "السيلز: " . $salesPerson;
+                if ($extraNotes)
+                    $notesArr[] = "ملاحظات: " . $extraNotes;
                 $notesStr = implode(' | ', $notesArr);
 
                 // Determine status automatically based on pickup & return date rules:

@@ -32,7 +32,12 @@ class DressController extends Controller
             $query->where('name', 'like', "%{$cleanSearch}%");
         }
 
-        return response()->json($query->latest()->paginate($request->input('per_page', 15)));
+        if ($request->input('per_page') === 'all') {
+            return response()->json($query->latest()->get());
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+        return response()->json($query->latest()->paginate($perPage));
     }
 
     public function store(Request $request): JsonResponse

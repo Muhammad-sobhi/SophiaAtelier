@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
-import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages } from 'lucide-react';
+import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft } from 'lucide-react';
 
 const DRESS_STAGES = [
 { id: 'ready', label: 'جاهز', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
@@ -17,6 +17,16 @@ export default function DressesPage() {
   const [designers, setDesigners] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState('15');
+  const [paginationMeta, setPaginationMeta] = useState({
+    total: 0,
+    lastPage: 1,
+    from: 0,
+    to: 0,
+  });
 
   // Form states for new/edit dress
   const [editingDress, setEditingDress] = useState(null);
@@ -97,11 +107,34 @@ export default function DressesPage() {
   // Accessories list states
   const [accessories, setAccessories] = useState(['']);
 
-  const fetchDresses = async () => {
+  const fetchDresses = async (page = currentPage, pageLimit = perPage) => {
     try {
-      const response = await apiClient.get('/dresses');
-      const data = response.data || [];
-      setDressesList(data);
+      const response = await apiClient.get('/dresses', {
+        params: {
+          page: pageLimit === 'all' ? undefined : page,
+          per_page: pageLimit
+        }
+      });
+
+      if (Array.isArray(response)) {
+        setDressesList(response);
+        setPaginationMeta({
+          total: response.length,
+          lastPage: 1,
+          from: response.length > 0 ? 1 : 0,
+          to: response.length,
+        });
+      } else if (response && response.data) {
+        setDressesList(response.data);
+        setPaginationMeta({
+          total: response.total || response.data.length,
+          lastPage: response.last_page || 1,
+          from: response.from || 1,
+          to: response.to || response.data.length,
+        });
+      } else {
+        setDressesList([]);
+      }
     } catch (e) {
       console.error('Failed to fetch dresses:', e);
     }
@@ -476,7 +509,29 @@ export default function DressesPage() {
       {/* Dresses Grid */}
       <div className="flex-1 bg-white rounded-3xl p-5 border border-slate-100 flex flex-col overflow-hidden shadow-sm">
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <h2 className="text-xs font-extrabold text-slate-600">كتالوج الفساتين المتاحة ({filteredDresses.length})</h2>
+          <h2 className="text-xs font-extrabold text-slate-600">
+            كتالوج الفساتين المتاحة ({paginationMeta.total || filteredDresses.length})
+          </h2>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500">العرض في الصفحة:</span>
+            <select
+              value={perPage}
+              onChange={(e) => {
+                const newLimit = e.target.value;
+                setPerPage(newLimit);
+                setCurrentPage(1);
+                fetchDresses(1, newLimit);
+              }}
+              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+              <option value="12">12 فستان</option>
+              <option value="15">15 فستان</option>
+              <option value="24">24 فستان</option>
+              <option value="48">48 فستان</option>
+              <option value="all">عرض الكل (Show All)</option>
+            </select>
+          </div>
         </div>
 
         <div className="flex-grow overflow-y-auto pr-1 scrollbar-thin select-none">
@@ -585,6 +640,47 @@ export default function DressesPage() {
             })}
           </div>
         </div>
+
+        {/* Pagination Footer Controls */}
+        {perPage !== 'all' && paginationMeta.lastPage > 1 && (
+          <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 flex-shrink-0 text-xs font-bold text-slate-600">
+            <div>
+              عرض {paginationMeta.from || 0} - {paginationMeta.to || 0} من أصل {paginationMeta.total || 0} فستان
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  const p = currentPage - 1;
+                  setCurrentPage(p);
+                  fetchDresses(p, perPage);
+                }}
+                className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
+                title="الصفحة السابقة"
+              >
+                <ChevronRight size={16} />
+              </button>
+
+              <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl font-extrabold text-xs">
+                صفحة {currentPage} من {paginationMeta.lastPage}
+              </span>
+
+              <button
+                disabled={currentPage >= paginationMeta.lastPage}
+                onClick={() => {
+                  const p = currentPage + 1;
+                  setCurrentPage(p);
+                  fetchDresses(p, perPage);
+                }}
+                className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
+                title="الصفحة التالية"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Dress Modal */}
