@@ -241,8 +241,23 @@ export default function DashboardPage() {
         setSelectedBrideId(filteredBrides[0].id);
       }
     }
-  }, [brideSearch, filteredBrides]);
-  const filteredDresses = dresses.filter((d) => d.name?.toLowerCase().includes(dressSearch.toLowerCase()));
+  const filteredDresses = dresses.filter((d) => {
+    if (!dressSearch.trim()) return true;
+    const q = dressSearch.toLowerCase().trim();
+    const nameMatch = (d.name || '').toLowerCase().includes(q);
+    const codeMatch = (d.code || '').toString().toLowerCase().includes(q);
+    const designerMatch = (typeof d.designer === 'object' ? d.designer?.name : d.designer)?.toLowerCase().includes(q);
+    return nameMatch || codeMatch || designerMatch;
+  });
+
+  // Auto-select first matched dress when search changes
+  useEffect(() => {
+    if (dressSearch.trim() && filteredDresses.length > 0) {
+      if (!filteredDresses.some(d => d.id === selectedDressId)) {
+        setSelectedDressId(filteredDresses[0].id);
+      }
+    }
+  }, [dressSearch, filteredDresses]);
 
   const priorityColors = {
     'عالي': 'text-rose-600 bg-rose-50 border-rose-100',
@@ -416,8 +431,21 @@ export default function DashboardPage() {
       {/* 4. Dress Journey Section (Slim Cubes Selector + Scrollbar + Natural Height Dress Card) */}
       <div className="grid grid-cols-12 gap-4 flex-shrink-0">
         {/* Dress Cubes Selector (Horizontal on Mobile, Vertical on Desktop with scrollbar) */}
-        <div className="col-span-12 sm:col-span-2 lg:col-span-1 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[380px] sm:max-h-[440px]">
-          <span className="text-[9px] font-black text-slate-400 mb-2 flex-shrink-0">الفساتين</span>
+        <div className="col-span-12 sm:col-span-3 lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[420px] sm:max-h-[480px]">
+          <div className="w-full flex items-center justify-between mb-2 flex-shrink-0">
+            <span className="text-[10px] font-black text-slate-500">الفساتين ({filteredDresses.length})</span>
+          </div>
+          {/* Live Search Input Box */}
+          <div className="w-full relative mb-2 flex-shrink-0">
+            <input
+              type="text"
+              placeholder="اسم / كود الفستان..."
+              value={dressSearch}
+              onChange={(e) => setDressSearch(e.target.value)}
+              className="w-full pr-7 pl-2 py-1 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-slate-700 placeholder:text-slate-400"
+            />
+            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+          </div>
           <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none flex-grow min-h-0">
             {filteredDresses.map((d) => {
               const isActive = selectedDressId === d.id;
@@ -464,7 +492,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Expanded Wide Dress Lifecycle Card with natural height */}
-        <div className="col-span-12 sm:col-span-10 lg:col-span-11">
+        <div className="col-span-12 sm:col-span-9 lg:col-span-10">
           {selectedDress ? (
             <DressLifecycleCard
               dress={selectedDress}
