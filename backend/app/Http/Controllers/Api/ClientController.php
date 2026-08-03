@@ -457,6 +457,19 @@ class ClientController extends Controller
 
         \DB::beginTransaction();
         try {
+            // Delete old broken excel_import records before re-importing clean data
+            $oldExcelClients = Client::where('source', 'excel_import')->orWhere('source', 'walkin')->whereHas('bookings', function($q) {
+                $q->where('notes', 'like', '%استيراد%');
+            })->get();
+
+            foreach ($oldExcelClients as $oldClient) {
+                foreach ($oldClient->bookings as $b) {
+                    \App\Models\Revenue::where('booking_id', $b->id)->delete();
+                    $b->forceDelete();
+                }
+                $oldClient->forceDelete();
+            }
+
             foreach ($rows as $index => $row) {
                 // Key fields matching the columns
                 $brideName = trim($row['bride_name'] ?? $row['اسم العروسه'] ?? $row[0] ?? '');
