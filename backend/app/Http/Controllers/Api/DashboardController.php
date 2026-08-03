@@ -94,12 +94,34 @@ class DashboardController extends Controller
                 'revenues'
             ])->latest();
         }, 'fittings'])
-        ->latest()
         ->get()
         ->map(function ($client) {
             $latestVisit = $client->visits->first();
             $latestBooking = $client->bookings->first();
  
+            // Extract relevant date for sorting (pickup_date > event_date > wedding_date > visit_date > booking_date)
+            $relevantDate = null;
+            if ($latestBooking) {
+                if (preg_match('/يوم الاستلام:\s*(\d{4}-\d{2}-\d{2})/', $latestBooking->notes ?? '', $m)) {
+                    $relevantDate = $m[1];
+                }
+                if (!$relevantDate && $latestBooking->event_date) {
+                    $relevantDate = \Carbon\Carbon::parse($latestBooking->event_date)->format('Y-m-d');
+                }
+                if (!$relevantDate && $latestBooking->booking_date) {
+                    $relevantDate = \Carbon\Carbon::parse($latestBooking->booking_date)->format('Y-m-d');
+                }
+            }
+            if (!$relevantDate && $client->wedding_date) {
+                $relevantDate = \Carbon\Carbon::parse($client->wedding_date)->format('Y-m-d');
+            }
+            if (!$relevantDate && $latestVisit?->visit_date) {
+                $relevantDate = \Carbon\Carbon::parse($latestVisit->visit_date)->format('Y-m-d');
+            }
+            if (!$relevantDate && $client->created_at) {
+                $relevantDate = $client->created_at->format('Y-m-d');
+            }
+
             return [
                 'id' => $client->id,
                 'name' => $client->name,
@@ -113,9 +135,14 @@ class DashboardController extends Controller
                 'latest_dress_name' => $latestBooking?->dress?->name,
                 'notes' => $client->notes ?? '',
                 'created_at' => $client->created_at->toDateString(),
+                'relevant_date' => $relevantDate,
                 'bookings' => $client->bookings,
             ];
-        });
+        })
+        ->sortBy(function ($client) {
+            return $client['relevant_date'] ?? '9999-12-31';
+        })
+        ->values();
 
         return response()->json($clients);
     }

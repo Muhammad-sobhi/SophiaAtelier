@@ -32,8 +32,8 @@ class NotificationController extends Controller
                 
                 $eventDt = \Carbon\Carbon::parse($booking->event_date);
                 $city = $booking->client->city ?? 'القاهرة';
-                $isCairo = str_contains($city, 'القاهرة') || str_contains(strtolower($city), 'cairo');
-                $pickupDaysBefore = $isCairo ? 1 : 2;
+                $isCairoOrGiza = str_contains($city, 'القاهرة') || str_contains($city, 'الجيزة') || str_contains(strtolower($city), 'cairo') || str_contains(strtolower($city), 'giza');
+                $pickupDaysBefore = $isCairoOrGiza ? 1 : 2;
                 
                 $pickupDt = $eventDt->copy()->subDays($pickupDaysBefore);
                 $pickupDateStr = $pickupDt->toDateString();

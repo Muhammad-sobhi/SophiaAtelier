@@ -8,8 +8,9 @@ import {
   Gem,
 
   X,
-  CreditCard } from
-'lucide-react';
+  CreditCard
+} from
+  'lucide-react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { BrideJourneyCard } from '@/components/BrideJourneyCard';
 import { DressLifecycleCard } from '@/components/DressLifecycleCard';
@@ -26,13 +27,13 @@ import { DressLifecycleCard } from '@/components/DressLifecycleCard';
 
 
 const mockAvatars = [
-'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=120&auto=format&fit=crop&q=80'];
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=120&auto=format&fit=crop&q=80'];
 
 
 export default function DashboardPage() {
@@ -78,9 +79,9 @@ export default function DashboardPage() {
     if (isPickupModalOpen && selectedBrideForPickup) {
       const booking = selectedBrideForPickup.bookings?.[0];
       const accs = [
-      ...(booking?.dress?.accessories || []),
-      ...(booking?.dress2?.accessories || []),
-      ...(booking?.dress3?.accessories || [])];
+        ...(booking?.dress?.accessories || []),
+        ...(booking?.dress2?.accessories || []),
+        ...(booking?.dress3?.accessories || [])];
 
       const initialChecked = {};
       accs.forEach((a, i) => {
@@ -99,9 +100,9 @@ export default function DashboardPage() {
     if (isReturnModalOpen && selectedBrideForReturn) {
       const booking = selectedBrideForReturn.bookings?.[0];
       const accs = [
-      ...(booking?.dress?.accessories || []),
-      ...(booking?.dress2?.accessories || []),
-      ...(booking?.dress3?.accessories || [])];
+        ...(booking?.dress?.accessories || []),
+        ...(booking?.dress2?.accessories || []),
+        ...(booking?.dress3?.accessories || [])];
 
       const initialChecked = {};
       accs.forEach((a, i) => {
@@ -120,8 +121,8 @@ export default function DashboardPage() {
 
       if (isAdmin) {
         const [dbStats, execStats] = await Promise.all([
-        apiClient.get('/dashboard'),
-        apiClient.get('/dashboard/executive')]
+          apiClient.get('/dashboard'),
+          apiClient.get('/dashboard/executive')]
         );
         setTotalBrides(dbStats.total_clients || 0);
         setFittingsCount(dbStats.today_fittings || 0);
@@ -161,7 +162,12 @@ export default function DashboardPage() {
       const res = await apiClient.get('/dashboard/brides-summary');
       const list = Array.isArray(res) ? res : res.data || [];
       setBrides(list);
-      if (list.length > 0) {
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const targetBrideId = searchParams.get('bride_id');
+      if (targetBrideId && list.some(b => b.id === Number(targetBrideId))) {
+        setSelectedBrideId(Number(targetBrideId));
+      } else if (list.length > 0) {
         setSelectedBrideId((prev) => prev !== null ? prev : list[0].id);
       }
     } catch (e) {
@@ -222,7 +228,20 @@ export default function DashboardPage() {
   const selectedBride = brides.find((b) => b.id === selectedBrideId);
   const selectedDress = dresses.find((d) => d.id === selectedDressId);
 
-  const filteredBrides = brides.filter((b) => b.name?.toLowerCase().includes(brideSearch.toLowerCase()));
+  const filteredBrides = brides.filter((b) => {
+    if (!brideSearch.trim()) return true;
+    const q = brideSearch.toLowerCase().trim();
+    return (b.name || '').toLowerCase().includes(q) || (b.phone || '').includes(q);
+  });
+
+  // Auto-select first matched bride when search changes
+  useEffect(() => {
+    if (brideSearch.trim() && filteredBrides.length > 0) {
+      if (!filteredBrides.some(b => b.id === selectedBrideId)) {
+        setSelectedBrideId(filteredBrides[0].id);
+      }
+    }
+  }, [brideSearch, filteredBrides]);
   const filteredDresses = dresses.filter((d) => d.name?.toLowerCase().includes(dressSearch.toLowerCase()));
 
   const priorityColors = {
@@ -274,11 +293,10 @@ export default function DashboardPage() {
               key={task.id}
               onMouseEnter={() => setHoveredTaskId(task.id)}
               onMouseLeave={() => setHoveredTaskId(null)}
-              className={`p-2.5 rounded-xl border transition-all duration-300 flex flex-col bg-slate-50/50 ${
-                hoveredTaskId === task.id
+              className={`p-2.5 rounded-xl border transition-all duration-300 flex flex-col bg-slate-50/50 ${hoveredTaskId === task.id
                   ? 'border-indigo-200 bg-indigo-50/10 shadow-sm'
                   : 'border-slate-100 hover:border-slate-200'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
@@ -301,11 +319,10 @@ export default function DashboardPage() {
               </div>
 
               <div
-                className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                  hoveredTaskId === task.id
+                className={`transition-all duration-300 ease-in-out overflow-hidden ${hoveredTaskId === task.id
                     ? 'max-h-32 mt-2 pt-2 border-t border-slate-100/70 opacity-100'
                     : 'max-h-0 opacity-0 pointer-events-none'
-                }`}
+                  }`}
               >
                 <div className="grid grid-cols-2 gap-2 text-right">
                   <div>
@@ -329,8 +346,21 @@ export default function DashboardPage() {
       {/* 3. Bride Journey Section (Slim Avatar Selector + Natural Height Journey Card) */}
       <div className="grid grid-cols-12 gap-4 flex-shrink-0">
         {/* Bride Avatars Selector (Horizontal on Mobile, Vertical on Desktop with scrollbar) */}
-        <div className="col-span-12 sm:col-span-2 lg:col-span-1 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[380px] sm:max-h-[440px]">
-          <span className="text-[9px] font-black text-slate-400 mb-2 flex-shrink-0">العرائس</span>
+        <div className="col-span-12 sm:col-span-3 lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[420px] sm:max-h-[480px]">
+          <div className="w-full flex items-center justify-between mb-2 flex-shrink-0">
+            <span className="text-[10px] font-black text-slate-500">العرائس ({filteredBrides.length})</span>
+          </div>
+          {/* Live Search Input Box */}
+          <div className="w-full relative mb-2 flex-shrink-0">
+            <input
+              type="text"
+              placeholder="اسم / هاتف العروس..."
+              value={brideSearch}
+              onChange={(e) => setBrideSearch(e.target.value)}
+              className="w-full pr-7 pl-2 py-1 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 placeholder:text-slate-400"
+            />
+            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+          </div>
           <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none flex-grow min-h-0">
             {filteredBrides.map((b, idx) => {
               const isActive = selectedBrideId === b.id;
@@ -342,11 +372,10 @@ export default function DashboardPage() {
                   <button
                     onClick={() => setSelectedBrideId(b.id)}
                     title={b.name}
-                    className={`w-9 h-9 rounded-full overflow-hidden border-2 transition-all duration-200 cursor-pointer ${
-                      isActive
+                    className={`w-9 h-9 rounded-full overflow-hidden border-2 transition-all duration-200 cursor-pointer ${isActive
                         ? 'border-indigo-600 ring-4 ring-indigo-600/20 scale-110 shadow-md'
                         : 'border-slate-200 hover:border-indigo-400 hover:scale-105 opacity-80 hover:opacity-100'
-                    }`}
+                      }`}
                   >
                     <img src={avatar} alt={b.name} className="w-full h-full object-cover" />
                   </button>
@@ -365,7 +394,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Expanded Wide Bride Journey Card with natural height */}
-        <div className="col-span-12 sm:col-span-10 lg:col-span-11">
+        <div className="col-span-12 sm:col-span-9 lg:col-span-10">
           {selectedBride ? (
             <BrideJourneyCard
               bride={selectedBride}
@@ -406,11 +435,10 @@ export default function DashboardPage() {
                   <button
                     onClick={() => setSelectedDressId(d.id)}
                     title={d.name}
-                    className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-pointer ${
-                      isActive
+                    className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-pointer ${isActive
                         ? 'border-violet-600 ring-4 ring-violet-600/20 scale-110 shadow-md'
                         : `${stageClass} hover:scale-105 opacity-85 hover:opacity-100`
-                    }`}
+                      }`}
                   >
                     {imageUrl ? (
                       <img src={imageUrl} alt={d.name} className="w-full h-full object-cover" />
@@ -458,9 +486,9 @@ export default function DashboardPage() {
         const dress3 = booking?.dress3;
 
         const accessoriesList = [
-        ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
-        ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
-        ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
+          ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
+          ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
+          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
 
 
         const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) || parseFloat(booking?.deposit_amount || 0);
@@ -516,7 +544,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسليم الفستان للعروس</h3>
-                <button onClick={() => {setIsPickupModalOpen(false);setSelectedBrideForPickup(null);}} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                <button onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
@@ -555,41 +583,41 @@ export default function DashboardPage() {
 
                     {/* Payment Inputs */}
                     {remaining > 0 &&
-                    <div className="pt-2 space-y-2">
+                      <div className="pt-2 space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
-                          type="checkbox"
-                          checked={recordPickupPayment}
-                          onChange={(e) => setRecordPickupPayment(e.target.checked)}
-                          className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm" />
-                        
+                            type="checkbox"
+                            checked={recordPickupPayment}
+                            onChange={(e) => setRecordPickupPayment(e.target.checked)}
+                            className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm" />
+
                           <span className="text-[10px] font-bold text-slate-700">تسجيل سداد المبلغ المتبقي الآن</span>
                         </label>
                         {recordPickupPayment &&
-                      <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">مبلغ السداد</label>
                               <input
-                            type="number"
-                            value={pickupPaymentAmount}
-                            onChange={(e) => setPickupPaymentAmount(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-                          
+                                type="number"
+                                value={pickupPaymentAmount}
+                                onChange={(e) => setPickupPaymentAmount(e.target.value)}
+                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
+
                             </div>
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">طريقة الدفع</label>
                               <select
-                            value={pickupPaymentMethod}
-                            onChange={(e) => setPickupPaymentMethod(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5">
-                            
+                                value={pickupPaymentMethod}
+                                onChange={(e) => setPickupPaymentMethod(e.target.value)}
+                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5">
+
                                 <option value="cash">نقداً (Cash)</option>
                                 <option value="card">فيزا / كارت (Card)</option>
                                 <option value="instapay">إنستا باي (InstaPay)</option>
                               </select>
                             </div>
                           </div>
-                      }
+                        }
                       </div>
                     }
 
@@ -602,7 +630,7 @@ export default function DashboardPage() {
                           value={pickupInsuranceAmount}
                           onChange={(e) => setPickupInsuranceAmount(e.target.value)}
                           className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-                        
+
                       </div>
                       <div className="flex items-end text-[8px] text-slate-400 font-bold pb-2 leading-tight">
                         * هذا المبلغ تأمين مسترد يتم إرجاعه للعميلة عند إرجاع الفستان سليم.
@@ -627,26 +655,26 @@ export default function DashboardPage() {
                           }}
                           className="hidden"
                           id="dashboard-pickup-receipt-file-input" />
-                        
+
                         <label
                           htmlFor="dashboard-pickup-receipt-file-input"
                           className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-                          
+
                           <CreditCard size={12} className="inline mr-1" />
                           <span>{pickupReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                         </label>
                         {pickupReceipt &&
-                        <button
-                          type="button"
-                          onClick={() => setPickupReceipt(null)}
-                          className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-                          
+                          <button
+                            type="button"
+                            onClick={() => setPickupReceipt(null)}
+                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
+
                             <X size={12} />
                           </button>
                         }
                       </div>
                       {pickupReceipt &&
-                      <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
+                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
                           <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
                         </div>
                       }
@@ -657,26 +685,26 @@ export default function DashboardPage() {
                   <div className="space-y-2">
                     <h4 className="text-xs font-black text-slate-700">قائمة إكسسوارات الفستان (تأكيد التسليم للعروس)</h4>
                     {accessoriesList.length > 0 ?
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
-                        const key = `${acc.name}_${idx}`;
-                        return (
-                          <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                          const key = `${acc.name}_${idx}`;
+                          return (
+                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
-                              type="checkbox"
-                              checked={!!checkedAccessories[key]}
-                              onChange={(e) => setCheckedAccessories({ ...checkedAccessories, [key]: e.target.checked })}
-                              className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-                            
+                                type="checkbox"
+                                checked={!!checkedAccessories[key]}
+                                onChange={(e) => setCheckedAccessories({ ...checkedAccessories, [key]: e.target.checked })}
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
+
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
                             </label>);
 
-                      })}
+                        })}
                       </div> :
 
-                    <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
                     }
@@ -688,7 +716,7 @@ export default function DashboardPage() {
                   <button type="submit" className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
                     تأكيد تسليم الفستان والملحقات
                   </button>
-                  <button type="button" onClick={() => {setIsPickupModalOpen(false);setSelectedBrideForPickup(null);}} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
                     إلغاء
                   </button>
                 </div>
@@ -706,9 +734,9 @@ export default function DashboardPage() {
         const dress3 = booking?.dress3;
 
         const accessoriesList = [
-        ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
-        ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
-        ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
+          ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
+          ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
+          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
 
 
         const handleReturnConfirm = async (e) => {
@@ -748,7 +776,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسجيل استلام وإرجاع الفستان</h3>
-                <button onClick={() => {setIsReturnModalOpen(false);setSelectedBrideForReturn(null);}} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                <button onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
@@ -773,26 +801,26 @@ export default function DashboardPage() {
                       <span>⚠️ يرجى جرد قائمة الملحقات والتأكد من استلامها كاملة:</span>
                     </h4>
                     {accessoriesList.length > 0 ?
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
-                        const key = `${acc.name}_${idx}`;
-                        return (
-                          <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                          const key = `${acc.name}_${idx}`;
+                          return (
+                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
-                              type="checkbox"
-                              checked={!!returnCheckedAccessories[key]}
-                              onChange={(e) => setReturnCheckedAccessories({ ...returnCheckedAccessories, [key]: e.target.checked })}
-                              className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-                            
+                                type="checkbox"
+                                checked={!!returnCheckedAccessories[key]}
+                                onChange={(e) => setReturnCheckedAccessories({ ...returnCheckedAccessories, [key]: e.target.checked })}
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
+
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
                             </label>);
 
-                      })}
+                        })}
                       </div> :
 
-                    <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
                     }
@@ -807,7 +835,7 @@ export default function DashboardPage() {
                       onChange={(e) => setReturnNotes(e.target.value)}
                       placeholder="مثال: تم الإرجاع سليم وبحالة جيدة للغسيل..."
                       className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                    
+
                   </div>
                 </div>
 
@@ -816,7 +844,7 @@ export default function DashboardPage() {
                   <button type="submit" className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
                     تأكيد إرجاع الفستان وحفظ الملحقات
                   </button>
-                  <button type="button" onClick={() => {setIsReturnModalOpen(false);setSelectedBrideForReturn(null);}} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
                     إلغاء
                   </button>
                 </div>

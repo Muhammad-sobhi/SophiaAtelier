@@ -26,7 +26,8 @@ class Client extends Model
             }
         }
         $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('id')->first() : $this->bookings()->latest()->first();
-        if (!$booking || empty($booking->event_date)) return null;
+        if (!$booking || empty($booking->event_date))
+            return null;
         try {
             return \Carbon\Carbon::parse($booking->event_date)->format('Y-m-d');
         } catch (\Exception $e) {
@@ -37,7 +38,8 @@ class Client extends Model
     public function getLatestVisitDateAttribute(): ?string
     {
         $visit = $this->relationLoaded('visits') ? $this->visits->sortByDesc('id')->first() : $this->visits()->latest()->first();
-        if (!$visit || empty($visit->visit_date)) return null;
+        if (!$visit || empty($visit->visit_date))
+            return null;
         try {
             return \Carbon\Carbon::parse($visit->visit_date)->format('Y-m-d');
         } catch (\Exception $e) {
@@ -48,7 +50,7 @@ class Client extends Model
     public function getLatestVisitTimeAttribute(): string
     {
         $visit = $this->relationLoaded('visits') ? $this->visits->sortByDesc('id')->first() : $this->visits()->latest()->first();
-        
+
         $rawSlot = $visit ? $visit->time_slot : null;
         if (!empty($rawSlot)) {
             try {
@@ -133,38 +135,100 @@ class Client extends Model
     }
 
     /**
-     * Compute the bride's current stage in her journey:
-     * 1. Visit -> 2. Booking -> 3. Fitting -> 4. Picked Up -> 5. Returned
+     * Compute the bride's current stage in her journey based on status and dates:
+     * 1. Returned (إرجاع الفستان)
+     * 2. Picked Up (استلام الفستان)
+     * 3. Fitting (غرفة القياس / البروفة)
+     * 4. Booking (حجز)
+     * 5. Visit (طلب زيارة)
      */
     public function getCurrentStageAttribute(): string
     {
-        // Load relationships
         $bookingsList = $this->relationLoaded('bookings') ? $this->bookings : $this->bookings()->get();
         $visitsList = $this->relationLoaded('visits') ? $this->visits : $this->visits()->get();
         $fittingsList = $this->relationLoaded('fittings') ? $this->fittings : $this->fittings()->get();
 
-        // 1. Returned stage (when booking is marked returned)
+        // 1. Returned stage
         if ($bookingsList->contains('status', 'returned')) {
             return 'returned';
         }
 
-        // 2. Picked up stage (when booking is marked picked_up/out OR when all fittings are completed)
-        $hasCompletedFittings = $fittingsList->count() > 0 && $fittingsList->every('status', 'completed');
-        if ($bookingsList->contains('status', 'picked_up') || $bookingsList->contains('status', 'out') || $hasCompletedFittings) {
-            return 'picked_up';
+        // Check latest active booking
+        $latestBooking = $bookingsList->sortByDesc('id')->first();
+        $today = \Carbon\Carbon::today()->format('Y-m-d');
+
+        if ($latestBooking) {
+            // Check status or date rules
+            if ($latestBooking->status === 'picked_up' || $latestBooking->status === 'out') {
+                return 'picked_up';
+            }
+
+            // Extract return / pickup date from notes if saved during excel import
+            $notes = $latestBooking->notes ?? '';
+            $isExcelImport = ($this->source === 'excel_import' || str_contains($notes, 'استيراد') || str_contains($notes, 'يوم الاستلام:'));
+
+            if ($isExcelImport) {
+                $returnDate = null;
+                $pickupDate = null;
+
+                if (preg_match('/(?:يوم|ميعاد)\s*التسليم:\s*(\d{4}-\d{2}-\d{2})/u', $notes, $m)) {
+                    $returnDate = $m[1];
+                }
+                if (preg_match('/(?:يوم|ميعاد)\s*الاستلام:\s*(\d{4}-\d{2}-\d{2})/u', $notes, $m)) {
+                    $pickupDate = $m[1];
+                }
+
+                // Calculate return date (1 day after wedding date if returnDate not explicitly set)
+                if (!$returnDate && !empty($latestBooking->event_date)) {
+                    $wedding = \Carbon\Carbon::parse($latestBooking->event_date);
+                    $returnDate = $wedding->addDay()->format('Y-m-d');
+                }
+
+                // Fallback pickupDate calculation from event_date if missing in notes string
+                if (!$pickupDate && !empty($latestBooking->event_date)) {
+                    $evt = \Carbon\Carbon::parse($latestBooking->event_date);
+                    $bCity = $this->city ?? 'القاهرة';
+                    $isCairoOrGiza = (! $bCity || stripos($bCity, 'cairo') !== false || stripos($bCity, 'giza') !== false || $bCity === 'القاهرة' || $bCity === 'الجيزة');
+                    $daysBefore = $isCairoOrGiza ? 1 : 2;
+                    $pickupDate = $evt->copy()->subDays($daysBefore)->format('Y-m-d');
+                }
+
+                // Apply Excel import rules ONLY for Excel imported data:
+                if ($pickupDate) {
+                    if ($pickupDate < '2026-08-02') {
+                        if ($returnDate && $returnDate <= $today) {
+                            return 'returned';
+                        } else {
+                            return 'picked_up';
+                        }
+                    } elseif ($pickupDate >= '2026-08-02' && $pickupDate <= '2026-08-10') {
+                        return 'picked_up';
+                    } else {
+                        return 'fitting';
+                    }
+                }
+            }
+
+            // Normal System Bookings (Not Excel import)
+            if (!empty($latestBooking->event_date)) {
+                $calcReturn = \Carbon\Carbon::parse($latestBooking->event_date)->addDay()->format('Y-m-d');
+                if ($calcReturn <= $today) {
+                    return 'returned';
+                }
+            }
+
+            // Only move to 'booking' stage if the booking status is 'confirmed'
+            if ($latestBooking->status === 'confirmed') {
+                return 'booking';
+            }
         }
 
-        // 3. Fitting stage (when fittings exist for the bride, e.g. scheduled or in progress)
+        // 2. Fitting stage (if fittings exist)
         if ($fittingsList->count() > 0) {
             return 'fitting';
         }
 
-        // 4. Booking stage (when booking is confirmed by staff)
-        if ($bookingsList->contains('status', 'confirmed')) {
-            return 'booking';
-        }
-
-        // 5. Default stage: Visit (for all new website leads & appointment requests)
+        // 3. Visit stage (if visits exist or default)
         return 'visit';
     }
 }

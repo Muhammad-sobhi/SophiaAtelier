@@ -35,10 +35,10 @@ export function getOccupiedDatesForBooking(weddingDateStr, city) {
   const weddingDate = new Date(weddingDateStr);
   const dates = [];
 
-  // Cairo: 2 days before, wedding day, 1 day after
-  // Other cities: 3 days before, wedding day, 1 day after
-  const isCairo = city === 'القاهرة' || city === 'cairo' || !city;
-  const daysBefore = isCairo ? 2 : 3;
+  // Cairo / Giza: 2 days before (pending start), pickup 1 day before, wedding day, 1 day after return
+  // Other cities: 3 days before (pending start), pickup 2 days before, wedding day, 1 day after return
+  const isCairoOrGiza = !city || city === 'القاهرة' || city === 'الجيزة' || city === 'cairo' || city === 'giza';
+  const daysBefore = isCairoOrGiza ? 2 : 3;
   const daysAfter = 1;
 
   for (let i = -daysBefore; i <= daysAfter; i++) {

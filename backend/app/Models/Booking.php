@@ -108,8 +108,8 @@ class Booking extends Model
         if (!$client) return null;
 
         $city = $client->city ?? 'القاهرة';
-        $isCairo = (stripos($city, 'cairo') !== false || $city === 'القاهرة');
-        $daysBefore = $isCairo ? 2 : 3;
+        $isCairoOrGiza = (! $city || stripos($city, 'cairo') !== false || stripos($city, 'giza') !== false || $city === 'القاهرة' || $city === 'الجيزة');
+        $daysBefore = $isCairoOrGiza ? 2 : 3;
         $daysAfter = 1;
 
         $proposedWedding = \Carbon\Carbon::parse($eventDate);
@@ -128,8 +128,8 @@ class Booking extends Model
         foreach ($existingBookings as $eb) {
             $exClient = $eb->client;
             $exCity = $exClient ? ($exClient->city ?? 'القاهرة') : 'القاهرة';
-            $exIsCairo = (stripos($exCity, 'cairo') !== false || $exCity === 'القاهرة');
-            $exDaysBefore = $exIsCairo ? 2 : 3;
+            $exIsCairoOrGiza = (! $exCity || stripos($exCity, 'cairo') !== false || stripos($exCity, 'giza') !== false || $exCity === 'القاهرة' || $exCity === 'الجيزة');
+            $exDaysBefore = $exIsCairoOrGiza ? 2 : 3;
             $exDaysAfter = 1;
 
             $exWedding = \Carbon\Carbon::parse($eb->event_date);
@@ -162,8 +162,8 @@ class Booking extends Model
         foreach ($bookings->get() as $b) {
             $bClient = $b->client;
             $bCity = $bClient ? ($bClient->city ?? 'القاهرة') : 'القاهرة';
-            $isCairo = (stripos($bCity, 'cairo') !== false || $bCity === 'القاهرة');
-            $daysBefore = $isCairo ? 2 : 3;
+            $isCairoOrGiza = (! $bCity || stripos($bCity, 'cairo') !== false || stripos($bCity, 'giza') !== false || $bCity === 'القاهرة' || $bCity === 'الجيزة');
+            $daysBefore = $isCairoOrGiza ? 2 : 3;
             $daysAfter = 1;
             
             $wedding = \Carbon\Carbon::parse($b->event_date);

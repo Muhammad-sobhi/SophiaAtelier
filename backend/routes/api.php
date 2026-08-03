@@ -134,6 +134,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Calendar — merged visits + bookings
     Route::get('/calendar/events', [CalendarController::class, 'events']);
 
+    Route::get('/clients/export-csv', [ClientController::class, 'exportCsv']);
+    Route::post('/clients/import-excel', [ClientController::class, 'importExcel']);
     Route::apiResource('clients', ClientController::class);
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
 

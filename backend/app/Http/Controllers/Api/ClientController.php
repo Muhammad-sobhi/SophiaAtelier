@@ -34,7 +34,7 @@ class ClientController extends Controller
             });
         }
 
-        return response()->json($query->latest()->paginate($request->input('per_page', 15)));
+        return response()->json($query->latest()->paginate($request->input('per_page', 100)));
     }
 
     public function findClient(Request $request): JsonResponse
@@ -443,5 +443,217 @@ class ClientController extends Controller
 
         return response()->stream($callback, 200, $headers);
     }
+
+    public function importExcel(Request $request): JsonResponse
+    {
+        $request->validate([
+            'rows' => 'required|array',
+            'rows.*' => 'array',
+        ]);
+
+        $rows = $request->input('rows');
+        $importedCount = 0;
+        $errors = [];
+
+        \DB::beginTransaction();
+        try {
+            foreach ($rows as $index => $row) {
+                // Key fields matching the columns
+                $brideName = trim($row['bride_name'] ?? $row['اسم العروسه'] ?? $row[0] ?? '');
+                if (empty($brideName) || $brideName === 'اسم العروسه') {
+                    continue; // Skip header or empty row
+                }
+
+                $dressName = trim($row['dress_name'] ?? $row['اسم الفستان'] ?? $row[1] ?? '');
+                $bookingDate = trim($row['booking_date'] ?? $row['تاريخ الحجز'] ?? $row['يوم الحجز'] ?? $row[2] ?? '');
+                $depositAmount = floatval($row['deposit_amount'] ?? $row['الديبوزيت'] ?? $row[3] ?? 0);
+
+                // Extract fields strictly by header title first, then fall back to numeric index
+                $city = trim($row['محافظه'] ?? $row['محافظة'] ?? $row['المحافظة'] ?? $row['city'] ?? $row[11] ?? '');
+                $salesPerson = trim($row['السيلز'] ?? $row['sales'] ?? $row[13] ?? '');
+                $insuranceAmount = floatval($row['التامين'] ?? $row['التأمين'] ?? $row['insurance_amount'] ?? $row[12] ?? 0);
+                $extraNotes = trim($row['ملاحظات'] ?? $row['notes'] ?? $row[14] ?? '');
+                $cashPayment = trim($row['كاش'] ?? $row['cash'] ?? $row[9] ?? '');
+                $transferPayment = trim($row['تحويل'] ?? $row['transfer'] ?? $row[10] ?? '');
+                $remainingAmount = floatval($row['الباقي'] ?? $row['باقي الحجز'] ?? $row['remaining_amount'] ?? $row[8] ?? 0);
+                $returnDate = trim($row['يوم التسليم'] ?? $row['ميعاد التسليم'] ?? $row['return_date'] ?? $row[7] ?? '');
+                $eventDate = trim($row['ميعاد الفرح'] ?? $row['event_date'] ?? $row[6] ?? '');
+                $pickupDate = trim($row['يوم الاستلام'] ?? $row['ميعاد الاستلام'] ?? $row['pickup_date'] ?? $row[5] ?? '');
+                $paymentMethodSymbol = trim($row['كاش/تحويل'] ?? $row['cash_transfer'] ?? $row[4] ?? '');
+
+                // Normalize Arabic city names (e.g., "الجيزه" -> "الجيزة", "القاهره" -> "القاهرة")
+                if (!empty($city)) {
+                    $city = str_replace(['ه', 'أ', 'إ', 'آ'], ['ة', 'ا', 'ا', 'ا'], $city);
+                    if (str_contains($city, 'جيز')) $city = 'الجيزة';
+                    if (str_contains($city, 'قاهر')) $city = 'القاهرة';
+                    if (str_contains($city, 'منصور')) $city = 'المنصورة';
+                    if (str_contains($city, 'اسكندر') || str_contains($city, 'إسكندر')) $city = 'الإسكندرية';
+                    if (str_contains($city, 'منوف')) $city = 'المنوفية';
+                    if (str_contains($city, 'اسماعيل') || str_contains($city, 'إسماعيل')) $city = 'الإسماعيلية';
+                    if (str_contains($city, 'سويف')) $city = 'بني سويف';
+                    if (str_contains($city, 'شرق')) $city = 'الشرقية';
+                    if (str_contains($city, 'غري')) $city = 'الغربية';
+                    if (str_contains($city, 'سويس')) $city = 'السويس';
+                }
+
+                // Helper to clean and format dates (handles 29\4, 29/4, 2\8, 2026-04-29, extra spaces and arabic digits)
+                $parseDate = function ($dateVal) {
+                    if (empty($dateVal)) return null;
+                    try {
+                        // Convert Eastern Arabic numerals to Western Arabic
+                        $westernDigits = ['0','1','2','3','4','5','6','7','8','9'];
+                        $easternDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+                        $str = str_replace($easternDigits, $westernDigits, trim($dateVal));
+
+                        // Match day and month pattern e.g., 2\8, 2/8, 02-08, 2.8
+                        if (preg_match('/^(\d{1,2})[\/\\\\.\-–]\s*(\d{1,2})/u', $str, $matches)) {
+                            $day = intval($matches[1]);
+                            $month = intval($matches[2]);
+                            $year = intval(date('Y'));
+                            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+                        }
+
+                        // Replace any slashes/backslashes for Carbon fallback
+                        $normalized = preg_replace('/[\/\\\\.]/', '-', $str);
+                        return \Carbon\Carbon::parse($normalized)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        return null;
+                    }
+                };
+
+                $formattedBookingDate = $parseDate($bookingDate) ?? date('Y-m-d');
+                $formattedEventDate = $parseDate($eventDate) ?? $formattedBookingDate;
+                $formattedPickupDate = $parseDate($pickupDate);
+                $formattedReturnDate = $parseDate($returnDate);
+
+                // 1. Create a distinct Client for every Excel row (supports brides with identical names)
+                $client = Client::create([
+                    'name' => $brideName,
+                    'phone' => '0100000' . rand(1000, 9999),
+                    'city' => $city ?: null,
+                    'wedding_date' => $formattedEventDate,
+                    'source' => 'excel_import',
+                    'notes' => $salesPerson ? "السيلز: {$salesPerson}" : null,
+                ]);
+
+                // 2. Find or Create Dress
+                $dressId = null;
+                if (!empty($dressName)) {
+                    $dress = \App\Models\Dress::where('name', 'like', "%{$dressName}%")
+                        ->orWhere('name_ar', 'like', "%{$dressName}%")
+                        ->orWhere('code', 'like', "%{$dressName}%")
+                        ->first();
+
+                    if (!$dress) {
+                        $firstCat = \App\Models\Category::first();
+                        $firstDes = \App\Models\Designer::first();
+                        $catId = $firstCat ? $firstCat->id : 1;
+                        $desId = $firstDes ? $firstDes->id : 1;
+
+                        $dress = \App\Models\Dress::create([
+                            'name' => $dressName,
+                            'name_ar' => $dressName,
+                            'category_id' => $catId,
+                            'designer_id' => $desId,
+                            'code' => 'IMP-' . strtoupper(substr(md5($dressName), 0, 5)),
+                            'rental_price' => $depositAmount + $remainingAmount,
+                            'status' => 'available',
+                        ]);
+                    }
+                    $dressId = $dress->id;
+                }
+
+                if (!$dressId) {
+                    $firstDress = \App\Models\Dress::first();
+                    $dressId = $firstDress ? $firstDress->id : 1;
+                }
+
+                // 3. Determine Payment Method (ت = instapay/bank_transfer, ك = cash)
+                $paymentMethod = 'cash';
+                if ($paymentMethodSymbol === 'ت' || !empty($transferPayment) && $transferPayment !== '0' && $transferPayment !== '-') {
+                    $paymentMethod = 'instapay';
+                } elseif ($paymentMethodSymbol === 'ك' || (!empty($cashPayment) && $cashPayment !== '0')) {
+                    $paymentMethod = 'cash';
+                }
+
+                $totalAmount = $depositAmount + $remainingAmount;
+
+                // Build notes from extra dates, sales, notes
+                $notesArr = [];
+                if ($formattedPickupDate) $notesArr[] = "يوم الاستلام: " . $formattedPickupDate;
+                if ($formattedReturnDate) $notesArr[] = "يوم التسليم: " . $formattedReturnDate;
+                if ($salesPerson) $notesArr[] = "السيلز: " . $salesPerson;
+                if ($extraNotes) $notesArr[] = "ملاحظات: " . $extraNotes;
+                $notesStr = implode(' | ', $notesArr);
+
+                // Determine status automatically based on pickup & return date rules:
+                // A bride ONLY moves to 'returned' IF her return date (1 day after wedding) has passed!
+                $todayStr = date('Y-m-d');
+                $calculatedReturnDate = $formattedReturnDate;
+                if (!$calculatedReturnDate && $formattedEventDate) {
+                    $calculatedReturnDate = \Carbon\Carbon::parse($formattedEventDate)->addDay()->format('Y-m-d');
+                }
+
+                $bookingStatus = 'confirmed';
+                if ($formattedPickupDate && $formattedPickupDate < '2026-08-02') {
+                    if ($calculatedReturnDate && $calculatedReturnDate <= $todayStr) {
+                        $bookingStatus = 'returned';
+                    } else {
+                        $bookingStatus = 'picked_up';
+                    }
+                } elseif ($formattedPickupDate && $formattedPickupDate === '2026-08-02') {
+                    if ($calculatedReturnDate && $calculatedReturnDate <= $todayStr) {
+                        $bookingStatus = 'returned';
+                    } else {
+                        $bookingStatus = 'picked_up';
+                    }
+                } else {
+                    $bookingStatus = 'confirmed';
+                }
+
+                // 4. Create Booking
+                $booking = Booking::create([
+                    'client_id' => $client->id,
+                    'dress_id' => $dressId,
+                    'booking_date' => $formattedBookingDate,
+                    'event_date' => $formattedEventDate,
+                    'status' => $bookingStatus,
+                    'total_amount' => $totalAmount,
+                    'deposit_amount' => $depositAmount,
+                    'insurance_amount' => $insuranceAmount,
+                    'payment_method' => $paymentMethod,
+                    'notes' => $notesStr ?: 'استيراد تلقائي من شيت إكسيل',
+                ]);
+
+                // Create revenue record for financial tracking if deposit paid
+                if ($depositAmount > 0) {
+                    \App\Models\Revenue::create([
+                        'booking_id' => $booking->id,
+                        'type' => 'deposit',
+                        'amount' => $depositAmount,
+                        'payment_method' => $paymentMethod,
+                        'payment_date' => $formattedBookingDate,
+                        'notes' => 'دفعة عربون من شيت الإكسيل - ' . $client->name,
+                    ]);
+                }
+
+                $importedCount++;
+            }
+
+            \DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => "تم استيراد {$importedCount} عروسة وحجز بنجاح!",
+                'count' => $importedCount
+            ]);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء استيراد البيانات: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
+
 

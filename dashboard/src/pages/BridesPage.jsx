@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard } from 'lucide-react';
 
 const BRIDE_STAGES = [
-{ id: 'visit', label: 'طلب زيارة / تجربة', icon: Calendar },
-{ id: 'booking', label: 'حجز', icon: Heart },
-{ id: 'fitting', label: 'غرفة القياس', icon: Ruler },
-{ id: 'picked_up', label: 'استلام الفستان', icon: Package },
-{ id: 'returned', label: 'إرجاع الفستان', icon: RotateCcw }];
+  { id: 'visit', label: 'طلب زيارة / تجربة', icon: Calendar },
+  { id: 'booking', label: 'حجز', icon: Heart },
+  { id: 'fitting', label: 'غرفة القياس', icon: Ruler },
+  { id: 'picked_up', label: 'استلام الفستان', icon: Package },
+  { id: 'returned', label: 'إرجاع الفستان', icon: RotateCcw }];
 
 
 const mockAvatars = [
-'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=120&auto=format&fit=crop&q=80',
-'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=120&auto=format&fit=crop&q=80'];
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=120&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=120&auto=format&fit=crop&q=80'];
 
 
 const STAGE_ACTIONS_CONFIG = {
@@ -28,11 +29,11 @@ const STAGE_ACTIONS_CONFIG = {
 };
 
 const PAYMENT_METHODS = [
-{ id: 'cash', label: 'نقدي (Cash)' },
-{ id: 'credit_card', label: 'فيزا / كارت (Visa / Card)' },
-{ id: 'instapay', label: 'إنستاباي (Instapay)' },
-{ id: 'vodafone_cash', label: 'فودافون كاش (Vodafone Cash)' },
-{ id: 'bank_transfer', label: 'تحويل بنكي (Bank Transfer)' }];
+  { id: 'cash', label: 'نقدي (Cash)' },
+  { id: 'credit_card', label: 'فيزا / كارت (Visa / Card)' },
+  { id: 'instapay', label: 'إنستاباي (Instapay)' },
+  { id: 'vodafone_cash', label: 'فودافون كاش (Vodafone Cash)' },
+  { id: 'bank_transfer', label: 'تحويل بنكي (Bank Transfer)' }];
 
 
 const formatDate = (dateStr) => {
@@ -50,6 +51,7 @@ const formatDate = (dateStr) => {
 };
 
 export default function BridesPage() {
+  const navigate = useNavigate();
   const [bridesList, setBridesList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -103,6 +105,12 @@ export default function BridesPage() {
   const [bookingReceipt, setBookingReceipt] = useState(null);
   const [bookingNotes, setBookingNotes] = useState('');
 
+  // Excel Import states
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState(null);
+
   // Complete list of dresses
   const [dressesList, setDressesList] = useState([]);
 
@@ -115,9 +123,9 @@ export default function BridesPage() {
     if (selectedBrideForPickup) {
       const booking = selectedBrideForPickup.bookings?.[0];
       const accs = [
-      ...(booking?.dress?.accessories || []),
-      ...(booking?.dress2?.accessories || []),
-      ...(booking?.dress3?.accessories || [])];
+        ...(booking?.dress?.accessories || []),
+        ...(booking?.dress2?.accessories || []),
+        ...(booking?.dress3?.accessories || [])];
 
       const initialChecked = {};
       accs.forEach((a, i) => {
@@ -136,9 +144,9 @@ export default function BridesPage() {
     if (selectedBrideForReturn) {
       const booking = selectedBrideForReturn.bookings?.[0];
       const accs = [
-      ...(booking?.dress?.accessories || []),
-      ...(booking?.dress2?.accessories || []),
-      ...(booking?.dress3?.accessories || [])];
+        ...(booking?.dress?.accessories || []),
+        ...(booking?.dress2?.accessories || []),
+        ...(booking?.dress3?.accessories || [])];
 
       const initialChecked = {};
       accs.forEach((a, i) => {
@@ -151,7 +159,7 @@ export default function BridesPage() {
 
   const fetchBrides = async () => {
     try {
-      const response = await apiClient.get('/clients');
+      const response = await apiClient.get('/clients?per_page=1000');
       const data = response.data || [];
       const mapped = data.map((c) => ({
         id: c.id,
@@ -184,7 +192,7 @@ export default function BridesPage() {
       try {
         const emp = JSON.parse(active);
         setIsAdmin(emp.role === 'admin' || emp.email === 'admin@atelier.test');
-      } catch (e) {}
+      } catch (e) { }
     }
 
     fetchBrides();
@@ -196,14 +204,14 @@ export default function BridesPage() {
         id: d.id,
         name: d.name || '',
         image: d.images?.[0]?.image_path ?
-        `${import.meta.env.VITE_API_URL?.replace('/api', '')}/storage/${d.images[0].image_path}` :
-        ''
+          `${import.meta.env.VITE_API_URL?.replace('/api', '')}/storage/${d.images[0].image_path}` :
+          ''
       })));
       if (data.length > 0) {
         setFittingDressId(data[0].id.toString());
         setBookingDressId(data[0].id.toString());
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     const interval = setInterval(() => {
       if (!isModalOpen && !isPickupModalOpen && !isReturnModalOpen) {
@@ -273,11 +281,11 @@ export default function BridesPage() {
         const t = templates.find((x) => x.key === 'booking_confirmation');
         if (t) {
           message = t.body.
-          replace(/\{\{client_name\}\}/g, selectedBrideForBooking.name).
-          replace(/\{\{wedding_date\}\}/g, selectedBrideForBooking.wedding_date || visitDate).
-          replace(/\{\{visit_date\}\}/g, visitDate).
-          replace(/\{\{visit_time\}\}/g, visitTime).
-          replace(/\{\{dress_line\}\}/g, dress ? `${dress.name}` : '');
+            replace(/\{\{client_name\}\}/g, selectedBrideForBooking.name).
+            replace(/\{\{wedding_date\}\}/g, selectedBrideForBooking.wedding_date || visitDate).
+            replace(/\{\{visit_date\}\}/g, visitDate).
+            replace(/\{\{visit_time\}\}/g, visitTime).
+            replace(/\{\{dress_line\}\}/g, dress ? `${dress.name}` : '');
         }
       } catch (err) {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
@@ -314,10 +322,10 @@ export default function BridesPage() {
     if (!newName.trim()) return;
 
     let mappedSource = 'instagram';
-    if (newSource.includes('موقع')) mappedSource = 'website';else
-    if (newSource.includes('توصية') || newSource.includes('إحالة')) mappedSource = 'referral';else
-    if (newSource.includes('واتس')) mappedSource = 'whatsapp';else
-    if (newSource.includes('زيارة') || newSource.includes('أخرى')) mappedSource = 'walkin';
+    if (newSource.includes('موقع')) mappedSource = 'website'; else
+      if (newSource.includes('توصية') || newSource.includes('إحالة')) mappedSource = 'referral'; else
+        if (newSource.includes('واتس')) mappedSource = 'whatsapp'; else
+          if (newSource.includes('زيارة') || newSource.includes('أخرى')) mappedSource = 'walkin';
 
     try {
       const fd = new FormData();
@@ -344,7 +352,7 @@ export default function BridesPage() {
         status: 'arrived',
         source: mappedSource,
         notes: 'تمت الزيارة والجدولة تلقائياً عند إضافة العروس'
-      }).catch(() => {});
+      }).catch(() => { });
 
       fetchBrides();
     } catch (e) {
@@ -376,10 +384,10 @@ export default function BridesPage() {
     if (!editingBride) return;
 
     let mappedSource = 'instagram';
-    if (newSource.includes('موقع')) mappedSource = 'website';else
-    if (newSource.includes('توصية') || newSource.includes('إحالة')) mappedSource = 'referral';else
-    if (newSource.includes('واتس')) mappedSource = 'whatsapp';else
-    if (newSource.includes('زيارة') || newSource.includes('أخرى')) mappedSource = 'walkin';
+    if (newSource.includes('موقع')) mappedSource = 'website'; else
+      if (newSource.includes('توصية') || newSource.includes('إحالة')) mappedSource = 'referral'; else
+        if (newSource.includes('واتس')) mappedSource = 'whatsapp'; else
+          if (newSource.includes('زيارة') || newSource.includes('أخرى')) mappedSource = 'walkin';
 
     try {
       const fd = new FormData();
@@ -429,13 +437,23 @@ export default function BridesPage() {
     }
   };
 
+  const [activePage, setActivePage] = useState(1);
+  const [archivePage, setArchivePage] = useState(1);
+  const itemsPerPage = 12;
+
   const filteredBrides = bridesList.filter((b) =>
-  b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  b.phone && b.phone.includes(searchQuery)
+    b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.phone && b.phone.includes(searchQuery)
   );
 
   const activeBrides = filteredBrides.filter((b) => b.current_stage !== 'returned');
   const previousBrides = filteredBrides.filter((b) => b.current_stage === 'returned');
+
+  const totalActivePages = Math.ceil(activeBrides.length / itemsPerPage) || 1;
+  const totalArchivePages = Math.ceil(previousBrides.length / itemsPerPage) || 1;
+
+  const paginatedActiveBrides = activeBrides.slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage);
+  const paginatedPreviousBrides = previousBrides.slice((archivePage - 1) * itemsPerPage, archivePage * itemsPerPage);
 
   const handleExportCSV = async () => {
     try {
@@ -465,20 +483,20 @@ export default function BridesPage() {
 
   const stageColor = (stage) => {
     switch (stage) {
-      case 'visit':return 'text-indigo-600 bg-indigo-50 border-indigo-100';
-      case 'fitting':return 'text-violet-600 bg-violet-50 border-violet-100';
-      case 'booking':return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'ready_for_pickup':return 'text-blue-600 bg-blue-50 border-blue-100';
-      case 'picked_up':return 'text-amber-600 bg-amber-50 border-amber-100';
-      case 'returned':return 'text-rose-600 bg-rose-50 border-rose-100';
-      default:return 'text-slate-500 bg-slate-50 border-slate-100';
+      case 'visit': return 'text-indigo-600 bg-indigo-50 border-indigo-100';
+      case 'fitting': return 'text-violet-600 bg-violet-50 border-violet-100';
+      case 'booking': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+      case 'ready_for_pickup': return 'text-blue-600 bg-blue-50 border-blue-100';
+      case 'picked_up': return 'text-amber-600 bg-amber-50 border-amber-100';
+      case 'returned': return 'text-rose-600 bg-rose-50 border-rose-100';
+      default: return 'text-slate-500 bg-slate-50 border-slate-100';
     }
   };
 
   const renderBrideCard = (bride, idx) => {
     const avatar = bride.image_path ?
-    `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${bride.image_path}` :
-    mockAvatars[idx % mockAvatars.length];
+      `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${bride.image_path}` :
+      mockAvatars[idx % mockAvatars.length];
     let actionInfo = STAGE_ACTIONS_CONFIG[bride.current_stage];
     if (bride.current_stage === 'picked_up') {
       const booking = bride.bookings?.[0];
@@ -491,7 +509,7 @@ export default function BridesPage() {
       <div
         key={bride.id}
         className="bg-white rounded-2xl border border-slate-150 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-md transition-all relative group">
-        
+
         <div>
           {/* Top Row: Avatar & Stage Badge */}
           <div className="flex items-start justify-between mb-3">
@@ -504,19 +522,19 @@ export default function BridesPage() {
               </span>
               {/* Admin actions overlay on hover */}
               {isAdmin &&
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                  onClick={() => handleEditBrideClick(bride)}
-                  className="p-1 text-indigo-650 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
-                  title="تعديل">
-                  
+                    onClick={() => handleEditBrideClick(bride)}
+                    className="p-1 text-indigo-650 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                    title="تعديل">
+
                     <Edit3 size={11} />
                   </button>
                   <button
-                  onClick={() => handleDeleteBride(bride.id)}
-                  className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                  title="حذف">
-                  
+                    onClick={() => handleDeleteBride(bride.id)}
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                    title="حذف">
+
                     <Trash2 size={11} />
                   </button>
                 </div>
@@ -536,7 +554,7 @@ export default function BridesPage() {
               <span>{bride.city || 'Cairo'}</span>
             </div>
             {bride.wedding_date &&
-            <div className="text-[8.5px] font-bold text-indigo-650 bg-indigo-50/50 p-1.5 rounded-lg border border-indigo-100 leading-tight block w-full mt-1">
+              <div className="text-[8.5px] font-bold text-indigo-650 bg-indigo-50/50 p-1.5 rounded-lg border border-indigo-100 leading-tight block w-full mt-1">
                 👰🏻‍♀️ موعد الزفاف: {formatDate(bride.wedding_date)}
               </div>
             }
@@ -549,67 +567,67 @@ export default function BridesPage() {
         {/* Stage Action Button */}
         <div className="mt-3 pt-3 border-t border-slate-100">
           {bride.current_stage === 'returned' ?
-          <button
-            onClick={async () => {
-              let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nألف مبروك لجميلتنا الرائعة *${bride.name}* 🤍👰🏻‍♀️،\nنتمنى لكِ حياة زوجية سعيدة ومليئة بالحب والفرح! سعدنا جداً بكوننا جزءاً من يومكِ المميز وتألقكِ بفستان أحلامكِ المختار من فساتين صوفيا 👗💖✨`;
-              try {
-                const templates = await apiClient.get('/whatsapp-templates');
-                const t = templates.find((x) => x.key === 'wedding_congratulations');
-                if (t) {
-                  message = t.body.replace(/\{\{client_name\}\}/g, bride.name);
+            <button
+              onClick={async () => {
+                let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nألف مبروك لجميلتنا الرائعة *${bride.name}* 🤍👰🏻‍♀️،\nنتمنى لكِ حياة زوجية سعيدة ومليئة بالحب والفرح! سعدنا جداً بكوننا جزءاً من يومكِ المميز وتألقكِ بفستان أحلامكِ المختار من فساتين صوفيا 👗💖✨`;
+                try {
+                  const templates = await apiClient.get('/whatsapp-templates');
+                  const t = templates.find((x) => x.key === 'wedding_congratulations');
+                  if (t) {
+                    message = t.body.replace(/\{\{client_name\}\}/g, bride.name);
+                  }
+                } catch (e) {
+                  console.error('Failed to load wedding congratulations template:', e);
                 }
-              } catch (e) {
-                console.error('Failed to load wedding congratulations template:', e);
-              }
-              const phone = bride.phone.replace(/[^\d]/g, '');
-              window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer">
-            
+                const phone = bride.phone.replace(/[^\d]/g, '');
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer">
+
               <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
               <span>إرسال تهنئة الزفاف</span>
             </button> :
-          actionInfo ?
-          <button
-            onClick={async () => {
-              if (actionInfo.action === 'mark_picked_up') {
-                setSelectedBrideForPickup(bride);
-                setIsPickupModalOpen(true);
-              } else if (actionInfo.action === 'mark_returned') {
-                setSelectedBrideForReturn(bride);
-                setIsReturnModalOpen(true);
-              } else if (actionInfo.action === 'confirm_booking') {
-                setSelectedBrideForBooking(bride);
-                setBookingEventDate(bride.wedding_date || new Date().toISOString().split('T')[0]);
-                setShowBookingModal(true);
-              } else if (actionInfo.action === 'schedule_fitting') {
-                setSelectedBrideForFitting(bride);
-                const bookedDressId = bride.bookings?.[0]?.dress_id;
-                if (bookedDressId) {
-                  setFittingDressId(bookedDressId.toString());
-                  const bookedDress = bride.bookings?.[0]?.dress;
-                  if (bookedDress) {
-                    setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+            actionInfo ?
+              <button
+                onClick={async () => {
+                  if (actionInfo.action === 'mark_picked_up') {
+                    setSelectedBrideForPickup(bride);
+                    setIsPickupModalOpen(true);
+                  } else if (actionInfo.action === 'mark_returned') {
+                    setSelectedBrideForReturn(bride);
+                    setIsReturnModalOpen(true);
+                  } else if (actionInfo.action === 'confirm_booking') {
+                    setSelectedBrideForBooking(bride);
+                    setBookingEventDate(bride.wedding_date || new Date().toISOString().split('T')[0]);
+                    setShowBookingModal(true);
+                  } else if (actionInfo.action === 'schedule_fitting') {
+                    setSelectedBrideForFitting(bride);
+                    const bookedDressId = bride.bookings?.[0]?.dress_id;
+                    if (bookedDressId) {
+                      setFittingDressId(bookedDressId.toString());
+                      const bookedDress = bride.bookings?.[0]?.dress;
+                      if (bookedDress) {
+                        setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+                      }
+                    }
+                    setShowFittingModal(true);
+                  } else {
+                    try {
+                      await apiClient.put(`/clients/${bride.id}/stage-action`, { action: actionInfo.action });
+                      fetchBrides();
+                    } catch (e) {
+                      console.error(e);
+                    }
                   }
-                }
-                setShowFittingModal(true);
-              } else {
-                try {
-                  await apiClient.put(`/clients/${bride.id}/stage-action`, { action: actionInfo.action });
-                  fetchBrides();
-                } catch (e) {
-                  console.error(e);
-                }
-              }
-            }}
-            className={`w-full py-2.5 text-white rounded-xl text-[9px] font-extrabold transition-all duration-300 active:scale-95 cursor-pointer shadow-xs ${actionInfo.color}`}>
-            
-              {actionInfo.label}
-            </button> :
+                }}
+                className={`w-full py-2.5 text-white rounded-xl text-[9px] font-extrabold transition-all duration-300 active:scale-95 cursor-pointer shadow-xs ${actionInfo.color}`}>
 
-          <div className="text-center py-2 text-emerald-650 font-extrabold text-[9px] bg-emerald-50 border border-emerald-100 rounded-xl">
-              ✓ الرحلة مكتملة
-            </div>
+                {actionInfo.label}
+              </button> :
+
+              <div className="text-center py-2 text-emerald-650 font-extrabold text-[9px] bg-emerald-50 border border-emerald-100 rounded-xl">
+                ✓ الرحلة مكتملة
+              </div>
           }
         </div>
       </div>);
@@ -632,13 +650,19 @@ export default function BridesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-4 pr-10 py-2 bg-white border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-700 shadow-sm" />
-            
+
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
           </div>
           <button
-            onClick={() => {resetForm();setIsModalOpen(true);}}
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-sm active:scale-95 cursor-pointer whitespace-nowrap">
+            <Package size={14} />
+            <span>استيراد شيت إكسيل</span>
+          </button>
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-sm active:scale-95 cursor-pointer whitespace-nowrap">
-            
+
             <Plus size={14} />
             <span>إضافة عميلة</span>
           </button>
@@ -649,45 +673,81 @@ export default function BridesPage() {
       <div className="flex-1 bg-white rounded-3xl p-5 border border-slate-100 flex flex-col overflow-hidden shadow-sm">
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
           <h2 className="text-xs font-extrabold text-slate-600">العرائس النشطات ({activeBrides.length})</h2>
+          {totalActivePages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={activePage === 1}
+                onClick={() => setActivePage((p) => Math.max(1, p - 1))}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                السابق
+              </button>
+              <span className="text-xs font-bold text-slate-500">{activePage} / {totalActivePages}</span>
+              <button
+                disabled={activePage === totalActivePages}
+                onClick={() => setActivePage((p) => Math.min(totalActivePages, p + 1))}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                التالي
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin select-none">
-          {activeBrides.length > 0 ?
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1">
-              {activeBrides.map((bride, idx) => renderBrideCard(bride, idx))}
-            </div> :
-
-          <div className="text-center py-12 text-slate-400 text-xs font-bold">لا يوجد عرائس نشطات حالياً.</div>
-          }
+          {paginatedActiveBrides.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1">
+              {paginatedActiveBrides.map((bride, idx) => renderBrideCard(bride, idx))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400 text-xs font-bold">لا يوجد عرائس نشطات حالياً.</div>
+          )}
         </div>
       </div>
 
       {/* Previous Brides Section */}
       <div className="flex-1 bg-white rounded-3xl p-5 border border-slate-100 flex flex-col overflow-hidden shadow-sm">
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <h2 className="text-xs font-extrabold text-slate-600">العرائس السابقات (الأرشيف) ({previousBrides.length})</h2>
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-650 hover:bg-emerald-700 text-emerald-600 border border-emerald-200 rounded-xl transition-all duration-300 text-[10px] font-bold shadow-xs active:scale-95 cursor-pointer hover:bg-emerald-50">
-            
-            <span>تصدير إكسل (CSV)</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xs font-extrabold text-slate-600">العرائس السابقات (الأرشيف) ({previousBrides.length})</h2>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-650 hover:bg-emerald-700 text-emerald-600 border border-emerald-200 rounded-xl transition-all duration-300 text-[10px] font-bold shadow-xs active:scale-95 cursor-pointer hover:bg-emerald-50">
+              <span>تصدير إكسل (CSV)</span>
+            </button>
+          </div>
+
+          {totalArchivePages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={archivePage === 1}
+                onClick={() => setArchivePage((p) => Math.max(1, p - 1))}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                السابق
+              </button>
+              <span className="text-xs font-bold text-slate-500">{archivePage} / {totalArchivePages}</span>
+              <button
+                disabled={archivePage === totalArchivePages}
+                onClick={() => setArchivePage((p) => Math.min(totalArchivePages, p + 1))}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                التالي
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin select-none">
-          {previousBrides.length > 0 ?
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1">
-              {previousBrides.map((bride, idx) => renderBrideCard(bride, idx))}
-            </div> :
-
-          <div className="text-center py-12 text-slate-400 text-xs font-bold">لا يوجد عرائس سابقات في الأرشيف.</div>
-          }
+          {paginatedPreviousBrides.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1">
+              {paginatedPreviousBrides.map((bride, idx) => renderBrideCard(bride, idx))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400 text-xs font-bold">لا يوجد عرائس سابقات في الأرشيف.</div>
+          )}
         </div>
       </div>
 
       {/* Add Bride Modal */}
       {isModalOpen &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
               <h3 className="text-sm font-extrabold text-slate-800">تسجيل ملف عروس جديدة</h3>
@@ -701,47 +761,47 @@ export default function BridesPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-slate-600 block">صورة العروس (اختياري)</label>
                 {imagePreviewUrl ?
-              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
                     <img src={imagePreviewUrl} alt="Bride Preview" className="w-full h-full object-cover" />
                     <button
-                  type="button"
-                  onClick={() => {setBrideImage(null);setImagePreviewUrl(null);}}
-                  className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer">
-                  
+                      type="button"
+                      onClick={() => { setBrideImage(null); setImagePreviewUrl(null); }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer">
+
                       <X size={10} />
                     </button>
                   </div> :
 
-              <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
+                  <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
                     <Plus size={16} className="text-indigo-500" />
                     <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صورة العروس</span>
                     <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setBrideImage(file);
-                      setImagePreviewUrl(URL.createObjectURL(file));
-                    }
-                  }} />
-                
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setBrideImage(file);
+                          setImagePreviewUrl(URL.createObjectURL(file));
+                        }
+                      }} />
+
                   </label>
-              }
+                }
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-slate-600">اسم العروس الكامل</label>
                 <input type="text" required placeholder="مثال: ريم عبدالله" value={newName} onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">المدينة</label>
                   <select value={newCity} onChange={(e) => setNewCity(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
                     <option value="القاهرة">القاهرة</option>
                     <option value="الجيزة">الجيزة</option>
                     <option value="الإسكندرية">الإسكندرية</option>
@@ -753,7 +813,7 @@ export default function BridesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">رقم الجوال</label>
                   <input type="tel" required placeholder="مثال: 01012345678" value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 </div>
               </div>
 
@@ -761,7 +821,7 @@ export default function BridesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
                   <select value={newSource} onChange={(e) => setNewSource(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
                     <option value="انستقرام">انستقرام</option>
                     <option value="فيسبوك">فيسبوك</option>
                     <option value="تيك توك">تيك توك</option>
@@ -774,40 +834,39 @@ export default function BridesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">تاريخ الزيارة</label>
                   <input type="date" required value={newVisitDate} onChange={(e) => setNewVisitDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
                 <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
               </div>
 
               {/* Dress Selection */}
               {availableDresses.length > 0 &&
-            <div className="space-y-1.5">
+                <div className="space-y-1.5">
                   <label className="text-xs font-extrabold text-slate-600 block">الفساتين المهتمة بها (حتى 3)</label>
                   <div className="flex flex-wrap gap-2 p-2.5 bg-slate-50 rounded-2xl border border-slate-100/50">
                     {availableDresses.map((dress) => {
-                  const isSelected = selectedModels.includes(dress.name);
-                  return (
-                    <button type="button" key={dress.id} onClick={() => handleToggleModelSelection(dress.name)}
-                    className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
-                    isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-155 text-slate-600 hover:bg-slate-100'}`
-                    }>
+                      const isSelected = selectedModels.includes(dress.name);
+                      return (
+                        <button type="button" key={dress.id} onClick={() => handleToggleModelSelection(dress.name)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-155 text-slate-600 hover:bg-slate-100'}`
+                          }>
                           {dress.name}
                         </button>);
 
-                })}
+                    })}
                   </div>
                 </div>
-            }
+              }
 
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
                 <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="تفضيلات العروس..."
-              className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
               </div>
 
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
@@ -825,7 +884,7 @@ export default function BridesPage() {
 
       {/* Edit Bride Modal */}
       {editingBride &&
-      <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700" dir="rtl">
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700" dir="rtl">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
               <h3 className="text-sm font-extrabold text-slate-800">تعديل بيانات العروس</h3>
@@ -839,52 +898,52 @@ export default function BridesPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-slate-600 block">صورة العروس (اختياري)</label>
                 {imagePreviewUrl ?
-              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
                     <img src={imagePreviewUrl} alt="Bride Preview" className="w-full h-full object-cover" />
                     <button
-                  type="button"
-                  onClick={() => {setBrideImage(null);setImagePreviewUrl(null);}}
-                  className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer">
-                  
+                      type="button"
+                      onClick={() => { setBrideImage(null); setImagePreviewUrl(null); }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer">
+
                       <X size={10} />
                     </button>
                   </div> :
 
-              <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
+                  <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
                     <Plus size={16} className="text-indigo-500" />
                     <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صورة جديدة للعروس</span>
                     <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setBrideImage(file);
-                      setImagePreviewUrl(URL.createObjectURL(file));
-                    }
-                  }} />
-                
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setBrideImage(file);
+                          setImagePreviewUrl(URL.createObjectURL(file));
+                        }
+                      }} />
+
                   </label>
-              }
+                }
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-slate-600">اسم العروس</label>
                 <input type="text" required value={newName} onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">رقم الهاتف</label>
                   <input type="text" required value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">المدينة</label>
                   <select value={newCity} onChange={(e) => setNewCity(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
                     <option value="القاهرة">القاهرة</option>
                     <option value="الجيزة">الجيزة</option>
                     <option value="الإسكندرية">الإسكندرية</option>
@@ -899,7 +958,7 @@ export default function BridesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
                   <select value={newSource} onChange={(e) => setNewSource(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
                     <option value="انستقرام">انستقرام</option>
                     <option value="فيسبوك">فيسبوك</option>
                     <option value="تيك توك">تيك توك</option>
@@ -912,14 +971,14 @@ export default function BridesPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
                   <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
                 <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="ملاحظات..."
-              className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
               </div>
 
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
@@ -937,7 +996,7 @@ export default function BridesPage() {
 
       {/* Delete Confirmation */}
       {deleteConfirm?.isOpen &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-100 shadow-xl space-y-4">
             <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-100">
               <Trash2 size={20} className="animate-pulse" />
@@ -945,12 +1004,12 @@ export default function BridesPage() {
             <h3 className="text-sm font-extrabold text-slate-800 text-center">{deleteConfirm.title}</h3>
             <p className="text-xs text-slate-500 font-bold leading-relaxed text-center whitespace-pre-line">{deleteConfirm.message}</p>
             <div className="flex items-center gap-3">
-              <button onClick={() => {deleteConfirm.onConfirm();setDeleteConfirm(null);}}
-            className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
+              <button onClick={() => { deleteConfirm.onConfirm(); setDeleteConfirm(null); }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
                 تأكيد الحذف
               </button>
               <button onClick={() => setDeleteConfirm(null)}
-            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
                 إلغاء
               </button>
             </div>
@@ -966,9 +1025,9 @@ export default function BridesPage() {
         const dress3 = booking?.dress3;
 
         const accessoriesList = [
-        ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
-        ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
-        ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
+          ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
+          ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
+          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
 
 
         const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) || parseFloat(booking?.deposit_amount || 0);
@@ -1024,12 +1083,12 @@ export default function BridesPage() {
             <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسليم الفستان للعروس</h3>
-                <button onClick={() => {setIsPickupModalOpen(false);setSelectedBrideForPickup(null);}} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                <button onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
-               <form onSubmit={handlePickupConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
+              <form onSubmit={handlePickupConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
                 <div className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
                   {/* Client and Dress info */}
                   <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-1">
@@ -1063,41 +1122,41 @@ export default function BridesPage() {
 
                     {/* Payment Inputs */}
                     {remaining > 0 &&
-                    <div className="pt-2 space-y-2">
+                      <div className="pt-2 space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
-                          type="checkbox"
-                          checked={recordPickupPayment}
-                          onChange={(e) => setRecordPickupPayment(e.target.checked)}
-                          className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm" />
-                        
+                            type="checkbox"
+                            checked={recordPickupPayment}
+                            onChange={(e) => setRecordPickupPayment(e.target.checked)}
+                            className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm" />
+
                           <span className="text-[10px] font-bold text-slate-700">تسجيل سداد المبلغ المتبقي الآن</span>
                         </label>
                         {recordPickupPayment &&
-                      <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">مبلغ السداد</label>
                               <input
-                            type="number"
-                            value={pickupPaymentAmount}
-                            onChange={(e) => setPickupPaymentAmount(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-                          
+                                type="number"
+                                value={pickupPaymentAmount}
+                                onChange={(e) => setPickupPaymentAmount(e.target.value)}
+                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
+
                             </div>
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">طريقة الدفع</label>
                               <select
-                            value={pickupPaymentMethod}
-                            onChange={(e) => setPickupPaymentMethod(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5">
-                            
+                                value={pickupPaymentMethod}
+                                onChange={(e) => setPickupPaymentMethod(e.target.value)}
+                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5">
+
                                 <option value="cash">نقداً (Cash)</option>
                                 <option value="card">فيزا / كارت (Card)</option>
                                 <option value="instapay">إنستا باي (InstaPay)</option>
                               </select>
                             </div>
                           </div>
-                      }
+                        }
                       </div>
                     }
 
@@ -1110,7 +1169,7 @@ export default function BridesPage() {
                           value={pickupInsuranceAmount}
                           onChange={(e) => setPickupInsuranceAmount(e.target.value)}
                           className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-                        
+
                       </div>
                       <div className="flex items-end text-[8px] text-slate-400 font-bold pb-2 leading-tight">
                         * هذا المبلغ تأمين مسترد يتم إرجاعه للعميلة عند إرجاع الفستان سليم.
@@ -1135,26 +1194,26 @@ export default function BridesPage() {
                           }}
                           className="hidden"
                           id="pickup-receipt-file-input" />
-                        
+
                         <label
                           htmlFor="pickup-receipt-file-input"
                           className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-                          
+
                           <CreditCard size={12} className="inline mr-1" />
                           <span>{pickupReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                         </label>
                         {pickupReceipt &&
-                        <button
-                          type="button"
-                          onClick={() => setPickupReceipt(null)}
-                          className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-                          
+                          <button
+                            type="button"
+                            onClick={() => setPickupReceipt(null)}
+                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
+
                             <X size={12} />
                           </button>
                         }
                       </div>
                       {pickupReceipt &&
-                      <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
+                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
                           <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
                         </div>
                       }
@@ -1165,26 +1224,26 @@ export default function BridesPage() {
                   <div className="space-y-2">
                     <h4 className="text-xs font-black text-slate-700">قائمة إكسسوارات الفستان (تأكيد التسليم للعروس)</h4>
                     {accessoriesList.length > 0 ?
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
-                        const key = `${acc.name}_${idx}`;
-                        return (
-                          <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                          const key = `${acc.name}_${idx}`;
+                          return (
+                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
-                              type="checkbox"
-                              checked={!!checkedAccessories[key]}
-                              onChange={(e) => setCheckedAccessories({ ...checkedAccessories, [key]: e.target.checked })}
-                              className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-                            
+                                type="checkbox"
+                                checked={!!checkedAccessories[key]}
+                                onChange={(e) => setCheckedAccessories({ ...checkedAccessories, [key]: e.target.checked })}
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
+
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
                             </label>);
 
-                      })}
+                        })}
                       </div> :
 
-                    <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
                     }
@@ -1196,7 +1255,7 @@ export default function BridesPage() {
                   <button type="submit" className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
                     تأكيد تسليم الفستان والملحقات
                   </button>
-                  <button type="button" onClick={() => {setIsPickupModalOpen(false);setSelectedBrideForPickup(null);}} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
                     إلغاء
                   </button>
                 </div>
@@ -1214,9 +1273,9 @@ export default function BridesPage() {
         const dress3 = booking?.dress3;
 
         const accessoriesList = [
-        ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
-        ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
-        ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
+          ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
+          ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
+          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
 
 
         const handleReturnConfirm = async (e) => {
@@ -1256,12 +1315,12 @@ export default function BridesPage() {
             <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسجيل استلام وإرجاع الفستان</h3>
-                <button onClick={() => {setIsReturnModalOpen(false);setSelectedBrideForReturn(null);}} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                <button onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
-               <form onSubmit={handleReturnConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
+              <form onSubmit={handleReturnConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
                 <div className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
                   {/* Client and Dress info */}
                   <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 space-y-1">
@@ -1281,26 +1340,26 @@ export default function BridesPage() {
                       <span>⚠️ يرجى جرد قائمة الملحقات والتأكد من استلامها كاملة:</span>
                     </h4>
                     {accessoriesList.length > 0 ?
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
-                        const key = `${acc.name}_${idx}`;
-                        return (
-                          <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                          const key = `${acc.name}_${idx}`;
+                          return (
+                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
-                              type="checkbox"
-                              checked={!!returnCheckedAccessories[key]}
-                              onChange={(e) => setReturnCheckedAccessories({ ...returnCheckedAccessories, [key]: e.target.checked })}
-                              className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-                            
+                                type="checkbox"
+                                checked={!!returnCheckedAccessories[key]}
+                                onChange={(e) => setReturnCheckedAccessories({ ...returnCheckedAccessories, [key]: e.target.checked })}
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
+
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
                             </label>);
 
-                      })}
+                        })}
                       </div> :
 
-                    <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
                     }
@@ -1315,7 +1374,7 @@ export default function BridesPage() {
                       onChange={(e) => setReturnNotes(e.target.value)}
                       placeholder="مثال: تم الإرجاع سليم وبحالة جيدة للغسيل..."
                       className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                    
+
                   </div>
                 </div>
 
@@ -1324,7 +1383,7 @@ export default function BridesPage() {
                   <button type="submit" className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
                     تأكيد إرجاع الفستان وحفظ الملحقات
                   </button>
-                  <button type="button" onClick={() => {setIsReturnModalOpen(false);setSelectedBrideForReturn(null);}} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
                     إلغاء
                   </button>
                 </div>
@@ -1335,7 +1394,7 @@ export default function BridesPage() {
       })()}
       {/* Fitting Appointment Booking Popup Modal */}
       {showFittingModal && selectedBrideForFitting &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
           <div className="bg-white rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
             {/* Header */}
             <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
@@ -1344,9 +1403,9 @@ export default function BridesPage() {
                 <span>حجز موعد بروفة قياس جديدة للعروس</span>
               </h3>
               <button
-              onClick={() => {setShowFittingModal(false);setSelectedBrideForFitting(null);}}
-              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-              
+                onClick={() => { setShowFittingModal(false); setSelectedBrideForFitting(null); }}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+
                 <X size={14} />
               </button>
             </div>
@@ -1358,62 +1417,62 @@ export default function BridesPage() {
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">تاريخ موعد القياس</label>
                     <input
-                    type="date"
-                    required
-                    value={fittingDate}
-                    onChange={(e) => setFittingDate(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-                  
+                      type="date"
+                      required
+                      value={fittingDate}
+                      onChange={(e) => setFittingDate(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
+
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">الوقت (الساعة)</label>
                     <select
-                    required
-                    value={fittingTime}
-                    onChange={(e) => setFittingTime(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-                    
+                      required
+                      value={fittingTime}
+                      onChange={(e) => setFittingTime(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
+
                       {["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"].map((t) =>
-                    <option key={t} value={t}>{t}</option>
-                    )}
+                        <option key={t} value={t}>{t}</option>
+                      )}
                     </select>
                   </div>
                 </div>
 
-                 <div className="space-y-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100/80 text-right">
+                <div className="space-y-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100/80 text-right">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">فستان البروفة (الفستان المحجوز)</label>
                   {(() => {
-                  const booking = selectedBrideForFitting?.bookings?.[0];
-                  const bookedDress = booking?.dress;
-                  if (bookedDress) {
-                    return (
-                      <div className="flex flex-col gap-1 mt-1">
+                    const booking = selectedBrideForFitting?.bookings?.[0];
+                    const bookedDress = booking?.dress;
+                    if (bookedDress) {
+                      return (
+                        <div className="flex flex-col gap-1 mt-1">
                           <span className="text-xs font-black text-indigo-650">{bookedDress.name}</span>
                           <span className="text-[9px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} | رسوم التجربة والقياس: {parseFloat(bookedDress.trying_fee || 0).toLocaleString()} ج.م</span>
                         </div>);
 
-                  }
-                  return <span className="text-xs font-bold text-rose-500">لا يوجد فستان محجوز حالياً!</span>;
-                })()}
+                    }
+                    return <span className="text-xs font-bold text-rose-500">لا يوجد فستان محجوز حالياً!</span>;
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">رسوم القياس المستحقة</label>
                     <input
-                    type="text"
-                    disabled
-                    value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right" />
-                  
+                      type="text"
+                      disabled
+                      value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right" />
+
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع الرسوم</label>
                     <select
-                    value={fittingPaymentMethod}
-                    onChange={(e) => setFittingPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-                    
+                      value={fittingPaymentMethod}
+                      onChange={(e) => setFittingPaymentMethod(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
+
                       <option value="cash">نقدي (Cash)</option>
                       <option value="credit_card">فيزا / كارت (Visa / Card)</option>
                       <option value="instapay">إنستاباي (InstaPay)</option>
@@ -1426,69 +1485,69 @@ export default function BridesPage() {
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع (اختياري)</label>
                   <div className="flex items-center gap-2">
                     <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFittingReceipt(reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                    id="brides-fitting-receipt-file-input" />
-                  
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setFittingReceipt(reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="brides-fitting-receipt-file-input" />
+
                     <label
-                    htmlFor="brides-fitting-receipt-file-input"
-                    className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-                    
+                      htmlFor="brides-fitting-receipt-file-input"
+                      className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
+
                       <CreditCard size={12} />
                       <span>{fittingReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                     </label>
                     {fittingReceipt &&
-                  <button
-                    type="button"
-                    onClick={() => setFittingReceipt(null)}
-                    className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-                    
+                      <button
+                        type="button"
+                        onClick={() => setFittingReceipt(null)}
+                        className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
+
                         <X size={12} />
                       </button>
-                  }
+                    }
                   </div>
                   {fittingReceipt &&
-                <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
+                    <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
                       <img src={fittingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
                     </div>
-                }
+                  }
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-550 block text-right">ملاحظات إضافية</label>
                   <textarea
-                  value={fittingNotes}
-                  onChange={(e) => setFittingNotes(e.target.value)}
-                  placeholder="ملاحظات حول المقاسات أو تفاصيل الموعد..."
-                  className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
-                
+                    value={fittingNotes}
+                    onChange={(e) => setFittingNotes(e.target.value)}
+                    placeholder="ملاحظات حول المقاسات أو تفاصيل الموعد..."
+                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
+
                 </div>
               </div>
 
               {/* Fixed Footer Buttons */}
               <div className="flex items-center gap-3 p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
-                type="submit"
-                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center">
-                
+                  type="submit"
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center">
+
                   تأكيد وحجز موعد القياس
                 </button>
                 <button
-                type="button"
-                onClick={() => {setShowFittingModal(false);setSelectedBrideForFitting(null);}}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="button"
+                  onClick={() => { setShowFittingModal(false); setSelectedBrideForFitting(null); }}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
+
                   إلغاء
                 </button>
               </div>
@@ -1499,7 +1558,7 @@ export default function BridesPage() {
 
       {/* Gown Booking Confirmation Modal */}
       {showBookingModal && selectedBrideForBooking &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
           <div className="bg-white rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
             {/* Header */}
             <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
@@ -1508,9 +1567,9 @@ export default function BridesPage() {
                 <span>تأكيد حجز فستان للعروس</span>
               </h3>
               <button
-              onClick={() => {setShowBookingModal(false);setSelectedBrideForBooking(null);}}
-              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-              
+                onClick={() => { setShowBookingModal(false); setSelectedBrideForBooking(null); }}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+
                 <X size={14} />
               </button>
             </div>
@@ -1521,48 +1580,48 @@ export default function BridesPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">اختر الفستان المراد حجزها</label>
                   <select
-                  required
-                  value={bookingDressId}
-                  onChange={(e) => setBookingDressId(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right">
-                  
+                    required
+                    value={bookingDressId}
+                    onChange={(e) => setBookingDressId(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right">
+
                     {dressesList.map((d) =>
-                  <option key={d.id} value={d.id}>{d.name} (مقاس: {d.size || '—'} | {parseFloat(d.rental_price || 0).toLocaleString()} ج.م)</option>
-                  )}
+                      <option key={d.id} value={d.id}>{d.name} (مقاس: {d.size || '—'} | {parseFloat(d.rental_price || 0).toLocaleString()} ج.م)</option>
+                    )}
                   </select>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">تاريخ الفرح / المناسبة</label>
                   <input
-                  type="date"
-                  required
-                  value={bookingEventDate}
-                  onChange={(e) => setBookingEventDate(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-                
+                    type="date"
+                    required
+                    value={bookingEventDate}
+                    onChange={(e) => setBookingEventDate(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
+
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">مبلغ الإيجار الإجمالي</label>
                     <input
-                    type="number"
-                    required
-                    value={bookingTotalAmount}
-                    onChange={(e) => setBookingTotalAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-                  
+                      type="number"
+                      required
+                      value={bookingTotalAmount}
+                      onChange={(e) => setBookingTotalAmount(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
+
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
                     <input
-                    type="number"
-                    required
-                    value={bookingDepositAmount}
-                    onChange={(e) => setBookingDepositAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-                  
+                      type="number"
+                      required
+                      value={bookingDepositAmount}
+                      onChange={(e) => setBookingDepositAmount(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
+
                   </div>
                 </div>
 
@@ -1570,13 +1629,13 @@ export default function BridesPage() {
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع العربون</label>
                     <select
-                    value={bookingPaymentMethod}
-                    onChange={(e) => setBookingPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-                    
+                      value={bookingPaymentMethod}
+                      onChange={(e) => setBookingPaymentMethod(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
+
                       {PAYMENT_METHODS.map((pm) =>
-                    <option key={pm.id} value={pm.id}>{pm.label}</option>
-                    )}
+                        <option key={pm.id} value={pm.id}>{pm.label}</option>
+                      )}
                     </select>
                   </div>
 
@@ -1584,71 +1643,71 @@ export default function BridesPage() {
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
                     <div className="flex items-center gap-2">
                       <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setBookingReceipt(reader.result);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="brides-booking-receipt-file-input" />
-                    
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setBookingReceipt(reader.result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="brides-booking-receipt-file-input" />
+
                       <label
-                      htmlFor="brides-booking-receipt-file-input"
-                      className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-                      
+                        htmlFor="brides-booking-receipt-file-input"
+                        className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
+
                         <CreditCard size={10} />
                         <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
                       </label>
                       {bookingReceipt &&
-                    <button
-                      type="button"
-                      onClick={() => setBookingReceipt(null)}
-                      className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-                      
+                        <button
+                          type="button"
+                          onClick={() => setBookingReceipt(null)}
+                          className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
+
                           <X size={10} />
                         </button>
-                    }
+                      }
                     </div>
                   </div>
                 </div>
 
                 {bookingReceipt &&
-              <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
+                  <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
                     <img src={bookingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
                   </div>
-              }
+                }
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-550 block text-right">ملاحظات إضافية</label>
                   <textarea
-                  value={bookingNotes}
-                  onChange={(e) => setBookingNotes(e.target.value)}
-                  placeholder="ملاحظات وتعديلات الفستان المطلوبة..."
-                  className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
-                
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
+                    placeholder="ملاحظات وتعديلات الفستان المطلوبة..."
+                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
+
                 </div>
               </div>
 
               {/* Fixed Footer Buttons */}
               <div className="flex items-center gap-3 p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
-                type="submit"
-                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95">
-                
+                  type="submit"
+                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95">
+
                   تأكيد الحجز وتثبيت التاريخ
                 </button>
                 <button
-                type="button"
-                onClick={() => {setShowBookingModal(false);setSelectedBrideForBooking(null);}}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="button"
+                  onClick={() => { setShowBookingModal(false); setSelectedBrideForBooking(null); }}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
+
                   إلغاء
                 </button>
               </div>
@@ -1656,6 +1715,123 @@ export default function BridesPage() {
           </div>
         </div>
       }
-    </div>);
 
-}
+      {/* Excel Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" dir="rtl">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col text-right">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-800">استيراد شيت الإكسيل مباشرة</h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">رفع شيت العرائس وتلقائياً قراءة وتوزيع البيانات والماليات</p>
+              </div>
+              <button
+                onClick={() => { setIsImportModalOpen(false); setImportFile(null); setImportStatus(null); }}
+                className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-all cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 text-xs text-indigo-900 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-indigo-800">
+                  <Package size={14} className="text-indigo-600" />
+                  <span>الأعمدة المدعومة وتوزيعها تلقائياً:</span>
+                </p>
+                <p className="text-[11px] leading-relaxed text-indigo-700 font-semibold">
+                  اسم العروسه | اسم الفستان | تاريخ الحجز | الديبوزيت | كاش/تحويل (ك = كاش ، ت = انستا) | يوم الاستلام | ميعاد الفرح | يوم التسليم | الباقي | محافظه | التامين | السيلز | ملاحظات
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">اختر ملف الشيت (.csv / .xlsx)</label>
+                <input
+                  type="file"
+                  accept=".csv, .xlsx, .xls"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setImportFile(file);
+                  }}
+                  className="w-full text-xs text-slate-500 file:ml-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 rounded-2xl p-2 bg-slate-50"
+                />
+              </div>
+
+              {importStatus && (
+                <div className={`p-3 rounded-2xl text-xs font-extrabold text-center ${importStatus.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                  {importStatus.message}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setIsImportModalOpen(false); setImportFile(null); setImportStatus(null); }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer">
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={!importFile || isImporting}
+                onClick={async () => {
+                  if (!importFile) return;
+                  setIsImporting(true);
+                  setImportStatus(null);
+                  try {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                      try {
+                        const text = e.target.result;
+                        const lines = text.split(/\r\n|\n/);
+                        const rows = [];
+                        let headers = [];
+                        lines.forEach((line, idx) => {
+                          if (!line.trim()) return;
+                          const cols = line.split(/,|\t|;/).map(c => c.replace(/^["']|["']$/g, '').trim());
+                          if (idx === 0) {
+                            headers = cols;
+                          } else {
+                            const rowObj = {};
+                            cols.forEach((col, cIdx) => {
+                              const headerKey = headers[cIdx] ? headers[cIdx].trim() : cIdx;
+                              rowObj[headerKey] = col;
+                              rowObj[cIdx] = col;
+                            });
+                            rows.push(rowObj);
+                          }
+                        });
+
+                        const res = await apiClient.post('/clients/import-excel', { rows });
+                        if (res.success) {
+                          setImportStatus({ success: true, message: res.message });
+                          fetchBrides();
+                          setTimeout(() => {
+                            setIsImportModalOpen(false);
+                            setImportFile(null);
+                            setImportStatus(null);
+                          }, 1800);
+                        } else {
+                          setImportStatus({ success: false, message: res.message || 'فشل الاستيراد' });
+                        }
+                      } catch (err) {
+                        setImportStatus({ success: false, message: 'حدث خطأ في قراءة ملف الإكسيل: ' + err.message });
+                      } finally {
+                        setIsImporting(false);
+                      }
+                    };
+                    reader.readAsText(importFile, 'UTF-8');
+                  } catch (err) {
+                    setImportStatus({ success: false, message: 'فشل قراءة الملف' });
+                    setIsImporting(false);
+                  }
+                }}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-sm">
+                {isImporting ? 'جاري الاستيراد...' : 'بدء الاستيراد'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

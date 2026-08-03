@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('email')->nullable();
             $table->text('address')->nullable();
-            $table->enum('source', ['instagram', 'website', 'referral', 'walkin', 'whatsapp'])->default('walkin');
+            $table->enum('source', ['instagram', 'website', 'referral', 'walkin', 'whatsapp', 'excel_import'])->default('walkin');
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

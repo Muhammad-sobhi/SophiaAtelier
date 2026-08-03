@@ -579,18 +579,19 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 {stageId === 'picked_up' && (bride.wedding_date || bride.bookings?.[0]?.event_date) && (() => {
                 const weddingDateStr = bride.bookings?.[0]?.event_date || bride.wedding_date;
                 const weddingDate = new Date(weddingDateStr);
-                const isCairo = bride.city === 'القاهرة' || bride.city?.toLowerCase() === 'cairo' || !bride.city;
-                const pickupDaysBefore = isCairo ? 1 : 2;
+                const cityLower = (bride.city || '').toLowerCase();
+                const isCairoOrGiza = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة' || cityLower.includes('cairo') || cityLower.includes('giza');
+                const pickupDaysBefore = isCairoOrGiza ? 1 : 2;
                 const pickupDate = new Date(weddingDate.getTime() - pickupDaysBefore * 24 * 60 * 60 * 1000);
                 const day = String(pickupDate.getDate()).padStart(2, '0');
                 const month = String(pickupDate.getMonth() + 1).padStart(2, '0');
                 const year = pickupDate.getFullYear();
-                const pickupDateFormatted = `${day}-${month}-${year}`;
+                const pickupDateFormatted = `${year}-${month}-${day}`;
 
-                const blockoutDaysBefore = isCairo ? 2 : 3;
+                const blockoutDaysBefore = isCairoOrGiza ? 2 : 3;
                 const blockoutStart = new Date(weddingDate.getTime() - blockoutDaysBefore * 24 * 60 * 60 * 1000);
                 const blockoutEnd = new Date(weddingDate.getTime() + 1 * 24 * 60 * 60 * 1000);
-                const formatD = (d) => `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                const formatD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
                 return (
                   <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-100/50 text-[9px] font-bold text-amber-850 space-y-1 text-right mb-3">
@@ -697,8 +698,9 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                           const brideName = (bride.name || '').trim() || 'عروسنا الجميلة';
                           const weddingDateRaw = bride.wedding_date || bride.bookings?.[0]?.event_date || '';
                           const weddingDate = weddingDateRaw ? weddingDateRaw.split(' ')[0].split('T')[0] : '';
-                          const isCairo = !bride.city || bride.city.includes('القاهرة') || bride.city.toLowerCase().includes('cairo');
-                          const pickupDaysBefore = isCairo ? 1 : 2;
+                          const cityLower = (bride.city || '').toLowerCase();
+                          const isCairoOrGiza = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة' || cityLower.includes('cairo') || cityLower.includes('giza');
+                          const pickupDaysBefore = isCairoOrGiza ? 1 : 2;
                           let pickupDateFormatted = 'غير محدد';
                           if (weddingDate) {
                             try {
@@ -713,11 +715,12 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                                 const yyyy = pD.getFullYear();
                                 pickupDateFormatted = `${yyyy}-${mm}-${dd}`;
                               }
-                            } catch {}
+                            } catch (err) {
+                              console.error(err);
+                            }
                           }
 
-                          let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${brideName}* 🤍،\nنود تذكيركِ بموعد استلام فستان زفافكِ 👗\n\n📅 *تفاصيل الاستلام:*\n• *تاريخ الزفاف:* ${weddingDate || 'غير محدد'}\n• *تاريخ الاستلام المقترح:* ${pickupDateFormatted} (خلال أوقات العمل من ١:٠٠ م إلى ٨:٣٠ م)\n\n🌸 *شروط وقواعد فساتين صوفيا:*\n( مسموح ب دخول فردين فقط مع العروسه ladies only )\n(الدخول ب أولوية الحضور)\n\nAddress ⤵️\nالتجمع الاول الياسمين ٢ \nفيلا 161 الباب الجانبي للفيلا بيكون شمال باب الفيلا (basement) \n⬅️اليافطه السودا161\n\nLocation📍\nhttps://maps.app.goo.gl/RUyaQk3v1rZR4gVC6\n\nيسعدنا تشريفكِ لتستلمي فستان أحلامكِ ✨🎀`;
-
+                          let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${brideName}* 🤍👰🏻‍♀️،\nنود تذكيركِ بموعد استلام فستان زفافكِ المختار من فساتين صوفيا!\n\n📅 *موعد الاستلام:* ${pickupDateFormatted}\n📍 *العنوان:* التجمع الأول - الياسمين 2 - فيلا 161 (الباب الجانبي)\n\nنحن بانتظاركِ وتجهيز كل التفاصيل لتكوني أجمل عروس ✨🎀`;
                           try {
                             const templates = await apiClient.get('/whatsapp-templates');
                             const list = Array.isArray(templates) ? templates : templates.data || [];
@@ -1393,7 +1396,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                         }
                           <div className="space-y-1 text-xs font-bold text-slate-700 flex-grow">
                             <div><span className="text-slate-400 font-medium">الفستان:</span> {booking.dress?.name || 'غير محدد'}</div>
-                            <div><span className="text-slate-400 font-medium">تاريخ المناسبة / الزفاف:</span> <span className="font-mono text-rose-600">{booking.event_date ? booking.event_date.split(' ')[0] : 'غير محدد'}</span></div>
+                            <div><span className="text-slate-400 font-medium">تاريخ المناسبة / الزفاف:</span> <span className="font-mono text-rose-600">{booking.event_date ? booking.event_date.split('T')[0].split(' ')[0] : 'غير محدد'}</span></div>
                           </div>
                         </div>
                       </div>
@@ -1403,7 +1406,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                         <h4 className="text-xs font-black text-emerald-900 border-b border-emerald-100/60 pb-1.5">💰 الوضع المالي والمدفوعات</h4>
                         <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-700">
                           <div><span className="text-slate-400 font-medium">إجمالي قيمة الإيجار:</span> {booking.total_amount} ج.م</div>
-                          <div><span className="text-slate-400 font-medium">العربون / المدفوع:</span> {totalPaid} ج.m</div>
+                          <div><span className="text-slate-400 font-medium">العربون / المدفوع:</span> {totalPaid} ج.م</div>
                           <div className="col-span-2"><span className="text-slate-400 font-medium">المبلغ المتبقي:</span> <span className={`${remaining > 0 ? 'text-rose-600 font-black' : 'text-emerald-600'}`}>{remaining} ج.م</span></div>
                         </div>
                         {booking.revenues && booking.revenues.length > 0 &&
@@ -1412,7 +1415,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                             {booking.revenues.map((rev, idx) =>
                         <div key={idx} className="flex justify-between items-center text-[10px] font-bold text-slate-600">
                                 <span>{rev.amount} ج.م ({PAYMENT_METHODS.find((m) => m.id === rev.payment_method)?.label || rev.payment_method})</span>
-                                <span className="font-mono text-slate-400">{rev.payment_date}</span>
+                                <span className="font-mono text-slate-400">{rev.payment_date ? rev.payment_date.split('T')[0].split(' ')[0] : ''}</span>
                               </div>
                         )}
                           </div>
