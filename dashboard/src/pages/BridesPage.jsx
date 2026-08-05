@@ -119,6 +119,63 @@ export default function BridesPage() {
   const [returnCheckedAccessories, setReturnCheckedAccessories] = useState({});
   const [returnNotes, setReturnNotes] = useState('تم الإرجاع بحالة جيدة');
 
+  // Pay Remaining modal states
+  const [isPayRemainingModalOpen, setIsPayRemainingModalOpen] = useState(false);
+  const [selectedBrideForPayRemaining, setSelectedBrideForPayRemaining] = useState(null);
+  const [payRemainingAmount, setPayRemainingAmount] = useState('0');
+  const [payRemainingMethod, setPayRemainingMethod] = useState('cash');
+  const [payRemainingReceipt, setPayRemainingReceipt] = useState(null);
+  const [payRemainingReceiptPreview, setPayRemainingReceiptPreview] = useState(null);
+  const [payRemainingNotes, setPayRemainingNotes] = useState('');
+  const [isSubmittingPayRemaining, setIsSubmittingPayRemaining] = useState(false);
+
+  const handleOpenPayRemaining = (bride) => {
+    const booking = bride.bookings?.[0];
+    const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
+    const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
+    setSelectedBrideForPayRemaining(bride);
+    setPayRemainingAmount(remaining.toString());
+    setPayRemainingMethod('cash');
+    setPayRemainingReceipt(null);
+    setPayRemainingReceiptPreview(null);
+    setPayRemainingNotes('');
+    setIsPayRemainingModalOpen(true);
+  };
+
+  const handlePayRemainingSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedBrideForPayRemaining || !payRemainingAmount || parseFloat(payRemainingAmount) <= 0) return;
+
+    setIsSubmittingPayRemaining(true);
+    try {
+      let receiptBase64 = null;
+      if (payRemainingReceipt) {
+        receiptBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(payRemainingReceipt);
+        });
+      }
+
+      await apiClient.put(`/clients/${selectedBrideForPayRemaining.id}/stage-action`, {
+        action: 'pay_remaining',
+        amount: parseFloat(payRemainingAmount),
+        payment_method: payRemainingMethod,
+        notes: payRemainingNotes,
+        receipt: receiptBase64
+      });
+
+      setIsPayRemainingModalOpen(false);
+      setSelectedBrideForPayRemaining(null);
+      fetchBrides();
+    } catch (err) {
+      console.error('Failed to submit pay remaining:', err);
+      alert('حدث خطأ أثناء تسجيل دافع المبلغ المتبقي');
+    } finally {
+      setIsSubmittingPayRemaining(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedBrideForPickup) {
       const booking = selectedBrideForPickup.bookings?.[0];
@@ -564,8 +621,25 @@ export default function BridesPage() {
           </div>
         </div>
 
-        {/* Stage Action Button */}
-        <div className="mt-3 pt-3 border-t border-slate-100">
+        {/* Stage Action & Pay Remaining Buttons */}
+        <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+          {(() => {
+            const booking = bride.bookings?.[0];
+            const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
+            const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
+
+            if (!booking || remaining <= 0) return null;
+
+            return (
+              <button
+                type="button"
+                onClick={() => handleOpenPayRemaining(bride)}
+                className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[9.5px] font-black transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5 active:scale-95 mb-1.5">
+                <CreditCard size={13} />
+                <span>سداد المبلغ المتبقي ({remaining.toLocaleString()} ج.م)</span>
+              </button>
+            );
+          })()}
           {bride.current_stage === 'returned' ?
             <button
               onClick={async () => {
@@ -1829,6 +1903,147 @@ export default function BridesPage() {
                 {isImporting ? 'جاري الاستيراد...' : 'بدء الاستيراد'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Remaining Modal */}
+      {isPayRemainingModalOpen && selectedBrideForPayRemaining && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold">
+                  <CreditCard size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">تسجيل سداد المبلغ المتبقي</h3>
+                  <p className="text-[10px] text-slate-400 font-bold">العروس: {selectedBrideForPayRemaining.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPayRemainingModalOpen(false)}
+                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Booking Summary Box */}
+            {(() => {
+              const booking = selectedBrideForPayRemaining.bookings?.[0];
+              const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
+              const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
+              const dressName = booking?.dress?.name || 'فستان زفاف';
+
+              return (
+                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-extrabold text-slate-700">
+                    <span>الفستان: {dressName}</span>
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full">
+                      إجمالي الإيجار: {parseFloat(booking?.total_amount || 0).toLocaleString()} ج.م
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-extrabold pt-1">
+                    <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                      <div className="text-slate-400 mb-0.5">المدفوع سابقاً</div>
+                      <div className="text-emerald-600 font-black text-xs">{totalPaid.toLocaleString()} ج.م</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                      <div className="text-slate-400 mb-0.5">المتبقي المطلوب</div>
+                      <div className="text-rose-600 font-black text-xs">{remaining.toLocaleString()} ج.م</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <form onSubmit={handlePayRemainingSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-700 block">مبلغ السداد (ج.م)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={payRemainingAmount}
+                  onChange={(e) => setPayRemainingAmount(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-700 block">طريقة الدفع</label>
+                <select
+                  value={payRemainingMethod}
+                  onChange={(e) => setPayRemainingMethod(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Receipt File Upload */}
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-700 block">رفع صورة الإيصال / الفاتورة (اختياري)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPayRemainingReceipt(file);
+                      setPayRemainingReceiptPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                  className="w-full text-xs text-slate-500 file:ml-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 rounded-2xl p-2 bg-slate-50"
+                />
+                {payRemainingReceiptPreview && (
+                  <div className="relative mt-2 w-24 h-24 rounded-xl overflow-hidden border border-slate-200">
+                    <img src={payRemainingReceiptPreview} alt="Receipt preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setPayRemainingReceipt(null); setPayRemainingReceiptPreview(null); }}
+                      className="absolute top-1 right-1 bg-rose-500 text-white p-1 rounded-full shadow-xs"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-700 block">ملاحظات إضافية (اختياري)</label>
+                <input
+                  type="text"
+                  placeholder="مثال: تم سداد باقي الفستان وحفظ الإيصال"
+                  value={payRemainingNotes}
+                  onChange={(e) => setPayRemainingNotes(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmittingPayRemaining}
+                  className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 text-center"
+                >
+                  {isSubmittingPayRemaining ? 'جاري التسجيل...' : 'تأكيد وتسجيل الدفعة بالمالية 💰'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPayRemainingModalOpen(false)}
+                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

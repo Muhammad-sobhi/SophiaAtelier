@@ -40,7 +40,7 @@ function CollectionsContent() {
   const [category, setCategory] = useState(searchParams.get('category') || 'All');
   const [collection, setCollection] = useState(searchParams.get('collection') || 'All');
   const [sort, setSort] = useState('featured');
-  const [gridCols, setGridCols] = useState(3);
+  const [gridCols, setGridCols] = useState(4);
 
   const sortOptions = [
     { label: t.collections.allCategories || 'All', value: 'featured' },

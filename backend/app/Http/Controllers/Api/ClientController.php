@@ -191,7 +191,7 @@ class ClientController extends Controller
     public function stageAction(Request $request, Client $client): JsonResponse
     {
         $request->validate([
-            'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned',
+            'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining',
             'dress_id' => 'nullable|integer|exists:dresses,id',
             'fitting_date' => 'nullable|date',
             'fitting_time' => 'nullable|string|max:20',
@@ -200,6 +200,7 @@ class ClientController extends Controller
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
+            'amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:50',
             'notes' => 'nullable|string|max:1000',
         ]);
@@ -384,6 +385,25 @@ class ClientController extends Controller
                             'payment_method' => $paymentMethod,
                             'payment_date' => now()->toDateString(),
                             'notes' => 'مرتجع مبلغ التأمين بعد استلام الفستان بحالة سليمة للعروس: ' . $client->name,
+                        ]);
+                    }
+                }
+                break;
+
+            case 'pay_remaining':
+                $booking = $client->bookings()->latest()->first();
+                if ($booking) {
+                    $payAmount = floatval($request->input('amount', 0));
+                    if ($payAmount > 0) {
+                        $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+                        \App\Models\Revenue::create([
+                            'booking_id' => $booking->id,
+                            'type' => 'balance',
+                            'amount' => $payAmount,
+                            'payment_method' => $request->input('payment_method', 'cash'),
+                            'payment_date' => now()->toDateString(),
+                            'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
+                            'receipt_path' => $receiptPath,
                         ]);
                     }
                 }
