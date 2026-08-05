@@ -19,13 +19,13 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: 55%;
+  width: 65%;
   height: 100%;
-  background-image: url('https://images.unsplash.com/photo-1546804784-896d0dca3814?w=1200&auto=format&fit=crop&q=80');
+  background-image: url('/images/category.png');
   background-size: cover;
-  background-position: center 30%;
-  opacity: 0.22;
-  filter: contrast(0.95) saturate(0.9);
+  background-position: center center;
+  opacity: 0.85;
+  filter: contrast(1) saturate(1.05);
   pointer-events: none;
 }
 

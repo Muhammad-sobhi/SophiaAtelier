@@ -150,55 +150,6 @@ export default function Categories() {
             </Link>
           ))}
         </div>
-
-        {/* Bottom Feature / Trust Strip */}
-        <div className={styles.trustStrip}>
-          <div className={styles.trustItem}>
-            <div className={styles.trustIconWrap}>
-              <Award size={18} className={styles.trustIcon} />
-            </div>
-            <div className={styles.trustText}>
-              <h4>{lang === 'ar' ? 'جودة فاخرة' : 'Premium Quality'}</h4>
-              <p>{lang === 'ar' ? 'أرقى الأقمشة والحرفية' : 'Finest fabrics & craftsmanship'}</p>
-            </div>
-          </div>
-
-          <div className={styles.trustDivider} />
-
-          <div className={styles.trustItem}>
-            <div className={styles.trustIconWrap}>
-              <Heart size={18} className={styles.trustIcon} />
-            </div>
-            <div className={styles.trustText}>
-              <h4>{lang === 'ar' ? 'صُنعت بحب' : 'Made with Love'}</h4>
-              <p>{lang === 'ar' ? 'مصممة للحظاتك الخاصة' : 'Designed for your special moments'}</p>
-            </div>
-          </div>
-
-          <div className={styles.trustDivider} />
-
-          <div className={styles.trustItem}>
-            <div className={styles.trustIconWrap}>
-              <Ruler size={18} className={styles.trustIcon} />
-            </div>
-            <div className={styles.trustText}>
-              <h4>{lang === 'ar' ? 'قياسات مخصصة' : 'Custom Fitting'}</h4>
-              <p>{lang === 'ar' ? 'مضبوطة تماماً لأجلك' : 'Tailored perfectly for you'}</p>
-            </div>
-          </div>
-
-          <div className={styles.trustDivider} />
-
-          <div className={styles.trustItem}>
-            <div className={styles.trustIconWrap}>
-              <Truck size={18} className={styles.trustIcon} />
-            </div>
-            <div className={styles.trustText}>
-              <h4>{lang === 'ar' ? 'خدمة متميزة' : 'Worldwide Shipping'}</h4>
-              <p>{lang === 'ar' ? 'توصيل وتنسيق خيالي' : 'Delivering joy to your door'}</p>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
