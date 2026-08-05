@@ -168,39 +168,43 @@ export default function DressesPage() {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    // 1. Resolve or Create Designer
-    let designerId = null;
+    // 1. Resolve or Create/Update Designer
+    let designerId = editingDress?.designer_id || null;
     const designerNameEn = newDesigner.trim() || newDesignerAr.trim() || '';
     const designerNameArVal = newDesignerAr.trim() || newDesigner.trim() || '';
 
-    const matchedDesigner = designers.find((d) => 
-      (d.name && d.name.toLowerCase() === designerNameEn.toLowerCase()) || 
-      (d.name_ar && d.name_ar.toLowerCase() === designerNameArVal.toLowerCase())
-    );
+    if (designerNameEn || designerNameArVal) {
+      const matchedDesigner = designers.find((d) => 
+        (d.name && d.name.toLowerCase() === designerNameEn.toLowerCase()) || 
+        (d.name_ar && d.name_ar.toLowerCase() === designerNameArVal.toLowerCase()) ||
+        (editingDress && d.id === editingDress.designer_id)
+      );
 
-    if (matchedDesigner) {
-      designerId = matchedDesigner.id;
-      if (newDesignerAr.trim() && matchedDesigner.name_ar !== newDesignerAr.trim()) {
-        try {
-          await apiClient.put(`/designers/${matchedDesigner.id}`, {
-            name: matchedDesigner.name || designerNameEn,
-            name_ar: newDesignerAr.trim()
-          });
-        } catch (err) {
-          console.error('Failed to update designer name_ar:', err);
+      if (matchedDesigner) {
+        designerId = matchedDesigner.id;
+        if (
+          (designerNameEn && matchedDesigner.name !== designerNameEn) ||
+          (designerNameArVal && matchedDesigner.name_ar !== designerNameArVal)
+        ) {
+          try {
+            await apiClient.put(`/designers/${matchedDesigner.id}`, {
+              name: designerNameEn || matchedDesigner.name,
+              name_ar: designerNameArVal || matchedDesigner.name_ar
+            });
+          } catch (err) {
+            console.error('Failed to update designer name/name_ar:', err);
+          }
         }
-      }
-    } else if (designerNameEn) {
-      try {
-        const desRes = await apiClient.post('/designers', {
-          name: designerNameEn,
-          name_ar: designerNameArVal,
-          phone: '000',
-          email: `${designerNameEn.replace(/\s+/g, '').toLowerCase()}@atelier-designer.com`
-        });
-        designerId = desRes.id || desRes.data?.id;
-      } catch (err) {
-        console.error('Failed to create designer:', err);
+      } else {
+        try {
+          const desRes = await apiClient.post('/designers', {
+            name: designerNameEn,
+            name_ar: designerNameArVal
+          });
+          designerId = desRes.id || desRes.data?.id;
+        } catch (err) {
+          console.error('Failed to create designer:', err);
+        }
       }
     }
     if (!designerId) designerId = designers[0]?.id || 1;

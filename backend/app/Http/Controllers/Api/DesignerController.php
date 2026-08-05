@@ -20,7 +20,7 @@ class DesignerController extends Controller
             'name' => 'required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email',
+            'email' => 'nullable',
             'notes' => 'nullable|string',
         ]);
 
@@ -42,7 +42,7 @@ class DesignerController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email',
+            'email' => 'nullable',
             'notes' => 'nullable|string',
         ]);
 
