@@ -3,7 +3,7 @@ import { apiClient } from '@/lib/api-client';
 import {
   DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
   X, FileText, Image as ImageIcon, Plus, CreditCard, Banknote,
-  Smartphone, Building2, Wallet, ChevronRight, Filter } from
+  Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, Filter, Search } from
 'lucide-react';
 
 
@@ -79,9 +79,17 @@ export default function FinancePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activePaymentFilter, setActivePaymentFilter] = useState(null);
 
+  // Search & Pagination states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Date range filter
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, activePaymentFilter, searchQuery, filterStart, filterEnd]);
 
   // New Transaction Form state
   const [newDesc, setNewDesc] = useState('');
@@ -229,13 +237,27 @@ export default function FinancePage() {
     return { key, label: paymentMethodLabels[key] || key, income, outcome, count: txs.length };
   });
 
-  // Filter transactions based on active tab AND active payment filter
+  // Filter transactions based on active tab, active payment filter, AND search query
   const filteredTransactions = allTransactions.filter((t) => {
     const tabOk = activeTab === 'all' || t.category === activeTab;
     const methodOk = !activePaymentFilter ||
     [activePaymentFilter, activePaymentFilter.replace('_', ' ')].includes(t.paymentMethod);
-    return tabOk && methodOk;
+
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query ||
+      (t.desc && t.desc.toLowerCase().includes(query)) ||
+      (categoryLabels[t.category] && categoryLabels[t.category].toLowerCase().includes(query)) ||
+      (paymentMethodLabels[t.paymentMethod] && paymentMethodLabels[t.paymentMethod].toLowerCase().includes(query)) ||
+      (t.amount && t.amount.toLowerCase().includes(query)) ||
+      (t.date && t.date.includes(query));
+
+    return tabOk && methodOk && matchesSearch;
   });
+
+  const itemsPerPage = 20;
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
   const net = totals.revenue - totals.expenses;
   const summaryCards = [
@@ -377,83 +399,172 @@ export default function FinancePage() {
 
       {/* Transaction Log Table & Mobile Cards */}
       <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.015)] border border-slate-50 overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-50 flex items-center justify-between">
-          <h3 className="text-xs font-extrabold text-slate-800">
-            {activePaymentFilter ? `معاملات ${paymentMethodLabels[activePaymentFilter] || activePaymentFilter}` :
-            activeTab === 'all' ? 'سجل كافة المعاملات المالية' : `سجل: ${categoryLabels[activeTab]}`}
-          </h3>
-          <span className="text-[10px] font-bold text-slate-400">{filteredTransactions.length} قيد</span>
-        </div>
-        {filteredTransactions.length === 0 ?
-        <div className="p-8 text-center text-xs font-bold text-slate-400">لا توجد قيود مالية مسجلة في هذا القسم بعد.</div> :
-        <>
-          {/* Mobile Cards View (Visible on screens < md) */}
-          <div className="block md:hidden p-3 space-y-2.5">
-            {filteredTransactions.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => setSelectedTx(t)}
-                className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3.5 flex flex-col gap-2 active:bg-indigo-50/30 transition-all cursor-pointer"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
-                  <span className={`text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {t.amount}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold pt-1 border-t border-slate-100">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 bg-white border border-slate-150 rounded-md font-extrabold text-slate-600">
-                      {categoryLabels[t.category] || '-'}
-                    </span>
-                    <span>{paymentMethodLabels[t.paymentMethod] || 'نقدي'}</span>
-                  </div>
-                  <span className="font-mono">{t.date}</span>
-                </div>
-              </div>
-            ))}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+          <div>
+            <h3 className="text-xs font-extrabold text-slate-800">
+              {activePaymentFilter ? `معاملات ${paymentMethodLabels[activePaymentFilter] || activePaymentFilter}` :
+              activeTab === 'all' ? 'سجل كافة المعاملات المالية' : `سجل: ${categoryLabels[activeTab]}`}
+            </h3>
+            <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+              إجمالي نتائج البحث: {filteredTransactions.length} قيد (حد أقصى 20 معاملة بالصفحة)
+            </p>
           </div>
 
-          {/* Desktop Table View (Visible on screens >= md) */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-right border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100/70">
-                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">الوصف</th>
-                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">التصنيف</th>
-                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">وسيلة الدفع</th>
-                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">المبلغ</th>
-                  <th className="px-5 py-4 text-xs font-extrabold text-slate-400">التاريخ</th>
-                  <th className="px-5 py-4 text-xs text-left"><SlidersHorizontal size={13} className="text-slate-400 inline" /></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map((t) =>
-              <tr key={t.id} onClick={() => setSelectedTx(t)}
-              className="border-b border-slate-50 last:border-0 hover:bg-indigo-50/20 transition-all duration-200 cursor-pointer">
-                    <td className="px-5 py-3.5 text-xs font-bold text-slate-800 max-w-[200px] truncate">{t.desc}</td>
-                    <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-extrabold text-slate-650">
+          {/* Search Box */}
+          <div className="relative w-full sm:w-80">
+            <input
+              type="text"
+              placeholder="بحث بالوصف، المبلغ، وسيلة الدفع..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            />
+            <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {filteredTransactions.length === 0 ? (
+          <div className="p-8 text-center text-xs font-bold text-slate-400">لا توجد قيود مالية مطابقة للبحث أو الفلتر المحدد.</div>
+        ) : (
+          <>
+            {/* Mobile Cards View (Visible on screens < md) */}
+            <div className="block md:hidden p-3 space-y-2.5">
+              {paginatedTransactions.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTx(t)}
+                  className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3.5 flex flex-col gap-2 active:bg-indigo-50/30 transition-all cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
+                    <span className={`text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {t.amount}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold pt-1 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 bg-white border border-slate-150 rounded-md font-extrabold text-slate-600">
                         {categoryLabels[t.category] || '-'}
                       </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-500 font-semibold whitespace-nowrap">
-                      {paymentMethodLabels[t.paymentMethod] || 'نقدي'}
-                    </td>
-                    <td className={`px-5 py-3.5 text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {t.amount}
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-500 font-semibold whitespace-nowrap">{t.date}</td>
-                    <td className="px-5 py-3.5 text-left">
-                      <ChevronRight size={14} className="text-slate-300 inline-block" />
-                    </td>
+                      <span>{paymentMethodLabels[t.paymentMethod] || 'نقدي'}</span>
+                    </div>
+                    <span className="font-mono">{t.date}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View (Visible on screens >= md) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-right border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100/70">
+                    <th className="px-5 py-4 text-xs font-extrabold text-slate-400">الوصف</th>
+                    <th className="px-5 py-4 text-xs font-extrabold text-slate-400">التصنيف</th>
+                    <th className="px-5 py-4 text-xs font-extrabold text-slate-400">وسيلة الدفع</th>
+                    <th className="px-5 py-4 text-xs font-extrabold text-slate-400">المبلغ</th>
+                    <th className="px-5 py-4 text-xs font-extrabold text-slate-400">التاريخ</th>
+                    <th className="px-5 py-4 text-xs text-left"><SlidersHorizontal size={13} className="text-slate-400 inline" /></th>
                   </tr>
-              )}
-              </tbody>
-            </table>
-          </div>
-        </>
-        }
+                </thead>
+                <tbody>
+                  {paginatedTransactions.map((t) => (
+                    <tr
+                      key={t.id}
+                      onClick={() => setSelectedTx(t)}
+                      className="border-b border-slate-50 last:border-0 hover:bg-indigo-50/20 transition-all duration-200 cursor-pointer"
+                    >
+                      <td className="px-5 py-3.5 text-xs font-bold text-slate-800 max-w-[200px] truncate">{t.desc}</td>
+                      <td className="px-5 py-3.5">
+                        <span className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-extrabold text-slate-650">
+                          {categoryLabels[t.category] || '-'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs text-slate-500 font-semibold whitespace-nowrap">
+                        {paymentMethodLabels[t.paymentMethod] || 'نقدي'}
+                      </td>
+                      <td className={`px-5 py-3.5 text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {t.amount}
+                      </td>
+                      <td className="px-5 py-3.5 text-xs text-slate-500 font-semibold whitespace-nowrap">{t.date}</td>
+                      <td className="px-5 py-3.5 text-left">
+                        <ChevronRight size={14} className="text-slate-300 inline-block" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls Footer */}
+            {filteredTransactions.length > 0 && (
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-extrabold text-slate-500">
+                <div>
+                  عرض {startIndex + 1} - {Math.min(startIndex + itemsPerPage, filteredTransactions.length)} من إجمالي {filteredTransactions.length} قيد
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5 dir-rtl">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <ChevronRight size={14} />
+                      <span>السابق</span>
+                    </button>
+
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                        .map((page, idx, arr) => {
+                          const prevPage = arr[idx - 1];
+                          const isGap = prevPage && page - prevPage > 1;
+
+                          return (
+                            <React.Fragment key={page}>
+                              {isGap && <span className="text-slate-300 text-xs px-1">...</span>}
+                              <button
+                                type="button"
+                                onClick={() => setCurrentPage(page)}
+                                className={`w-7 h-7 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center ${
+                                  currentPage === page
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            </React.Fragment>
+                          );
+                        })}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <span>التالي</span>
+                      <ChevronLeft size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Transaction details popup */}
