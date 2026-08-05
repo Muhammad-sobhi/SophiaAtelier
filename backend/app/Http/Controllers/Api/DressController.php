@@ -32,6 +32,10 @@ class DressController extends Controller
             $query->where('name', 'like', "%{$cleanSearch}%");
         }
 
+        if ($request->has('is_website_visible')) {
+            $query->where('is_website_visible', filter_var($request->input('is_website_visible'), FILTER_VALIDATE_BOOLEAN));
+        }
+
         if ($request->input('per_page') === 'all') {
             return response()->json($query->latest()->get());
         }
@@ -65,6 +69,7 @@ class DressController extends Controller
             'notes' => 'nullable|string',
             'accessories' => 'nullable|array',
             'new_collection' => 'nullable|boolean',
+            'is_website_visible' => 'nullable|boolean',
         ]);
 
         $dress = Dress::create($validated);
@@ -134,6 +139,7 @@ class DressController extends Controller
             'notes' => 'nullable|string',
             'accessories' => 'nullable|array',
             'new_collection' => 'nullable|boolean',
+            'is_website_visible' => 'nullable|boolean',
         ]);
 
         $dress->update($validated);

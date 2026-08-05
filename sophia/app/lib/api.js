@@ -41,10 +41,10 @@ export function getStorageUrl(path) {
 
 export async function fetchDresses() {
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/dresses`, { cache: 'no-store' });
+    const res = await fetchWithTimeout(`${API_BASE}/dresses?per_page=all`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
-    const dresses = data.data || data;
+    const dresses = (data.data || data).filter((d) => d.is_website_visible !== false && d.is_website_visible !== 0);
     return dresses.map((d) => {
       const hasWeightFrom = d.weight_from !== null && d.weight_from !== undefined && d.weight_from !== '';
       const hasWeightTo = d.weight_to !== null && d.weight_to !== undefined && d.weight_to !== '';

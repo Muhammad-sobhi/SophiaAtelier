@@ -48,6 +48,7 @@ export default function DressesPage() {
   const [newColor, setNewColor] = useState('');
   const [newColorAr, setNewColorAr] = useState('');
   const [newNewCollection, setNewNewCollection] = useState(false);
+  const [isWebsiteVisible, setIsWebsiteVisible] = useState(true);
   const [isTranslating, setIsTranslating] = useState(false);
 
   // Category & Collection selection options
@@ -77,6 +78,7 @@ export default function DressesPage() {
     setNewColor('');
     setNewColorAr('');
     setNewNewCollection(false);
+    setIsWebsiteVisible(true);
     setIsAddingNewCategory(false);
     setNewCategoryName('');
     setNewCategoryImageFile(null);
@@ -256,7 +258,8 @@ export default function DressesPage() {
         color: newColor,
         color_ar: newColorAr || newColor,
         accessories: validAccs,
-        new_collection: newNewCollection ? 1 : 0
+        new_collection: newNewCollection ? 1 : 0,
+        is_website_visible: isWebsiteVisible ? 1 : 0
       };
 
       if (editingDress) {
@@ -292,6 +295,18 @@ export default function DressesPage() {
     resetForm();
   };
 
+  const handleToggleWebsiteVisibility = async (dress) => {
+    try {
+      const updatedVisibility = !(dress.is_website_visible !== false && dress.is_website_visible !== 0);
+      await apiClient.put(`/dresses/${dress.id}`, {
+        is_website_visible: updatedVisibility ? 1 : 0
+      });
+      fetchDresses();
+    } catch (e) {
+      console.error('Failed to update website visibility:', e);
+    }
+  };
+
   const handleEditClick = (dress) => {
     setEditingDress(dress);
     setNewCode(dress.code || '');
@@ -313,6 +328,7 @@ export default function DressesPage() {
     setNewColor(dress.color || 'White');
     setNewColorAr(dress.color_ar || dress.color || 'أوف وايت');
     setNewNewCollection(dress.new_collection === true || dress.new_collection === 1 || dress.new_collection === '1');
+    setIsWebsiteVisible(dress.is_website_visible !== false && dress.is_website_visible !== 0);
     setSelectedCategoryId(dress.category_id ? dress.category_id.toString() : '');
     setSelectedCollectionId(dress.collection_id ? dress.collection_id.toString() : '');
     setIsAddingNewCategory(false);
@@ -567,6 +583,19 @@ export default function DressesPage() {
                           ✨ تشكيلة جديدة
                         </div>
                       }
+                      {/* Website Visibility Badge / Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleWebsiteVisibility(dress)}
+                        className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[8px] font-black shadow-xs transition-all cursor-pointer ${
+                          dress.is_website_visible !== false && dress.is_website_visible !== 0
+                            ? 'bg-emerald-600/90 text-white hover:bg-emerald-700'
+                            : 'bg-slate-700/80 text-slate-200 hover:bg-slate-800'
+                        }`}
+                        title="انقر للتغيير (معروض بالموقع / مخفي من الموقع)"
+                      >
+                        {dress.is_website_visible !== false && dress.is_website_visible !== 0 ? '🌐 معروض بالموقع' : '👁️ مخفي من الموقع'}
+                      </button>
                       {/* Edit/Delete Overlay */}
                       <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -1036,18 +1065,33 @@ export default function DressesPage() {
                   </div>
                 </div>
 
-                {/* New Collection Checkbox */}
-                <div className="flex items-center gap-2 py-1 text-right bg-amber-50/50 p-3 rounded-2xl border border-amber-100/60">
-                  <input
-                    type="checkbox"
-                    id="new_collection"
-                    checked={newNewCollection}
-                    onChange={(e) => setNewNewCollection(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                  />
-                  <label htmlFor="new_collection" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
-                    ✨ هذا الفستان جزء من التشكيلة الجديدة (New Collection)
-                  </label>
+                {/* New Collection & Website Visibility Checkboxes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-right">
+                  <div className="flex items-center gap-2 py-1 bg-amber-50/50 p-3 rounded-2xl border border-amber-100/60">
+                    <input
+                      type="checkbox"
+                      id="new_collection"
+                      checked={newNewCollection}
+                      onChange={(e) => setNewNewCollection(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <label htmlFor="new_collection" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
+                      ✨ تشكيلة جديدة (New Collection)
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2 py-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/60">
+                    <input
+                      type="checkbox"
+                      id="is_website_visible"
+                      checked={isWebsiteVisible}
+                      onChange={(e) => setIsWebsiteVisible(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="is_website_visible" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
+                      🌐 إظهار الفستان بالموقع الإلكتروني
+                    </label>
+                  </div>
                 </div>
 
                 {/* Dynamic Accessories Section */}
