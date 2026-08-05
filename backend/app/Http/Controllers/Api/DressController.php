@@ -144,6 +144,23 @@ class DressController extends Controller
 
         $dress->update($validated);
 
+        if (array_key_exists('purchase_price', $validated) && $validated['purchase_price'] > 0) {
+            $expense = \App\Models\Expense::where('category', 'purchase')
+                ->where('description', 'LIKE', '%' . $dress->name . '%')
+                ->first();
+
+            if ($expense) {
+                $expense->update(['amount' => $validated['purchase_price']]);
+            } else {
+                \App\Models\Expense::create([
+                    'category'    => 'purchase',
+                    'amount'      => $validated['purchase_price'],
+                    'description' => 'شراء فستان: ' . $dress->name,
+                    'date'        => now()->toDateString(),
+                ]);
+            }
+        }
+
         if ($request->has('accessories')) {
             $dress->accessories()->delete();
             foreach ($request->input('accessories') as $accName) {
