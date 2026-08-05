@@ -168,41 +168,39 @@ export default function DressesPage() {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    // 1. Resolve or Create Designer
-    let designerId = null;
+    // 1. Resolve or Update/Create Designer
+    let designerId = editingDress?.designer_id || null;
     const designerNameEn = newDesigner.trim() || newDesignerAr.trim() || '';
     const designerNameArVal = newDesignerAr.trim() || newDesigner.trim() || '';
 
     if (designerNameEn || designerNameArVal) {
-      const matchedDesigner = designers.find((d) => 
-        (d.name && d.name.trim().toLowerCase() === designerNameEn.toLowerCase()) || 
-        (d.name_ar && d.name_ar.trim().toLowerCase() === designerNameArVal.toLowerCase())
-      );
-
-      if (matchedDesigner) {
-        designerId = matchedDesigner.id;
-        if (
-          (designerNameEn && matchedDesigner.name !== designerNameEn) ||
-          (designerNameArVal && matchedDesigner.name_ar !== designerNameArVal)
-        ) {
-          try {
-            await apiClient.put(`/designers/${matchedDesigner.id}`, {
-              name: designerNameEn || matchedDesigner.name,
-              name_ar: designerNameArVal || matchedDesigner.name_ar
-            });
-          } catch (err) {
-            console.error('Failed to update designer name/name_ar:', err);
-          }
-        }
-      } else {
+      if (editingDress && designerId) {
         try {
-          const desRes = await apiClient.post('/designers', {
+          await apiClient.put(`/designers/${designerId}`, {
             name: designerNameEn,
             name_ar: designerNameArVal
           });
-          designerId = desRes.id || desRes.data?.id;
         } catch (err) {
-          console.error('Failed to create designer:', err);
+          console.error('Failed to update current designer:', err);
+        }
+      } else {
+        const matchedDesigner = designers.find((d) => 
+          (d.name && d.name.trim().toLowerCase() === designerNameEn.toLowerCase()) || 
+          (d.name_ar && d.name_ar.trim().toLowerCase() === designerNameArVal.toLowerCase())
+        );
+
+        if (matchedDesigner) {
+          designerId = matchedDesigner.id;
+        } else {
+          try {
+            const desRes = await apiClient.post('/designers', {
+              name: designerNameEn,
+              name_ar: designerNameArVal
+            });
+            designerId = desRes.id || desRes.data?.id;
+          } catch (err) {
+            console.error('Failed to create designer:', err);
+          }
         }
       }
     }
