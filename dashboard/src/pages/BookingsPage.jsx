@@ -344,7 +344,7 @@ export default function BookingsPage() {
     const clientObj = clientsObjects.find((c) => c.name === newClient);
     const clientId = clientObj?.id || 1;
 
-    const amountNum = parseFloat(newAmount.replace(/[^\d]/g, '')) || 0;
+    const amountNum = parseFloat(newAmount.replace(/[^\d.]/g, '')) || 0;
     const mappedStatus = newStatus === 'مؤكد' ? 'confirmed' : newStatus === 'ملغي' ? 'cancelled' : 'pending';
 
     try {
@@ -412,7 +412,7 @@ export default function BookingsPage() {
     const dressObj = dressesObjects.find((d) => d.name === newDress);
     const dressId = dressObj?.id || 1;
 
-    const amountNum = parseFloat(newAmount.replace(/[^\d]/g, '')) || 0;
+    const amountNum = parseFloat(newAmount.replace(/[^\d.]/g, '')) || 0;
     const mappedStatus = newStatus === 'مؤكد' ? 'confirmed' : newStatus === 'ملغي' ? 'cancelled' : 'pending';
 
     try {

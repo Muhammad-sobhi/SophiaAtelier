@@ -226,9 +226,9 @@ export default function DressesPage() {
     }
     if (!categoryId) categoryId = categories[0]?.id || 1;
 
-    const priceNum = parseFloat(newPurchasePrice.toString().replace(/[^\d]/g, '')) || 0;
-    const rentalNum = parseFloat(newRentalCost.toString().replace(/[^\d]/g, '')) || 0;
-    const tryingNum = newTryingFee ? parseFloat(newTryingFee.toString().replace(/[^\d]/g, '')) : 0;
+    const priceNum = parseFloat(newPurchasePrice.toString().replace(/[^\d.]/g, '')) || 0;
+    const rentalNum = parseFloat(newRentalCost.toString().replace(/[^\d.]/g, '')) || 0;
+    const tryingNum = newTryingFee ? parseFloat(newTryingFee.toString().replace(/[^\d.]/g, '')) : 0;
 
     const wFrom = newWeightFrom ? parseInt(newWeightFrom) : null;
     const wTo = newWeightTo ? parseInt(newWeightTo) : null;
