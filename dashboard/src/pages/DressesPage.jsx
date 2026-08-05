@@ -168,16 +168,15 @@ export default function DressesPage() {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    // 1. Resolve or Create/Update Designer
-    let designerId = editingDress?.designer_id || null;
+    // 1. Resolve or Create Designer
+    let designerId = null;
     const designerNameEn = newDesigner.trim() || newDesignerAr.trim() || '';
     const designerNameArVal = newDesignerAr.trim() || newDesigner.trim() || '';
 
     if (designerNameEn || designerNameArVal) {
       const matchedDesigner = designers.find((d) => 
-        (d.name && d.name.toLowerCase() === designerNameEn.toLowerCase()) || 
-        (d.name_ar && d.name_ar.toLowerCase() === designerNameArVal.toLowerCase()) ||
-        (editingDress && d.id === editingDress.designer_id)
+        (d.name && d.name.trim().toLowerCase() === designerNameEn.toLowerCase()) || 
+        (d.name_ar && d.name_ar.trim().toLowerCase() === designerNameArVal.toLowerCase())
       );
 
       if (matchedDesigner) {
