@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowUpRight, Award, Heart, Ruler, Truck, Sparkles, Gem, Crown } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { useScrollAnimation } from '../ScrollAnimations/useScrollAnimation';
 import { useStore } from '../../context/StoreContext';
 import { getStorageUrl } from '../../lib/api';
@@ -82,11 +82,13 @@ export default function Categories() {
 
   return (
     <section className={styles.section} id="categories" ref={ref}>
-      {/* Warm Ambient Hero Background Banner */}
-      <div className={styles.heroBanner}>
-        <div className={styles.heroBgImage} />
-        <div className={styles.heroOverlay} />
-        <div className={`container ${styles.heroContent}`}>
+      {/* Full Section Background Image & Blending Gradient */}
+      <div className={styles.bgImage} />
+      <div className={styles.bgOverlay} />
+
+      <div className={`container ${styles.container}`}>
+        {/* Header Block */}
+        <div className={styles.headerBlock}>
           <div className={styles.leftCol}>
             <span className={styles.eyebrow}>{lang === 'ar' ? 'تسوقي حسب التصنيف' : 'SHOP BY CATEGORY'}</span>
             <h2 className={styles.heading}>
@@ -106,10 +108,8 @@ export default function Categories() {
             </Link>
           </div>
         </div>
-      </div>
 
-      {/* Categories 5-Columns Cards Container */}
-      <div className={`container ${styles.cardsContainer}`}>
+        {/* Categories 5-Columns Grid */}
         <div className={styles.grid}>
           {displayCategories.map((cat, i) => (
             <Link

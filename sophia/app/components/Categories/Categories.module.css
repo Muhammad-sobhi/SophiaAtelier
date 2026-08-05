@@ -1,50 +1,54 @@
 .section {
+  position: relative;
   background-color: #FAF7F2;
-  position: relative;
-  padding: 0 0 70px 0;
+  padding: 85px 0 95px 0;
   overflow: hidden;
 }
 
-/* ---------- Hero Banner Container ---------- */
-.heroBanner {
-  position: relative;
-  width: 100%;
-  padding: 70px 0 160px 0;
-  background-color: #F8F4EE;
-  background-image: radial-gradient(circle at 80% 40%, rgba(240, 230, 218, 0.6) 0%, rgba(248, 244, 238, 0) 60%);
-  overflow: hidden;
-}
-
-.heroBgImage {
+/* Full Width Seamless Studio Background Image */
+.bgImage {
   position: absolute;
   top: 0;
   right: 0;
   width: 65%;
-  height: 100%;
+  height: 90%;
   background-image: url('/images/category.png');
   background-size: cover;
-  background-position: center center;
-  opacity: 0.85;
-  filter: contrast(1) saturate(1.05);
+  background-position: right top;
+  opacity: 0.95;
+  filter: contrast(0.98) saturate(1.05);
   pointer-events: none;
 }
 
-.heroOverlay {
+/* Soft Radial & Linear Gradient Overlays for Seamless Text & Card Integration */
+.bgOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    #F8F4EE 0%,
-    #F8F4EE 40%,
-    rgba(248, 244, 238, 0.85) 65%,
-    rgba(248, 244, 238, 0.4) 100%
-  );
+  background:
+    linear-gradient(
+      90deg,
+      #FAF7F2 0%,
+      #FAF7F2 36%,
+      rgba(250, 247, 242, 0.78) 58%,
+      rgba(250, 247, 242, 0.15) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(250, 247, 242, 0) 0%,
+      rgba(250, 247, 242, 0) 55%,
+      #FAF7F2 88%
+    );
   pointer-events: none;
 }
 
-.heroContent {
+.container {
   position: relative;
-  z-index: 2;
+  z-index: 3;
+}
+
+/* Header Text Area */
+.headerBlock {
+  margin-bottom: 50px;
 }
 
 .leftCol {
@@ -61,12 +65,12 @@
   letter-spacing: 3px;
   text-transform: uppercase;
   color: #B29672;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .heading {
   font-family: var(--font-heading), 'Playfair Display', serif;
-  font-size: 40px;
+  font-size: 42px;
   font-weight: 400;
   color: #24201D;
   line-height: 1.22;
@@ -86,8 +90,10 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 22px;
-  background: transparent;
+  padding: 11px 24px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid #D8D0C2;
   border-radius: 8px;
   font-family: var(--font-body), sans-serif;
@@ -115,12 +121,6 @@
 }
 
 /* ---------- 5 Cards Grid Layout ---------- */
-.cardsContainer {
-  position: relative;
-  z-index: 3;
-  margin-top: -110px;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -260,84 +260,17 @@
   transform: translate(2px, -2px);
 }
 
-/* ---------- Bottom Trust Strip ---------- */
-.trustStrip {
-  margin-top: 36px;
-  background: #FDFBF8;
-  border: 1px solid #EFEAE1;
-  border-radius: 16px;
-  padding: 20px 30px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 4px 20px rgba(36, 32, 29, 0.03);
-}
-
-.trustItem {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex: 1;
-}
-
-.trustIconWrap {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #FAF4EB;
-  border: 1px solid #EFE4D4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #9E835E;
-  flex-shrink: 0;
-}
-
-.trustText h4 {
-  font-family: var(--font-body), sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: #24201D;
-  margin: 0 0 2px 0;
-}
-
-.trustText p {
-  font-family: var(--font-body), sans-serif;
-  font-size: 10.5px;
-  color: #7D756A;
-  margin: 0;
-}
-
-.trustDivider {
-  width: 1px;
-  height: 36px;
-  background: #EFE8DD;
-  margin: 0 20px;
-  flex-shrink: 0;
-}
-
 /* ---------- Responsive Breakpoints ---------- */
 @media (max-width: 1200px) {
   .grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
   }
-  .cardsContainer {
-    margin-top: -80px;
-  }
-  .trustStrip {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
-  }
-  .trustDivider {
-    display: none;
-  }
 }
 
 @media (max-width: 768px) {
-  .heroBanner {
-    padding: 50px 0 120px 0;
+  .section {
+    padding: 60px 0 70px 0;
   }
   .heading {
     font-size: 32px;
@@ -346,13 +279,9 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 14px;
   }
-  .cardsContainer {
-    margin-top: -60px;
-  }
-  .trustStrip {
-    grid-template-columns: 1fr;
-    gap: 16px;
-    padding: 20px;
+  .bgImage {
+    width: 100%;
+    opacity: 0.4;
   }
 }
 
