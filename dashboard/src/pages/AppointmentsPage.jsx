@@ -665,111 +665,115 @@ export default function AppointmentsPage() {
           </div>
         </div> : viewMode === 'monthly' ? (
       /* Monthly Grid Calendar View */
-      <div className="flex-1 bg-white border border-slate-200/80 rounded-[2rem] p-5 shadow-xs overflow-y-auto flex flex-col">
-        {/* Month Day Headers */}
-        <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-black text-slate-700 bg-slate-50/80 py-2.5 rounded-xl border border-slate-100">
-          <div>السبت</div>
-          <div>الأحد</div>
-          <div>الاثنين</div>
-          <div>الثلاثاء</div>
-          <div>الأربعاء</div>
-          <div>الخميس</div>
-          <div>الجمعة</div>
-        </div>
+      <div className="flex-1 bg-white border border-slate-200/80 rounded-[2rem] p-4 md:p-5 shadow-xs overflow-y-auto flex flex-col">
+        <div className="overflow-x-auto w-full flex-1 flex flex-col pb-2 scrollbar-thin">
+          <div className="min-w-[700px] flex-1 flex flex-col">
+            {/* Month Day Headers */}
+            <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-black text-slate-700 bg-slate-50/80 py-2.5 rounded-xl border border-slate-100">
+              <div>السبت</div>
+              <div>الأحد</div>
+              <div>الاثنين</div>
+              <div>الثلاثاء</div>
+              <div>الأربعاء</div>
+              <div>الخميس</div>
+              <div>الجمعة</div>
+            </div>
 
-        {/* Month Grid Cells */}
-        <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr">
-          {(() => {
-            if (!startDateStr) return null;
-            const monthStart = parseLocalDate(startDateStr);
-            const startDayIdx = (monthStart.getDay() + 1) % 7; // Saturday = 0
-            const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+            {/* Month Grid Cells */}
+            <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr">
+              {(() => {
+                if (!startDateStr) return null;
+                const monthStart = parseLocalDate(startDateStr);
+                const startDayIdx = (monthStart.getDay() + 1) % 7; // Saturday = 0
+                const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
 
-            const cells = [];
-            // Padding cells before first day of month
-            for (let i = 0; i < startDayIdx; i++) {
-              cells.push(<div key={`pad-${i}`} className="bg-slate-50/30 border border-slate-100/50 rounded-2xl min-h-[110px]" />);
-            }
+                const cells = [];
+                // Padding cells before first day of month
+                for (let i = 0; i < startDayIdx; i++) {
+                  cells.push(<div key={`pad-${i}`} className="bg-slate-50/30 border border-slate-100/50 rounded-2xl min-h-[110px]" />);
+                }
 
-            // Month days
-            for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-              const currentCellDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), dayNum);
-              const dateStr = formatLocalYYYYMMDD(currentCellDate);
+                // Month days
+                for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+                  const currentCellDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), dayNum);
+                  const dateStr = formatLocalYYYYMMDD(currentCellDate);
 
-              const dayEvents = events.filter((e) => e.original_date === dateStr && (
-                e.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                e.dress_name?.toLowerCase().includes(searchQuery.toLowerCase())
-              ));
+                  const dayEvents = events.filter((e) => e.original_date === dateStr && (
+                    e.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    e.dress_name?.toLowerCase().includes(searchQuery.toLowerCase())
+                  ));
 
-              const isToday = dateStr === formatLocalYYYYMMDD(new Date());
+                  const isToday = dateStr === formatLocalYYYYMMDD(new Date());
 
-              cells.push(
-                <div
-                  key={`day-${dayNum}`}
-                  className={`border rounded-2xl p-2 flex flex-col min-h-[115px] transition-all bg-white hover:border-indigo-300 ${
-                    isToday ? 'border-indigo-400 bg-indigo-50/10' : 'border-slate-150'
-                  }`}
-                >
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-1.5">
-                    <span className={`text-[11px] font-black rounded-md px-1.5 py-0.5 ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'}`}>
-                      {dayNum}
-                    </span>
-                    {dayEvents.length > 0 && (
-                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                        {dayEvents.length} مواعيد
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[130px] pr-0.5 scrollbar-none">
-                    {dayEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        onClick={() => setSelectedAppointmentForDetail(event)}
-                        className={`p-1.5 rounded-xl border flex items-center gap-1.5 transition-all bg-white hover:shadow-sm cursor-pointer select-none ${
-                          event.type === 'visit'
-                            ? 'border-rose-100 text-rose-900 bg-rose-50/20'
-                            : event.type === 'fitting'
-                            ? 'border-purple-100 text-purple-900 bg-purple-50/20'
-                            : event.type === 'pickup'
-                            ? 'border-amber-100 text-amber-900 bg-amber-50/20'
-                            : event.status === 'pending'
-                            ? 'border-orange-200 text-orange-950 bg-orange-50/20'
-                            : 'border-blue-100 text-blue-900 bg-blue-50/20'
-                        }`}
-                      >
-                        <img
-                          src={event.dress_image}
-                          alt="dress"
-                          className="w-6 h-6 rounded-lg object-cover flex-shrink-0 border border-slate-100"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-[9px] font-black truncate block text-slate-800">
-                              {event.client_name}
-                            </span>
-                            <span className={`text-[7px] font-bold px-1 rounded ${
-                              event.type === 'visit' ? 'bg-rose-100 text-rose-700' :
-                              event.type === 'fitting' ? 'bg-purple-100 text-purple-700' :
-                              event.type === 'pickup' ? 'bg-amber-100 text-amber-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {event.type === 'visit' ? 'زيارة' : event.type === 'fitting' ? 'بروفة' : event.type === 'pickup' ? 'استلام' : 'حجز'}
-                            </span>
-                          </div>
-                          <span className="text-[7.5px] text-slate-400 font-semibold block truncate">
-                            {event.time_slot || event.dress_name || 'موعد'}
+                  cells.push(
+                    <div
+                      key={`day-${dayNum}`}
+                      className={`border rounded-2xl p-2 flex flex-col min-h-[115px] transition-all bg-white hover:border-indigo-300 ${
+                        isToday ? 'border-indigo-400 bg-indigo-50/10' : 'border-slate-150'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-1.5 gap-1">
+                        <span className={`text-[11px] font-black rounded-md px-1.5 py-0.5 flex-shrink-0 ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'}`}>
+                          {dayNum}
+                        </span>
+                        {dayEvents.length > 0 && (
+                          <span className="text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap flex-shrink-0">
+                            {dayEvents.length} {dayEvents.length === 1 ? 'موعد' : 'مواعيد'}
                           </span>
-                        </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
 
-            return cells;
-          })()}
+                      <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[130px] pr-0.5 scrollbar-none">
+                        {dayEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            onClick={() => setSelectedAppointmentForDetail(event)}
+                            className={`p-1.5 rounded-xl border flex items-center gap-1.5 transition-all bg-white hover:shadow-sm cursor-pointer select-none ${
+                              event.type === 'visit'
+                                ? 'border-rose-100 text-rose-900 bg-rose-50/20'
+                                : event.type === 'fitting'
+                                ? 'border-purple-100 text-purple-900 bg-purple-50/20'
+                                : event.type === 'pickup'
+                                ? 'border-amber-100 text-amber-900 bg-amber-50/20'
+                                : event.status === 'pending'
+                                ? 'border-orange-200 text-orange-950 bg-orange-50/20'
+                                : 'border-blue-100 text-blue-900 bg-blue-50/20'
+                            }`}
+                          >
+                            <img
+                              src={event.dress_image}
+                              alt="dress"
+                              className="w-6 h-6 rounded-lg object-cover flex-shrink-0 border border-slate-100"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[9px] font-black truncate block text-slate-800">
+                                  {event.client_name}
+                                </span>
+                                <span className={`text-[7px] font-bold px-1 rounded ${
+                                  event.type === 'visit' ? 'bg-rose-100 text-rose-700' :
+                                  event.type === 'fitting' ? 'bg-purple-100 text-purple-700' :
+                                  event.type === 'pickup' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {event.type === 'visit' ? 'زيارة' : event.type === 'fitting' ? 'بروفة' : event.type === 'pickup' ? 'استلام' : 'حجز'}
+                                </span>
+                              </div>
+                              <span className="text-[7.5px] text-slate-400 font-semibold block truncate">
+                                {event.time_slot || event.dress_name || 'موعد'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return cells;
+              })()}
+            </div>
+          </div>
         </div>
       </div>
     ) : (

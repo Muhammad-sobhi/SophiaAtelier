@@ -598,20 +598,20 @@ export default function DressesPage() {
                         {dress.is_website_visible !== false && dress.is_website_visible !== 0 ? '🌐 معروض بالموقع' : '👁️ مخفي من الموقع'}
                       </button>
                       {/* Edit/Delete Overlay */}
-                      <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-2 left-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEditClick(dress)}
                           className="p-1.5 bg-white/90 text-indigo-600 hover:bg-white rounded-lg transition-all shadow-xs cursor-pointer"
                           title="تعديل">
                           
-                          <Edit3 size={11} />
+                          <Edit3 size={12} />
                         </button>
                         <button
                           onClick={() => setDeleteConfirm({ isOpen: true, id: dress.id, title: dress.name })}
                           className="p-1.5 bg-white/90 text-rose-500 hover:bg-white rounded-lg transition-all shadow-xs cursor-pointer"
                           title="حذف">
                           
-                          <Trash2 size={11} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>

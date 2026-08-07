@@ -579,20 +579,20 @@ export default function BridesPage() {
               </span>
               {/* Admin actions overlay on hover */}
               {isAdmin &&
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleEditBrideClick(bride)}
                     className="p-1 text-indigo-650 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
                     title="تعديل">
 
-                    <Edit3 size={11} />
+                    <Edit3 size={12} />
                   </button>
                   <button
                     onClick={() => handleDeleteBride(bride.id)}
                     className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
                     title="حذف">
 
-                    <Trash2 size={11} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               }
