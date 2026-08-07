@@ -472,9 +472,9 @@ export default function AppointmentsPage() {
     <div className="p-4 sm:p-6 md:p-8 space-y-4 flex flex-col min-h-full overflow-y-auto bg-slate-50/50 text-right font-sans text-slate-800" dir="rtl">
       
       {/* Global Control & Filter Bar */}
-      <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs flex flex-col sm:flex-row flex-wrap gap-4 items-stretch sm:items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="relative w-60">
+      <div className="bg-white border border-slate-200/80 p-3.5 sm:p-4 rounded-2xl shadow-xs flex flex-col xl:flex-row gap-3 sm:gap-4 items-stretch xl:items-center justify-between flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="relative w-full sm:w-60 flex-shrink-0">
             <input
               type="text"
               placeholder="البحث عن العرائس أو الفساتين..."
@@ -486,31 +486,33 @@ export default function AppointmentsPage() {
           </div>
           
           {/* Week Selector Controls */}
-          <div className="flex items-center gap-1 border border-slate-200 rounded-xl p-1 bg-slate-50">
+          <div className="flex items-center justify-between gap-1 border border-slate-200 rounded-xl p-1 bg-slate-50 flex-shrink-0 max-w-full">
             <button
               onClick={() => setWeekOffset((prev) => prev - 1)}
-              className="p-1.5 hover:bg-white rounded-lg text-slate-500 transition-all cursor-pointer">
+              className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition-all cursor-pointer flex-shrink-0"
+              title="السابق">
               
-              <ChevronRight size={13} />
+              <ChevronRight size={15} />
             </button>
-            <span className="text-[9px] font-black px-2 text-slate-600 font-mono">
+            <span className="text-[10px] sm:text-xs font-black px-1.5 sm:px-2 text-slate-700 font-mono whitespace-nowrap text-center truncate">
               {startDateStr} إلى {endDateStr}
             </span>
             <button
               onClick={() => setWeekOffset((prev) => prev + 1)}
-              className="p-1.5 hover:bg-white rounded-lg text-slate-500 transition-all cursor-pointer">
+              className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition-all cursor-pointer flex-shrink-0"
+              title="التالي">
               
-              <ChevronLeft size={13} />
+              <ChevronLeft size={15} />
             </button>
           </div>
         </div>
 
         {/* View Mode & Add Appt */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap sm:flex-nowrap">
           <div className="flex items-center bg-slate-100 rounded-xl p-1 border">
             <button
               onClick={() => setViewMode('monthly')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
               viewMode === 'monthly' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`
               }>
               
@@ -519,7 +521,7 @@ export default function AppointmentsPage() {
             </button>
             <button
               onClick={() => setViewMode('weekly')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
               viewMode === 'weekly' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`
               }>
               
@@ -528,7 +530,7 @@ export default function AppointmentsPage() {
             </button>
             <button
               onClick={() => setViewMode('daily')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer ${
               viewMode === 'daily' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`
               }>
               
@@ -539,7 +541,7 @@ export default function AppointmentsPage() {
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer">
+            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap">
             
             <Plus size={14} />
             <span>حجز موعد</span>
@@ -780,9 +782,11 @@ export default function AppointmentsPage() {
 
       /* Daily View List */
       <div className="flex-1 bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-xs overflow-y-auto">
-          <div className="flex items-center gap-2 mb-4 border-b pb-3">
-            <span className="text-xs font-black text-slate-700">اختر يوم العرض:</span>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 mb-4 border-b border-slate-100 pb-3">
+            <span className="text-xs font-black text-slate-800 whitespace-nowrap flex-shrink-0">
+              اختر يوم العرض:
+            </span>
+            <div className="flex flex-wrap gap-1.5 min-w-0">
               {calendarColumns.map((day) => {
               const dayIndex = calendarColumns.indexOf(day);
               const colDate = parseLocalDate(startDateStr);
@@ -796,7 +800,7 @@ export default function AppointmentsPage() {
                   className={`px-3 py-1.5 rounded-xl text-[10px] font-black cursor-pointer border transition-all ${
                   selectedDailyDay === day ?
                   'bg-indigo-600 border-indigo-600 text-white shadow-xs' :
-                  'bg-slate-50 border-slate-200 text-slate-655 hover:bg-slate-100'}`
+                  'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`
                   }>
                   
                     {day === 'Saturday' ? 'السبت' :
