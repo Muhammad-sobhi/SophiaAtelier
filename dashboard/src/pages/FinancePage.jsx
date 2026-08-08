@@ -3,8 +3,9 @@ import { apiClient } from '@/lib/api-client';
 import {
   DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
   X, FileText, Image as ImageIcon, Plus, CreditCard, Banknote,
-  Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, Filter, Search } from
-'lucide-react';
+  Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, Filter, Search,
+  Sparkles, Trash2
+} from 'lucide-react';
 
 
 
@@ -100,6 +101,17 @@ export default function FinancePage() {
   const [newPaymentMethod, setNewPaymentMethod] = useState('cash');
   const [newReceiptImage, setNewReceiptImage] = useState(null);
 
+  // Cleaning Orders State
+  const [cleaningOrders, setCleaningOrders] = useState([]);
+  const [cleaningSummary, setCleaningSummary] = useState({ total_orders: 0, total_cost: 0, total_paid: 0, outstanding: 0 });
+  const [isCleaningModalOpen, setIsCleaningModalOpen] = useState(false);
+  const [showCleaningSection, setShowCleaningSection] = useState(false);
+  const [cleaningDesc, setCleaningDesc] = useState('');
+  const [cleaningCost, setCleaningCost] = useState('');
+  const [cleaningPaid, setCleaningPaid] = useState('');
+  const [cleaningDate, setCleaningDate] = useState(new Date().toISOString().split('T')[0]);
+  const [cleaningNotes, setCleaningNotes] = useState('');
+
   // Numeric totals
   const [totals, setTotals] = useState({ revenue: 0, expenses: 0 });
 
@@ -170,6 +182,21 @@ export default function FinancePage() {
 
   useEffect(() => {loadData();}, [loadData]);
 
+  // Load cleaning orders
+  const loadCleaningOrders = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/cleaning-orders');
+      setCleaningOrders(res.orders || []);
+      setCleaningSummary(res.summary || { total_orders: 0, total_cost: 0, total_paid: 0, outstanding: 0 });
+    } catch (e) {
+      console.error('Failed to load cleaning orders:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showCleaningSection) loadCleaningOrders();
+  }, [showCleaningSection, loadCleaningOrders]);
+
   const handleAddTransactionSubmit = async (e) => {
     e.preventDefault();
     if (!newDesc.trim() || !newAmount.trim()) return;
@@ -214,6 +241,52 @@ export default function FinancePage() {
       setNewReceiptImage(null);
     } catch (e) {
       console.error('Failed to add transaction:', e);
+    }
+  };
+
+  const handleAddCleaningOrder = async (e) => {
+    e.preventDefault();
+    if (!cleaningDesc.trim() || !cleaningCost) return;
+
+    try {
+      await apiClient.post('/cleaning-orders', {
+        description: cleaningDesc,
+        cost: parseFloat(cleaningCost),
+        paid_amount: parseFloat(cleaningPaid) || 0,
+        date: cleaningDate,
+        notes: cleaningNotes,
+      });
+
+      setIsCleaningModalOpen(false);
+      setCleaningDesc('');
+      setCleaningCost('');
+      setCleaningPaid('');
+      setCleaningNotes('');
+      loadCleaningOrders();
+      loadData(); // refresh finance totals too
+    } catch (e) {
+      console.error('Failed to add cleaning order:', e);
+    }
+  };
+
+  const handleDeleteCleaningOrder = async (id) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+    try {
+      await apiClient.delete(`/cleaning-orders/${id}`);
+      loadCleaningOrders();
+    } catch (e) {
+      console.error('Failed to delete cleaning order:', e);
+    }
+  };
+
+  const handleUpdateCleaningPayment = async (order, newPaidAmount) => {
+    try {
+      await apiClient.put(`/cleaning-orders/${order.id}`, {
+        paid_amount: parseFloat(newPaidAmount),
+      });
+      loadCleaningOrders();
+    } catch (e) {
+      console.error('Failed to update cleaning payment:', e);
     }
   };
 
@@ -395,7 +468,120 @@ export default function FinancePage() {
             {tab.label}
           </button>
         )}
+        <button
+          onClick={() => setShowCleaningSection(!showCleaningSection)}
+          className={`px-3.5 py-2 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-300 cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            showCleaningSection ? 'bg-sparkles-600 bg-sky-600 text-white shadow-md shadow-sky-600/15' : 'bg-sky-50 border border-sky-100 text-sky-700 hover:bg-sky-100'
+          }`}>
+          <Sparkles size={13} />
+          <span>طلبات التنظيف والكي ({cleaningSummary.total_orders || 0})</span>
+        </button>
       </div>
+
+      {/* Cleaning Orders Section */}
+      {showCleaningSection && (
+        <div className="bg-white rounded-3xl p-5 border border-sky-100 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
+                <Sparkles size={16} className="text-sky-500" />
+                تتبع تكاليف الشخص المسئول عن تنظيف الفساتين
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-0.5">تسجيل تكاليف غسيل/تنظيف الفساتين وتدقيق المبالغ المدفوعة والمتبقية</p>
+            </div>
+            <button
+              onClick={() => setIsCleaningModalOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl text-xs font-bold transition-all shadow-sm cursor-pointer self-start sm:self-auto">
+              <Plus size={15} />
+              <span>تسجيل طلب تنظيف جديد</span>
+            </button>
+          </div>
+
+          {/* Cleaning Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="bg-sky-50/50 p-3 rounded-2xl border border-sky-100">
+              <span className="text-[10px] text-slate-400 font-bold block">إجمالي عدد الطلبات:</span>
+              <span className="font-extrabold text-sky-700 text-sm">{cleaningSummary.total_orders} طلب</span>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+              <span className="text-[10px] text-slate-400 font-bold block">إجمالي التكلفة:</span>
+              <span className="font-extrabold text-slate-800 text-sm">{cleaningSummary.total_cost.toLocaleString()} ج.م</span>
+            </div>
+            <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+              <span className="text-[10px] text-slate-400 font-bold block">المبلغ المدفوع:</span>
+              <span className="font-extrabold text-emerald-700 text-sm">{cleaningSummary.total_paid.toLocaleString()} ج.م</span>
+            </div>
+            <div className="bg-rose-50/50 p-3 rounded-2xl border border-rose-100">
+              <span className="text-[10px] text-slate-400 font-bold block">المتبقي (آجل/غير مدفوع):</span>
+              <span className="font-extrabold text-rose-600 text-sm">{cleaningSummary.outstanding.toLocaleString()} ج.م</span>
+            </div>
+          </div>
+
+          {/* Cleaning Orders List */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-slate-50 text-slate-400 font-bold border-b border-slate-100">
+                <tr>
+                  <th className="p-3">التاريخ</th>
+                  <th className="p-3">بيان / تفاصيل التنظيف</th>
+                  <th className="p-3">التكلفة الإجمالية</th>
+                  <th className="p-3">المبلغ المدفوع</th>
+                  <th className="p-3">حالة الدفع</th>
+                  <th className="p-3 text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cleaningOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-slate-400 font-bold">لا يوجد طلبات تنظيف مسجلة</td>
+                  </tr>
+                ) : (
+                  cleaningOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-slate-50/50 font-semibold">
+                      <td className="p-3 text-slate-500 whitespace-nowrap">{order.date}</td>
+                      <td className="p-3 text-slate-800 font-bold">
+                        {order.description}
+                        {order.notes && <span className="block text-[10px] text-slate-400 font-normal">{order.notes}</span>}
+                      </td>
+                      <td className="p-3 font-extrabold text-slate-800">{parseFloat(order.cost).toLocaleString()} ج.م</td>
+                      <td className="p-3 font-extrabold text-emerald-600">
+                        {parseFloat(order.paid_amount).toLocaleString()} ج.م
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          order.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-600' :
+                          order.payment_status === 'partial' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                        }`}>
+                          {order.payment_status === 'paid' ? 'تم الدفع بالكامل' : order.payment_status === 'partial' ? 'مدفوع جزئياً' : 'غير مدفوع'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              const newAmount = prompt('أدخل المبلغ المدفوع الجديد:', order.paid_amount);
+                              if (newAmount !== null && !isNaN(parseFloat(newAmount))) {
+                                handleUpdateCleaningPayment(order, newAmount);
+                              }
+                            }}
+                            className="text-[10px] font-bold text-sky-600 hover:text-sky-800 bg-sky-50 px-2 py-1 rounded-lg cursor-pointer">
+                            تحديث المدفوع
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCleaningOrder(order.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Transaction Log Table & Mobile Cards */}
       <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.015)] border border-slate-50 overflow-hidden">
@@ -814,6 +1000,107 @@ export default function FinancePage() {
           </div>
         </div>
       }
+
+      {/* Cleaning Order Modal */}
+      {isCleaningModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs text-slate-700">
+          <div className="bg-white rounded-3xl p-6 shadow-xl w-full max-w-md border border-slate-100">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                <Sparkles size={16} className="text-sky-500" />
+                تسجيل طلب تنظيف/غسيل جديد
+              </h3>
+              <button
+                onClick={() => setIsCleaningModalOpen(false)}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCleaningOrder} className="space-y-4">
+              <div>
+                <label className="text-xs font-extrabold text-slate-600 block mb-1">البيان / تفاصيل الفساتين والنظافة</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: تنظيف 3 فساتين زفاف كود D-101, D-105"
+                  value={cleaningDesc}
+                  onChange={(e) => setCleaningDesc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-extrabold text-slate-600 block mb-1">التكلفة الإجمالية (ج.م)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="مثال: 300"
+                    value={cleaningCost}
+                    onChange={(e) => setCleaningCost(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-extrabold text-slate-600 block mb-1">المبلغ المدفوع حالياً (ج.م)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="مثال: 200"
+                    value={cleaningPaid}
+                    onChange={(e) => setCleaningPaid(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-extrabold text-slate-600 block mb-1">التاريخ</label>
+                <input
+                  type="date"
+                  required
+                  value={cleaningDate}
+                  onChange={(e) => setCleaningDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-extrabold text-slate-600 block mb-1">ملاحظات إضافية (اختياري)</label>
+                <textarea
+                  rows={2}
+                  value={cleaningNotes}
+                  onChange={(e) => setCleaningNotes(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold resize-none"
+                  placeholder="ملاحظات حول حالة الغسيل أو موعد الاستلام..."
+                />
+              </div>
+
+              <div className="bg-sky-50 border border-sky-200 p-3 rounded-2xl">
+                <p className="text-[10px] text-sky-700 font-bold">
+                  ℹ️ سيتم إضافة التكلفة تلقائياً إلى المصروفات في المالية تحت قسم "خدمات وتنظيف".
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  حفظ طلب التنظيف
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCleaningModalOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>);
 
 }

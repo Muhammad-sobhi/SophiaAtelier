@@ -5,11 +5,13 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\CleaningOrderController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DressController;
 use App\Http\Controllers\Api\DesignerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeeLoanController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\FittingController;
@@ -167,8 +169,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Payroll summary (for attendance/payroll tab)
     Route::get('/payroll/summary', [PayrollController::class, 'summary']);
+    Route::post('/payroll/deduct-loans', [PayrollController::class, 'deductLoans']);
 
     Route::apiResource('leave-requests', LeaveRequestController::class);
+
+    // Employee Loans (read for staff & admin)
+    Route::get('/employee-loans', [EmployeeLoanController::class, 'index']);
+    Route::get('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'show']);
 
     Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
@@ -206,6 +213,14 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     // Leave request status approval — admin only
     Route::put('/leave-requests/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus']);
+
+    // Employee Loans — admin only (create, update, delete)
+    Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
+    Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
+    Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
+
+    // Cleaning Orders — admin only
+    Route::apiResource('cleaning-orders', CleaningOrderController::class);
 
     // Reports — admin only
     Route::get('/reports/sales', [ReportController::class, 'sales']);

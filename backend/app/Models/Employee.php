@@ -11,8 +11,8 @@ class Employee extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'phone', 'email', 'position', 'salary', 'hire_date', 'notes',
-        'password', 'address', 'id_number', 'id_image', 'permissions'
+        'name', 'phone', 'email', 'position', 'salary', 'pay_cycle', 'pay_cycle_days',
+        'hire_date', 'notes', 'password', 'address', 'id_number', 'id_image', 'permissions'
     ];
 
     protected $hidden = ['password', 'id_number', 'id_image'];
@@ -34,6 +34,11 @@ class Employee extends Model
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(EmployeeLoan::class);
     }
 
     protected static function booted()

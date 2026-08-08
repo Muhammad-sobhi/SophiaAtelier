@@ -3,21 +3,14 @@ import { apiClient } from '@/lib/api-client';
 import {
   Clock,
   Calendar as CalendarIcon,
-
-
-
   Plus,
   DollarSign,
-
-
-
   FileText,
   Printer,
-
-
-  TrendingDown } from
-
-'lucide-react';
+  TrendingDown,
+  Banknote,
+  X
+} from 'lucide-react';
 
 
 
@@ -98,6 +91,13 @@ export default function AttendancePage() {
   const [payrollYear, setPayrollYear] = useState(new Date().getFullYear());
   const [payrollList, setPayrollList] = useState([]);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+
+  // Loan Modal State
+  const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
+  const [loanEmployeeId, setLoanEmployeeId] = useState('');
+  const [loanAmount, setLoanAmount] = useState('');
+  const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loanReason, setLoanReason] = useState('');
 
   useEffect(() => {
     // Check if user is admin
@@ -253,8 +253,35 @@ export default function AttendancePage() {
     }
   };
 
+  const handleCreateLoan = async (e) => {
+    e.preventDefault();
+    if (!loanEmployeeId || !loanAmount) return;
+
+    try {
+      await apiClient.post('/employee-loans', {
+        employee_id: loanEmployeeId,
+        amount: parseFloat(loanAmount),
+        date: loanDate,
+        reason: loanReason,
+        status: 'approved'
+      });
+
+      setIsLoanModalOpen(false);
+      setLoanEmployeeId('');
+      setLoanAmount('');
+      setLoanReason('');
+
+      // Refresh payroll to reflect the new loan
+      const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
+      setPayrollList(Array.isArray(res) ? res : []);
+    } catch (err) {
+      console.error('Failed to create loan:', err);
+    }
+  };
+
   const totalMonthlyPayroll = payrollList.reduce((acc, curr) => acc + curr.net_salary, 0);
   const totalDeductionsAll = payrollList.reduce((acc, curr) => acc + curr.total_deductions, 0);
+  const totalLoansAll = payrollList.reduce((acc, curr) => acc + (curr.loan_deduction || 0), 0);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 flex flex-col min-h-full overflow-y-auto bg-slate-50/50 text-right" dir="rtl">
@@ -543,6 +570,9 @@ export default function AttendancePage() {
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase">إجمالي الاستقطاعات والخصومات</p>
                 <h3 className="text-xl font-extrabold text-rose-600 mt-1">-{totalDeductionsAll.toLocaleString()} ج.م</h3>
+                {totalLoansAll > 0 && (
+                  <p className="text-[10px] text-amber-600 font-bold mt-0.5">منها سلف: {totalLoansAll.toLocaleString()} ج.م</p>
+                )}
               </div>
               <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center">
                 <TrendingDown size={20} />
@@ -579,6 +609,16 @@ export default function AttendancePage() {
             </div>
           </div>
 
+          {/* Loan Button */}
+          <div className="flex items-center justify-end flex-shrink-0">
+            <button
+              onClick={() => setIsLoanModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl transition-all text-xs font-bold shadow-md shadow-amber-500/10 cursor-pointer">
+              <Banknote size={16} />
+              <span>تسجيل سلفة / إقراض موظف</span>
+            </button>
+          </div>
+
           {/* Payroll List */}
           <div className="flex-1 bg-white rounded-3xl p-6 border border-slate-100/70 shadow-xs overflow-y-auto scrollbar-thin">
             <div className="space-y-3">
@@ -593,17 +633,27 @@ export default function AttendancePage() {
                     </div>
                     <div>
                       <h4 className="font-extrabold text-xs text-slate-800">{pay.employee_name}</h4>
-                      <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-bold mt-0.5 inline-block">
-                        {pay.position}
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-bold inline-block">
+                          {pay.position}
+                        </span>
+                        <span className="text-[8px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
+                          {pay.pay_cycle === 'monthly' ? 'شهري' : pay.pay_cycle === 'weekly' ? 'أسبوعي' : `كل ${pay.pay_cycle_days} يوم`}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold text-slate-600 w-full lg:w-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold text-slate-600 w-full lg:w-auto">
                     <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">الراتب الأساسي:</span>
+                      <span className="text-[9px] text-slate-400 block font-bold">الراتب (الشهري):</span>
                       <span className="font-extrabold text-slate-800">{pay.base_salary.toLocaleString()} ج.م</span>
+                      {pay.pay_cycle !== 'monthly' && (
+                        <span className="text-[8px] text-indigo-600 font-bold block">
+                          راتب الدورة ({pay.pay_cycle === 'weekly' ? '7 أيام' : `${pay.pay_cycle_days} أيام`}): {pay.cycle_salary.toLocaleString()} ج.م
+                        </span>
+                      )}
                     </div>
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold">أيام الحضور / ساعات:</span>
@@ -613,6 +663,12 @@ export default function AttendancePage() {
                       <span className="text-[9px] text-slate-400 block font-bold">الخصومات والاستقطاعات:</span>
                       <span className="font-extrabold text-rose-600">-{pay.total_deductions.toLocaleString()} ج.م</span>
                     </div>
+                    {pay.loan_deduction > 0 && (
+                      <div>
+                        <span className="text-[9px] text-amber-500 block font-bold">خصم سلفة:</span>
+                        <span className="font-extrabold text-amber-600">-{pay.loan_deduction.toLocaleString()} ج.م</span>
+                      </div>
+                    )}
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold">الصافي المستحِق:</span>
                       <span className="font-extrabold text-emerald-600 text-sm">{pay.net_salary.toLocaleString()} ج.م</span>
@@ -728,16 +784,20 @@ export default function AttendancePage() {
       {/* Payslip Detailed Modal */}
       {selectedPayslip &&
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs text-slate-700">
-          <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-lg border border-slate-100 space-y-4">
+          <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-lg border border-slate-100 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-extrabold text-sm text-slate-800">كشف حساب مفصل للراتب</h3>
-                <p className="text-[10px] text-slate-400 font-bold">{selectedPayslip.employee_name} — شهر {selectedPayslip.month} / {selectedPayslip.year}</p>
+                <p className="text-[10px] text-slate-400 font-bold">
+                  {selectedPayslip.employee_name} — شهر {selectedPayslip.month} / {selectedPayslip.year}
+                  <span className="mr-2 text-indigo-500">
+                    ({selectedPayslip.pay_cycle === 'monthly' ? 'شهري' : selectedPayslip.pay_cycle === 'weekly' ? 'أسبوعي' : `كل ${selectedPayslip.pay_cycle_days} يوم`})
+                  </span>
+                </p>
               </div>
               <button
               onClick={() => setSelectedPayslip(null)}
-              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600">
-              
+              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 cursor-pointer">
                 ✕
               </button>
             </div>
@@ -745,11 +805,17 @@ export default function AttendancePage() {
             <div className="space-y-3 text-xs">
               <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1.5 border border-slate-100">
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold">الراتب الأساسي:</span>
+                  <span className="text-slate-500 font-bold">الراتب الشهري الأساسي:</span>
                   <span className="font-extrabold text-slate-800">{selectedPayslip.base_salary.toLocaleString()} ج.م</span>
                 </div>
+                {selectedPayslip.pay_cycle !== 'monthly' && (
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-indigo-500 font-bold">مستحق الدورة ({selectedPayslip.pay_cycle === 'weekly' ? 'أسبوعي / 7 أيام' : `كل ${selectedPayslip.pay_cycle_days} أيام`}):</span>
+                    <span className="font-bold text-indigo-600">{selectedPayslip.cycle_salary?.toLocaleString()} ج.م</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">أجر اليوم (30 يوم):</span>
+                  <span className="text-slate-400">أجر اليوم:</span>
                   <span className="font-bold text-slate-600">{selectedPayslip.daily_rate} ج.م</span>
                 </div>
                 <div className="flex justify-between text-[11px]">
@@ -774,6 +840,23 @@ export default function AttendancePage() {
                 </div>
               </div>
 
+              {/* Loan Deductions Section */}
+              {selectedPayslip.loan_deduction > 0 && (
+                <div className="bg-amber-50/50 border border-amber-200 p-3.5 rounded-2xl space-y-1.5">
+                  <p className="font-extrabold text-amber-700 text-[11px]">خصم سلفة / إقراض:</p>
+                  {selectedPayslip.loan_details?.map((loan, idx) => (
+                    <div key={idx} className="flex justify-between text-[11px]">
+                      <span className="text-amber-600">سلفة بتاريخ {loan.date}{loan.reason ? ` (${loan.reason})` : ''}:</span>
+                      <span className="font-bold text-amber-700">-{loan.amount.toLocaleString()} ج.م</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-[11px] border-t border-amber-200 pt-1 mt-1">
+                    <span className="font-bold text-amber-700">إجمالي خصم السلف:</span>
+                    <span className="font-extrabold text-amber-700">-{selectedPayslip.loan_deduction.toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between">
                 <div>
                   <p className="text-[10px] text-emerald-600 font-bold uppercase">الصافي الواجب صرفه للموظف</p>
@@ -784,12 +867,96 @@ export default function AttendancePage() {
                 <button
                 onClick={() => window.print()}
                 className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer">
-                
                   <Printer size={14} />
                   <span>طباعة الكشف</span>
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      }
+
+      {/* Loan Creation Modal */}
+      {isLoanModalOpen &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs text-slate-700">
+          <div className="bg-white rounded-3xl p-6 shadow-xl w-full max-w-md border border-slate-100">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-extrabold text-slate-800">تسجيل سلفة / إقراض موظف</h3>
+              <button
+              onClick={() => setIsLoanModalOpen(false)}
+              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateLoan} className="space-y-4">
+              <div>
+                <label className="text-xs font-extrabold text-slate-600 block mb-1">اختر الموظف</label>
+                <select
+                required
+                value={loanEmployeeId}
+                onChange={(e) => setLoanEmployeeId(parseInt(e.target.value))}
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold">
+                  <option value="">-- اختر الموظف --</option>
+                  {employees.map((emp) =>
+                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                )}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-extrabold text-slate-600 block mb-1">مبلغ السلفة (ج.م)</label>
+                  <input
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="مثال: 500"
+                  value={loanAmount}
+                  onChange={(e) => setLoanAmount(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold" />
+                </div>
+                <div>
+                  <label className="text-xs font-extrabold text-slate-600 block mb-1">تاريخ السلفة</label>
+                  <input
+                  type="date"
+                  required
+                  value={loanDate}
+                  onChange={(e) => setLoanDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-extrabold text-slate-600 block mb-1">السبب / الملاحظات (اختياري)</label>
+                <textarea
+                rows={2}
+                value={loanReason}
+                onChange={(e) => setLoanReason(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold resize-none"
+                placeholder="سبب طلب السلفة..." />
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl">
+                <p className="text-[10px] text-amber-700 font-bold">
+                  ⚠️ سيتم خصم هذا المبلغ تلقائياً من الراتب القادم للموظف وتسجيله كمصروف في النظام المالي.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                type="submit"
+                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  تسجيل السلفة
+                </button>
+                <button
+                type="button"
+                onClick={() => setIsLoanModalOpen(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  إلغاء
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       }

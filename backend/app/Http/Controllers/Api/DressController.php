@@ -47,7 +47,7 @@ class DressController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => 'nullable|string|max:50',
+            'code' => 'nullable|string|max:50|unique:dresses,code',
             'name' => 'required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -117,7 +117,7 @@ class DressController extends Controller
     public function update(Request $request, Dress $dress): JsonResponse
     {
         $validated = $request->validate([
-            'code' => 'nullable|string|max:50',
+            'code' => 'nullable|string|max:50|unique:dresses,code,' . $dress->id,
             'name' => 'sometimes|required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',

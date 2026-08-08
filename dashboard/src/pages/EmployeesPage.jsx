@@ -46,6 +46,8 @@ export default function EmployeesPage() {
   const [position, setPosition] = useState('');
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('');
+  const [payCycle, setPayCycle] = useState('monthly');
+  const [payCycleDays, setPayCycleDays] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
@@ -82,6 +84,8 @@ export default function EmployeesPage() {
         position: emp.position || emp.role || 'موظف',
         phone: emp.phone || '',
         salary: emp.salary ? `${parseFloat(emp.salary).toLocaleString()} ج.م` : '0 ج.م',
+        payCycle: emp.pay_cycle || 'monthly',
+        payCycleDays: emp.pay_cycle_days || '',
         email: emp.email || '',
         password: emp.password || '',
         address: emp.address || '',
@@ -114,6 +118,8 @@ export default function EmployeesPage() {
     setPosition(emp.position);
     setPhone(emp.phone);
     setSalary(emp.salary.replace(' ج.م', '').replace(/,/g, ''));
+    setPayCycle(emp.payCycle || 'monthly');
+    setPayCycleDays(emp.payCycleDays || '');
     setEmail(emp.email);
     setPassword(emp.password || '');
     setAddress(emp.address || '');
@@ -129,6 +135,8 @@ export default function EmployeesPage() {
     setPosition('');
     setPhone('');
     setSalary('');
+    setPayCycle('monthly');
+    setPayCycleDays('');
     setEmail('');
     setPassword('');
     setAddress('');
@@ -158,6 +166,8 @@ export default function EmployeesPage() {
           position: position || 'موظف',
           phone,
           salary: parseFloat(salary.replace(/,/g, '')) || 0,
+          pay_cycle: payCycle,
+          pay_cycle_days: payCycle === 'custom' ? parseInt(payCycleDays) || null : null,
           email,
           password: password || undefined,
           address,
@@ -171,6 +181,8 @@ export default function EmployeesPage() {
           position: position || 'موظف',
           phone,
           salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
+          payCycle,
+          payCycleDays: payCycle === 'custom' ? parseInt(payCycleDays) || '' : '',
           email,
           password: password || emp.password,
           address,
@@ -184,6 +196,8 @@ export default function EmployeesPage() {
           position: position || 'موظف',
           phone,
           salary: parseFloat(salary.replace(/,/g, '')) || 0,
+          pay_cycle: payCycle,
+          pay_cycle_days: payCycle === 'custom' ? parseInt(payCycleDays) || null : null,
           email,
           password,
           address,
@@ -197,6 +211,8 @@ export default function EmployeesPage() {
           position: position || 'موظف',
           phone,
           salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
+          payCycle,
+          payCycleDays: payCycle === 'custom' ? parseInt(payCycleDays) || '' : '',
           email,
           password,
           address,
@@ -215,6 +231,8 @@ export default function EmployeesPage() {
     setPosition('');
     setPhone('');
     setSalary('');
+    setPayCycle('monthly');
+    setPayCycleDays('');
     setEmail('');
     setPassword('');
     setAddress('');
@@ -345,6 +363,9 @@ export default function EmployeesPage() {
                   <div className="flex items-center gap-2 text-xs text-emerald-600 font-extrabold">
                     <DollarSign size={13} className="text-emerald-400" />
                     <span>الراتب: {emp.salary}</span>
+                    <span className="text-[9px] text-slate-400 font-bold">
+                      ({emp.payCycle === 'monthly' ? 'شهري' : emp.payCycle === 'weekly' ? 'أسبوعي' : `كل ${emp.payCycleDays} يوم`})
+                    </span>
                   </div>
                 </div>
 
@@ -441,7 +462,7 @@ export default function EmployeesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">الراتب الشهري</label>
+                  <label className="text-xs font-extrabold text-slate-600">الراتب</label>
                   <input
                   type="text"
                   placeholder="مثال: 6,000 ج.م"
@@ -450,6 +471,34 @@ export default function EmployeesPage() {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 
                 </div>
+              </div>
+
+              <div className={`grid ${payCycle === 'custom' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">دورة صرف الراتب</label>
+                  <select
+                  value={payCycle}
+                  onChange={(e) => setPayCycle(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    <option value="monthly">شهري (كل شهر)</option>
+                    <option value="weekly">أسبوعي (كل أسبوع)</option>
+                    <option value="custom">مخصص (كل عدد أيام)</option>
+                  </select>
+                </div>
+
+                {payCycle === 'custom' && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">عدد الأيام لكل دورة</label>
+                    <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    placeholder="مثال: 3 أو 5"
+                    value={payCycleDays}
+                    onChange={(e) => setPayCycleDays(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

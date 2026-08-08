@@ -50,6 +50,7 @@ export default function DressesPage() {
   const [newNewCollection, setNewNewCollection] = useState(false);
   const [isWebsiteVisible, setIsWebsiteVisible] = useState(true);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [codeError, setCodeError] = useState('');
 
   // Category & Collection selection options
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
@@ -79,6 +80,7 @@ export default function DressesPage() {
     setNewColorAr('');
     setNewNewCollection(false);
     setIsWebsiteVisible(true);
+    setCodeError('');
     setIsAddingNewCategory(false);
     setNewCategoryName('');
     setNewCategoryImageFile(null);
@@ -287,13 +289,22 @@ export default function DressesPage() {
 
       fetchDresses();
       loadDependencies();
+      setIsModalOpen(false);
+      setEditingDress(null);
+      resetForm();
     } catch (err) {
       console.error('Failed to save dress:', err);
+      if (err.response?.status === 422 || err.status === 422 || err.data?.errors) {
+        const errors = err.response?.data?.errors || err.data?.errors || {};
+        if (errors.code) {
+          setCodeError('كود الفستان مستخدم بالفعل، يرجى كتابة كود آخر فريد.');
+        } else {
+          alert('تعذر حفظ الفستان: ' + (err.response?.data?.message || err.message || 'بيانات غير صالحة'));
+        }
+      } else {
+        alert('حدث خطأ أثناء حفظ الفستان. يرجى التأكد من البيانات والمحاولة مجدداً.');
+      }
     }
-
-    setIsModalOpen(false);
-    setEditingDress(null);
-    resetForm();
   };
 
   const handleToggleWebsiteVisibility = async (dress) => {
@@ -740,9 +751,19 @@ export default function DressesPage() {
                       type="text"
                       placeholder="مثال: DR-101 أو SOPHIA-01"
                       value={newCode}
-                      onChange={(e) => setNewCode(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      onChange={(e) => {
+                        setNewCode(e.target.value);
+                        if (codeError) setCodeError('');
+                      }}
+                      className={`w-full px-4 py-2.5 bg-slate-50 border rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 ${
+                        codeError ? 'border-rose-500 bg-rose-50/20 focus:border-rose-500 ring-rose-500/20' : 'border-slate-100 focus:border-indigo-500'
+                      }`}
                     />
+                    {codeError && (
+                      <p className="text-[11px] font-extrabold text-rose-600 mt-1 flex items-center gap-1">
+                        ⚠️ {codeError}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
