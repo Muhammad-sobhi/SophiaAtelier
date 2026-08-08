@@ -312,19 +312,21 @@ export default function EmployeesPage() {
                     <span>البريد: {emp.email}</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <Lock size={12} className="text-slate-400" />
-                      <span>كلمة المرور:</span>
-                      <span className="font-mono">{showPasswords[emp.id] ? emp.password : '••••••••'}</span>
+                  {isAdmin && (
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold bg-slate-50 p-2 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <Lock size={12} className="text-slate-400" />
+                        <span>كلمة المرور:</span>
+                        <span className="font-mono">{showPasswords[emp.id] ? emp.password : '••••••••'}</span>
+                      </div>
+                      <button
+                      onClick={() => togglePasswordVisibility(emp.id)}
+                      className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-md transition-colors">
+                      
+                        {showPasswords[emp.id] ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
                     </div>
-                    <button
-                    onClick={() => togglePasswordVisibility(emp.id)}
-                    className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-md transition-colors">
-                    
-                      {showPasswords[emp.id] ? <EyeOff size={12} /> : <Eye size={12} />}
-                    </button>
-                  </div>
+                  )}
 
                   {emp.address &&
                 <div className="flex items-center gap-2 text-[10px] text-slate-500 font-semibold">

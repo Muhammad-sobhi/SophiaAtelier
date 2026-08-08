@@ -153,9 +153,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('reviews', ReviewController::class);
     Route::apiResource('faqs', FaqController::class);
 
-    // Attendance (read-only for staff)
+    // Employee read routes (staff & admin)
+    Route::get('/employees', [EmployeeController::class, 'index']);
+    Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
+
+    // Attendance (read & save for staff & admin)
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::get('/attendance/{attendance}', [AttendanceController::class, 'show']);
+    Route::post('/attendance/bulk', [AttendanceController::class, 'bulkStore']);
+    Route::post('/attendance', [AttendanceController::class, 'store']);
+    Route::put('/attendance/{attendance}', [AttendanceController::class, 'update']);
+    Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
+
+    // Payroll summary (for attendance/payroll tab)
+    Route::get('/payroll/summary', [PayrollController::class, 'summary']);
+
     Route::apiResource('leave-requests', LeaveRequestController::class);
 
     Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
@@ -181,8 +193,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::get('/dashboard/executive', [DashboardController::class, 'executive']);
 
-    // Employee management — admin only
-    Route::apiResource('employees', EmployeeController::class);
+    // Employee management (create, update, delete) — admin only
+    Route::post('/employees', [EmployeeController::class, 'store']);
+    Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
+    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
 
     // Finance & Payroll — admin only
     Route::apiResource('revenues', RevenueController::class);
@@ -190,13 +204,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
     Route::get('/clients/export/csv', [ClientController::class, 'exportCsv']);
 
-    // Attendance management — admin only
-    Route::post('/attendance/bulk', [AttendanceController::class, 'bulkStore']);
-    Route::post('/attendance', [AttendanceController::class, 'store']);
-    Route::put('/attendance/{attendance}', [AttendanceController::class, 'update']);
-    Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
+    // Leave request status approval — admin only
     Route::put('/leave-requests/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus']);
-    Route::get('/payroll/summary', [PayrollController::class, 'summary']);
 
     // Reports — admin only
     Route::get('/reports/sales', [ReportController::class, 'sales']);
