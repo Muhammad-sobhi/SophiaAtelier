@@ -354,7 +354,12 @@ export default function DressesPage() {
 
     // Prepopulate images
     if (dress.images && dress.images.length > 0) {
-      setImagePreviewUrls(dress.images.map((img) => getStorageUrl(img.image_path)).filter(Boolean));
+      setImagePreviewUrls(dress.images.map((img) => ({
+        id: img.id,
+        url: getStorageUrl(img.image_path),
+        isExisting: true,
+        path: img.image_path
+      })).filter((item) => Boolean(item.url)));
     } else {
       setImagePreviewUrls([]);
     }
@@ -480,20 +485,34 @@ export default function DressesPage() {
     return DRESS_STAGES.find((s) => s.id === stage)?.color || 'text-slate-500 bg-slate-50 border-slate-100';
   };
 
-  // Image Upload Field Change
+  // Image / Media Upload Field Change
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files || []);
-    const remaining = 4 - dressImages.length;
+    const remaining = 4 - imagePreviewUrls.length;
     const toAdd = files.slice(0, remaining);
     setDressImages((prev) => [...prev, ...toAdd]);
-    setImagePreviewUrls((prev) => [
-    ...prev,
-    ...toAdd.map((f) => URL.createObjectURL(f))]
-    );
+    const newItems = toAdd.map((f) => ({
+      url: URL.createObjectURL(f),
+      file: f,
+      isExisting: false,
+      isVideo: f.type.startsWith('video/')
+    }));
+    setImagePreviewUrls((prev) => [...prev, ...newItems]);
   };
 
-  const handleRemoveImage = (idx) => {
-    setDressImages((prev) => prev.filter((_, i) => i !== idx));
+  const handleRemoveImage = async (idx) => {
+    const item = imagePreviewUrls[idx];
+    if (item && item.isExisting && item.id && editingDress?.id) {
+      try {
+        await apiClient.delete(`/dresses/${editingDress.id}/images/${item.id}`);
+      } catch (err) {
+        console.error('Failed to delete media from server:', err);
+        alert('تعذر حذف الوسائط من الخادم. يرجى المحاولة مرة أخرى.');
+        return;
+      }
+    } else if (item && !item.isExisting && item.file) {
+      setDressImages((prev) => prev.filter((f) => f !== item.file));
+    }
     setImagePreviewUrls((prev) => prev.filter((_, i) => i !== idx));
   };
 
@@ -566,7 +585,9 @@ export default function DressesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1 animate-fade-in">
             {filteredDresses.map((dress) => {
               const actions = getActionsForDress(dress);
-              const imageUrl = dress.images?.[0]?.image_path ? getStorageUrl(dress.images[0].image_path) : null;
+              const firstMedia = dress.images?.[0]?.image_path ? dress.images[0].image_path : null;
+              const mediaUrl = firstMedia ? getStorageUrl(firstMedia) : null;
+              const isVideo = firstMedia && /\.(mp4|mov|webm|avi)$/i.test(firstMedia);
 
               return (
                 <div
@@ -574,15 +595,19 @@ export default function DressesPage() {
                   className="bg-white rounded-2xl border border-slate-150 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-md transition-all relative group text-right">
                   
                   <div>
-                    {/* Image with Trying Fee Badge */}
+                    {/* Image / Video with Trying Fee Badge */}
                     <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 mb-3 flex-shrink-0">
-                      {imageUrl ?
-                      <img src={imageUrl} alt={dress.name} className="w-full h-full object-cover" /> :
-
-                      <div className="w-full h-full flex items-center justify-center">
+                      {mediaUrl ? (
+                        isVideo ? (
+                          <video src={mediaUrl} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                        ) : (
+                          <img src={mediaUrl} alt={dress.name} className="w-full h-full object-cover" />
+                        )
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
                           <Sparkles size={24} className="text-slate-300" />
                         </div>
-                      }
+                      )}
                       {/* Trying Fee Overlay */}
                       {dress.trying_fee > 0 &&
                       <div className="absolute top-2 right-2 bg-rose-600/90 text-white text-[8.5px] font-black px-2 py-0.5 rounded-full shadow-xs">
@@ -1151,38 +1176,49 @@ export default function DressesPage() {
                   </button>
                 </div>
 
-                {/* Image Zone (up to 4 images) */}
+                {/* Media Zone (up to 4 images/videos) */}
                 <div className="space-y-2 text-right">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-extrabold text-slate-600">صور الفستان (حتى 4 صور)</label>
+                    <label className="text-xs font-extrabold text-slate-600">صور وفيديوهات الفستان (حتى 4 وسائط - 50MB كحد أقصى)</label>
                     <span className="text-[10px] font-semibold text-slate-400">{imagePreviewUrls.length}/4</span>
                   </div>
                   {imagePreviewUrls.length > 0 && (
                     <div className="grid grid-cols-4 gap-2">
-                      {imagePreviewUrls.map((url, idx) => (
-                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
-                          <img src={url} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
-                          {idx === 0 && (
-                            <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full">رئيسية</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(idx)}
-                            className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
+                      {imagePreviewUrls.map((item, idx) => {
+                        const srcUrl = typeof item === 'string' ? item : item.url;
+                        const isVid = typeof item === 'object' ? item.isVideo || /\.(mp4|mov|webm|avi)$/i.test(item.path || srcUrl || '') : /\.(mp4|mov|webm|avi)$/i.test(srcUrl || '');
+                        return (
+                          <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+                            {isVid ? (
+                              <video src={srcUrl} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                            ) : (
+                              <img src={srcUrl} alt={`وسائط ${idx + 1}`} className="w-full h-full object-cover" />
+                            )}
+                            {idx === 0 && (
+                              <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full z-10">رئيسية</span>
+                            )}
+                            {isVid && (
+                              <span className="absolute bottom-1 left-1 bg-rose-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full z-10">فيديو</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(idx)}
+                              className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer z-20"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   {imagePreviewUrls.length < 4 && (
                     <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
                       <Plus size={16} className="text-indigo-500" />
-                      <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صور الفستان</span>
+                      <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صور أو فيديو للفستان</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,video/*"
                         multiple
                         className="hidden"
                         onChange={handleImageSelect}

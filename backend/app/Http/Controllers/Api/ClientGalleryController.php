@@ -31,7 +31,7 @@ class ClientGalleryController extends Controller
     {
         $validated = $request->validate([
             'client_name' => 'required|string|max:255',
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'image' => 'required|file|mimes:jpeg,png,jpg,webp,mp4,mov,webm,avi|max:51200',
             'is_published' => 'nullable|boolean',
             'sort_order' => 'nullable|integer',
         ]);
@@ -66,7 +66,7 @@ class ClientGalleryController extends Controller
             'client_name' => 'sometimes|required|string|max:255',
             'is_published' => 'nullable|boolean',
             'sort_order' => 'nullable|integer',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'image' => 'nullable|file|mimes:jpeg,png,jpg,webp,mp4,mov,webm,avi|max:51200',
         ]);
 
         // Remove file object from validated data

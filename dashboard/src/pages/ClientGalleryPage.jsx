@@ -160,13 +160,18 @@ export default function ClientGalleryPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto p-1">
             {filteredItems.map((item) => {
-              const imageUrl = getStorageUrl(item.image_path);
+              const mediaUrl = getStorageUrl(item.image_path);
+              const isVideo = item.image_path && /\.(mp4|mov|webm|avi)$/i.test(item.image_path);
               return (
                 <div key={item.id} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all relative">
                   <div>
                     <div className="relative group aspect-[3/4] rounded-xl overflow-hidden mb-3 border border-slate-200 bg-slate-100">
-                      {imageUrl ? (
-                        <img src={imageUrl} alt={item.client_name} className="w-full h-full object-cover" />
+                      {mediaUrl ? (
+                        isVideo ? (
+                          <video src={mediaUrl} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                        ) : (
+                          <img src={mediaUrl} alt={item.client_name} className="w-full h-full object-cover" />
+                        )
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300">
                           <ImageIcon size={32} />
@@ -261,15 +266,19 @@ export default function ClientGalleryPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-extrabold text-slate-600 block">صورة الفستان / العروس</label>
+                <label className="text-xs font-extrabold text-slate-600 block">صورة أو فيديو الفستان / العروس (حتى 50MB)</label>
                 {imagePreview && (
-                  <div className="w-full h-48 rounded-2xl overflow-hidden border border-slate-200 mb-2 relative">
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="w-full h-48 rounded-2xl overflow-hidden border border-slate-200 mb-2 relative bg-slate-900 flex items-center justify-center">
+                    {(imageFile?.type?.startsWith('video/') || (editingItem?.image_path && /\.(mp4|mov|webm|avi)$/i.test(editingItem.image_path))) ? (
+                      <video src={imagePreview} className="w-full h-full object-cover" controls autoPlay muted />
+                    ) : (
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    )}
                   </div>
                 )}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={(e) => {
                     if (e.target.files?.[0]) {
                       setImageFile(e.target.files[0]);

@@ -63,14 +63,25 @@ export default function ClientGallery() {
               data-delay={String(Math.min(i + 1, 6))}
             >
               <div className={styles.imageWrap}>
-                <Image
-                  src={c.image}
-                  alt={c.name}
-                  width={380}
-                  height={520}
-                  unoptimized={c.image.includes('/storage/')}
-                  className={styles.image}
-                />
+                {/\.(mp4|mov|webm|avi)$/i.test(c.image || '') ? (
+                  <video
+                    src={c.image}
+                    className={styles.image}
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                ) : (
+                  <Image
+                    src={c.image}
+                    alt={c.name}
+                    width={380}
+                    height={520}
+                    unoptimized={c.image.includes('/storage/')}
+                    className={styles.image}
+                  />
+                )}
                 <div className={styles.nameOverlay}>
                   <span className={styles.clientName}>{c.name}</span>
                 </div>

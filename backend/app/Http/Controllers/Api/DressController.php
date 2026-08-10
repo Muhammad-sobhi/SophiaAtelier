@@ -184,7 +184,7 @@ class DressController extends Controller
     }
 
     /**
-     * Upload up to 4 images for a dress.
+     * Upload up to 4 images/videos for a dress.
      * POST /api/dresses/{dress}/images
      * Body: multipart/form-data with field "images[]"
      */
@@ -192,12 +192,12 @@ class DressController extends Controller
     {
         $request->validate([
             'images' => 'required|array|max:4',
-            'images.*' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'images.*' => 'required|file|mimes:jpeg,png,jpg,webp,mp4,mov,webm,avi|max:51200',
         ]);
 
         $existing = $dress->images()->count();
         if ($existing >= 4) {
-            return response()->json(['message' => 'الحد الأقصى للصور هو 4 لكل فستان'], 422);
+            return response()->json(['message' => 'الحد الأقصى للوسائط هو 4 لكل فستان'], 422);
         }
 
         // Ensure storage directory exists
@@ -236,7 +236,7 @@ class DressController extends Controller
     }
 
     /**
-     * Delete a single dress image.
+     * Delete a single dress image or video.
      * DELETE /api/dresses/{dress}/images/{image}
      */
     public function deleteImage(Dress $dress, DressImage $image): JsonResponse
