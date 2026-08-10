@@ -209,3 +209,12 @@ img {
     padding: 60px 0;
   }
 }
+
+@media (max-width: 480px) {
+  :root {
+    --container-padding: 16px;
+  }
+  .section-padding {
+    padding: 40px 0;
+  }
+}

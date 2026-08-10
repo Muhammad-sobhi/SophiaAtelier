@@ -547,6 +547,13 @@
 }
 
 @media (max-width: 768px) {
+  .filterBarContainer,
+  .resultsBar,
+  .content {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
   .viewToggle {
     display: none;
   }
@@ -577,6 +584,13 @@
 }
 
 @media (max-width: 480px) {
+  .filterBarContainer,
+  .resultsBar,
+  .content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .grid3,
   .grid4 {
     grid-template-columns: 1fr;
