@@ -77,35 +77,54 @@ export default function QuickView() {
           <div className={styles.galleryRow}>
             {images.length > 1 && (
               <div className={styles.thumbnails}>
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    className={`${styles.thumbBtn} ${activeImage === img ? styles.activeThumb : ''}`}
-                    onClick={() => setActiveImage(img)}
-                  >
-                    <Image
-                      src={img}
-                      alt="Thumbnail"
-                      width={70}
-                      height={90}
-                      unoptimized={typeof img === 'string' && (img.includes('/storage/') || img.startsWith('blob:'))}
-                      className={styles.thumbImg}
-                    />
-                  </button>
-                ))}
+                {images.map((img, idx) => {
+                  const isVid = typeof img === 'string' && /\.(mp4|mov|webm|avi)$/i.test(img);
+                  return (
+                    <button
+                      key={idx}
+                      className={`${styles.thumbBtn} ${activeImage === img ? styles.activeThumb : ''}`}
+                      onClick={() => setActiveImage(img)}
+                    >
+                      {isVid ? (
+                        <video src={img} className={styles.thumbImg} muted loop autoPlay playsInline />
+                      ) : (
+                        <Image
+                          src={img}
+                          alt="Thumbnail"
+                          width={70}
+                          height={90}
+                          unoptimized={typeof img === 'string' && (img.includes('/storage/') || img.startsWith('blob:'))}
+                          className={styles.thumbImg}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             <div className={styles.mainImageWrap}>
-              <Image
-                src={activeImage || product.image}
-                alt={displayName || 'Dress image'}
-                width={500}
-                height={680}
-                unoptimized={typeof (activeImage || product.image) === 'string' && ((activeImage || product.image).includes('/storage/') || (activeImage || product.image).startsWith('blob:'))}
-                className={styles.mainImage}
-                priority
-              />
+              {/\.(mp4|mov|webm|avi)$/i.test(activeImage || product.image || '') ? (
+                <video
+                  src={activeImage || product.image}
+                  className={styles.mainImage}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+              ) : (
+                <Image
+                  src={activeImage || product.image}
+                  alt={displayName || 'Dress image'}
+                  width={500}
+                  height={680}
+                  unoptimized={typeof (activeImage || product.image) === 'string' && ((activeImage || product.image).includes('/storage/') || (activeImage || product.image).startsWith('blob:'))}
+                  className={styles.mainImage}
+                  priority
+                />
+              )}
               {product.new_collection && (
                 <div className={styles.newBadge}>
                   <Sparkles size={12} />

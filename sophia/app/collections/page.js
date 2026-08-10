@@ -264,14 +264,18 @@ function CollectionsContent() {
               {filtered.map((p) => (
                 <div key={p.id} className={styles.card} onClick={() => openQuickView(p)}>
                   <div className={styles.imageWrap}>
-                    <Image
-                      src={p.image}
-                      alt={p.name}
-                      fill
-                      sizes="(max-width: 768px) 50vw, 33vw"
-                      unoptimized={typeof p.image === 'string' && p.image.includes('/storage/')}
-                      className={styles.image}
-                    />
+                    {/\.(mp4|mov|webm|avi)$/i.test(p.image || '') ? (
+                      <video src={p.image} className={styles.image} muted loop autoPlay playsInline />
+                    ) : (
+                      <Image
+                        src={p.image}
+                        alt={p.name}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 33vw"
+                        unoptimized={typeof p.image === 'string' && p.image.includes('/storage/')}
+                        className={styles.image}
+                      />
+                    )}
                     {p.badge && <span className={styles.badge}>{p.badge}</span>}
 
                     {/* Hover Overlay Controls */}
