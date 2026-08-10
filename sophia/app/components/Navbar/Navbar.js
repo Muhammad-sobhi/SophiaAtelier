@@ -11,6 +11,7 @@ export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, ca
   const { brideUser, setAuthModalOpen, t, lang, toggleLang } = useStore();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const navLinks = [
     { label: t.nav.home, href: '/' },
@@ -22,8 +23,14 @@ export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, ca
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
+    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    checkMobile();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', checkMobile);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', checkMobile);
+    };
   }, []);
 
   useEffect(() => {
@@ -31,13 +38,15 @@ export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, ca
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
+  const showGoldenLogo = scrolled || isMobile || mobileOpen;
+
   return (
     <>
       <nav className={`${styles.navbar} ${scrolled ? styles.scrolled : ''}`} id="navbar">
         <div className={styles.navInner}>
           <Link href="/" className={styles.logo}>
             <Image
-              src={scrolled ? "/images/goldenlogo.png" : "/images/whitelogo.png"}
+              src={showGoldenLogo ? "/images/goldenlogo.png" : "/images/whitelogo.png"}
               alt="Sophia Dresses"
               width={220}
               height={85}
