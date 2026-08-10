@@ -4,10 +4,11 @@ import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, Eye, ChevronDown, RotateCcw, Grid3X3, LayoutGrid } from 'lucide-react';
+import { Heart, Eye, ChevronDown, RotateCcw, Grid3X3, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import Navbar from '../components/Navbar/Navbar';
 import Footer from '../components/Footer/Footer';
+import DressCard from '../components/DressCard/DressCard';
 import styles from './collections.module.css';
 
 const SORT_OPTIONS = [
@@ -41,6 +42,8 @@ function CollectionsContent() {
   const [collection, setCollection] = useState(searchParams.get('collection') || 'All');
   const [sort, setSort] = useState('featured');
   const [gridCols, setGridCols] = useState(4);
+  const [perPage, setPerPage] = useState(16);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const sortOptions = [
     { label: t.collections.allCategories || 'All', value: 'featured' },
@@ -54,6 +57,11 @@ function CollectionsContent() {
     if (cat) setCategory(cat);
     if (col) setCollection(col);
   }, [searchParams]);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [category, collection, sort, perPage]);
 
   const categoryList = useMemo(() => {
     const names = categories.map((c) => c.name);
@@ -94,6 +102,19 @@ function CollectionsContent() {
 
     return result;
   }, [dresses, category, collection, sort]);
+
+  const totalPages = Math.ceil(filtered.length / perPage) || 1;
+  const startIndex = (currentPage - 1) * perPage;
+  const paginatedDresses = useMemo(() => {
+    return filtered.slice(startIndex, startIndex + perPage);
+  }, [filtered, startIndex, perPage]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 380, behavior: 'smooth' });
+    }
+  };
 
   const clearFilters = () => {
     setCategory('All');
@@ -180,6 +201,23 @@ function CollectionsContent() {
 
             {/* Sort & Controls Right */}
             <div className={styles.controlsRight}>
+              {/* Items Per Page Option */}
+              <div className={styles.perPageBox}>
+                <span className={styles.filterGroupLabel}>{lang === 'ar' ? 'لكل صفحة' : 'Per Page'}</span>
+                <div className={styles.sortSelectWrap}>
+                  <select
+                    className={styles.sortSelect}
+                    value={perPage}
+                    onChange={(e) => setPerPage(Number(e.target.value))}
+                  >
+                    <option value={16}>16</option>
+                    <option value={32}>32</option>
+                    <option value={64}>64</option>
+                  </select>
+                  <ChevronDown size={14} className={styles.sortChevron} />
+                </div>
+              </div>
+
               <div className={styles.sortBox}>
                 <span className={styles.filterGroupLabel}>{t.collections.sortBy}</span>
                 <div className={styles.sortSelectWrap}>
@@ -231,9 +269,9 @@ function CollectionsContent() {
         <div className={`container ${styles.resultsBar}`}>
           <span className={styles.countText}>
             {lang === 'ar' ? (
-              <>عرض <strong>{filtered.length}</strong> فستان</>
+              <>عرض <strong>{filtered.length > 0 ? `${startIndex + 1}–${Math.min(startIndex + perPage, filtered.length)}` : '0'}</strong> من <strong>{filtered.length}</strong> فستان</>
             ) : (
-              <>Showing <strong>{filtered.length}</strong> {filtered.length === 1 ? 'dress' : 'dresses'}</>
+              <>Showing <strong>{filtered.length > 0 ? `${startIndex + 1}–${Math.min(startIndex + perPage, filtered.length)}` : '0'}</strong> of <strong>{filtered.length}</strong> {filtered.length === 1 ? 'dress' : 'dresses'}</>
             )}
           </span>
 
@@ -260,54 +298,52 @@ function CollectionsContent() {
           {loadingDresses ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>...</div>
           ) : (
-            <div className={`${styles.grid} ${gridCols === 4 ? styles.grid4 : styles.grid3}`}>
-              {filtered.map((p) => (
-                <div key={p.id} className={styles.card} onClick={() => openQuickView(p)}>
-                  <div className={styles.imageWrap}>
-                    {/\.(mp4|mov|webm|avi)$/i.test(p.image || '') ? (
-                      <video src={p.image} className={styles.image} muted loop autoPlay playsInline />
-                    ) : (
-                      <Image
-                        src={p.image}
-                        alt={p.name}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                        unoptimized={typeof p.image === 'string' && p.image.includes('/storage/')}
-                        className={styles.image}
-                      />
-                    )}
-                    {p.badge && <span className={styles.badge}>{p.badge}</span>}
+            <>
+              <div className={`${styles.grid} ${gridCols === 4 ? styles.grid4 : styles.grid3}`}>
+                {paginatedDresses.map((p) => (
+                  <DressCard
+                    key={p.id}
+                    product={p}
+                    onQuickView={openQuickView}
+                    onToggleWishlist={toggleWishlist}
+                    isWishlisted={isWishlisted}
+                  />
+                ))}
+              </div>
 
-                    {/* Hover Overlay Controls */}
-                    <div className={styles.overlayControls}>
-                      <button
-                        className={`${styles.overlayBtn} ${isWishlisted(p.id) ? styles.activeWish : ''}`}
-                        onClick={(e) => { e.stopPropagation(); toggleWishlist(p); }}
-                        aria-label="Wishlist"
-                        title={t.quickView.addToWishlist}
-                      >
-                        <Heart size={16} fill={isWishlisted(p.id) ? '#c8a96a' : 'none'} color={isWishlisted(p.id) ? '#c8a96a' : '#111'} />
-                      </button>
-                      <button
-                        className={styles.quickViewOverlayBtn}
-                        onClick={(e) => { e.stopPropagation(); openQuickView(p); }}
-                      >
-                        {t.bestSellers.quickView}
-                      </button>
-                    </div>
+              {/* Pagination Bar */}
+              {totalPages > 1 && (
+                <div className={styles.paginationContainer}>
+                  <button
+                    className={styles.pageArrowBtn}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    aria-label="Previous Page"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
 
-                    <div className={styles.overlayPriceTag}>{p.price}</div>
-                  </div>
-                  <div className={styles.info}>
-                    <div className={styles.meta}>
-                      <span className={styles.collection}>{p.collection}</span>
-                      <span className={styles.category}>{p.category}</span>
-                    </div>
-                    <h3 className={styles.name}>{lang === 'ar' && p.name_ar ? p.name_ar : p.name}</h3>
-                  </div>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      className={`${styles.pageBtn} ${currentPage === pageNum ? styles.pageBtnActive : ''}`}
+                      onClick={() => handlePageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+
+                  <button
+                    className={styles.pageArrowBtn}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    aria-label="Next Page"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
 
           {!loadingDresses && filtered.length === 0 && (

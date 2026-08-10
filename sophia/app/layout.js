@@ -6,6 +6,7 @@ import SearchPanel from "./components/SearchPanel/SearchPanel";
 import CartDrawer from "./components/CartDrawer/CartDrawer";
 import WishlistDrawer from "./components/WishlistDrawer/WishlistDrawer";
 import AuthModalWrapper from "./components/AuthModal/AuthModalWrapper";
+import ScrollToTop from "./components/ScrollToTop/ScrollToTop";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -50,6 +51,7 @@ export default function RootLayout({ children }) {
           <CartDrawer />
           <WishlistDrawer />
           <AuthModalWrapper />
+          <ScrollToTop />
         </StoreProvider>
       </body>
     </html>

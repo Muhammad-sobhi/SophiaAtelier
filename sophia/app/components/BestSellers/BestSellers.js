@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useScrollAnimation } from '../ScrollAnimations/useScrollAnimation';
 import { useStore } from '../../context/StoreContext';
+import DressCard from '../DressCard/DressCard';
 import styles from './BestSellers.module.css';
 
 export default function BestSellers({ onQuickView, onToggleWishlist, isWishlisted }) {
@@ -41,51 +42,17 @@ export default function BestSellers({ onQuickView, onToggleWishlist, isWishliste
               <div style={{ padding: '40px', color: '#999' }}>—</div>
             ) : (
               displayProducts.map((p, i) => (
-                <div
+                <DressCard
                   key={`${p.id}-${i}`}
+                  product={p}
+                  onQuickView={onQuickView}
+                  onToggleWishlist={onToggleWishlist}
+                  isWishlisted={isWishlisted}
+                  showMeta={false}
+                  dataAnimate="fade-up"
+                  dataDelay={String(Math.min(i + 1, 6))}
                   className={styles.card}
-                  data-animate="fade-up"
-                  data-delay={String(Math.min(i + 1, 6))}
-                  onClick={() => onQuickView?.(p)}
-                >
-                  <div className={styles.imageWrap}>
-                    {/\.(mp4|mov|webm|avi)$/i.test(p.image || '') ? (
-                      <video src={p.image} className={styles.image} muted loop autoPlay playsInline />
-                    ) : (
-                      <Image
-                        src={p.image}
-                        alt={p.name}
-                        fill
-                        sizes="(max-width: 900px) 210px, 25vw"
-                        unoptimized={typeof p.image === 'string' && p.image.includes('/storage/')}
-                        className={styles.image}
-                      />
-                    )}
-                    
-                    {/* Hover Overlay Controls */}
-                    <div className={styles.overlayControls}>
-                      <button
-                        className={`${styles.overlayBtn} ${isWishlisted?.(p.id) ? styles.activeWish : ''}`}
-                        onClick={(e) => { e.stopPropagation(); onToggleWishlist?.(p); }}
-                        aria-label="Wishlist"
-                        title={t.quickView.addToWishlist}
-                      >
-                        <Heart size={16} fill={isWishlisted?.(p.id) ? '#c8a96a' : 'none'} color={isWishlisted?.(p.id) ? '#c8a96a' : '#111'} />
-                      </button>
-                      <button
-                        className={styles.quickViewOverlayBtn}
-                        onClick={(e) => { e.stopPropagation(); onQuickView?.(p); }}
-                      >
-                        {t.bestSellers.quickView}
-                      </button>
-                    </div>
-
-                    <div className={styles.overlayPriceTag}>{p.price}</div>
-                  </div>
-                  <div className={styles.infoRow}>
-                    <h3 className={styles.name}>{lang === 'ar' && p.name_ar ? p.name_ar : p.name}</h3>
-                  </div>
-                </div>
+                />
               ))
             )}
           </div>
