@@ -56,14 +56,19 @@ class DressController extends Controller
     public function store(Request $request): JsonResponse
     {
         if ($code = $request->input('code')) {
-            $cleanCode = trim($code);
+            $cleanCode = trim((string)$code);
             if ($cleanCode !== '') {
-                Dress::onlyTrashed()->where('code', $cleanCode)->update(['code' => null]);
+                \Illuminate\Support\Facades\DB::table('dresses')
+                    ->where(function($q) use ($cleanCode) {
+                        $q->where('code', $cleanCode)
+                          ->orWhereRaw('TRIM(code) = ?', [$cleanCode]);
+                    })
+                    ->update(['code' => null]);
             }
         }
 
         $validated = $request->validate([
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')],
+            'code' => ['nullable', 'string', 'max:50'],
             'name' => 'required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -134,14 +139,20 @@ class DressController extends Controller
     public function update(Request $request, Dress $dress): JsonResponse
     {
         if ($code = $request->input('code')) {
-            $cleanCode = trim($code);
+            $cleanCode = trim((string)$code);
             if ($cleanCode !== '') {
-                Dress::onlyTrashed()->where('code', $cleanCode)->where('id', '!=', $dress->id)->update(['code' => null]);
+                \Illuminate\Support\Facades\DB::table('dresses')
+                    ->where('id', '!=', $dress->id)
+                    ->where(function($q) use ($cleanCode) {
+                        $q->where('code', $cleanCode)
+                          ->orWhereRaw('TRIM(code) = ?', [$cleanCode]);
+                    })
+                    ->update(['code' => null]);
             }
         }
 
         $validated = $request->validate([
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')->ignore($dress->id)],
+            'code' => ['nullable', 'string', 'max:50'],
             'name' => 'sometimes|required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',
