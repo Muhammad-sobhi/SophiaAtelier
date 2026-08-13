@@ -40,6 +40,17 @@ Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
 Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionController::class, 'publicIndex']);
 Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryController::class, 'publicIndex']);
 Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
+Route::get('/public/system-status', function () {
+    if (function_exists('opcache_reset')) {
+        @opcache_reset();
+    }
+    return response()->json([
+        'status' => 'online',
+        'dress_code_auto_release' => true,
+        'version' => '2026.08.13-v4',
+        'server_time' => now()->toDateTimeString(),
+    ]);
+});
 Route::get('/dresses', [DressController::class, 'index']);
 Route::get('/dresses/release-code/{code}', [DressController::class, 'releaseCode']);
 Route::get('/dresses/{dress}', [DressController::class, 'show']);

@@ -308,9 +308,12 @@ export default function DressesPage() {
       if (err.response?.status === 422 || err.status === 422 || err.data?.errors) {
         const errors = err.response?.data?.errors || err.data?.errors || {};
         if (errors.code) {
-          setCodeError('كود الفستان مستخدم بالفعل، يرجى كتابة كود آخر فريد.');
+          const codeMsg = Array.isArray(errors.code) ? errors.code[0] : errors.code;
+          setCodeError(`كود الفستان مستخدم بالفعل: (${codeMsg})`);
         } else {
-          alert('تعذر حفظ الفستان: ' + (err.response?.data?.message || err.message || 'بيانات غير صالحة'));
+          const firstKey = Object.keys(errors)[0];
+          const firstMsg = firstKey && Array.isArray(errors[firstKey]) ? errors[firstKey][0] : (err.response?.data?.message || err.message || 'بيانات غير صالحة');
+          alert('تعذر حفظ الفستان: ' + firstMsg);
         }
       } else {
         alert('حدث خطأ أثناء حفظ الفستان. يرجى التأكد من البيانات والمحاولة مجدداً.');
