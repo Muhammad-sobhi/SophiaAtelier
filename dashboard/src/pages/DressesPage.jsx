@@ -172,40 +172,48 @@ export default function DressesPage() {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    // 1. Resolve or Update/Create Designer
-    let designerId = editingDress?.designer_id || null;
-    const designerNameEn = newDesigner.trim() || newDesignerAr.trim() || '';
-    const designerNameArVal = newDesignerAr.trim() || newDesigner.trim() || '';
+    // 1. Resolve & Sanitize Designer
+    let cleanDesignerEn = newDesigner.trim();
+    let cleanDesignerAr = newDesignerAr.trim();
 
-    if (designerNameEn || designerNameArVal) {
-      if (editingDress && designerId) {
+    if (/^isbridal$/i.test(cleanDesignerEn) || cleanDesignerEn.toLowerCase().includes('isbridal')) {
+      cleanDesignerEn = 'Esraa El Qsas';
+    }
+    if (!cleanDesignerEn && !cleanDesignerAr) {
+      cleanDesignerEn = 'Esraa El Qsas';
+      cleanDesignerAr = 'اسراء القصاص';
+    }
+
+    const designerNameEn = cleanDesignerEn || cleanDesignerAr;
+    const designerNameArVal = cleanDesignerAr || cleanDesignerEn;
+
+    let designerId = null;
+    const matchedDesigner = designers.find((d) => 
+      (d.name && d.name.trim().toLowerCase() === designerNameEn.toLowerCase()) || 
+      (d.name_ar && d.name_ar.trim().toLowerCase() === designerNameArVal.toLowerCase())
+    );
+
+    if (matchedDesigner) {
+      designerId = matchedDesigner.id;
+      if (/^isbridal$/i.test(matchedDesigner.name) || (matchedDesigner.name && matchedDesigner.name.toLowerCase().includes('isbridal'))) {
         try {
-          await apiClient.put(`/designers/${designerId}`, {
-            name: designerNameEn,
-            name_ar: designerNameArVal
+          await apiClient.put(`/designers/${matchedDesigner.id}`, {
+            name: 'Esraa El Qsas',
+            name_ar: matchedDesigner.name_ar || 'اسراء القصاص'
           });
         } catch (err) {
-          console.error('Failed to update current designer:', err);
+          console.error('Failed to auto-fix Isbridal designer:', err);
         }
-      } else {
-        const matchedDesigner = designers.find((d) => 
-          (d.name && d.name.trim().toLowerCase() === designerNameEn.toLowerCase()) || 
-          (d.name_ar && d.name_ar.trim().toLowerCase() === designerNameArVal.toLowerCase())
-        );
-
-        if (matchedDesigner) {
-          designerId = matchedDesigner.id;
-        } else {
-          try {
-            const desRes = await apiClient.post('/designers', {
-              name: designerNameEn,
-              name_ar: designerNameArVal
-            });
-            designerId = desRes.id || desRes.data?.id;
-          } catch (err) {
-            console.error('Failed to create designer:', err);
-          }
-        }
+      }
+    } else {
+      try {
+        const desRes = await apiClient.post('/designers', {
+          name: designerNameEn,
+          name_ar: designerNameArVal
+        });
+        designerId = desRes.id || desRes.data?.id;
+      } catch (err) {
+        console.error('Failed to create designer:', err);
       }
     }
     if (!designerId) designerId = designers[0]?.id || 1;
@@ -332,8 +340,16 @@ export default function DressesPage() {
     setNewFabric(dress.fabric || 'Satin');
     setNewFabricAr(dress.fabric_ar || 'ساتان');
     const desObj = typeof dress.designer === 'object' ? dress.designer : null;
-    setNewDesigner(desObj?.name || (typeof dress.designer === 'string' ? dress.designer : ''));
-    setNewDesignerAr(desObj?.name_ar || desObj?.name || (typeof dress.designer === 'string' ? dress.designer : ''));
+    let rawDesEn = desObj?.name || (typeof dress.designer === 'string' ? dress.designer : '');
+    let rawDesAr = desObj?.name_ar || desObj?.name || (typeof dress.designer === 'string' ? dress.designer : '');
+    if (/^isbridal$/i.test(rawDesEn.trim()) || rawDesEn.toLowerCase().includes('isbridal')) {
+      rawDesEn = 'Esraa El Qsas';
+      if (!rawDesAr || /^isbridal$/i.test(rawDesAr.trim()) || rawDesAr.toLowerCase().includes('isbridal')) {
+        rawDesAr = 'اسراء القصاص';
+      }
+    }
+    setNewDesigner(rawDesEn);
+    setNewDesignerAr(rawDesAr);
     setNewPurchasePrice(dress.purchase_price ? dress.purchase_price.toString() : '');
     setNewPurchaseDate(dress.purchase_date ? dress.purchase_date.toString().substring(0, 10) : '');
     setNewRentalCost(dress.rental_price ? dress.rental_price.toString() : '');
