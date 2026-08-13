@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
-import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft, Calendar } from 'lucide-react';
 
 const DRESS_STAGES = [
 { id: 'ready', label: 'جاهز', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
@@ -40,6 +40,7 @@ export default function DressesPage() {
   const [newDesigner, setNewDesigner] = useState('');
   const [newDesignerAr, setNewDesignerAr] = useState('');
   const [newPurchasePrice, setNewPurchasePrice] = useState('');
+  const [newPurchaseDate, setNewPurchaseDate] = useState('');
   const [newRentalCost, setNewRentalCost] = useState('');
   const [newTryingFee, setNewTryingFee] = useState('');
   const [newSize, setNewSize] = useState('');
@@ -71,6 +72,7 @@ export default function DressesPage() {
     setNewDesigner('');
     setNewDesignerAr('');
     setNewPurchasePrice('');
+    setNewPurchaseDate('');
     setNewRentalCost('');
     setNewTryingFee('');
     setNewSize('');
@@ -253,6 +255,7 @@ export default function DressesPage() {
         collection_id: selectedCollectionId ? parseInt(selectedCollectionId) : null,
         designer_id: designerId,
         purchase_price: priceNum,
+        purchase_date: newPurchaseDate || null,
         rental_price: rentalNum,
         trying_fee: tryingNum,
         size: sizeStr,
@@ -332,6 +335,7 @@ export default function DressesPage() {
     setNewDesigner(desObj?.name || (typeof dress.designer === 'string' ? dress.designer : ''));
     setNewDesignerAr(desObj?.name_ar || desObj?.name || (typeof dress.designer === 'string' ? dress.designer : ''));
     setNewPurchasePrice(dress.purchase_price ? dress.purchase_price.toString() : '');
+    setNewPurchaseDate(dress.purchase_date ? dress.purchase_date.toString().substring(0, 10) : '');
     setNewRentalCost(dress.rental_price ? dress.rental_price.toString() : '');
     setNewTryingFee(dress.trying_fee ? dress.trying_fee.toString() : '');
     setNewSize(dress.size || '');
@@ -473,8 +477,13 @@ export default function DressesPage() {
 
   const filteredDresses = dressesList.filter((d) => {
     const designerName = typeof d.designer === 'object' ? d.designer?.name : d.designer;
-    return d.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    designerName?.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      d.name?.toLowerCase().includes(q) ||
+      d.name_ar?.toLowerCase().includes(q) ||
+      d.code?.toLowerCase().includes(q) ||
+      (designerName && designerName.toLowerCase().includes(q))
+    );
   });
 
   const getStageLabel = (stage) => {
@@ -684,6 +693,12 @@ export default function DressesPage() {
                           المصمم: {typeof dress.designer === 'object' ? dress.designer.name : dress.designer}
                         </div>
                       }
+                      {dress.purchase_date && (
+                        <div className="flex items-center gap-1 col-span-2 text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 text-[8.5px]">
+                          <Calendar size={10} className="text-slate-400" />
+                          <span>تاريخ الشراء للأتيليه: {dress.purchase_date.toString().substring(0, 10)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1076,8 +1091,8 @@ export default function DressesPage() {
                   </div>
                 </div>
 
-                {/* Prices & Fees */}
-                <div className="grid grid-cols-3 gap-4 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100">
+                {/* Prices, Date & Fees */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100">
                   <div className="space-y-1">
                     <label className="text-xs font-extrabold text-slate-600 block">تكلفة الشراء</label>
                     <input
@@ -1085,6 +1100,16 @@ export default function DressesPage() {
                       placeholder="15000"
                       value={newPurchasePrice}
                       onChange={(e) => setNewPurchasePrice(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600 block">تاريخ الشراء (لـ الأتيليه)</label>
+                    <input
+                      type="date"
+                      value={newPurchaseDate}
+                      onChange={(e) => setNewPurchaseDate(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
                   </div>
@@ -1203,9 +1228,10 @@ export default function DressesPage() {
                             <button
                               type="button"
                               onClick={() => handleRemoveImage(idx)}
-                              className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer z-20"
+                              className="absolute top-1 right-1 w-6 h-6 bg-rose-600 hover:bg-rose-700 text-white rounded-full flex items-center justify-center opacity-100 transition-all shadow-md cursor-pointer z-20 active:scale-95"
+                              title="حذف هذه الصورة/الفيديو"
                             >
-                              <X size={10} />
+                              <X size={12} />
                             </button>
                           </div>
                         );

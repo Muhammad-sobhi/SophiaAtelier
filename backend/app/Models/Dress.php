@@ -14,7 +14,7 @@ class Dress extends Model
 
     protected $fillable = [
         'code', 'name', 'name_ar', 'category_id', 'collection_id', 'designer_id', 'description', 'description_ar',
-        'purchase_price', 'rental_price', 'trying_fee', 'status', 'size', 'weight_from', 'weight_to',
+        'purchase_price', 'purchase_date', 'rental_price', 'trying_fee', 'status', 'size', 'weight_from', 'weight_to',
         'color', 'color_ar', 'fabric', 'fabric_ar', 'notes', 'new_collection', 'is_website_visible',
     ];
 
@@ -22,6 +22,7 @@ class Dress extends Model
     {
         return [
             'purchase_price' => 'decimal:2',
+            'purchase_date' => 'date',
             'rental_price' => 'decimal:2',
             'weight_from' => 'integer',
             'weight_to' => 'integer',

@@ -8,6 +8,7 @@ use App\Models\DressImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class DressController extends Controller
 {
@@ -29,7 +30,15 @@ class DressController extends Controller
 
         if ($search = $request->input('search')) {
             $cleanSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
-            $query->where('name', 'like', "%{$cleanSearch}%");
+            $query->where(function ($q) use ($cleanSearch) {
+                $q->where('name', 'like', "%{$cleanSearch}%")
+                  ->orWhere('name_ar', 'like', "%{$cleanSearch}%")
+                  ->orWhere('code', 'like', "%{$cleanSearch}%")
+                  ->orWhereHas('designer', function ($dq) use ($cleanSearch) {
+                      $dq->where('name', 'like', "%{$cleanSearch}%")
+                         ->orWhere('name_ar', 'like', "%{$cleanSearch}%");
+                  });
+            });
         }
 
         if ($request->has('is_website_visible')) {
@@ -47,7 +56,7 @@ class DressController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => 'nullable|string|max:50|unique:dresses,code',
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')],
             'name' => 'required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -56,6 +65,7 @@ class DressController extends Controller
             'description' => 'nullable|string',
             'description_ar' => 'nullable|string',
             'purchase_price' => 'nullable|numeric|min:0',
+            'purchase_date' => 'nullable|date',
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:available,out,maintenance,cleaning',
@@ -91,7 +101,7 @@ class DressController extends Controller
                 'category'    => 'purchase',
                 'amount'      => $validated['purchase_price'],
                 'description' => 'شراء فستان: ' . $dress->name,
-                'date'        => now()->toDateString(),
+                'date'        => !empty($validated['purchase_date']) ? $validated['purchase_date'] : now()->toDateString(),
             ]);
         }
 
@@ -117,7 +127,7 @@ class DressController extends Controller
     public function update(Request $request, Dress $dress): JsonResponse
     {
         $validated = $request->validate([
-            'code' => 'nullable|string|max:50|unique:dresses,code,' . $dress->id,
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')->ignore($dress->id)],
             'name' => 'sometimes|required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',
@@ -126,6 +136,7 @@ class DressController extends Controller
             'description' => 'nullable|string',
             'description_ar' => 'nullable|string',
             'purchase_price' => 'nullable|numeric|min:0',
+            'purchase_date' => 'nullable|date',
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:available,out,maintenance,cleaning',
@@ -149,14 +160,19 @@ class DressController extends Controller
                 ->where('description', 'LIKE', '%' . $dress->name . '%')
                 ->first();
 
+            $expenseDate = !empty($validated['purchase_date']) ? $validated['purchase_date'] : now()->toDateString();
+
             if ($expense) {
-                $expense->update(['amount' => $validated['purchase_price']]);
+                $expense->update([
+                    'amount' => $validated['purchase_price'],
+                    'date'   => $expenseDate,
+                ]);
             } else {
                 \App\Models\Expense::create([
                     'category'    => 'purchase',
                     'amount'      => $validated['purchase_price'],
                     'description' => 'شراء فستان: ' . $dress->name,
-                    'date'        => now()->toDateString(),
+                    'date'        => $expenseDate,
                 ]);
             }
         }
@@ -178,6 +194,8 @@ class DressController extends Controller
 
     public function destroy(Dress $dress): JsonResponse
     {
+        $dress->code = null;
+        $dress->save();
         $dress->delete();
 
         return response()->json(['message' => 'Dress deleted']);

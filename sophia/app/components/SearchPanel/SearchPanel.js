@@ -27,7 +27,7 @@ export default function SearchPanel() {
 
   const results = query.trim()
     ? dresses.filter((p) =>
-        [p.name, p.name_ar, p.category, p.collection, p.description]
+        [p.code, p.name, p.name_ar, p.category, p.collection, p.description]
           .filter(Boolean)
           .join(' ')
           .toLowerCase()
