@@ -41,6 +41,7 @@ Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionControlle
 Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryController::class, 'publicIndex']);
 Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
 Route::get('/dresses', [DressController::class, 'index']);
+Route::get('/dresses/release-code/{code}', [DressController::class, 'releaseCode']);
 Route::get('/dresses/{dress}', [DressController::class, 'show']);
 
 // Direct file serving route for uploads (bypasses web server symlink issues completely)

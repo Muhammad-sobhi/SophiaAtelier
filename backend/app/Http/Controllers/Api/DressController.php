@@ -332,4 +332,39 @@ class DressController extends Controller
             'status' => $dress->status,
         ]);
     }
+
+    /**
+     * Release a dress code from any soft-deleted dresses or clear conflicts.
+     * GET /api/dresses/release-code/{code}
+     */
+    public function releaseCode(string $code): JsonResponse
+    {
+        $cleanCode = trim($code);
+        if ($cleanCode === '') {
+            return response()->json(['message' => 'Invalid code'], 400);
+        }
+
+        // 1. Clear code on soft-deleted dresses
+        $deletedCount = \Illuminate\Support\Facades\DB::table('dresses')
+            ->whereNotNull('deleted_at')
+            ->where('code', $cleanCode)
+            ->update(['code' => null]);
+
+        // 2. Check if an active dress uses this code
+        $activeCount = \Illuminate\Support\Facades\DB::table('dresses')
+            ->whereNull('deleted_at')
+            ->where('code', $cleanCode)
+            ->count();
+
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+
+        return response()->json([
+            'message' => "تمت معالجة كود الفستان {$cleanCode} بنجاح",
+            'clean_code' => $cleanCode,
+            'cleared_soft_deleted_count' => $deletedCount,
+            'active_dresses_count' => $activeCount,
+        ]);
+    }
 }

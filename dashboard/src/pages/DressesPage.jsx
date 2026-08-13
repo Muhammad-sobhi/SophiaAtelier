@@ -816,9 +816,28 @@ export default function DressesPage() {
                       }`}
                     />
                     {codeError && (
-                      <p className="text-[11px] font-extrabold text-rose-600 mt-1 flex items-center gap-1">
-                        ⚠️ {codeError}
-                      </p>
+                      <div className="space-y-1.5 mt-1">
+                        <p className="text-[11px] font-extrabold text-rose-600 flex items-center gap-1">
+                          ⚠️ {codeError}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!newCode.trim()) return;
+                            try {
+                              await apiClient.get(`/dresses/release-code/${encodeURIComponent(newCode.trim())}`);
+                              setCodeError('');
+                              alert(`تم تفريغ كود #${newCode.trim()} بنجاح! يمكنك الآن النقر على "حفظ الفستان بالكتالوج".`);
+                            } catch (err) {
+                              console.error('Failed to release code:', err);
+                              alert('تعذر تفريغ الكود تلقائياً. يرجى المحاولة مرة أخرى.');
+                            }
+                          }}
+                          className="text-[10.5px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100 transition-all cursor-pointer inline-flex items-center gap-1 shadow-xs active:scale-95"
+                        >
+                          ⚡ انقري هنا لتفريغ كود #{newCode} وإعادة استخدامه فوراً
+                        </button>
+                      </div>
                     )}
                   </div>
 
