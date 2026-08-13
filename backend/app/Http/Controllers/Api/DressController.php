@@ -55,6 +55,13 @@ class DressController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($code = $request->input('code')) {
+            $cleanCode = trim($code);
+            if ($cleanCode !== '') {
+                Dress::onlyTrashed()->where('code', $cleanCode)->update(['code' => null]);
+            }
+        }
+
         $validated = $request->validate([
             'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')],
             'name' => 'required|string|max:255',
@@ -126,6 +133,13 @@ class DressController extends Controller
 
     public function update(Request $request, Dress $dress): JsonResponse
     {
+        if ($code = $request->input('code')) {
+            $cleanCode = trim($code);
+            if ($cleanCode !== '') {
+                Dress::onlyTrashed()->where('code', $cleanCode)->where('id', '!=', $dress->id)->update(['code' => null]);
+            }
+        }
+
         $validated = $request->validate([
             'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')->ignore($dress->id)],
             'name' => 'sometimes|required|string|max:255',
