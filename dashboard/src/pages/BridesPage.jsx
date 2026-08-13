@@ -496,12 +496,73 @@ export default function BridesPage() {
 
   const [activePage, setActivePage] = useState(1);
   const [archivePage, setArchivePage] = useState(1);
+  const [selectedWeddingMonth, setSelectedWeddingMonth] = useState('all');
   const itemsPerPage = 12;
 
-  const filteredBrides = bridesList.filter((b) =>
-    b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.phone && b.phone.includes(searchQuery)
-  );
+  // Extract unique wedding months from bridesList
+  const weddingMonthsOptions = React.useMemo(() => {
+    const monthNamesAr = [
+      'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const monthsMap = {};
+
+    bridesList.forEach((b) => {
+      if (b.wedding_date) {
+        const d = new Date(b.wedding_date);
+        if (!isNaN(d.getTime())) {
+          const year = d.getFullYear();
+          const monthIdx = d.getMonth();
+          const key = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+          const label = `${monthNamesAr[monthIdx]} ${year}`;
+          if (!monthsMap[key]) {
+            monthsMap[key] = { key, label, count: 0 };
+          }
+          monthsMap[key].count += 1;
+        }
+      } else {
+        if (!monthsMap['no_date']) {
+          monthsMap['no_date'] = { key: 'no_date', label: 'بدون تاريخ زفاف', count: 0 };
+        }
+        monthsMap['no_date'].count += 1;
+      }
+    });
+
+    const sortedKeys = Object.keys(monthsMap)
+      .filter((k) => k !== 'no_date')
+      .sort();
+
+    const result = sortedKeys.map((k) => monthsMap[k]);
+    if (monthsMap['no_date']) {
+      result.push(monthsMap['no_date']);
+    }
+    return result;
+  }, [bridesList]);
+
+  const filteredBrides = bridesList.filter((b) => {
+    const matchesSearch =
+      b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.phone && b.phone.includes(searchQuery));
+
+    let matchesMonth = true;
+    if (selectedWeddingMonth !== 'all') {
+      if (selectedWeddingMonth === 'no_date') {
+        matchesMonth = !b.wedding_date;
+      } else if (b.wedding_date) {
+        const d = new Date(b.wedding_date);
+        if (!isNaN(d.getTime())) {
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          matchesMonth = key === selectedWeddingMonth;
+        } else {
+          matchesMonth = false;
+        }
+      } else {
+        matchesMonth = false;
+      }
+    }
+
+    return matchesSearch && matchesMonth;
+  });
 
   const activeBrides = filteredBrides.filter((b) => b.current_stage !== 'returned');
   const previousBrides = filteredBrides.filter((b) => b.current_stage === 'returned');
@@ -740,6 +801,52 @@ export default function BridesPage() {
             <Plus size={14} />
             <span>إضافة عميلة</span>
           </button>
+        </div>
+      </div>
+
+      {/* Wedding Month Filter Bar */}
+      <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+            <Calendar size={16} />
+          </div>
+          <div>
+            <h3 className="text-xs font-extrabold text-slate-800">تصفية بحسب شهر الزفاف</h3>
+            <p className="text-[10px] text-slate-400 font-bold">تقسيم وتصنيف العرائس بناءً على موعد الفرح</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 max-w-full">
+          <button
+            onClick={() => { setSelectedWeddingMonth('all'); setActivePage(1); setArchivePage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              selectedWeddingMonth === 'all'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <span>جميع الشهور</span>
+            <span className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ${selectedWeddingMonth === 'all' ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
+              {bridesList.length}
+            </span>
+          </button>
+
+          {weddingMonthsOptions.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => { setSelectedWeddingMonth(m.key); setActivePage(1); setArchivePage(1); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                selectedWeddingMonth === m.key
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <span>{m.label}</span>
+              <span className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ${selectedWeddingMonth === m.key ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {m.count}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
