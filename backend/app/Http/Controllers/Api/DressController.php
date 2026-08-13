@@ -58,9 +58,8 @@ class DressController extends Controller
         if ($code = $request->input('code')) {
             $cleanCode = trim((string)$code);
             if ($cleanCode !== '') {
-                // Clear code from any soft-deleted dresses
+                // Force release this code from any other dress (active or soft-deleted) in DB
                 \Illuminate\Support\Facades\DB::table('dresses')
-                    ->whereNotNull('deleted_at')
                     ->where(function($q) use ($cleanCode) {
                         $q->where('code', $cleanCode)
                           ->orWhereRaw('TRIM(code) = ?', [$cleanCode]);
@@ -70,7 +69,7 @@ class DressController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')],
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -143,9 +142,8 @@ class DressController extends Controller
         if ($code = $request->input('code')) {
             $cleanCode = trim((string)$code);
             if ($cleanCode !== '') {
-                // Clear code from any soft-deleted dresses
+                // Force release this code from any other dress (active or soft-deleted) in DB
                 \Illuminate\Support\Facades\DB::table('dresses')
-                    ->whereNotNull('deleted_at')
                     ->where('id', '!=', $dress->id)
                     ->where(function($q) use ($cleanCode) {
                         $q->where('code', $cleanCode)
@@ -156,7 +154,7 @@ class DressController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('dresses', 'code')->whereNull('deleted_at')->ignore($dress->id)],
+            'code' => 'nullable|string|max:50',
             'name' => 'sometimes|required|string|max:255',
             'name_ar' => 'nullable|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',
