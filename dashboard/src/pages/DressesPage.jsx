@@ -113,14 +113,20 @@ export default function DressesPage() {
   // Accessories list states
   const [accessories, setAccessories] = useState(['']);
 
-  const fetchDresses = async (page = currentPage, pageLimit = perPage) => {
+  const fetchDresses = async (page = currentPage, pageLimit = perPage, search = searchQuery) => {
     try {
-      const response = await apiClient.get('/dresses', {
-        params: {
-          page: pageLimit === 'all' ? undefined : page,
-          per_page: pageLimit
-        }
-      });
+      const params = {};
+      if (pageLimit !== 'all') {
+        params.page = page;
+        params.per_page = pageLimit;
+      } else {
+        params.per_page = 'all';
+      }
+      if (search && search.trim()) {
+        params.search = search.trim();
+      }
+
+      const response = await apiClient.get('/dresses', { params });
 
       if (Array.isArray(response)) {
         setDressesList(response);
@@ -164,9 +170,16 @@ export default function DressesPage() {
   };
 
   useEffect(() => {
-    fetchDresses();
     loadDependencies();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchDresses(1, perPage, searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, perPage]);
 
   const handleAddDressSubmit = async (e) => {
     e.preventDefault();
