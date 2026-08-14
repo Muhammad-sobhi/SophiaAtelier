@@ -32,7 +32,7 @@ class RevenueController extends Controller
     {
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
-            'type' => 'nullable|in:deposit,balance,fitting_fee,other',
+            'type' => 'nullable|string|max:50',
             'amount' => 'required|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'payment_date' => 'required|date',
@@ -62,7 +62,7 @@ class RevenueController extends Controller
     {
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
-            'type' => 'nullable|in:deposit,balance,fitting_fee,other',
+            'type' => 'nullable|string|max:50',
             'amount' => 'sometimes|required|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'payment_date' => 'sometimes|required|date',

@@ -432,7 +432,11 @@ class ClientController extends Controller
 
                     // Log negative revenue for insurance refund using the SAME payment method used when collecting insurance
                     $insuranceAmount = floatval($booking->insurance_amount ?: 5000);
-                    if ($insuranceAmount > 0) {
+                    $damageDeduction = floatval($request->input('damage_deduction', 0));
+                    $damageNotes = $request->input('damage_notes', '');
+                    $refundAmount = max(0, $insuranceAmount - $damageDeduction);
+
+                    if ($refundAmount > 0) {
                         $insuranceRev = $booking->revenues()
                             ->where('notes', 'like', '%تأمين%')
                             ->latest()
@@ -443,13 +447,18 @@ class ClientController extends Controller
                         $dressesNames = array_filter([$booking->dress?->name, $booking->dress2?->name]);
                         $dressesStr = !empty($dressesNames) ? implode(' و ', $dressesNames) : 'الفستان';
 
+                        $refundNote = 'مرتجع مبلغ التأمين بعد استلام (' . $dressesStr . ') للعروس: ' . $client->name;
+                        if ($damageDeduction > 0) {
+                            $refundNote .= " (تم خصم {$damageDeduction} ج.م مقابل تلفيات/صيانة: {$damageNotes})";
+                        }
+
                         \App\Models\Revenue::create([
                             'booking_id' => $booking->id,
                             'type' => 'other',
-                            'amount' => -$insuranceAmount,
+                            'amount' => -$refundAmount,
                             'payment_method' => $paymentMethod,
                             'payment_date' => now()->toDateString(),
-                            'notes' => 'مرتجع مبلغ التأمين بعد استلام (' . $dressesStr . ') بحالة سليمة للعروس: ' . $client->name,
+                            'notes' => $refundNote,
                         ]);
                     }
                 }

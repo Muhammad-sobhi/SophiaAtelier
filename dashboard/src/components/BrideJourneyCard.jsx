@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import {
   Phone,
@@ -7,12 +8,15 @@ import {
   Ruler,
   Heart,
   Package,
-
   Check,
   User,
   X,
   Search,
-  CreditCard } from
+  CreditCard,
+  Scissors,
+  Edit3,
+  ExternalLink,
+  Sparkles } from
 'lucide-react';
 
 
@@ -67,6 +71,7 @@ const PAYMENT_METHODS = [
 
 
 export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, onReturnClick }) {
+  const navigate = useNavigate();
   const [selectedMobileStage, setSelectedMobileStage] = useState(bride?.current_stage || 'visit');
 
   React.useEffect(() => {
@@ -78,6 +83,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentType, setPaymentType] = useState('fitting_fee');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
@@ -607,27 +613,51 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     }
   };
 
+  const handleSendCongratsWhatsApp = async (e) => {
+    e?.stopPropagation?.();
+    const phone = (bride.phone || '').replace(/[^\d]/g, '');
+    if (!phone) {
+      alert('لا يوجد رقم هاتف مسجل للعروس');
+      return;
+    }
+
+    let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nألف مبروك لجميلتنا الرائعة *${bride.name}* 🤍👰🏻‍♀️،\nنتمنى لكِ حياة زوجية سعيدة ومليئة بالحب والفرح! سعدنا جداً بكوننا جزءاً من يومكِ المميز وتألقكِ بفستان أحلامكِ المختار من فساتين صوفيا 👗💖✨`;
+    try {
+      const templates = await apiClient.get('/whatsapp-templates');
+      const t = templates.find((x) => x.key === 'wedding_congratulations');
+      if (t) {
+        message = t.body.replace(/\{\{client_name\}\}/g, bride.name);
+      }
+    } catch (err) {}
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   const handleCreatePayment = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     try {
       setIsSubmittingPayment(true);
       const amountNum = parseFloat(paymentAmount);
       if (!isNaN(amountNum) && amountNum > 0) {
         await apiClient.post('/revenues', {
+          booking_id: bride.bookings?.[0]?.id || null,
           type: paymentType,
           amount: amountNum,
           payment_method: paymentMethod,
           payment_date: new Date().toISOString().split('T')[0],
-          notes: paymentNotes || (paymentType === 'fitting_fee' ? `رسوم قياس للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`)
+          notes: paymentNotes || (paymentType === 'fitting_fee' ? `رسوم قياس وتجربة للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`),
+          receipt_image: paymentReceipt
         });
         setShowPaymentModal(false);
         setPaymentAmount('');
         setPaymentMethod('cash');
         setPaymentNotes('');
+        setPaymentReceipt(null);
         onStageUpdate?.();
       }
     } catch (e) {
       console.error('Failed to record payment:', e);
+      alert('حدث خطأ أثناء تسجيل الدفعة');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -635,10 +665,45 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
   const openPaymentModalFor = (type) => {
     setPaymentType(type);
-    setPaymentAmount(type === 'fitting_fee' ? '150' : '');
-    setPaymentNotes(type === 'fitting_fee' ? `رسوم قياس للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`);
+    const bookedDress = bride.bookings?.[0]?.dress || bride.visits?.[0]?.dress;
+    const fee = (bride.latest_dress_trying_fee && bride.latest_dress_trying_fee > 0)
+      ? bride.latest_dress_trying_fee
+      : (bookedDress ? parseFloat(bookedDress.trying_fee || 150) : 150);
+    setPaymentAmount(type === 'fitting_fee' ? fee.toString() : '');
+    setPaymentNotes(type === 'fitting_fee' ? `رسوم قياس وتجربة للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`);
     setPaymentMethod('cash');
+    setPaymentReceipt(null);
     setShowPaymentModal(true);
+  };
+
+  const handleSendPickupReminderWhatsApp = async (e) => {
+    e?.stopPropagation?.();
+    const phone = (bride.phone || '').replace(/[^\d]/g, '');
+    if (!phone) {
+      alert('لا يوجد رقم هاتف مسجل للعروس');
+      return;
+    }
+
+    const booking = bride.bookings?.[0];
+    const dress1Name = booking?.dress?.name || bride.latest_dress_name || 'فستان الزفاف';
+    const dress2Name = booking?.dress2?.name;
+    const dressesStr = dress2Name ? `${dress1Name} و ${dress2Name}` : dress1Name;
+    const weddingDate = bride.wedding_date || booking?.event_date || 'قريباً';
+
+    let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${bride.name}* 🤍،\nنود تذكيركِ بأن فستان زفافكِ الرائع (*${dressesStr}*) أصبح جاهزاً بالكامل للاستلام من الأتيليه 👗✨.\n\n📍 *العنوان:* التجمع الأول - الياسمين ٢ - فيلا 161 (الباب الجانبي شمال الفيلا)\n🗺️ *الموقع:* https://maps.app.goo.gl/RUyaQk3v1rZR4gVC6\n\nبانتظار تشريفكِ لتسليمكِ الفستان والإكسسوارات مع أطيب تمنياتنا لكِ بأجمل ليلة زفاف! 💍👰🏻‍♀️`;
+
+    try {
+      const templates = await apiClient.get('/whatsapp-templates');
+      const t = templates.find((x) => x.key === 'pickup_ready' || x.key === 'pickup_reminder');
+      if (t) {
+        message = t.body
+          .replace(/\{\{client_name\}\}/g, bride.name)
+          .replace(/\{\{wedding_date\}\}/g, weddingDate)
+          .replace(/\{\{dress_name\}\}/g, dressesStr);
+      }
+    } catch (err) {}
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const renderColumn = (stageId, label, icon, colorClasses) => {
@@ -728,112 +793,232 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 })()}
 
                 {/* Pickup details and blockout periods */}
-                {stageId === 'picked_up' && (bride.wedding_date || bride.bookings?.[0]?.event_date) && (() => {
-                const weddingDateStr = bride.bookings?.[0]?.event_date || bride.wedding_date;
-                const weddingDate = new Date(weddingDateStr);
-                const cityLower = (bride.city || '').toLowerCase();
-                const isCairoOrGiza = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة' || cityLower.includes('cairo') || cityLower.includes('giza');
-                const pickupDaysBefore = isCairoOrGiza ? 1 : 2;
-                const pickupDate = new Date(weddingDate.getTime() - pickupDaysBefore * 24 * 60 * 60 * 1000);
-                const day = String(pickupDate.getDate()).padStart(2, '0');
-                const month = String(pickupDate.getMonth() + 1).padStart(2, '0');
-                const year = pickupDate.getFullYear();
-                const pickupDateFormatted = `${year}-${month}-${day}`;
-
-                const blockoutDaysBefore = isCairoOrGiza ? 2 : 3;
-                const blockoutStart = new Date(weddingDate.getTime() - blockoutDaysBefore * 24 * 60 * 60 * 1000);
-                const blockoutEnd = new Date(weddingDate.getTime() + 1 * 24 * 60 * 60 * 1000);
-                const formatD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-                return (
-                  <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-100/50 text-[9px] font-bold text-amber-850 space-y-1 text-right mb-3">
-                      <div>✨ <span className="font-extrabold text-amber-900">موعد الاستلام:</span> {pickupDateFormatted}</div>
-                      <div className="text-[7.5px] text-amber-600 font-medium leading-normal">🔒 حظر الفستان: من {formatD(blockoutStart)} إلى {formatD(blockoutEnd)}</div>
-                    </div>);
-
-              })()}
+                {stageId === 'picked_up' && (
+                  <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-150/70 text-[9px] text-amber-900 mb-3 space-y-1 text-right">
+                    <div className="flex justify-between items-center font-bold">
+                      <span className="font-extrabold text-amber-700">
+                        {bride.bookings?.[0]?.status === 'picked_up' || bride.bookings?.[0]?.status === 'out' ? 'تم التسليم' : 'بانتظار الاستلام'}
+                      </span>
+                      <span>حالة الفستان:</span>
+                    </div>
+                    {bride.wedding_date && (
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold">{bride.wedding_date}</span>
+                        <span>تاريخ الزفاف:</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {/* Action Buttons */}
-              <div className="mt-3.5 pt-3 border-t border-slate-100 flex-shrink-0 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+              
+              {/* Action Button Area */}
+              <div className="mt-2 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                 {(() => {
                 if (stageId === 'visit') {
                   return (
                     <div className="space-y-1.5">
-                        <button
+                      <button
                         disabled={isSubmitting}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleStageAction('confirm_visit');
                         }}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                        
-                          {isSubmitting ? 'جاري الحفظ...' : 'تأكيد موعد الزيارة 💬'}
-                        </button>
-                        <button
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        {isSubmitting ? 'جاري الحفظ...' : 'تأكيد موعد الزيارة 💬'}
+                      </button>
+                      <button
                         disabled={isSubmitting}
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowBookingModal(true);
                         }}
-                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                        
-                          حجز فستان الزفاف 👗
-                        </button>
-                      </div>);
-
+                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        <span>حجز فستان الزفاف 👗</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPaymentModalFor('fitting_fee');
+                        }}
+                        className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
+                      >
+                        <CreditCard size={11} className="text-slate-500" />
+                        <span>تسجيل رسوم القياس 💰</span>
+                      </button>
+                    </div>
+                  );
                 }
 
                 if (stageId === 'booking') {
-                  return (
-                    <button
-                      disabled={isSubmitting}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowFittingModal(true);
-                      }}
-                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
-                    >
-                      حجز موعد قياس 📐
-                    </button>);
+                  const weddingDate = bride.wedding_date || bride.bookings?.[0]?.event_date;
+                  let isWeddingNear = false;
+                  if (weddingDate) {
+                    const daysLeft = Math.ceil((new Date(weddingDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    if (daysLeft >= 0 && daysLeft <= 14 && (!bride.fittings || bride.fittings.length === 0)) {
+                      isWeddingNear = true;
+                    }
+                  }
 
+                  return (
+                    <div className="space-y-1.5">
+                      {isWeddingNear && (
+                        <div className="text-[8px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center leading-tight">
+                          ⚠️ موعد الزفاف قريب (أقل من أسبوعين) ولم يتم تحديد بروفة بعد!
+                        </div>
+                      )}
+                      <button
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowFittingModal(true);
+                        }}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        <span>حجز موعد قياس 📐</span>
+                      </button>
+                      <button
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowBookingModal(true);
+                        }}
+                        className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
+                      >
+                        <Edit3 size={11} className="text-slate-500" />
+                        <span>تعديل الحجز / استبدال الفستان ✏️</span>
+                      </button>
+                    </div>
+                  );
                 }
 
                 if (stageId === 'fitting') {
                   return (
-                    <button
-                      disabled={isSubmitting}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onPickupClick) {
-                          onPickupClick(bride);
-                        } else {
-                          handleStageAction('mark_picked_up');
-                        }
-                      }}
-                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
-                    >
-                      تسليم الفستان للعروس 📦
-                    </button>);
-
+                    <div className="space-y-1.5">
+                      <button
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowFittingModal(true);
+                        }}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                      >
+                        <span>إضافة بروفة إضافية 📐</span>
+                      </button>
+                      <button
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStageAction('end_fitting');
+                        }}
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                      >
+                        <span>إنهاء البروفة ✂️</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/dashboard/fittings');
+                        }}
+                        className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
+                      >
+                        <Ruler size={11} className="text-slate-500" />
+                        <span>كارت القياسات والترزي 🪡</span>
+                      </button>
+                    </div>
+                  );
                 }
 
                 if (stageId === 'picked_up') {
-                  return (
-                    <button
-                      disabled={isSubmitting}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onReturnClick) {
-                          onReturnClick(bride);
-                        } else {
-                          handleStageAction('mark_returned');
-                        }
-                      }}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
-                    >
-                      تسجيل إرجاع الفستان 🔄
-                    </button>);
+                  const booking = bride.bookings?.[0];
+                  const isDelivered = booking?.status === 'picked_up' || booking?.status === 'out';
 
+                  const weddingDate = bride.wedding_date || booking?.event_date;
+                  let isPickupOverdue = false;
+                  if (weddingDate && !isDelivered) {
+                    const isCairo = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة';
+                    const pickupDate = new Date(new Date(weddingDate).getTime() - (isCairo ? 1 : 2) * 24 * 60 * 60 * 1000);
+                    if (new Date() > pickupDate) {
+                      isPickupOverdue = true;
+                    }
+                  }
+
+                  if (!isDelivered) {
+                    return (
+                      <div className="space-y-1.5">
+                        {isPickupOverdue && (
+                          <div className="text-[8px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center leading-tight">
+                            ⚠️ تنبيه: حان موعد استلام الفستان / تأخرت العروس!
+                          </div>
+                        )}
+                        <button
+                          disabled={isSubmitting}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPickupClick) {
+                              onPickupClick(bride);
+                            } else {
+                              handleStageAction('mark_picked_up');
+                            }
+                          }}
+                          className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                        >
+                          <span>تسليم الفستان للعروس 📦</span>
+                        </button>
+                        <button
+                          disabled={isSubmitting}
+                          onClick={handleSendPickupReminderWhatsApp}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
+                          <span>تذكير بموعد الاستلام 📲</span>
+                        </button>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="text-[8.5px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg text-center">
+                          📦 الفستان في حوزة العروسة (خارج الأتيليه)
+                        </div>
+                        <button
+                          disabled={isSubmitting}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onReturnClick) {
+                              onReturnClick(bride);
+                            } else {
+                              handleStageAction('mark_returned');
+                            }
+                          }}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                        >
+                          <span>تسجيل إرجاع الفستان 🔄</span>
+                        </button>
+                      </div>
+                    );
+                  }
+                }
+
+                if (stageId === 'returned') {
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="text-[8.5px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg text-center">
+                        ✓ تم استلام الفستان بنجاح
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSendCongratsWhatsApp}
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
+                        <span>إرسال تهنئة الزفاف 💐</span>
+                      </button>
+                    </div>
+                  );
                 }
 
                 return null;
@@ -879,14 +1064,14 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       {/* Payment Popup Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
-          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-sm w-full border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] space-y-3 max-h-[min(90vh,580px)] overflow-y-auto scrollbar-thin my-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-sm w-full border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] space-y-3 max-h-[min(90vh,600px)] overflow-y-auto scrollbar-thin my-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <CreditCard size={14} className="text-indigo-650 animate-pulse" />
                 <span>إتمام عملية الدفع للعروس</span>
               </h3>
               <button
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => { setShowPaymentModal(false); setPaymentReceipt(null); }}
                 className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 <X size={14} />
@@ -901,10 +1086,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   onChange={(e) => setPaymentType(e.target.value)}
                   className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
                 >
+                  <option value="fitting_fee">رسوم بروفة قياس (Trying Fee)</option>
                   <option value="deposit">دفعة عربون حجز (Deposit)</option>
                   <option value="balance">سداد متبقي الإيجار (Balance Payment)</option>
                   <option value="security_deposit">مبلغ تأمين مسترد (Security Deposit)</option>
-                  <option value="fitting_fee">رسوم بروفة قياس (Trying Fee)</option>
                   <option value="late_fee">غرامة تأخير إرجاع (Late Fee)</option>
                   <option value="damage_fee">رسوم تلفيات / تنظيف (Damage/Cleaning)</option>
                   <option value="other">أخرى (Other)</option>
@@ -937,6 +1122,50 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 </div>
               </div>
 
+              {/* Receipt Upload */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع / التحويل (اختياري)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setPaymentReceipt(reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="trying-fee-receipt-input-journey"
+                  />
+                  <label
+                    htmlFor="trying-fee-receipt-input-journey"
+                    className="flex-grow px-3 py-2 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <CreditCard size={12} className="inline mr-1" />
+                    <span>{paymentReceipt ? 'تغيير الإيصال المرفق' : 'رفع صورة الإيصال 📎'}</span>
+                  </label>
+                  {paymentReceipt && (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentReceipt(null)}
+                      className="p-2 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+                {paymentReceipt && (
+                  <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
+                    <img src={paymentReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[10px] font-extrabold text-slate-500 block text-right">ملاحظات وتفاصيل التحويل</label>
                 <textarea
@@ -957,7 +1186,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={() => { setShowPaymentModal(false); setPaymentReceipt(null); }}
                   className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
                 >
                   إلغاء

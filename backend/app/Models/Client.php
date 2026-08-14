@@ -212,14 +212,24 @@ class Client extends Model
             // Normal System Bookings (Not Excel import)
             if (!empty($latestBooking->event_date)) {
                 $calcReturn = \Carbon\Carbon::parse($latestBooking->event_date)->addDay()->format('Y-m-d');
-                if ($calcReturn <= $today) {
+                if ($calcReturn <= $today && $latestBooking->status === 'returned') {
                     return 'returned';
                 }
             }
 
-            // If a fitting is scheduled for this client/booking, move to fitting stage
+            // Fitting stage handling:
             if ($fittingsList->count() > 0) {
-                return 'fitting';
+                // If there are active/scheduled fittings, client is in 'fitting' stage
+                $hasActiveFitting = $fittingsList->contains(function ($f) {
+                    return $f->status !== 'completed';
+                });
+
+                if ($hasActiveFitting) {
+                    return 'fitting';
+                }
+
+                // If all fittings are completed, move to 'picked_up' stage (ready for pickup / delivery)
+                return 'picked_up';
             }
 
             // Only stay in 'booking' stage if the booking is confirmed and no fitting is scheduled yet
@@ -228,9 +238,15 @@ class Client extends Model
             }
         }
 
-        // 2. Fitting stage (if fittings exist without booking)
+        // 2. Fitting stage (if active fittings exist without booking)
         if ($fittingsList->count() > 0) {
-            return 'fitting';
+            $hasActiveFitting = $fittingsList->contains(function ($f) {
+                return $f->status !== 'completed';
+            });
+            if ($hasActiveFitting) {
+                return 'fitting';
+            }
+            return 'picked_up';
         }
 
         // 3. Visit stage (if visits exist or default)
