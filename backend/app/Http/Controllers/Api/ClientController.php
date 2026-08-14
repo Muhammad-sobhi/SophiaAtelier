@@ -194,6 +194,7 @@ class ClientController extends Controller
             'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining',
             'phone' => 'nullable|string|max:50',
             'dress_id' => 'nullable|integer|exists:dresses,id',
+            'dress_2_id' => 'nullable|integer|exists:dresses,id',
             'fitting_date' => 'nullable|date',
             'fitting_time' => 'nullable|string|max:20',
             'event_date' => 'nullable|date',
@@ -203,7 +204,12 @@ class ClientController extends Controller
             'trying_fee' => 'nullable|numeric|min:0',
             'amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:50',
+            'sales_name' => 'nullable|string|max:255',
+            'is_override' => 'nullable|boolean',
+            'force_override' => 'nullable|boolean',
             'notes' => 'nullable|string|max:1000',
+            'receipt' => 'nullable',
+            'receipt_image' => 'nullable',
         ]);
 
         $action = $request->input('action');
@@ -289,43 +295,73 @@ class ClientController extends Controller
                 }
 
                 $dressId = $request->input('dress_id');
+                $dress2Id = $request->input('dress_2_id');
                 $eventDate = $request->input('event_date', $client->wedding_date);
+                $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
 
-                // Validate availability
-                $conflict = \App\Models\Booking::checkDressAvailability(
-                    $client->id,
-                    $dressId,
-                    $eventDate,
-                    $booking->id
-                );
+                // Validate availability for both dresses if not force override
+                if (!$forceOverride) {
+                    $conflict1 = Booking::checkDressAvailability(
+                        $client->id,
+                        $dressId,
+                        $eventDate,
+                        $booking->id
+                    );
 
-                if ($conflict) {
-                    return response()->json([
-                        'message' => "هذا الفستان غير متوفر في هذه الفترة: {$conflict}"
-                    ], 422);
+                    $conflict2 = $dress2Id ? Booking::checkDressAvailability(
+                        $client->id,
+                        $dress2Id,
+                        $eventDate,
+                        $booking->id
+                    ) : null;
+
+                    if ($conflict1 || $conflict2) {
+                        $errorMsg = $conflict1 ? "الفستان الأول غير متوفر في هذه الفترة: {$conflict1}" : '';
+                        if ($conflict2) {
+                            $errorMsg .= ($errorMsg ? ' | ' : '') . "الفستان الثاني غير متوفر في هذه الفترة: {$conflict2}";
+                        }
+
+                        return response()->json([
+                            'message' => $errorMsg,
+                            'conflict_dress_1' => $conflict1,
+                            'conflict_dress_2' => $conflict2,
+                            'available_date' => $conflict1 ?: $conflict2
+                        ], 422);
+                    }
                 }
 
                 $booking->dress_id = $dressId;
+                $booking->dress_2_id = $dress2Id;
+                $booking->sales_name = $request->input('sales_name');
+                $booking->is_override = $forceOverride;
                 $booking->booking_date = now()->toDateString();
                 $booking->event_date = $eventDate;
                 $booking->total_amount = floatval($request->input('total_amount', 0));
                 $booking->deposit_amount = floatval($request->input('deposit_amount', 0));
-                $booking->insurance_amount = floatval($request->input('insurance_amount', 500));
+                $booking->insurance_amount = floatval($request->input('insurance_amount', 5000));
                 $booking->status = 'confirmed';
                 $booking->notes = $request->input('notes');
+                if ($request->input('payment_method')) {
+                    $booking->payment_method = $request->input('payment_method');
+                }
+
+                $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+                if ($receiptPath) {
+                    $booking->receipt_path = $receiptPath;
+                }
+
                 $booking->save();
 
                 // Save revenue deposit if greater than 0
                 $deposit = floatval($request->input('deposit_amount', 0));
                 if ($deposit > 0) {
-                    $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
                     \App\Models\Revenue::create([
                         'booking_id' => $booking->id,
                         'type' => 'deposit',
                         'amount' => $deposit,
                         'payment_method' => $request->input('payment_method', 'cash'),
                         'payment_date' => now()->toDateString(),
-                        'notes' => 'عربون حجز فستان من رحلة العروس',
+                        'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
                         'receipt_path' => $receiptPath,
                     ]);
                 }
@@ -357,9 +393,12 @@ class ClientController extends Controller
                         'status' => 'picked_up',
                         'insurance_amount' => floatval($request->input('insurance_amount', $booking->insurance_amount))
                     ]);
-                    // Also update dress status
+                    // Update both dresses status to out
                     if ($booking->dress) {
                         $booking->dress->update(['status' => 'out']);
+                    }
+                    if ($booking->dress2) {
+                        $booking->dress2->update(['status' => 'out']);
                     }
                 }
                 break;
@@ -368,13 +407,16 @@ class ClientController extends Controller
                 $booking = $client->bookings()->latest()->first();
                 if ($booking) {
                     $booking->update(['status' => 'returned']);
-                    // Mark dress for dry clean
+                    // Mark both dresses for dry clean
                     if ($booking->dress) {
                         $booking->dress->update(['status' => 'dry_clean']);
                     }
+                    if ($booking->dress2) {
+                        $booking->dress2->update(['status' => 'dry_clean']);
+                    }
 
                     // Log negative revenue for insurance refund using the SAME payment method used when collecting insurance
-                    $insuranceAmount = floatval($booking->insurance_amount ?: 500);
+                    $insuranceAmount = floatval($booking->insurance_amount ?: 5000);
                     if ($insuranceAmount > 0) {
                         $insuranceRev = $booking->revenues()
                             ->where('notes', 'like', '%تأمين%')
@@ -383,13 +425,16 @@ class ClientController extends Controller
 
                         $paymentMethod = $insuranceRev ? $insuranceRev->payment_method : 'cash';
 
+                        $dressesNames = array_filter([$booking->dress?->name, $booking->dress2?->name]);
+                        $dressesStr = !empty($dressesNames) ? implode(' و ', $dressesNames) : 'الفستان';
+
                         \App\Models\Revenue::create([
                             'booking_id' => $booking->id,
                             'type' => 'other',
                             'amount' => -$insuranceAmount,
                             'payment_method' => $paymentMethod,
                             'payment_date' => now()->toDateString(),
-                            'notes' => 'مرتجع مبلغ التأمين بعد استلام الفستان بحالة سليمة للعروس: ' . $client->name,
+                            'notes' => 'مرتجع مبلغ التأمين بعد استلام (' . $dressesStr . ') بحالة سليمة للعروس: ' . $client->name,
                         ]);
                     }
                 }

@@ -150,13 +150,23 @@ export default function BridesPage() {
   const [selectedBrideForBooking, setSelectedBrideForBooking] = useState(null);
   const [bookingDressId, setBookingDressId] = useState('');
   const [bookingDressSearch, setBookingDressSearch] = useState('');
+  const [bookingHasSecondDress, setBookingHasSecondDress] = useState(false);
+  const [bookingDress2Id, setBookingDress2Id] = useState('');
+  const [bookingDress2Search, setBookingDress2Search] = useState('');
+  const [bookingDress1Details, setBookingDress1Details] = useState(null);
+  const [bookingDress2Details, setBookingDress2Details] = useState(null);
+  const [bookingSalesName, setBookingSalesName] = useState('');
+  const [employeesList, setEmployeesList] = useState([]);
   const [bookingPhone, setBookingPhone] = useState('');
   const [bookingEventDate, setBookingEventDate] = useState(new Date().toISOString().split('T')[0]);
   const [bookingTotalAmount, setBookingTotalAmount] = useState('3500');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('1000');
+  const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState('5000');
   const [bookingPaymentMethod, setBookingPaymentMethod] = useState('cash');
   const [bookingReceipt, setBookingReceipt] = useState(null);
   const [bookingNotes, setBookingNotes] = useState('');
+  const [showConflictConfirmDialog, setShowConflictConfirmDialog] = useState(false);
+  const [conflictWarningMessage, setConflictWarningMessage] = useState('');
 
   // Excel Import states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -267,6 +277,47 @@ export default function BridesPage() {
     }
   }, [selectedBrideForReturn]);
 
+  useEffect(() => {
+    if (selectedBrideForFitting) {
+      setFittingNotes('');
+      setFittingReceipt(null);
+      setFittingPaymentMethod('cash');
+      setFittingDate(new Date().toISOString().split('T')[0]);
+      setFittingTime('01:00 م');
+      const bookedDressId = selectedBrideForFitting.bookings?.[0]?.dress_id;
+      if (bookedDressId) {
+        setFittingDressId(bookedDressId.toString());
+      } else if (dressesList.length > 0) {
+        setFittingDressId(dressesList[0].id.toString());
+      }
+    }
+  }, [selectedBrideForFitting]);
+
+  useEffect(() => {
+    if (selectedBrideForBooking) {
+      setBookingNotes('');
+      setBookingReceipt(null);
+      setBookingDressSearch('');
+      setBookingDress2Search('');
+      setBookingHasSecondDress(false);
+      setBookingDress2Id('');
+      setBookingSalesName('');
+      setBookingInsuranceAmount('5000');
+      setBookingDepositAmount('1000');
+      setBookingPaymentMethod('cash');
+      setBookingPhone(selectedBrideForBooking.phone || '');
+      setBookingEventDate(selectedBrideForBooking.wedding_date || selectedBrideForBooking.bookings?.[0]?.event_date || new Date().toISOString().split('T')[0]);
+      const bookedDressId = selectedBrideForBooking.bookings?.[0]?.dress_id || (dressesList.length > 0 ? dressesList[0].id.toString() : '');
+      if (bookedDressId) {
+        setBookingDressId(bookedDressId.toString());
+        const d = dressesList.find(x => x.id.toString() === bookedDressId.toString());
+        if (d && d.rental_price) {
+          setBookingTotalAmount(parseFloat(d.rental_price || 0).toString());
+        }
+      }
+    }
+  }, [selectedBrideForBooking]);
+
   const fetchBrides = async () => {
     try {
       const response = await apiClient.get('/clients?per_page=1000');
@@ -307,6 +358,11 @@ export default function BridesPage() {
 
     fetchBrides();
 
+    apiClient.get('/employees').then((res) => {
+      const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
+      setEmployeesList(data);
+    }).catch(() => { });
+
     apiClient.get('/dresses?per_page=all').then((res) => {
       const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
       setDressesList(data);
@@ -332,6 +388,80 @@ export default function BridesPage() {
     return () => clearInterval(interval);
   }, [isModalOpen, isPickupModalOpen, isReturnModalOpen]);
 
+  useEffect(() => {
+    if (showBookingModal && bookingDressId) {
+      apiClient.get(`/dresses/${bookingDressId}`).then((res) => {
+        setBookingDress1Details(res.data || res || null);
+      }).catch(() => setBookingDress1Details(null));
+    } else {
+      setBookingDress1Details(null);
+    }
+  }, [showBookingModal, bookingDressId]);
+
+  useEffect(() => {
+    if (showBookingModal && bookingHasSecondDress && bookingDress2Id) {
+      apiClient.get(`/dresses/${bookingDress2Id}`).then((res) => {
+        setBookingDress2Details(res.data || res || null);
+      }).catch(() => setBookingDress2Details(null));
+    } else {
+      setBookingDress2Details(null);
+    }
+  }, [showBookingModal, bookingHasSecondDress, bookingDress2Id]);
+
+  // Calculate if selected wedding/booking date is blocked for Dress 1
+  const isBookingDateBlocked = (() => {
+    if (!bookingEventDate || !bookingDress1Details || !bookingDress1Details.bookings || !selectedBrideForBooking) return false;
+    const fD = new Date(bookingEventDate);
+    fD.setHours(0, 0, 0, 0);
+
+    return bookingDress1Details.bookings.some((b) => {
+      if (b.client_id === selectedBrideForBooking.id) return false;
+
+      const city = b.client?.city ?? 'القاهرة';
+      const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+      const daysBefore = isCairo ? 2 : 3;
+      const daysAfter = 1;
+
+      const weddingDate = new Date(b.event_date.split(' ')[0]);
+      weddingDate.setHours(0, 0, 0, 0);
+
+      const start = new Date(weddingDate);
+      start.setDate(start.getDate() - daysBefore);
+
+      const end = new Date(weddingDate);
+      end.setDate(end.getDate() + daysAfter);
+
+      return fD >= start && fD <= end;
+    });
+  })();
+
+  // Calculate if selected wedding/booking date is blocked for Dress 2
+  const isBookingDate2Blocked = (() => {
+    if (!bookingHasSecondDress || !bookingDress2Id || !bookingEventDate || !bookingDress2Details || !bookingDress2Details.bookings || !selectedBrideForBooking) return false;
+    const fD = new Date(bookingEventDate);
+    fD.setHours(0, 0, 0, 0);
+
+    return bookingDress2Details.bookings.some((b) => {
+      if (b.client_id === selectedBrideForBooking.id) return false;
+
+      const city = b.client?.city ?? 'القاهرة';
+      const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+      const daysBefore = isCairo ? 2 : 3;
+      const daysAfter = 1;
+
+      const weddingDate = new Date(b.event_date.split(' ')[0]);
+      weddingDate.setHours(0, 0, 0, 0);
+
+      const start = new Date(weddingDate);
+      start.setDate(start.getDate() - daysBefore);
+
+      const end = new Date(weddingDate);
+      end.setDate(end.getDate() + daysAfter);
+
+      return fD >= start && fD <= end;
+    });
+  })();
+
   const handleFittingSubmit = async (e) => {
     e.preventDefault();
     if (!selectedBrideForFitting) return;
@@ -348,6 +478,7 @@ export default function BridesPage() {
       });
       setShowFittingModal(false);
       setFittingReceipt(null);
+      setFittingNotes('');
       setSelectedBrideForFitting(null);
       fetchBrides();
     } catch (err) {
@@ -356,24 +487,47 @@ export default function BridesPage() {
     }
   };
 
-  const handleBookingSubmit = async (e) => {
-    e.preventDefault();
+  const handleBookingSubmit = async (e, forceOverride = false) => {
+    if (e) e.preventDefault();
     if (!selectedBrideForBooking) return;
+
+    if ((isBookingDateBlocked || isBookingDate2Blocked) && !forceOverride) {
+      const d1 = dressesList.find((d) => d.id.toString() === bookingDressId)?.name || 'الفستان الأول';
+      const d2 = dressesList.find((d) => d.id.toString() === bookingDress2Id)?.name || 'الفستان الثاني';
+      let msg = '';
+      if (isBookingDateBlocked && isBookingDate2Blocked) {
+        msg = `يوجد تعارض في تاريخ المناسبة لكلا الفستانين (${d1} و ${d2}) مع حجوزات لعميلات أخريات.`;
+      } else if (isBookingDateBlocked) {
+        msg = `يوجد تعارض في تاريخ المناسبة للفستان (${d1}) مع حجز لعميلة أخرى.`;
+      } else {
+        msg = `يوجد تعارض في تاريخ المناسبة للفستان الثاني (${d2}) مع حجز لعميلة أخرى.`;
+      }
+      setConflictWarningMessage(msg);
+      setShowConflictConfirmDialog(true);
+      return;
+    }
+
     try {
       const activePhone = bookingPhone.trim() || selectedBrideForBooking.phone || '';
       await apiClient.put(`/clients/${selectedBrideForBooking.id}/stage-action`, {
         action: 'confirm_booking',
         phone: activePhone,
         dress_id: parseInt(bookingDressId),
+        dress_2_id: bookingHasSecondDress && bookingDress2Id ? parseInt(bookingDress2Id) : null,
+        sales_name: bookingSalesName.trim() || null,
+        force_override: forceOverride,
         event_date: bookingEventDate,
         total_amount: parseFloat(bookingTotalAmount),
         deposit_amount: parseFloat(bookingDepositAmount),
+        insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
         payment_method: bookingPaymentMethod,
         receipt_image: bookingReceipt,
         notes: bookingNotes
       });
       setShowBookingModal(false);
+      setShowConflictConfirmDialog(false);
       setBookingReceipt(null);
+      setBookingNotes('');
       setSelectedBrideForBooking(null);
       fetchBrides();
 
@@ -385,7 +539,13 @@ export default function BridesPage() {
         visitTime = match ? match[1].trim() : 'غير محدد';
       }
       const dress = dressesList.find((d) => d.id.toString() === bookingDressId);
-      const dressText = dress ? `\n• *فستان الزفاف:* ${dress.name}` : '';
+      const dress2 = bookingHasSecondDress && bookingDress2Id ? dressesList.find((d) => d.id.toString() === bookingDress2Id) : null;
+      let dressText = '';
+      if (dress && dress2) {
+        dressText = `\n• *فستان الزفاف 1:* ${dress.name}\n• *فستان 2:* ${dress2.name}`;
+      } else if (dress) {
+        dressText = `\n• *فستان الزفاف:* ${dress.name}`;
+      }
 
       let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${selectedBrideForBooking.name}* 🤍،\nيسعدنا جداً تأكيد حجز موعدكِ وتجهيز فستان أحلامكِ!\n\n📅 *تفاصيل الموعد:*\n• *التاريخ:* ${visitDate}\n• *الوقت:* ${visitTime}\n${dressText}\n\n🌸 *شروط وقواعد فساتين صوفيا:*\n( مسموح ب دخول فردين فقط مع العروسه ladies only )\n(الدخول ب أولوية الحضور)\n\nAddress ⤵️\nالتجمع الاول الياسمين ٢ \nفيلا 161 الباب الجانبي للفيلا بيكون شمال باب الفيلا (basement) \n⬅️اليافطه السودا161\n\nLocation📍\nhttps://maps.app.goo.gl/RUyaQk3v1rZR4gVC6\n\nنحن بانتظار تشريفكِ لتنيري المكان ✨🎀`;
 
@@ -393,12 +553,12 @@ export default function BridesPage() {
         const templates = await apiClient.get('/whatsapp-templates');
         const t = templates.find((x) => x.key === 'booking_confirmation');
         if (t) {
-          message = t.body.
-            replace(/\{\{client_name\}\}/g, selectedBrideForBooking.name).
-            replace(/\{\{wedding_date\}\}/g, selectedBrideForBooking.wedding_date || visitDate).
-            replace(/\{\{visit_date\}\}/g, visitDate).
-            replace(/\{\{visit_time\}\}/g, visitTime).
-            replace(/\{\{dress_line\}\}/g, dress ? `${dress.name}` : '');
+          message = t.body
+            .replace(/\{\{client_name\}\}/g, selectedBrideForBooking.name)
+            .replace(/\{\{wedding_date\}\}/g, selectedBrideForBooking.wedding_date || visitDate)
+            .replace(/\{\{visit_date\}\}/g, visitDate)
+            .replace(/\{\{visit_time\}\}/g, visitTime)
+            .replace(/\{\{dress_line\}\}/g, dress2 ? `${dress?.name || ''} و ${dress2.name}` : (dress ? `${dress.name}` : ''));
         }
       } catch (err) {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
@@ -412,7 +572,12 @@ export default function BridesPage() {
 
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ حجز الفستان');
+      if (err?.response?.data?.available_date || err?.available_date || err?.message?.includes('غير متوفر')) {
+        setConflictWarningMessage(err?.response?.data?.message || err?.message || 'هذا الفستان غير متوفر في الفترة المحددة.');
+        setShowConflictConfirmDialog(true);
+      } else {
+        alert(err?.response?.data?.message || err?.message || 'حدث خطأ أثناء حفظ حجز الفستان');
+      }
     }
   };
 
@@ -2069,12 +2234,12 @@ export default function BridesPage() {
       {/* Gown Booking Confirmation Modal */}
       {showBookingModal && selectedBrideForBooking && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
-          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] my-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(92vh,720px)] my-auto">
             {/* Header */}
             <div className="flex items-center justify-between p-3 sm:p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <Heart size={14} className="text-rose-600 animate-pulse" />
-                <span>تأكيد حجز فستان للعروس</span>
+                <span>تأكيد حجز فستان للعروس ({selectedBrideForBooking.name})</span>
               </h3>
               <button
                 onClick={() => { setShowBookingModal(false); setSelectedBrideForBooking(null); }}
@@ -2085,18 +2250,54 @@ export default function BridesPage() {
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="p-3.5 sm:p-4 space-y-2.5 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
-                {/* Dress Selection with Fast Search */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">الفستان المراد حجزه</label>
+            <form onSubmit={(e) => handleBookingSubmit(e, false)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-3.5 sm:p-4 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
+
+                {/* Sales Person Selection */}
+                <div className="space-y-1 bg-amber-50/40 p-2.5 rounded-2xl border border-amber-150/70">
+                  <label className="text-[10px] font-extrabold text-amber-900 block text-right flex items-center justify-between">
+                    <span>مسؤول المبيعات / السيلز (Sales Person)</span>
+                    <span className="text-[8.5px] font-normal text-amber-700">(اختياري)</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <select
+                      value={employeesList.some(e => e.name === bookingSalesName) ? bookingSalesName : (bookingSalesName ? '__custom__' : '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val !== '__custom__') {
+                          setBookingSalesName(val);
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    >
+                      <option value="">-- اختر موظف المبيعات --</option>
+                      {employeesList.map((emp) => (
+                        <option key={emp.id} value={emp.name}>{emp.name} {emp.role ? `(${emp.role})` : ''}</option>
+                      ))}
+                      <option value="__custom__">✍️ كتابة اسم آخر...</option>
+                    </select>
+                    {(!employeesList.some(e => e.name === bookingSalesName) || bookingSalesName === '') && (
+                      <input
+                        type="text"
+                        placeholder="أو اكتب اسم السيلز..."
+                        value={bookingSalesName}
+                        onChange={(e) => setBookingSalesName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Dress 1 Selection with Fast Search */}
+                <div className="space-y-1.5 bg-rose-50/20 p-2.5 rounded-2xl border border-rose-100">
+                  <label className="text-[10px] font-black text-rose-900 block text-right">👗 الفستان الأساسي (الفستان 1)</label>
                   <div className="relative">
                     <input
                       type="text"
                       placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
                       value={bookingDressSearch}
                       onChange={(e) => setBookingDressSearch(e.target.value)}
-                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
+                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
                     />
                     <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                     {bookingDressSearch && (
@@ -2111,7 +2312,7 @@ export default function BridesPage() {
                   </div>
 
                   {/* Filtered dress buttons / selection list */}
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
                     {dressesList
                       .filter((d) => {
                         if (!bookingDressSearch.trim()) return true;
@@ -2129,9 +2330,10 @@ export default function BridesPage() {
                             key={d.id}
                             onClick={() => {
                               setBookingDressId(d.id.toString());
-                              if (d.rental_price) {
-                                setBookingTotalAmount(parseFloat(d.rental_price || 0).toString());
-                              }
+                              const p1 = parseFloat(d.rental_price || 0);
+                              const d2 = bookingHasSecondDress ? dressesList.find(x => x.id.toString() === bookingDress2Id) : null;
+                              const p2 = parseFloat(d2?.rental_price || 0);
+                              setBookingTotalAmount((p1 + p2).toString());
                             }}
                             className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
                               isSelected
@@ -2143,15 +2345,6 @@ export default function BridesPage() {
                           </button>
                         );
                       })}
-                    {dressesList.filter((d) => {
-                      if (!bookingDressSearch.trim()) return true;
-                      const q = bookingDressSearch.toLowerCase().trim();
-                      return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
-                    }).length === 0 && (
-                      <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
-                        لا توجد فساتين مطابقة للبحث "{bookingDressSearch}"
-                      </div>
-                    )}
                   </div>
 
                   {/* Currently selected dress indicator */}
@@ -2160,11 +2353,108 @@ export default function BridesPage() {
                     if (!activeDress) return null;
                     return (
                       <div className="text-[10px] font-extrabold text-rose-700 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
-                        <span>الفستان المختار: <strong className="font-black">{activeDress.name}</strong></span>
-                        {activeDress.code && <span className="font-mono text-[9.5px] text-rose-800">كود: {activeDress.code}</span>}
+                        <span>الفستان 1 المختار: <strong className="font-black">{activeDress.name}</strong></span>
+                        <span className="font-mono text-[9.5px] text-rose-800">السعر: {activeDress.rental_price} ج.م</span>
                       </div>
                     );
                   })()}
+
+                  {isBookingDateBlocked && (
+                    <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-[9px] font-bold text-rose-700 text-right">
+                      ⚠️ الفستان الأول غير متوفر في هذا التاريخ لتقاطعه مع حجز آخر. يمكنك المتابعة وتأكيد الحجز بتجاوز التعارض.
+                    </div>
+                  )}
+                </div>
+
+                {/* Second Dress Toggle & Selection */}
+                <div className="bg-purple-50/30 p-2.5 rounded-2xl border border-purple-100 space-y-2">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                      <span>✨ حجز فستان ثانٍ إضافي لنفس العروس (2 Dresses)</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={bookingHasSecondDress}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setBookingHasSecondDress(checked);
+                        const d1 = dressesList.find(d => d.id.toString() === bookingDressId);
+                        const d2 = dressesList.find(d => d.id.toString() === bookingDress2Id);
+                        const p1 = parseFloat(d1?.rental_price || 0);
+                        const p2 = checked && d2 ? parseFloat(d2?.rental_price || 0) : 0;
+                        setBookingTotalAmount((p1 + p2).toString());
+                        if (!bookingInsuranceAmount || bookingInsuranceAmount === '500' || bookingInsuranceAmount === '1000') {
+                          setBookingInsuranceAmount('5000');
+                        }
+                      }}
+                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
+                    />
+                  </label>
+
+                  {bookingHasSecondDress && (
+                    <div className="space-y-1.5 pt-1 border-t border-purple-100">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="🔍 بحث سريع عن الفستان الثاني..."
+                          value={bookingDress2Search}
+                          onChange={(e) => setBookingDress2Search(e.target.value)}
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-right"
+                        />
+                        <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-purple-100 max-h-24 overflow-y-auto scrollbar-thin">
+                        {dressesList
+                          .filter((d) => d.id.toString() !== bookingDressId)
+                          .filter((d) => {
+                            if (!bookingDress2Search.trim()) return true;
+                            const q = bookingDress2Search.toLowerCase().trim();
+                            return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                          })
+                          .map((d) => {
+                            const isSelected = bookingDress2Id === d.id.toString();
+                            return (
+                              <button
+                                type="button"
+                                key={d.id}
+                                onClick={() => {
+                                  setBookingDress2Id(d.id.toString());
+                                  const d1 = dressesList.find(x => x.id.toString() === bookingDressId);
+                                  const p1 = parseFloat(d1?.rental_price || 0);
+                                  const p2 = parseFloat(d.rental_price || 0);
+                                  setBookingTotalAmount((p1 + p2).toString());
+                                }}
+                                className={`px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                  isSelected
+                                    ? 'bg-purple-600 border-purple-600 text-white'
+                                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-purple-50'
+                                }`}
+                              >
+                                {d.name} {d.code ? `(${d.code})` : ''} - {d.rental_price} ج.م
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      {bookingDress2Id && (() => {
+                        const activeDress2 = dressesList.find((d) => d.id.toString() === bookingDress2Id);
+                        if (!activeDress2) return null;
+                        return (
+                          <div className="text-[10px] font-extrabold text-purple-800 bg-purple-100/60 border border-purple-200 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                            <span>الفستان 2 المختار: <strong className="font-black">{activeDress2.name}</strong></span>
+                            <span className="font-mono text-[9.5px]">السعر: {activeDress2.rental_price} ج.م</span>
+                          </div>
+                        );
+                      })()}
+
+                      {isBookingDate2Blocked && (
+                        <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-[9px] font-bold text-rose-700 text-right">
+                          ⚠️ الفستان الثاني غير متوفر في هذا التاريخ لتقاطعه مع حجز آخر. يمكنك المتابعة وتأكيد الحجز بتجاوز التعارض.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Bride Phone Field */}
@@ -2187,29 +2477,42 @@ export default function BridesPage() {
                     required
                     value={bookingEventDate}
                     onChange={(e) => setBookingEventDate(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
+                      (isBookingDateBlocked || isBookingDate2Blocked) ? 'border-amber-300 bg-amber-50/20 text-amber-900' : 'bg-slate-50 border-slate-150'
+                    }`}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                {/* Financial Fields */}
+                <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">مبلغ الإيجار الإجمالي</label>
+                    <label className="text-[9.5px] font-extrabold text-slate-500 block text-right">إجمالي الإيجار</label>
                     <input
                       type="number"
                       required
                       value={bookingTotalAmount}
                       onChange={(e) => setBookingTotalAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
+                    <label className="text-[9.5px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
                     <input
                       type="number"
                       required
                       value={bookingDepositAmount}
                       onChange={(e) => setBookingDepositAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] font-extrabold text-slate-500 block text-right">مبلغ التأمين</label>
+                    <input
+                      type="number"
+                      required
+                      value={bookingInsuranceAmount}
+                      onChange={(e) => setBookingInsuranceAmount(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
                   </div>
                 </div>
@@ -2290,7 +2593,7 @@ export default function BridesPage() {
                   type="submit"
                   className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95"
                 >
-                  تأكيد الحجز وتثبيت التاريخ
+                  {(isBookingDateBlocked || isBookingDate2Blocked) ? 'تأكيد الحجز (يوجد تعارض)' : 'تأكيد الحجز وتثبيت التاريخ'}
                 </button>
                 <button
                   type="button"
@@ -2301,6 +2604,47 @@ export default function BridesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Override Confirmation Dialog Modal */}
+      {showConflictConfirmDialog && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[10000] flex items-center justify-center p-3 sm:p-4 text-right animate-fade-in" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-amber-200 shadow-2xl p-5 space-y-4 my-auto">
+            <div className="flex items-center gap-2.5 text-amber-600 border-b border-amber-100 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-xl">⚠️</span>
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">تنبيه: تعارض في مواعيد حجز الفستان</h3>
+                <p className="text-[10px] text-slate-500 font-bold">يوجد حجز آخر أو فترة تسليم تتقاطع مع هذا التاريخ</p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-xs font-bold text-amber-900 leading-relaxed">
+              <p>{conflictWarningMessage || 'هذا الفستان محجوز لعميلة أخرى في هذه الفترة أو قيد الإرجاع والتنظيف.'}</p>
+              <div className="text-[11px] text-slate-600 font-normal pt-1 border-t border-amber-200/60">
+                هل ترغب في المتابعة وتأكيد الحجز وتجاوز هذا التعارض على مسؤوليتك؟
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => handleBookingSubmit(null, true)}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md shadow-amber-600/20 active:scale-95 text-center flex items-center justify-center gap-1.5"
+              >
+                <span>⚡ تأكيد الحجز رغم التعارض</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConflictConfirmDialog(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+              >
+                تغيير الفستان / الموعد
+              </button>
+            </div>
           </div>
         </div>
       )}

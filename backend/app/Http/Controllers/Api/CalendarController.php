@@ -114,6 +114,8 @@ class CalendarController extends Controller
                     'client_city' => $clientCity,
                     'is_cairo' => $isCairo,
                     'status' => $booking->status,
+                    'sales_name' => $booking->sales_name,
+                    'is_override' => (bool) $booking->is_override,
                     'notes' => $booking->notes,
                     'total_amount' => $booking->total_amount,
                     'deposit_amount' => $booking->deposit_amount,

@@ -203,7 +203,9 @@ export default function AppointmentsPage() {
           dress_image: dummyImages[idx % dummyImages.length],
           booking_id: e.booking_id,
           total_amount: e.total_amount,
-          deposit_amount: e.deposit_amount
+          deposit_amount: e.deposit_amount,
+          sales_name: e.sales_name,
+          is_override: e.is_override
         };
       });
 
@@ -277,7 +279,7 @@ export default function AppointmentsPage() {
           event_date: newEventDate,
           total_amount: total,
           deposit_amount: deposit,
-          insurance_amount: 500,
+          insurance_amount: 5000,
           status: 'confirmed',
           notes: finalNotes
         });
@@ -1344,16 +1346,40 @@ export default function AppointmentsPage() {
             <>
                   {/* Selected Reserved Dress Card */}
                   <div className="bg-slate-50/50 p-4.5 rounded-2xl border border-slate-100 space-y-3">
-                    <h4 className="text-xs font-black text-slate-550 border-b pb-2 mb-2">الفستان المحجوز المعتمد</h4>
+                    <div className="flex items-center justify-between border-b pb-2 mb-2">
+                      <h4 className="text-xs font-black text-slate-550">الفساتين المحجوزة المعتمدة</h4>
+                      {selectedAppointmentForDetail.sales_name && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                          السيلز: {selectedAppointmentForDetail.sales_name}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dress 1 */}
                     <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-slate-150">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+                      <div className="w-14 h-14 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
                         <img src={selectedAppointmentForDetail.dress_image} alt="dress" className="w-full h-full object-cover" />
                       </div>
                       <div className="text-right flex-grow min-w-0">
-                        <h4 className="text-xs font-black text-slate-800">{selectedAppointmentForDetail.dress_name}</h4>
-                        <span className="text-[10px] font-semibold text-slate-500 block mt-1">تاريخ الحجز المعتمد: {selectedAppointmentForDetail.booking_date || selectedAppointmentForDetail.original_date}</span>
+                        <h4 className="text-xs font-black text-slate-800">1. {selectedAppointmentForDetail.dress_name}</h4>
+                        <span className="text-[10px] font-semibold text-slate-500 block mt-0.5">تاريخ الحجز: {selectedAppointmentForDetail.booking_date || selectedAppointmentForDetail.original_date}</span>
                       </div>
                     </div>
+
+                    {/* Dress 2 */}
+                    {selectedAppointmentForDetail.dress_2_name && (
+                      <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-purple-150">
+                        <div className="text-right flex-grow min-w-0">
+                          <h4 className="text-xs font-black text-purple-800">2. {selectedAppointmentForDetail.dress_2_name} (فستان إضافي)</h4>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedAppointmentForDetail.is_override && (
+                      <div className="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-xl text-center">
+                        ⚠️ تم تأكيد هذا الحجز بتجاوز التعارض الزمني
+                      </div>
+                    )}
                   </div>
 
                   {/* Financials details */}

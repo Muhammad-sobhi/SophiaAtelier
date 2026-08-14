@@ -587,8 +587,9 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-slate-700 mt-1">
                       <div>العروس: <span className="font-extrabold">{selectedBrideForPickup.name}</span></div>
                       <div>الهاتف: <span className="font-mono">{selectedBrideForPickup.phone}</span></div>
-                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5">
-                        الفستان الأساسي: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span>
+                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5 space-y-0.5">
+                        <div>الفستان 1: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span></div>
+                        {dress2 && <div>الفستان 2: <span className="font-extrabold text-purple-700">{dress2?.name || '—'} (مقاس: {dress2?.size || '—'})</span></div>}
                       </div>
                     </div>
                   </div>
@@ -820,8 +821,9 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-slate-700 mt-1">
                       <div>العروس: <span className="font-extrabold">{selectedBrideForReturn.name}</span></div>
                       <div>الهاتف: <span className="font-mono">{selectedBrideForReturn.phone}</span></div>
-                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5">
-                        الفستان الأساسي: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span>
+                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5 space-y-0.5">
+                        <div>الفستان 1: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span></div>
+                        {dress2 && <div>الفستان 2: <span className="font-extrabold text-purple-700">{dress2?.name || '—'} (مقاس: {dress2?.size || '—'})</span></div>}
                       </div>
                     </div>
                   </div>

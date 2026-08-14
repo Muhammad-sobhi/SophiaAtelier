@@ -14,7 +14,7 @@ class Booking extends Model
     protected $fillable = [
         'client_id', 'dress_id', 'dress_2_id', 'dress_3_id', 'booking_date', 'event_date',
         'status', 'total_amount', 'deposit_amount', 'insurance_amount', 'notes',
-        'receipt_path', 'payment_method',
+        'receipt_path', 'payment_method', 'sales_name', 'is_override',
     ];
 
     protected $appends = ['receipt_url'];
@@ -40,6 +40,7 @@ class Booking extends Model
             'total_amount' => 'decimal:2',
             'deposit_amount' => 'decimal:2',
             'insurance_amount' => 'decimal:2',
+            'is_override' => 'boolean',
         ];
     }
 
@@ -78,26 +79,36 @@ class Booking extends Model
         static::updated(function ($booking) {
             // Check if status transitioned to returned
             if ($booking->wasChanged('status') && $booking->status === 'returned') {
-                $dressName = $booking->dress->name ?? 'فستان غير معروف';
-                
-                // 1. Create a cleaning task
-                $task = \App\Models\Task::create([
-                    'booking_id' => $booking->id,
-                    'title' => 'تنظيف فستان: ' . $dressName,
-                    'description' => 'تلقائي: تم إرجاع الفستان من العميل ويجب تنظيفه كأولوية قصوى.',
-                    'type' => 'cleaning',
-                    'status' => 'pending',
-                    'due_date' => now()->addDays(1)->toDateString(),
-                ]);
+                $dressesToClean = [];
+                if ($booking->dress) {
+                    $dressesToClean[] = $booking->dress;
+                }
+                if ($booking->dress2) {
+                    $dressesToClean[] = $booking->dress2;
+                }
 
-                // 2. Create a notification for this return
-                \App\Models\Notification::create([
-                    'type' => 'dress_returned',
-                    'title' => 'تم إرجاع فستان: ' . $dressName,
-                    'message' => 'تم استلام الفستان المرتجع بنجاح وإنشاء مهمة تنظيف جديدة بالرقم #' . $task->id,
-                    'related_type' => 'booking',
-                    'related_id' => $booking->id
-                ]);
+                foreach ($dressesToClean as $dressItem) {
+                    $dressName = $dressItem->name ?? 'فستان غير معروف';
+                    
+                    // 1. Create a cleaning task
+                    $task = \App\Models\Task::create([
+                        'booking_id' => $booking->id,
+                        'title' => 'تنظيف فستان: ' . $dressName,
+                        'description' => 'تلقائي: تم إرجاع الفستان من العميل ويجب تنظيفه كأولوية قصوى.',
+                        'type' => 'cleaning',
+                        'status' => 'pending',
+                        'due_date' => now()->addDays(1)->toDateString(),
+                    ]);
+
+                    // 2. Create a notification for this return
+                    \App\Models\Notification::create([
+                        'type' => 'dress_returned',
+                        'title' => 'تم إرجاع فستان: ' . $dressName,
+                        'message' => 'تم استلام الفستان المرتجع بنجاح وإنشاء مهمة تنظيف جديدة بالرقم #' . $task->id,
+                        'related_type' => 'booking',
+                        'related_id' => $booking->id
+                    ]);
+                }
             }
         });
     }
@@ -116,7 +127,11 @@ class Booking extends Model
         $proposedStart = $proposedWedding->copy()->subDays($daysBefore)->startOfDay();
         $proposedEnd = $proposedWedding->copy()->addDays($daysAfter)->endOfDay();
 
-        $query = self::with('client')->where('dress_id', $dressId)
+        $query = self::with('client')
+            ->where(function ($q) use ($dressId) {
+                $q->where('dress_id', $dressId)
+                  ->orWhere('dress_2_id', $dressId);
+            })
             ->whereIn('status', ['confirmed', 'picked_up', 'out', 'returned']);
 
         if ($excludeBookingId) {
@@ -152,7 +167,11 @@ class Booking extends Model
         if (!$dressId || !$date) return null;
         $checkDate = \Carbon\Carbon::parse($date)->startOfDay();
         
-        $bookings = self::with('client')->where('dress_id', $dressId)
+        $bookings = self::with('client')
+            ->where(function ($q) use ($dressId) {
+                $q->where('dress_id', $dressId)
+                  ->orWhere('dress_2_id', $dressId);
+            })
             ->whereIn('status', ['confirmed', 'picked_up', 'out', 'returned']);
             
         if ($excludeClientId) {

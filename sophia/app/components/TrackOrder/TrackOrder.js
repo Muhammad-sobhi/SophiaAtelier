@@ -120,6 +120,7 @@ export default function TrackOrder() {
   const activeIndex = getStageIndex(currentStage);
   const latestBooking = clientData?.bookings && clientData.bookings.length > 0 ? clientData.bookings[0] : null;
   const currentDress = latestBooking?.dress;
+  const currentDress2 = latestBooking?.dress2;
 
   // Active visit or fitting info
   const latestVisit = clientData?.visits && clientData.visits.length > 0 ? clientData.visits[0] : null;
@@ -151,7 +152,7 @@ export default function TrackOrder() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {currentDress && (
               <div style={{ background: '#faf8f5', padding: '8px 16px', borderRadius: '12px', border: '1px solid #e8e3d9', fontSize: '12px', fontWeight: '600' }}>
-                <span style={{ color: '#888' }}>Selected Gown:</span> <strong style={{ color: '#111' }}>{currentDress.name}</strong>
+                <span style={{ color: '#888' }}>Selected Gown{currentDress2 ? 's' : ''}:</span> <strong style={{ color: '#111' }}>{currentDress.name}{currentDress2 ? ` & ${currentDress2.name}` : ''}</strong>
               </div>
             )}
             <button
@@ -281,8 +282,11 @@ export default function TrackOrder() {
                       <div className={styles.metaRow}>
                         <Shirt size={18} strokeWidth={1.4} className={styles.metaIcon} />
                         <div>
-                          <span className={styles.metaTitle}>Selected Gown</span>
-                          <span className={styles.metaValue}>{currentDress?.name || 'Luxury Wedding Dress'}</span>
+                          <span className={styles.metaTitle}>Selected Gown{currentDress2 ? 's' : ''}</span>
+                          <span className={styles.metaValue}>
+                            1. {currentDress?.name || 'Luxury Wedding Dress'}
+                            {currentDress2 && ` | 2. ${currentDress2.name}`}
+                          </span>
                         </div>
                       </div>
                       <div className={styles.metaRow}>
@@ -325,8 +329,11 @@ export default function TrackOrder() {
                   <div className={styles.metaRow}>
                     <Shirt size={18} strokeWidth={1.4} className={styles.metaIcon} />
                     <div>
-                      <span className={styles.metaTitle}>Reserved Wedding Gown</span>
-                      <span className={styles.metaValue}>{currentDress?.name || 'Luxury Wedding Dress'}</span>
+                      <span className={styles.metaTitle}>Reserved Wedding Gown{currentDress2 ? 's' : ''}</span>
+                      <span className={styles.metaValue}>
+                        1. {currentDress?.name || 'Luxury Wedding Dress'}
+                        {currentDress2 && ` | 2. ${currentDress2.name}`}
+                      </span>
                     </div>
                   </div>
                   <div className={styles.metaRow}>
@@ -470,7 +477,7 @@ export default function TrackOrder() {
                       <div className={styles.timelineContent}>
                         <h5 className={styles.timelineTitle}>
                           {booking.dress?.name
-                            ? `Gown: ${booking.dress.name}`
+                            ? `Gown 1: ${booking.dress.name}${booking.dress2?.name ? ` | Gown 2: ${booking.dress2.name}` : ''}`
                             : `Booking #${booking.id}`}
                         </h5>
                         <p className={styles.timelineDesc}>

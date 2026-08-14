@@ -109,18 +109,34 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingDressId, setBookingDressId] = useState('');
   const [bookingDressSearch, setBookingDressSearch] = useState('');
+  const [bookingHasSecondDress, setBookingHasSecondDress] = useState(false);
+  const [bookingDress2Id, setBookingDress2Id] = useState('');
+  const [bookingDress2Search, setBookingDress2Search] = useState('');
+  const [dress2Details, setDress2Details] = useState(null);
+  const [salesName, setSalesName] = useState('');
+  const [employeesList, setEmployeesList] = useState([]);
   const [bookingPhone, setBookingPhone] = useState(bride.phone || '');
   const [bookingEventDate, setBookingEventDate] = useState(bride.wedding_date || new Date().toISOString().split('T')[0]);
   const [bookingTotalAmount, setBookingTotalAmount] = useState('0');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('0');
+  const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState('5000');
   const [bookingPaymentMethod, setBookingPaymentMethod] = useState('instapay');
   const [bookingReceipt, setBookingReceipt] = useState(null);
   const [bookingNotes, setBookingNotes] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showConflictConfirmDialog, setShowConflictConfirmDialog] = useState(false);
+  const [conflictWarningMessage, setConflictWarningMessage] = useState('');
 
   React.useEffect(() => {
     setBookingPhone(bride.phone || '');
   }, [bride.id, bride.phone]);
+
+  React.useEffect(() => {
+    apiClient.get('/employees').then((res) => {
+      const list = Array.isArray(res) ? res : (res.data?.data || res.data || []);
+      setEmployeesList(list);
+    }).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     if (showFittingModal) {
@@ -161,13 +177,75 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     }
   }, [showFittingModal, showBookingModal, fittingDressId, bookingDressId]);
 
-  // Calculate if selected wedding/booking date is blocked
+  React.useEffect(() => {
+    if (showBookingModal) {
+      setBookingNotes('');
+      setBookingReceipt(null);
+      setBookingDressSearch('');
+      setBookingDress2Search('');
+      setBookingHasSecondDress(false);
+      setBookingDress2Id('');
+      setSalesName('');
+      setBookingInsuranceAmount('5000');
+      setBookingDepositAmount('0');
+      setBookingPaymentMethod('instapay');
+      setBookingPhone(bride.phone || '');
+      setBookingEventDate(bride.wedding_date || new Date().toISOString().split('T')[0]);
+    }
+  }, [showBookingModal, bride.id]);
+
+  React.useEffect(() => {
+    if (showFittingModal) {
+      setFittingNotes('');
+      setFittingReceipt(null);
+      setFittingPaymentMethod('cash');
+    }
+  }, [showFittingModal, bride.id]);
+
+  React.useEffect(() => {
+    if (showBookingModal && bookingHasSecondDress && bookingDress2Id) {
+      apiClient.get(`/dresses/${bookingDress2Id}`).then((res) => {
+        setDress2Details(res.data || res || null);
+      }).catch(console.error);
+    } else {
+      setDress2Details(null);
+    }
+  }, [showBookingModal, bookingHasSecondDress, bookingDress2Id]);
+
+  // Calculate if selected wedding/booking date is blocked for Dress 1
   const isBookingDateBlocked = (() => {
     if (!bookingEventDate || !dressDetails || !dressDetails.bookings) return false;
     const fD = new Date(bookingEventDate);
     fD.setHours(0, 0, 0, 0);
 
     return dressDetails.bookings.some((b) => {
+      if (b.client_id === bride.id) return false;
+
+      const city = b.client?.city ?? 'القاهرة';
+      const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+      const daysBefore = isCairo ? 2 : 3;
+      const daysAfter = 1;
+
+      const weddingDate = new Date(b.event_date.split(' ')[0]);
+      weddingDate.setHours(0, 0, 0, 0);
+
+      const start = new Date(weddingDate);
+      start.setDate(start.getDate() - daysBefore);
+
+      const end = new Date(weddingDate);
+      end.setDate(end.getDate() + daysAfter);
+
+      return fD >= start && fD <= end;
+    });
+  })();
+
+  // Calculate if selected wedding/booking date is blocked for Dress 2
+  const isBookingDate2Blocked = (() => {
+    if (!bookingHasSecondDress || !bookingDress2Id || !bookingEventDate || !dress2Details || !dress2Details.bookings) return false;
+    const fD = new Date(bookingEventDate);
+    fD.setHours(0, 0, 0, 0);
+
+    return dress2Details.bookings.some((b) => {
       if (b.client_id === bride.id) return false;
 
       const city = b.client?.city ?? 'القاهرة';
@@ -242,6 +320,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       });
       setShowFittingModal(false);
       setFittingReceipt(null);
+      setFittingNotes('');
       onStageUpdate?.();
     } catch (err) {
       console.error(err);
@@ -251,8 +330,26 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     }
   };
 
-  const handleBookingSubmit = async (e) => {
-    e.preventDefault();
+  const handleBookingSubmit = async (e, forceOverride = false) => {
+    if (e) e.preventDefault();
+
+    // If a conflict exists and forceOverride is false, prompt the confirmation dialog
+    if ((isBookingDateBlocked || isBookingDate2Blocked) && !forceOverride) {
+      const d1 = dressesList.find((d) => d.id.toString() === bookingDressId)?.name || 'الفستان الأول';
+      const d2 = dressesList.find((d) => d.id.toString() === bookingDress2Id)?.name || 'الفستان الثاني';
+      let msg = '';
+      if (isBookingDateBlocked && isBookingDate2Blocked) {
+        msg = `يوجد تعارض في تاريخ المناسبة لكلا الفستانين (${d1} و ${d2}) مع حجوزات لعميلات أخريات.`;
+      } else if (isBookingDateBlocked) {
+        msg = `يوجد تعارض في تاريخ المناسبة للفستان (${d1}) مع حجز لعميلة أخرى.`;
+      } else {
+        msg = `يوجد تعارض في تاريخ المناسبة للفستان الثاني (${d2}) مع حجز لعميلة أخرى.`;
+      }
+      setConflictWarningMessage(msg);
+      setShowConflictConfirmDialog(true);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const activePhone = bookingPhone.trim() || bride.phone || '';
@@ -260,15 +357,21 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         action: 'confirm_booking',
         phone: activePhone,
         dress_id: parseInt(bookingDressId),
+        dress_2_id: bookingHasSecondDress && bookingDress2Id ? parseInt(bookingDress2Id) : null,
+        sales_name: salesName.trim() || null,
+        force_override: forceOverride,
         event_date: bookingEventDate,
         total_amount: parseFloat(bookingTotalAmount),
         deposit_amount: parseFloat(bookingDepositAmount),
+        insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
         payment_method: bookingPaymentMethod,
         receipt_image: bookingReceipt,
         notes: bookingNotes
       });
       setShowBookingModal(false);
+      setShowConflictConfirmDialog(false);
       setBookingReceipt(null);
+      setBookingNotes('');
       onStageUpdate?.();
 
       // WhatsApp redirection
@@ -279,7 +382,14 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         visitTime = match ? match[1].trim() : 'خلال أوقات العمل الرسمية (من ١:٠٠ م حتى ٨:٣٠ م)';
       }
       const dress = dressesList.find((d) => d.id.toString() === bookingDressId);
-      const dressText = dress ? `\n• *فستان الزفاف:* ${dress.name}` : '';
+      const dress2 = bookingHasSecondDress && bookingDress2Id ? dressesList.find((d) => d.id.toString() === bookingDress2Id) : null;
+
+      let dressText = '';
+      if (dress && dress2) {
+        dressText = `\n• *فستان الزفاف 1:* ${dress.name}\n• *فستان 2:* ${dress2.name}`;
+      } else if (dress) {
+        dressText = `\n• *فستان الزفاف:* ${dress.name}`;
+      }
 
       let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${bride.name}* 🤍،\nيسعدنا جداً تأكيد حجز موعدكِ وتجهيز فستان أحلامكِ!\n\n📅 *تفاصيل الموعد:*\n• *التاريخ:* ${visitDate}\n• *الوقت:* ${visitTime}\n${dressText}\n\n🌸 *شروط وقواعد فساتين صوفيا:*\n( مسموح ب دخول فردين فقط مع العروسه ladies only )\n(الدخول ب أولوية الحضور)\n\nAddress ⤵️\nالتجمع الاول الياسمين ٢ \nفيلا 161 الباب الجانبي للفيلا بيكون شمال باب الفيلا (basement) \n⬅️اليافطه السودا161\n\nLocation📍\nhttps://maps.app.goo.gl/RUyaQk3v1rZR4gVC6\n\nنحن بانتظار تشريفكِ لتنيري المكان ✨🎀`;
 
@@ -287,12 +397,12 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         const templates = await apiClient.get('/whatsapp-templates');
         const t = templates.find((x) => x.key === 'booking_confirmation');
         if (t) {
-          message = t.body.
-          replace(/\{\{client_name\}\}/g, bride.name).
-          replace(/\{\{wedding_date\}\}/g, bride.wedding_date || visitDate).
-          replace(/\{\{visit_date\}\}/g, visitDate).
-          replace(/\{\{visit_time\}\}/g, visitTime).
-          replace(/\{\{dress_line\}\}/g, dress ? `${dress.name}` : '');
+          message = t.body
+            .replace(/\{\{client_name\}\}/g, bride.name)
+            .replace(/\{\{wedding_date\}\}/g, bride.wedding_date || visitDate)
+            .replace(/\{\{visit_date\}\}/g, visitDate)
+            .replace(/\{\{visit_time\}\}/g, visitTime)
+            .replace(/\{\{dress_line\}\}/g, dress2 ? `${dress?.name || ''} و ${dress2.name}` : (dress ? `${dress.name}` : ''));
         }
       } catch (err) {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
@@ -306,7 +416,12 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
     } catch (err) {
       console.error(err);
-      alert(err?.message || 'حدث خطأ أثناء حفظ حجز الفستان');
+      if (err?.response?.data?.available_date || err?.available_date || err?.message?.includes('غير متوفر')) {
+        setConflictWarningMessage(err?.response?.data?.message || err?.message || 'هذا الفستان غير متوفر في الفترة المحددة.');
+        setShowConflictConfirmDialog(true);
+      } else {
+        alert(err?.response?.data?.message || err?.message || 'حدث خطأ أثناء حفظ حجز الفستان');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -570,21 +685,43 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 </div>
 
                 {/* Gown Info if selected */}
-                {bride.latest_dress_name &&
-              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[9px] font-extrabold text-slate-650 mb-3 text-right">
-                    <span className="text-[7.5px] text-slate-400 block mb-0.5 uppercase tracking-wider">Gown Details</span>
-                    <div className="flex justify-between items-center">
-                      <span className="text-blue-600 font-mono">{bride.latest_dress_name}</span>
-                      <span className="text-slate-400">الفستان:</span>
-                    </div>
-                    {bride.latest_visit_date &&
-                <div className="flex justify-between items-center mt-0.5">
-                        <span>{bride.latest_visit_date}</span>
-                        <span className="text-slate-400">التاريخ:</span>
+                {(bride.latest_dress_name || bride.bookings?.[0]?.dress || bride.bookings?.[0]?.dress2) && (() => {
+                  const booking = bride.bookings?.[0];
+                  const dress1Name = booking?.dress?.name || bride.latest_dress_name;
+                  const dress2Name = booking?.dress2?.name;
+                  return (
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[9px] font-extrabold text-slate-650 mb-3 text-right">
+                      <span className="text-[7.5px] text-slate-400 block mb-0.5 uppercase tracking-wider">تفاصيل الفساتين</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-blue-600 font-mono truncate max-w-[130px]">{dress1Name}</span>
+                        <span className="text-slate-400">الفستان 1:</span>
                       </div>
-                }
-                  </div>
-              }
+                      {dress2Name && (
+                        <div className="flex justify-between items-center mt-0.5">
+                          <span className="text-purple-600 font-mono truncate max-w-[130px]">{dress2Name}</span>
+                          <span className="text-slate-400">الفستان 2:</span>
+                        </div>
+                      )}
+                      {booking?.sales_name && (
+                        <div className="flex justify-between items-center mt-0.5 border-t border-slate-100 pt-0.5">
+                          <span className="text-amber-700 font-medium">{booking.sales_name}</span>
+                          <span className="text-slate-400">السيلز:</span>
+                        </div>
+                      )}
+                      {booking?.is_override && (
+                        <div className="mt-1 text-[8px] font-black text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-100 text-center">
+                          ⚠️ تم تأكيد الحجز بتجاوز التعارض
+                        </div>
+                      )}
+                      {bride.latest_visit_date && (
+                        <div className="flex justify-between items-center mt-0.5">
+                          <span>{bride.latest_visit_date}</span>
+                          <span className="text-slate-400">التاريخ:</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Pickup details and blockout periods */}
                 {stageId === 'picked_up' && (bride.wedding_date || bride.bookings?.[0]?.event_date) && (() => {
@@ -650,137 +787,58 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                         e.stopPropagation();
                         setShowFittingModal(true);
                       }}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                      
-                        حجز موعد بروفة قياس 📏
-                      </button>);
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
+                    >
+                      حجز موعد قياس 📐
+                    </button>);
 
                 }
 
                 if (stageId === 'fitting') {
                   return (
-                    <div className="space-y-1.5">
-                        <button
-                        disabled={isSubmitting}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowFittingModal(true);
-                        }}
-                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                        
-                          إضافة بروفة إضافية ➕
-                        </button>
-                        <button
-                        disabled={isSubmitting}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStageAction('end_fitting');
-                        }}
-                        className="w-full py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                        
-                          إنهاء البروفات 🏁
-                        </button>
-                      </div>);
+                    <button
+                      disabled={isSubmitting}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onPickupClick) {
+                          onPickupClick(bride);
+                        } else {
+                          handleStageAction('mark_picked_up');
+                        }
+                      }}
+                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
+                    >
+                      تسليم الفستان للعروس 📦
+                    </button>);
 
                 }
 
                 if (stageId === 'picked_up') {
-                  const booking = bride.bookings?.[0];
-                  if (booking?.status === 'picked_up') {
-                    return (
-                      <button
-                        disabled={isSubmitting}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onReturnClick?.(bride);
-                        }}
-                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                        
-                          تسجيل إرجاع الفستان 🔄
-                        </button>);
-
-                  }
                   return (
-                    <div className="space-y-1.5">
-                        <button
-                        disabled={isSubmitting}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const brideName = (bride.name || '').trim() || 'عروسنا الجميلة';
-                          const weddingDateRaw = bride.wedding_date || bride.bookings?.[0]?.event_date || '';
-                          const weddingDate = weddingDateRaw ? weddingDateRaw.split(' ')[0].split('T')[0] : '';
-                          const cityLower = (bride.city || '').toLowerCase();
-                          const isCairoOrGiza = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة' || cityLower.includes('cairo') || cityLower.includes('giza');
-                          const pickupDaysBefore = isCairoOrGiza ? 1 : 2;
-                          let pickupDateFormatted = 'غير محدد';
-                          if (weddingDate) {
-                            try {
-                              const parts = weddingDate.split('-');
-                              if (parts.length >= 3) {
-                                const year = parseInt(parts[0], 10);
-                                const month = parseInt(parts[1], 10) - 1;
-                                const day = parseInt(parts[2], 10);
-                                const pD = new Date(year, month, day - pickupDaysBefore);
-                                const dd = String(pD.getDate()).padStart(2, '0');
-                                const mm = String(pD.getMonth() + 1).padStart(2, '0');
-                                const yyyy = pD.getFullYear();
-                                pickupDateFormatted = `${yyyy}-${mm}-${dd}`;
-                              }
-                            } catch (err) {
-                              console.error(err);
-                            }
-                          }
-
-                          let message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${brideName}* 🤍👰🏻‍♀️،\nنود تذكيركِ بموعد استلام فستان زفافكِ المختار من فساتين صوفيا!\n\n📅 *موعد الاستلام:* ${pickupDateFormatted}\n📍 *العنوان:* التجمع الأول - الياسمين 2 - فيلا 161 (الباب الجانبي)\n\nنحن بانتظاركِ وتجهيز كل التفاصيل لتكوني أجمل عروس ✨🎀`;
-                          try {
-                            const templates = await apiClient.get('/whatsapp-templates');
-                            const list = Array.isArray(templates) ? templates : templates.data || [];
-                            const t = list.find((x) => x.key === 'pickup_reminder');
-                            if (t) {
-                              message = t.body.
-                              replace(/\{\{client_name\}\}/g, brideName).
-                              replace(/\{\{wedding_date\}\}/g, weddingDate || 'غير محدد').
-                              replace(/\{\{pickup_date\}\}/g, pickupDateFormatted);
-                            }
-                          } catch (err) {
-                            console.error('Failed to fetch whatsapp template:', err);
-                          }
-
-                          const cleanPhone = (bride.phone || '').replace(/[^\d]/g, '');
-                          if (cleanPhone) {
-                            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-                            window.open(whatsappUrl, '_blank');
-                          }
-                        }}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1">
-                        
-                          <span>تذكير بموعد الاستلام 💬</span>
-                        </button>
-                        <button
-                        disabled={isSubmitting}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPickupClick?.(bride);
-                        }}
-                        className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs">
-                        
-                          تسليم الفستان للعروس 👗
-                        </button>
-                      </div>);
+                    <button
+                      disabled={isSubmitting}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onReturnClick) {
+                          onReturnClick(bride);
+                        } else {
+                          handleStageAction('mark_returned');
+                        }
+                      }}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
+                    >
+                      تسجيل إرجاع الفستان 🔄
+                    </button>);
 
                 }
 
-                return (
-                  <div className="text-center py-2 text-emerald-600 font-black text-[9px] bg-emerald-50 border border-emerald-100 rounded-xl">
-                      ✓ الرحلة مكتملة
-                    </div>);
-
+                return null;
               })()}
               </div>
             </div> :
 
-          <div className="h-full border border-dashed border-slate-200/60 rounded-2xl flex items-center justify-center bg-slate-50/20 p-4 min-h-[220px]">
-              <span className="text-[10px] font-bold text-slate-350">—</span>
+          <div className="h-full border border-dashed border-slate-200/80 rounded-2xl flex items-center justify-center p-4 bg-slate-50/30">
+              <span className="text-[10px] text-slate-400 font-bold">لا توجد مرحلة حالية</span>
             </div>
           }
         </div>
@@ -788,43 +846,23 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
   };
 
+  const handlePaymentSubmit = (e) => {
+    handleCreatePayment(e);
+  };
+
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-100 p-4 sm:p-6 shadow-xs animate-fade-in text-right h-full" dir="rtl">
-      {/* Title Header */}
-      <div className="border-b border-slate-100 pb-3.5 mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
-            متابعة رحلة العروس: {bride?.name || ''}
-          </h2>
-          <p className="text-[9px] text-slate-400 font-extrabold mt-0.5">مخطط وجدول مراحل العروس بالأكاديمية والورشة</p>
+    <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] space-y-4" dir="rtl">
+      {/* Top Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+          <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
+            متابعة رحلة العروس: <span className="text-indigo-650">{bride?.name}</span>
+          </h3>
         </div>
         <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
           المرحلة الحالية: {bride?.current_stage ? bride.current_stage.toUpperCase() : 'VISIT'}
         </span>
-      </div>
-
-      {/* Mobile Stage Selector Tabs (visible only on mobile) */}
-      <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-3 mb-4 border-b border-slate-100 scrollbar-none">
-        {STAGES.map((s) => {
-          const isSelected = selectedMobileStage === s.id;
-          const isCurrentStage = bride?.current_stage === s.id;
-          return (
-            <button
-              key={s.id}
-              onClick={() => setSelectedMobileStage(s.id)}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
-                isSelected
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : isCurrentStage
-                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                  : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              <span>{s.label.split(' ')[0]}</span>
-              {isCurrentStage && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-            </button>
-          );
-        })}
       </div>
 
       {/* Desktop Grid containing 5 Columns */}
@@ -832,14 +870,6 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         {STAGES.map((stage) =>
           renderColumn(stage.id, stage.label, stage.icon, stage.color)
         )}
-      </div>
-
-      {/* Mobile Single Selected Stage Display */}
-      <div className="block md:hidden">
-        {(() => {
-          const stageObj = STAGES.find((s) => s.id === selectedMobileStage) || STAGES[0];
-          return renderColumn(stageObj.id, stageObj.label, stageObj.icon, stageObj.color);
-        })()}
       </div>
 
       {/* Payment Popup Modal */}
@@ -870,7 +900,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   <option value="deposit">دفعة عربون حجز (Deposit)</option>
                   <option value="balance">سداد متبقي الإيجار (Balance Payment)</option>
                   <option value="security_deposit">مبلغ تأمين مسترد (Security Deposit)</option>
-                  <option value="trying_fee">رسوم بروفة قياس (Trying Fee)</option>
+                  <option value="fitting_fee">رسوم بروفة قياس (Trying Fee)</option>
                   <option value="late_fee">غرامة تأخير إرجاع (Late Fee)</option>
                   <option value="damage_fee">رسوم تلفيات / تنظيف (Damage/Cleaning)</option>
                   <option value="other">أخرى (Other)</option>
@@ -1113,12 +1143,12 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       {/* Gown Booking Confirmation Modal */}
       {showBookingModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
-          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] my-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(92vh,720px)] my-auto">
             {/* Header */}
             <div className="flex items-center justify-between p-3 sm:p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <Heart size={14} className="text-rose-600 animate-pulse" />
-                <span>تأكيد حجز فستان للعروس</span>
+                <span>تأكيد حجز فستان للعروس ({bride.name})</span>
               </h3>
               <button
                 onClick={() => setShowBookingModal(false)}
@@ -1129,18 +1159,54 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="p-3.5 sm:p-4 space-y-2.5 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
-                {/* Dress Selection with Fast Search */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">الفستان المراد حجزه</label>
+            <form onSubmit={(e) => handleBookingSubmit(e, false)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-3.5 sm:p-4 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
+
+                {/* Sales Person Selection */}
+                <div className="space-y-1 bg-amber-50/40 p-2.5 rounded-2xl border border-amber-150/70">
+                  <label className="text-[10px] font-extrabold text-amber-900 block text-right flex items-center justify-between">
+                    <span>مسؤول المبيعات / السيلز (Sales Person)</span>
+                    <span className="text-[8.5px] font-normal text-amber-700">(اختياري)</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <select
+                      value={employeesList.some(e => e.name === salesName) ? salesName : (salesName ? '__custom__' : '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val !== '__custom__') {
+                          setSalesName(val);
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    >
+                      <option value="">-- اختر موظف المبيعات --</option>
+                      {employeesList.map((emp) => (
+                        <option key={emp.id} value={emp.name}>{emp.name} {emp.role ? `(${emp.role})` : ''}</option>
+                      ))}
+                      <option value="__custom__">✍️ كتابة اسم آخر...</option>
+                    </select>
+                    {(!employeesList.some(e => e.name === salesName) || salesName === '') && (
+                      <input
+                        type="text"
+                        placeholder="أو اكتب اسم السيلز..."
+                        value={salesName}
+                        onChange={(e) => setSalesName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Dress 1 Selection with Fast Search */}
+                <div className="space-y-1.5 bg-rose-50/20 p-2.5 rounded-2xl border border-rose-100">
+                  <label className="text-[10px] font-black text-rose-900 block text-right">👗 الفستان الأساسي (الفستان 1)</label>
                   <div className="relative">
                     <input
                       type="text"
                       placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
                       value={bookingDressSearch}
                       onChange={(e) => setBookingDressSearch(e.target.value)}
-                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
+                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
                     />
                     <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                     {bookingDressSearch && (
@@ -1155,7 +1221,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   </div>
 
                   {/* Filtered dress buttons / selection list */}
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
                     {dressesList
                       .filter((d) => {
                         if (!bookingDressSearch.trim()) return true;
@@ -1173,9 +1239,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                             key={d.id}
                             onClick={() => {
                               setBookingDressId(d.id.toString());
-                              if (d.rental_price) {
-                                setBookingTotalAmount(parseFloat(d.rental_price || 0).toString());
-                              }
+                              const p1 = parseFloat(d.rental_price || 0);
+                              const d2 = bookingHasSecondDress ? dressesList.find(x => x.id.toString() === bookingDress2Id) : null;
+                              const p2 = parseFloat(d2?.rental_price || 0);
+                              setBookingTotalAmount((p1 + p2).toString());
                             }}
                             className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
                               isSelected
@@ -1187,15 +1254,6 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                           </button>
                         );
                       })}
-                    {dressesList.filter((d) => {
-                      if (!bookingDressSearch.trim()) return true;
-                      const q = bookingDressSearch.toLowerCase().trim();
-                      return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
-                    }).length === 0 && (
-                      <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
-                        لا توجد فساتين مطابقة للبحث "{bookingDressSearch}"
-                      </div>
-                    )}
                   </div>
 
                   {/* Currently selected dress indicator */}
@@ -1204,53 +1262,108 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                     if (!activeDress) return null;
                     return (
                       <div className="text-[10px] font-extrabold text-rose-700 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
-                        <span>الفستان المختار: <strong className="font-black">{activeDress.name}</strong></span>
-                        {activeDress.code && <span className="font-mono text-[9.5px] text-rose-800">كود: {activeDress.code}</span>}
+                        <span>الفستان 1 المختار: <strong className="font-black">{activeDress.name}</strong></span>
+                        <span className="font-mono text-[9.5px] text-rose-800">السعر: {activeDress.rental_price} ج.م</span>
                       </div>
                     );
                   })()}
 
-                  {(() => {
-                    if (!dressDetails || !dressDetails.bookings || dressDetails.bookings.length === 0) return null;
-                    const ranges = dressDetails.bookings
-                      .filter((b) => b.client_id !== bride.id)
-                      .map((b) => {
-                        const city = b.client?.city ?? 'القاهرة';
-                        const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
-                        const daysBefore = isCairo ? 2 : 3;
-                        const daysAfter = 1;
+                  {isBookingDateBlocked && (
+                    <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-[9px] font-bold text-rose-700 text-right">
+                      ⚠️ الفستان الأول غير متوفر في هذا التاريخ لتقاطعه مع حجز آخر. يمكنك المتابعة وتأكيد الحجز بتجاوز التعارض.
+                    </div>
+                  )}
+                </div>
 
-                        const wDate = new Date(b.event_date.split(' ')[0]);
-                        const start = new Date(wDate);
-                        start.setDate(start.getDate() - daysBefore);
-                        const end = new Date(wDate);
-                        end.setDate(end.getDate() + daysAfter);
+                {/* Second Dress Toggle & Selection */}
+                <div className="bg-purple-50/30 p-2.5 rounded-2xl border border-purple-100 space-y-2">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                      <span>✨ حجز فستان ثانٍ إضافي لنفس العروس (2 Dresses)</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={bookingHasSecondDress}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setBookingHasSecondDress(checked);
+                        const d1 = dressesList.find(d => d.id.toString() === bookingDressId);
+                        const d2 = dressesList.find(d => d.id.toString() === bookingDress2Id);
+                        const p1 = parseFloat(d1?.rental_price || 0);
+                        const p2 = checked && d2 ? parseFloat(d2?.rental_price || 0) : 0;
+                        setBookingTotalAmount((p1 + p2).toString());
+                        if (!bookingInsuranceAmount || bookingInsuranceAmount === '500' || bookingInsuranceAmount === '1000') {
+                          setBookingInsuranceAmount('5000');
+                        }
+                      }}
+                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
+                    />
+                  </label>
 
-                        const formatYMD = (d) => {
-                          const y = d.getFullYear();
-                          const m = String(d.getMonth() + 1).padStart(2, '0');
-                          const dd = String(d.getDate()).padStart(2, '0');
-                          return `${y}-${m}-${dd}`;
-                        };
-                        return {
-                          start: formatYMD(start),
-                          end: formatYMD(end),
-                          clientName: b.client?.name || 'عروس أخرى'
-                        };
-                      });
+                  {bookingHasSecondDress && (
+                    <div className="space-y-1.5 pt-1 border-t border-purple-100">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="🔍 بحث سريع عن الفستان الثاني..."
+                          value={bookingDress2Search}
+                          onChange={(e) => setBookingDress2Search(e.target.value)}
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-right"
+                        />
+                        <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                      </div>
 
-                    if (ranges.length === 0) return null;
-                    return (
-                      <div className="mt-1.5 p-2.5 bg-rose-50/50 border border-rose-100 rounded-xl space-y-1 text-right">
-                        <span className="text-[9px] font-black text-rose-800 block">🔒 تواريخ عدم توفر الفستان (خارج الأتيليه):</span>
-                        {ranges.map((r, i) => (
-                          <div key={i} className="text-[8.5px] font-extrabold text-rose-700 leading-relaxed">
-                            • من <span className="font-mono text-rose-800">{r.start}</span> إلى <span className="font-mono text-rose-800">{r.end}</span> (مع العروس: {r.clientName})
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-purple-100 max-h-24 overflow-y-auto scrollbar-thin">
+                        {dressesList
+                          .filter((d) => d.id.toString() !== bookingDressId)
+                          .filter((d) => {
+                            if (!bookingDress2Search.trim()) return true;
+                            const q = bookingDress2Search.toLowerCase().trim();
+                            return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                          })
+                          .map((d) => {
+                            const isSelected = bookingDress2Id === d.id.toString();
+                            return (
+                              <button
+                                type="button"
+                                key={d.id}
+                                onClick={() => {
+                                  setBookingDress2Id(d.id.toString());
+                                  const d1 = dressesList.find(x => x.id.toString() === bookingDressId);
+                                  const p1 = parseFloat(d1?.rental_price || 0);
+                                  const p2 = parseFloat(d.rental_price || 0);
+                                  setBookingTotalAmount((p1 + p2).toString());
+                                }}
+                                className={`px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                  isSelected
+                                    ? 'bg-purple-600 border-purple-600 text-white'
+                                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-purple-50'
+                                }`}
+                              >
+                                {d.name} {d.code ? `(${d.code})` : ''} - {d.rental_price} ج.م
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      {bookingDress2Id && (() => {
+                        const activeDress2 = dressesList.find((d) => d.id.toString() === bookingDress2Id);
+                        if (!activeDress2) return null;
+                        return (
+                          <div className="text-[10px] font-extrabold text-purple-800 bg-purple-100/60 border border-purple-200 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                            <span>الفستان 2 المختار: <strong className="font-black">{activeDress2.name}</strong></span>
+                            <span className="font-mono text-[9.5px]">السعر: {activeDress2.rental_price} ج.م</span>
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                        );
+                      })()}
+
+                      {isBookingDate2Blocked && (
+                        <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-[9px] font-bold text-rose-700 text-right">
+                          ⚠️ الفستان الثاني غير متوفر في هذا التاريخ لتقاطعه مع حجز آخر. يمكنك المتابعة وتأكيد الحجز بتجاوز التعارض.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Bride Phone Field */}
@@ -1274,33 +1387,41 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                     value={bookingEventDate}
                     onChange={(e) => setBookingEventDate(e.target.value)}
                     className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
-                      isBookingDateBlocked ? 'border-rose-300 bg-rose-50/20 text-rose-700' : 'bg-slate-50 border-slate-150'
+                      (isBookingDateBlocked || isBookingDate2Blocked) ? 'border-amber-300 bg-amber-50/20 text-amber-900' : 'bg-slate-50 border-slate-150'
                     }`}
                   />
-                  {isBookingDateBlocked && (
-                    <span className="text-[8.5px] font-bold text-rose-600 block mt-0.5 text-right">⚠️ هذا التاريخ غير متاح لتواجد الفستان بالأتيليه.</span>
-                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                {/* Financial Fields */}
+                <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">مبلغ الإيجار الإجمالي</label>
+                    <label className="text-[9.5px] font-extrabold text-slate-500 block text-right">إجمالي الإيجار</label>
                     <input
                       type="number"
                       required
                       value={bookingTotalAmount}
                       onChange={(e) => setBookingTotalAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
+                    <label className="text-[9.5px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
                     <input
                       type="number"
                       required
                       value={bookingDepositAmount}
                       onChange={(e) => setBookingDepositAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] font-extrabold text-slate-500 block text-right">مبلغ التأمين</label>
+                    <input
+                      type="number"
+                      required
+                      value={bookingInsuranceAmount}
+                      onChange={(e) => setBookingInsuranceAmount(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
                   </div>
                 </div>
@@ -1379,14 +1500,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
               <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
                   type="submit"
-                  disabled={isSubmitting || isBookingDateBlocked}
-                  className={`flex-1 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center ${
-                    isSubmitting || isBookingDateBlocked
-                      ? 'bg-slate-350 text-slate-500 cursor-not-allowed shadow-none'
-                      : 'bg-rose-600 hover:bg-rose-700 text-white active:scale-95'
-                  }`}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95"
                 >
-                  {isSubmitting ? 'جاري الحفظ...' : 'تأكيد الحجز وتثبيت التاريخ'}
+                  {isSubmitting ? 'جاري الحفظ...' : (isBookingDateBlocked || isBookingDate2Blocked) ? 'تأكيد الحجز (يوجد تعارض)' : 'تأكيد الحجز وتثبيت التاريخ'}
                 </button>
                 <button
                   type="button"
@@ -1397,6 +1514,48 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Override Confirmation Dialog Modal */}
+      {showConflictConfirmDialog && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[10000] flex items-center justify-center p-3 sm:p-4 text-right animate-fade-in" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-amber-200 shadow-2xl p-5 space-y-4 my-auto">
+            <div className="flex items-center gap-2.5 text-amber-600 border-b border-amber-100 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-xl">⚠️</span>
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">تنبيه: تعارض في مواعيد حجز الفستان</h3>
+                <p className="text-[10px] text-slate-500 font-bold">يوجد حجز آخر أو فترة تسليم تتقاطع مع هذا التاريخ</p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-xs font-bold text-amber-900 leading-relaxed">
+              <p>{conflictWarningMessage || 'هذا الفستان محجوز لعميلة أخرى في هذه الفترة أو قيد الإرجاع والتنظيف.'}</p>
+              <div className="text-[11px] text-slate-600 font-normal pt-1 border-t border-amber-200/60">
+                هل ترغب في المتابعة وتأكيد الحجز وتجاوز هذا التعارض على مسؤوليتك؟
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleBookingSubmit(null, true)}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md shadow-amber-600/20 active:scale-95 text-center flex items-center justify-center gap-1.5"
+              >
+                <span>⚡ تأكيد الحجز رغم التعارض</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConflictConfirmDialog(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+              >
+                تغيير الفستان / الموعد
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1446,20 +1605,20 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                           <div><span className="text-slate-400 font-medium">تاريخ الزيارة المفضل:</span> <span className="font-mono text-indigo-600">{bride.latest_visit_date || 'غير محدد'}</span></div>
                           {booking &&
                         <div className="mt-3 p-3 bg-white rounded-xl border border-slate-100 space-y-2">
-                              <span className="text-[10px] font-black text-slate-400 block mb-1">الفساتين الـ 3 المطلوبة للتجربة:</span>
+                              <span className="text-[10px] font-black text-slate-400 block mb-1">الفساتين المطلوبة للتجربة:</span>
                               <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                                 <span>1. {booking.dress?.name || 'غير محدد'}</span>
                               </div>
                               {booking.dress_2_id &&
                           <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                  <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                                   <span>2. {booking.dress2?.name || 'فستان إضافي 2'}</span>
                                 </div>
                           }
                               {booking.dress_3_id &&
                           <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
                                   <span>3. {booking.dress3?.name || 'فستان إضافي 3'}</span>
                                 </div>
                           }
@@ -1480,15 +1639,47 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   <div className="space-y-4">
                       {/* Gown details */}
                       <div className="bg-rose-50/20 p-4 rounded-2xl border border-rose-100/50 space-y-2.5">
-                        <h4 className="text-xs font-black text-rose-900 border-b border-rose-100/60 pb-1.5">👗 الفستان المعتمد المحجوز</h4>
-                        <div className="flex items-start gap-3">
+                        <h4 className="text-xs font-black text-rose-900 border-b border-rose-100/60 pb-1.5 flex items-center justify-between">
+                          <span>👗 الفساتين المعتمدة والمحجوزة</span>
+                          {booking.sales_name && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-150">
+                              السيلز: {booking.sales_name}
+                            </span>
+                          )}
+                        </h4>
+                        
+                        {/* Dress 1 */}
+                        <div className="flex items-start gap-3 bg-white p-2.5 rounded-xl border border-slate-100">
                           {booking.dress?.image_url &&
-                        <img src={booking.dress.image_url} alt="dress" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
-                        }
-                          <div className="space-y-1 text-xs font-bold text-slate-700 flex-grow">
-                            <div><span className="text-slate-400 font-medium">الفستان:</span> {booking.dress?.name || 'غير محدد'}</div>
-                            <div><span className="text-slate-400 font-medium">تاريخ المناسبة / الزفاف:</span> <span className="font-mono text-rose-600">{booking.event_date ? booking.event_date.split('T')[0].split(' ')[0] : 'غير محدد'}</span></div>
+                            <img src={booking.dress.image_url} alt="dress" className="w-14 h-14 rounded-xl object-cover border border-slate-200" />
+                          }
+                          <div className="space-y-0.5 text-xs font-bold text-slate-700 flex-grow">
+                            <div className="text-rose-700 font-black">1. {booking.dress?.name || 'غير محدد'}</div>
+                            <div className="text-[10px] text-slate-500 font-normal">كود: {booking.dress?.code || '—'} | الإيجار: {booking.dress?.rental_price || 0} ج.م</div>
                           </div>
+                        </div>
+
+                        {/* Dress 2 if present */}
+                        {booking.dress2 && (
+                          <div className="flex items-start gap-3 bg-white p-2.5 rounded-xl border border-purple-100">
+                            {booking.dress2?.image_url &&
+                              <img src={booking.dress2.image_url} alt="dress 2" className="w-14 h-14 rounded-xl object-cover border border-slate-200" />
+                            }
+                            <div className="space-y-0.5 text-xs font-bold text-slate-700 flex-grow">
+                              <div className="text-purple-700 font-black">2. {booking.dress2?.name} (فستان إضافي)</div>
+                              <div className="text-[10px] text-slate-500 font-normal">كود: {booking.dress2?.code || '—'} | الإيجار: {booking.dress2?.rental_price || 0} ج.م</div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="pt-1 text-xs font-bold text-slate-600">
+                          <span>تاريخ المناسبة / الزفاف: </span>
+                          <span className="font-mono text-rose-600">{booking.event_date ? booking.event_date.split('T')[0].split(' ')[0] : 'غير محدد'}</span>
+                          {booking.is_override && (
+                            <span className="mr-2 text-[9px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
+                              ⚠️ تم تأكيد الحجز بتجاوز التعارض
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1498,7 +1689,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                         <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-700">
                           <div><span className="text-slate-400 font-medium">إجمالي قيمة الإيجار:</span> {booking.total_amount} ج.م</div>
                           <div><span className="text-slate-400 font-medium">العربون / المدفوع:</span> {totalPaid} ج.م</div>
-                          <div className="col-span-2"><span className="text-slate-400 font-medium">المبلغ المتبقي:</span> <span className={`${remaining > 0 ? 'text-rose-600 font-black' : 'text-emerald-600'}`}>{remaining} ج.م</span></div>
+                          <div><span className="text-slate-400 font-medium">مبلغ التأمين:</span> {booking.insurance_amount || 5000} ج.م</div>
+                          <div><span className="text-slate-400 font-medium">المبلغ المتبقي:</span> <span className={`${remaining > 0 ? 'text-rose-600 font-black' : 'text-emerald-600'}`}>{remaining} ج.م</span></div>
                         </div>
                         {booking.revenues && booking.revenues.length > 0 &&
                       <div className="space-y-1.5 mt-2 bg-white p-2.5 rounded-xl border border-slate-100">

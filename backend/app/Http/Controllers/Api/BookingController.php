@@ -56,28 +56,50 @@ class BookingController extends Controller
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
+            'sales_name' => 'nullable|string|max:255',
             'payment_method' => 'nullable|string',
+            'is_override' => 'nullable|boolean',
+            'force_override' => 'nullable|boolean',
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
 
         $status = $request->input('status', 'pending');
-        if ($status === 'confirmed' || $status === 'picked_up') {
-            $conflict = Booking::checkDressAvailability(
+        $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
+
+        if (($status === 'confirmed' || $status === 'picked_up') && !$forceOverride) {
+            $conflict1 = Booking::checkDressAvailability(
                 $request->input('client_id'),
                 $request->input('dress_id'),
                 $request->input('event_date')
             );
 
-            if ($conflict) {
+            $conflict2 = $request->filled('dress_2_id') ? Booking::checkDressAvailability(
+                $request->input('client_id'),
+                $request->input('dress_2_id'),
+                $request->input('event_date')
+            ) : null;
+
+            if ($conflict1 || $conflict2) {
+                $errorMsg = $conflict1 ? "الفستان الأول غير متوفر في هذه الفترة: {$conflict1}" : '';
+                if ($conflict2) {
+                    $errorMsg .= ($errorMsg ? ' | ' : '') . "الفستان الثاني غير متوفر في هذه الفترة: {$conflict2}";
+                }
+
                 return response()->json([
                     'errors' => [
-                        'event_date' => ["هذا الفستان غير متوفر في هذه الفترة: {$conflict}"]
+                        'event_date' => [$errorMsg]
                     ],
-                    'message' => "هذا الفستان غير متوفر في هذه الفترة: {$conflict}",
-                    'available_date' => $conflict
+                    'message' => $errorMsg,
+                    'conflict_dress_1' => $conflict1,
+                    'conflict_dress_2' => $conflict2,
+                    'available_date' => $conflict1 ?: $conflict2
                 ], 422);
             }
+        }
+
+        if ($forceOverride) {
+            $validated['is_override'] = true;
         }
 
         $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
@@ -85,6 +107,7 @@ class BookingController extends Controller
             $validated['receipt_path'] = $receiptPath;
         }
 
+        unset($validated['force_override']);
         $booking = Booking::create($validated);
 
         // Create new booking notification
@@ -128,33 +151,56 @@ class BookingController extends Controller
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
+            'sales_name' => 'nullable|string|max:255',
             'payment_method' => 'nullable|string',
+            'is_override' => 'nullable|boolean',
+            'force_override' => 'nullable|boolean',
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
 
         $clientId = $request->input('client_id', $booking->client_id);
         $dressId = $request->input('dress_id', $booking->dress_id);
+        $dress2Id = $request->has('dress_2_id') ? $request->input('dress_2_id') : $booking->dress_2_id;
         $eventDate = $request->input('event_date', $booking->event_date);
         $status = $request->input('status', $booking->status);
+        $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
 
-        if ($status === 'confirmed' || $status === 'picked_up') {
-            $conflict = Booking::checkDressAvailability(
+        if (($status === 'confirmed' || $status === 'picked_up') && !$forceOverride) {
+            $conflict1 = Booking::checkDressAvailability(
                 $clientId,
                 $dressId,
                 $eventDate,
                 $booking->id
             );
 
-            if ($conflict) {
+            $conflict2 = $dress2Id ? Booking::checkDressAvailability(
+                $clientId,
+                $dress2Id,
+                $eventDate,
+                $booking->id
+            ) : null;
+
+            if ($conflict1 || $conflict2) {
+                $errorMsg = $conflict1 ? "الفستان الأول غير متوفر في هذه الفترة: {$conflict1}" : '';
+                if ($conflict2) {
+                    $errorMsg .= ($errorMsg ? ' | ' : '') . "الفستان الثاني غير متوفر في هذه الفترة: {$conflict2}";
+                }
+
                 return response()->json([
                     'errors' => [
-                        'event_date' => ["هذا الفستان غير متوفر في هذه الفترة: {$conflict}"]
+                        'event_date' => [$errorMsg]
                     ],
-                    'message' => "هذا الفستان غير متوفر في هذه الفترة: {$conflict}",
-                    'available_date' => $conflict
+                    'message' => $errorMsg,
+                    'conflict_dress_1' => $conflict1,
+                    'conflict_dress_2' => $conflict2,
+                    'available_date' => $conflict1 ?: $conflict2
                 ], 422);
             }
+        }
+
+        if ($forceOverride) {
+            $validated['is_override'] = true;
         }
 
         $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
@@ -162,6 +208,7 @@ class BookingController extends Controller
             $validated['receipt_path'] = $receiptPath;
         }
 
+        unset($validated['force_override']);
         $booking->update($validated);
 
         $loaded = $booking->load(['client', 'dress', 'dress2', 'dress3']);
