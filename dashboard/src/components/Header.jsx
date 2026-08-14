@@ -109,16 +109,16 @@ export function Header({ onMenuClick }) {
       setIsSearching(true);
       try {
         const [clientsRes, dressesRes] = await Promise.allSettled([
-        apiClient.get('/clients'),
-        apiClient.get('/dresses')]
-        );
+          apiClient.get('/clients?per_page=1000'),
+          apiClient.get('/dresses?per_page=all')
+        ]);
 
         const results = [];
 
         if (clientsRes.status === 'fulfilled') {
           const clients = clientsRes.value.data || [];
           const filtered = clients.filter((c) =>
-          c.name?.toLowerCase().includes(query.toLowerCase())
+            c.name?.toLowerCase().includes(query.toLowerCase())
           );
           filtered.forEach((c) => {
             results.push({ id: c.id, label: c.name, type: 'client', path: '/dashboard/brides' });
@@ -126,12 +126,13 @@ export function Header({ onMenuClick }) {
         }
 
         if (dressesRes.status === 'fulfilled') {
-          const dresses = dressesRes.value.data || [];
+          const dresses = Array.isArray(dressesRes.value) ? dressesRes.value : (dressesRes.value?.data || []);
           const filtered = dresses.filter((d) =>
-          d.name?.toLowerCase().includes(query.toLowerCase())
+            d.name?.toLowerCase().includes(query.toLowerCase()) ||
+            d.code?.toLowerCase().includes(query.toLowerCase())
           );
           filtered.forEach((d) => {
-            results.push({ id: d.id, label: d.name, type: 'dress', path: '/dashboard/dresses' });
+            results.push({ id: d.id, label: `${d.name} ${d.code ? `(${d.code})` : ''}`, type: 'dress', path: '/dashboard/dresses' });
           });
         }
 

@@ -221,9 +221,10 @@ export default function AppointmentsPage() {
       if (res.data?.length > 0) setNewClientId(res.data[0].id.toString());
     }).catch(() => {});
 
-    apiClient.get('/dresses').then((res) => {
-      setDressesList(res.data || []);
-      if (res.data?.length > 0) setNewDressId(res.data[0].id.toString());
+    apiClient.get('/dresses?per_page=all').then((res) => {
+      const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
+      setDressesList(data);
+      if (data.length > 0) setNewDressId(data[0].id.toString());
     }).catch(() => {});
   };
 

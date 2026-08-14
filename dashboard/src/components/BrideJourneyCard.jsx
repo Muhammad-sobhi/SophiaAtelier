@@ -134,8 +134,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       }
     }
     if ((showFittingModal || showBookingModal) && dressesList.length === 0) {
-      apiClient.get('/dresses').then((res) => {
-        const list = res.data?.data || res.data || [];
+      apiClient.get('/dresses?per_page=all').then((res) => {
+        const list = Array.isArray(res) ? res : (res.data?.data || res.data || []);
         setDressesList(list);
         if (list.length > 0) {
           if (!bride.bookings?.[0]?.dress_id) {

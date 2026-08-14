@@ -307,12 +307,13 @@ export default function BridesPage() {
 
     fetchBrides();
 
-    apiClient.get('/dresses').then((res) => {
-      const data = res.data?.data || res.data || [];
+    apiClient.get('/dresses?per_page=all').then((res) => {
+      const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
       setDressesList(data);
       setAvailableDresses(data.map((d) => ({
         id: d.id,
         name: d.name || '',
+        code: d.code || '',
         image: d.images?.[0]?.image_path ?
           `${import.meta.env.VITE_API_URL?.replace('/api', '')}/storage/${d.images[0].image_path}` :
           ''

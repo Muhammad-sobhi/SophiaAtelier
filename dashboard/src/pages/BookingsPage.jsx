@@ -245,8 +245,8 @@ export default function BookingsPage() {
     }).catch(() => {});
 
     // Load dresses catalog from API
-    apiClient.get('/dresses').then((res) => {
-      const data = res.data || [];
+    apiClient.get('/dresses?per_page=all').then((res) => {
+      const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
       setDressesObjects(data);
       if (data.length > 0) setAvailableDresses(data.map((d) => d.name));
     }).catch(() => {});

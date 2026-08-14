@@ -8,7 +8,11 @@ return [
         env('DASHBOARD_URL', 'http://localhost:5173'),
         'https://sophiadresses.cloud',
         'https://www.sophiadresses.cloud',
+        'https://dashboard.sophiadresses.cloud',
         'https://admin.sophiadresses.cloud',
+        'https://api.sophiadresses.cloud',
+        'http://localhost:5173',
+        'http://localhost:3000',
     ]),
     'allowed_origins_patterns' => [
         '#^https?://.*\.sophiadresses\.cloud$#',
