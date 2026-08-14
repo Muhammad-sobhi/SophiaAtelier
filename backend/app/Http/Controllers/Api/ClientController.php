@@ -32,7 +32,8 @@ class ClientController extends Controller
             $cleanSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
             $query->where(function ($q) use ($cleanSearch) {
                 $q->where('name', 'like', "%{$cleanSearch}%")
-                    ->orWhere('phone', 'like', "%{$cleanSearch}%");
+                    ->orWhere('phone', 'like', "%{$cleanSearch}%")
+                    ->orWhere('phone2', 'like', "%{$cleanSearch}%");
             });
         }
 
@@ -70,14 +71,18 @@ class ClientController extends Controller
             $cleanPhone = preg_replace('/[^\d]/', '', $phone);
             $query->where(function ($q) use ($phone, $cleanPhone, $email) {
                 $q->where('phone', $phone)
+                    ->orWhere('phone2', $phone)
                     ->orWhere('phone', 'LIKE', "%{$cleanPhone}%")
+                    ->orWhere('phone2', 'LIKE', "%{$cleanPhone}%")
                     ->orWhere('email', $email);
             });
         } elseif ($phone) {
             $cleanPhone = preg_replace('/[^\d]/', '', $phone);
             $query->where(function ($q) use ($phone, $cleanPhone) {
                 $q->where('phone', $phone)
-                    ->orWhere('phone', 'LIKE', "%{$cleanPhone}%");
+                    ->orWhere('phone2', $phone)
+                    ->orWhere('phone', 'LIKE', "%{$cleanPhone}%")
+                    ->orWhere('phone2', 'LIKE', "%{$cleanPhone}%");
             });
         } elseif ($email) {
             $query->where('email', $email);
@@ -116,6 +121,7 @@ class ClientController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
             'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
+            'phone2' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'email' => 'nullable|email',
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
@@ -144,6 +150,7 @@ class ClientController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
             'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
+            'phone2' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'email' => 'nullable|email',
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
@@ -193,6 +200,7 @@ class ClientController extends Controller
         $request->validate([
             'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining',
             'phone' => 'nullable|string|max:50',
+            'phone2' => 'nullable|string|max:50',
             'dress_id' => 'nullable|integer|exists:dresses,id',
             'dress_2_id' => 'nullable|integer|exists:dresses,id',
             'fitting_date' => 'nullable|date',
@@ -283,8 +291,15 @@ class ClientController extends Controller
                 break;
 
             case 'confirm_booking':
+                $clientUpdates = [];
                 if ($request->filled('phone')) {
-                    $client->update(['phone' => $request->input('phone')]);
+                    $clientUpdates['phone'] = $request->input('phone');
+                }
+                if ($request->has('phone2')) {
+                    $clientUpdates['phone2'] = $request->input('phone2');
+                }
+                if (!empty($clientUpdates)) {
+                    $client->update($clientUpdates);
                 }
 
                 // Get or create booking

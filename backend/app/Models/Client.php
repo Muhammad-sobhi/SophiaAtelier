@@ -12,7 +12,7 @@ class Client extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'phone', 'email', 'address', 'city', 'source', 'wedding_date', 'notes', 'image_path'];
+    protected $fillable = ['name', 'phone', 'phone2', 'email', 'address', 'city', 'source', 'wedding_date', 'notes', 'image_path'];
 
     protected $appends = ['visits_count', 'total_bookings', 'current_stage', 'latest_visit_date', 'latest_visit_time', 'latest_dress_name', 'latest_dress_trying_fee', 'wedding_date'];
 

@@ -118,6 +118,7 @@ export default function BridesPage() {
   const [newName, setNewName] = useState('');
   const [newCity, setNewCity] = useState('القاهرة');
   const [newPhone, setNewPhone] = useState('');
+  const [newPhone2, setNewPhone2] = useState('');
   const [newSource, setNewSource] = useState('انستقرام');
   const [newVisitDate, setNewVisitDate] = useState(new Date().toISOString().split('T')[0]);
   const [newWeddingDate, setNewWeddingDate] = useState('');
@@ -158,6 +159,7 @@ export default function BridesPage() {
   const [bookingSalesName, setBookingSalesName] = useState('');
   const [employeesList, setEmployeesList] = useState([]);
   const [bookingPhone, setBookingPhone] = useState('');
+  const [bookingPhone2, setBookingPhone2] = useState('');
   const [bookingEventDate, setBookingEventDate] = useState(new Date().toISOString().split('T')[0]);
   const [bookingTotalAmount, setBookingTotalAmount] = useState('3500');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('1000');
@@ -306,6 +308,7 @@ export default function BridesPage() {
       setBookingDepositAmount('1000');
       setBookingPaymentMethod('cash');
       setBookingPhone(selectedBrideForBooking.phone || '');
+      setBookingPhone2(selectedBrideForBooking.phone2 || '');
       setBookingEventDate(selectedBrideForBooking.wedding_date || selectedBrideForBooking.bookings?.[0]?.event_date || new Date().toISOString().split('T')[0]);
       const bookedDressId = selectedBrideForBooking.bookings?.[0]?.dress_id || (dressesList.length > 0 ? dressesList[0].id.toString() : '');
       if (bookedDressId) {
@@ -326,6 +329,7 @@ export default function BridesPage() {
         id: c.id,
         name: c.name,
         phone: c.phone || '',
+        phone2: c.phone2 || '',
         email: c.email || '',
         source: c.source || '',
         city: c.city || c.address || '',
@@ -512,6 +516,7 @@ export default function BridesPage() {
       await apiClient.put(`/clients/${selectedBrideForBooking.id}/stage-action`, {
         action: 'confirm_booking',
         phone: activePhone,
+        phone2: bookingPhone2.trim() || null,
         dress_id: parseInt(bookingDressId),
         dress_2_id: bookingHasSecondDress && bookingDress2Id ? parseInt(bookingDress2Id) : null,
         sales_name: bookingSalesName.trim() || null,
@@ -611,6 +616,9 @@ export default function BridesPage() {
       const fd = new FormData();
       fd.append('name', newName.trim());
       fd.append('phone', newPhone.trim() || '0000000000');
+      if (newPhone2.trim()) {
+        fd.append('phone2', newPhone2.trim());
+      }
       fd.append('email', `${Date.now()}@atelier-bride.com`);
       fd.append('city', newCity.trim());
       fd.append('address', newCity.trim());
@@ -653,6 +661,7 @@ export default function BridesPage() {
     setNewName(b.name);
     setNewCity(b.city || 'القاهرة');
     setNewPhone(b.phone || '');
+    setNewPhone2(b.phone2 || '');
     setNewSource(b.source || 'انستقرام');
     setNewWeddingDate(b.wedding_date || '');
 
@@ -691,6 +700,7 @@ export default function BridesPage() {
       fd.append('_method', 'PUT');
       fd.append('name', newName.trim());
       fd.append('phone', newPhone.trim() || '0000000000');
+      fd.append('phone2', newPhone2.trim() || '');
       fd.append('city', newCity.trim());
       fd.append('address', newCity.trim());
       fd.append('source', mappedSource);
@@ -722,6 +732,7 @@ export default function BridesPage() {
     setNewName('');
     setNewCity('القاهرة');
     setNewPhone('');
+    setNewPhone2('');
     setNewSource('انستقرام');
     setNewVisitDate(new Date().toISOString().split('T')[0]);
     setNewWeddingDate('');
@@ -912,7 +923,7 @@ export default function BridesPage() {
             <h4 className="text-xs font-black text-slate-800 tracking-tight">{bride.name}</h4>
             <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold justify-start">
               <Phone size={10} className="text-slate-400" />
-              <span className="font-mono">{bride.phone || '—'}</span>
+              <span className="font-mono">{bride.phone || '—'}{bride.phone2 ? ` / ${bride.phone2}` : ''}</span>
             </div>
             <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold justify-start">
               <MapPin size={10} className="text-slate-400" />
@@ -1247,6 +1258,30 @@ export default function BridesPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">رقم الجوال الأساسي</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="مثال: 01012345678"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-mono text-right"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">رقم هاتف إضافي (اختياري)</label>
+                    <input
+                      type="tel"
+                      placeholder="رقم آخر / مرافق..."
+                      value={newPhone2}
+                      onChange={(e) => setNewPhone2(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-mono text-right"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
                     <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
                     <input
                       type="text"
@@ -1258,20 +1293,6 @@ export default function BridesPage() {
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600">رقم الجوال</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="مثال: 01012345678"
-                      value={newPhone}
-                      onChange={(e) => setNewPhone(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
                     <select
@@ -1288,6 +1309,9 @@ export default function BridesPage() {
                       <option value="أخرى">أخرى</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-extrabold text-slate-600">تاريخ الزيارة</label>
                     <input
@@ -1493,15 +1517,28 @@ export default function BridesPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600">رقم الهاتف</label>
+                    <label className="text-xs font-extrabold text-slate-600">رقم الهاتف الأساسي</label>
                     <input
                       type="text"
                       required
                       value={newPhone}
                       onChange={(e) => setNewPhone(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-mono text-right"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">رقم هاتف إضافي (اختياري)</label>
+                    <input
+                      type="text"
+                      placeholder="رقم آخر / مرافق..."
+                      value={newPhone2}
+                      onChange={(e) => setNewPhone2(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-mono text-right"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
                     <input
@@ -1514,9 +1551,6 @@ export default function BridesPage() {
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
                     <select
@@ -1533,15 +1567,15 @@ export default function BridesPage() {
                       <option value="أخرى">أخرى</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
-                    <input
-                      type="date"
-                      value={newWeddingDate}
-                      onChange={(e) => setNewWeddingDate(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                    />
-                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
+                  <input
+                    type="date"
+                    value={newWeddingDate}
+                    onChange={(e) => setNewWeddingDate(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
                 </div>
 
                 {/* Fast Dress Selection */}
@@ -2478,17 +2512,29 @@ export default function BridesPage() {
                   )}
                 </div>
 
-                {/* Bride Phone Field */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف العروس (واتساب)</label>
-                  <input
-                    type="tel"
-                    required
-                    value={bookingPhone}
-                    onChange={(e) => setBookingPhone(e.target.value)}
-                    placeholder="مثال: 01012345678"
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
-                  />
+                {/* Bride Phone Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف العروس (واتساب)</label>
+                    <input
+                      type="tel"
+                      required
+                      value={bookingPhone}
+                      onChange={(e) => setBookingPhone(e.target.value)}
+                      placeholder="مثال: 01012345678"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف إضافي (اختياري)</label>
+                    <input
+                      type="tel"
+                      value={bookingPhone2}
+                      onChange={(e) => setBookingPhone2(e.target.value)}
+                      placeholder="رقم آخر / مرافق..."
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">

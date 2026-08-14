@@ -116,6 +116,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [salesName, setSalesName] = useState('');
   const [employeesList, setEmployeesList] = useState([]);
   const [bookingPhone, setBookingPhone] = useState(bride.phone || '');
+  const [bookingPhone2, setBookingPhone2] = useState(bride.phone2 || '');
   const [bookingEventDate, setBookingEventDate] = useState(bride.wedding_date || new Date().toISOString().split('T')[0]);
   const [bookingTotalAmount, setBookingTotalAmount] = useState('0');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('0');
@@ -129,7 +130,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
   React.useEffect(() => {
     setBookingPhone(bride.phone || '');
-  }, [bride.id, bride.phone]);
+    setBookingPhone2(bride.phone2 || '');
+  }, [bride.id, bride.phone, bride.phone2]);
 
   React.useEffect(() => {
     apiClient.get('/employees').then((res) => {
@@ -190,6 +192,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       setBookingDepositAmount('0');
       setBookingPaymentMethod('instapay');
       setBookingPhone(bride.phone || '');
+      setBookingPhone2(bride.phone2 || '');
       setBookingEventDate(bride.wedding_date || new Date().toISOString().split('T')[0]);
     }
   }, [showBookingModal, bride.id]);
@@ -356,6 +359,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       await apiClient.put(`/clients/${bride.id}/stage-action`, {
         action: 'confirm_booking',
         phone: activePhone,
+        phone2: bookingPhone2.trim() || null,
         dress_id: parseInt(bookingDressId),
         dress_2_id: bookingHasSecondDress && bookingDress2Id ? parseInt(bookingDress2Id) : null,
         sales_name: salesName.trim() || null,
@@ -675,7 +679,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 <div className="mb-3 space-y-1">
                   <h4 className="text-xs font-black text-slate-800 tracking-tight text-right">{bride.name}</h4>
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-550 justify-end">
-                    <span className="font-mono">{bride.phone || '—'}</span>
+                    <span className="font-mono">{bride.phone || '—'}{bride.phone2 ? ` / ${bride.phone2}` : ''}</span>
                     <Phone size={10} className="text-slate-400" />
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-550 justify-end">
@@ -1387,17 +1391,29 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   )}
                 </div>
 
-                {/* Bride Phone Field */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف العروس (واتساب)</label>
-                  <input
-                    type="tel"
-                    required
-                    value={bookingPhone}
-                    onChange={(e) => setBookingPhone(e.target.value)}
-                    placeholder="مثال: 01012345678"
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
-                  />
+                {/* Bride Phone Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف العروس (واتساب)</label>
+                    <input
+                      type="tel"
+                      required
+                      value={bookingPhone}
+                      onChange={(e) => setBookingPhone(e.target.value)}
+                      placeholder="مثال: 01012345678"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف إضافي (اختياري)</label>
+                    <input
+                      type="tel"
+                      value={bookingPhone2}
+                      onChange={(e) => setBookingPhone2(e.target.value)}
+                      placeholder="رقم آخر / مرافق..."
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
