@@ -570,60 +570,60 @@ export default function DashboardPage() {
         };
 
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-            <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+            <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
+              <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسليم الفستان للعروس</h3>
                 <button onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
-              <form onSubmit={handlePickupConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-                <div className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
+              <form onSubmit={handlePickupConfirm} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
                   {/* Client and Dress info */}
-                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-1">
+                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-3 space-y-1">
                     <h4 className="text-xs font-black text-indigo-700">بيانات العروس والفستان</h4>
-                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-700 mt-2">
+                    <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-slate-700 mt-1">
                       <div>العروس: <span className="font-extrabold">{selectedBrideForPickup.name}</span></div>
                       <div>الهاتف: <span className="font-mono">{selectedBrideForPickup.phone}</span></div>
-                      <div className="col-span-2 border-t border-slate-150 pt-2 mt-1">
+                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5">
                         الفستان الأساسي: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Financial Summary */}
-                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-2">
+                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3 space-y-1.5">
                     <h4 className="text-xs font-black text-slate-700">ملخص الحساب المالي للفستان</h4>
                     <div className="grid grid-cols-3 gap-2 text-[9px] font-extrabold text-slate-500">
-                      <div className="bg-white p-2 rounded-lg border border-slate-100 text-center">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100 text-center">
                         <div className="text-slate-400 mb-0.5">الإجمالي</div>
                         <div className="text-slate-800 font-black text-xs">{parseFloat(booking?.total_amount || 0).toLocaleString()} ج.م</div>
                       </div>
-                      <div className="bg-white p-2 rounded-lg border border-slate-100 text-center">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100 text-center">
                         <div className="text-slate-400 mb-0.5">المدفوع سابقاً</div>
                         <div className="text-emerald-600 font-black text-xs">{totalPaid.toLocaleString()} ج.م</div>
                       </div>
-                      <div className="bg-white p-2 rounded-lg border border-slate-100 text-center">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100 text-center">
                         <div className="text-slate-400 mb-0.5">المتبقي</div>
                         <div className="text-rose-600 font-black text-xs">{remaining.toLocaleString()} ج.م</div>
                       </div>
                     </div>
 
                     {/* Payment Inputs */}
-                    {remaining > 0 &&
-                      <div className="pt-2 space-y-2">
+                    {remaining > 0 && (
+                      <div className="pt-1.5 space-y-1.5">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={recordPickupPayment}
                             onChange={(e) => setRecordPickupPayment(e.target.checked)}
-                            className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm" />
-
+                            className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm"
+                          />
                           <span className="text-[10px] font-bold text-slate-700">تسجيل سداد المبلغ المتبقي الآن</span>
                         </label>
-                        {recordPickupPayment &&
+                        {recordPickupPayment && (
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">مبلغ السداد</label>
@@ -631,43 +631,44 @@ export default function DashboardPage() {
                                 type="number"
                                 value={pickupPaymentAmount}
                                 onChange={(e) => setPickupPaymentAmount(e.target.value)}
-                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-
+                                className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
+                              />
                             </div>
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">طريقة الدفع</label>
                               <select
                                 value={pickupPaymentMethod}
                                 onChange={(e) => setPickupPaymentMethod(e.target.value)}
-                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5">
-
+                                className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
+                              >
                                 <option value="cash">نقداً (Cash)</option>
                                 <option value="card">فيزا / كارت (Card)</option>
                                 <option value="instapay">إنستا باي (InstaPay)</option>
                               </select>
                             </div>
                           </div>
-                        }
+                        )}
                       </div>
-                    }
+                    )}
 
                     {/* Insurance Input */}
-                    <div className="pt-1 border-t border-slate-150 mt-2 grid grid-cols-2 gap-2">
+                    <div className="pt-1 border-t border-slate-150 mt-1 grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[9px] font-extrabold text-slate-500">مبلغ التأمين المستلم</label>
                         <input
                           type="number"
                           value={pickupInsuranceAmount}
                           onChange={(e) => setPickupInsuranceAmount(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-
+                          className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
+                        />
                       </div>
-                      <div className="flex items-end text-[8px] text-slate-400 font-bold pb-2 leading-tight">
+                      <div className="flex items-end text-[8px] text-slate-400 font-bold pb-1 leading-tight">
                         * هذا المبلغ تأمين مسترد يتم إرجاعه للعميلة عند إرجاع الفستان سليم.
                       </div>
                     </div>
+
                     {/* Upload Receipt */}
-                    <div className="pt-2 border-t border-slate-150 mt-2 space-y-1">
+                    <div className="pt-1.5 border-t border-slate-150 mt-1 space-y-1">
                       <label className="text-[9px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع (اختياري)</label>
                       <div className="flex items-center gap-2">
                         <input
@@ -684,76 +685,76 @@ export default function DashboardPage() {
                             }
                           }}
                           className="hidden"
-                          id="dashboard-pickup-receipt-file-input" />
-
+                          id="dashboard-pickup-receipt-file-input"
+                        />
                         <label
                           htmlFor="dashboard-pickup-receipt-file-input"
-                          className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-
+                          className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                        >
                           <CreditCard size={12} className="inline mr-1" />
                           <span>{pickupReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                         </label>
-                        {pickupReceipt &&
+                        {pickupReceipt && (
                           <button
                             type="button"
                             onClick={() => setPickupReceipt(null)}
-                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-
+                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                          >
                             <X size={12} />
                           </button>
-                        }
+                        )}
                       </div>
-                      {pickupReceipt &&
-                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
-                          <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                      {pickupReceipt && (
+                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
+                          <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
                         </div>
-                      }
+                      )}
                     </div>
                   </div>
 
                   {/* Accessories Checklist */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <h4 className="text-xs font-black text-slate-700">قائمة إكسسوارات الفستان (تأكيد التسليم للعروس)</h4>
-                    {accessoriesList.length > 0 ?
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {accessoriesList.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
                           const key = `${acc.name}_${idx}`;
                           return (
-                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                            <label key={idx} className="flex items-center gap-2 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
                                 type="checkbox"
                                 checked={!!checkedAccessories[key]}
                                 onChange={(e) => setCheckedAccessories({ ...checkedAccessories, [key]: e.target.checked })}
-                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500"
+                              />
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
-                            </label>);
-
+                            </label>
+                          );
                         })}
-                      </div> :
-
-                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      </div>
+                    ) : (
+                      <div className="text-center py-3 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
-                    }
+                    )}
                   </div>
                 </div>
 
                 {/* Fixed Footer */}
-                <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
-                  <button type="submit" className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
+                <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                  <button type="submit" className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 text-center">
                     تأكيد تسليم الفستان والملحقات
                   </button>
-                  <button type="button" onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
                     إلغاء
                   </button>
                 </div>
               </form>
             </div>
-          </div>);
-
+          </div>
+        );
       })()}
 
       {/* Return stage Confirmation Modal */}
@@ -766,8 +767,8 @@ export default function DashboardPage() {
         const accessoriesList = [
           ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
           ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
-          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
-
+          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))
+        ];
 
         const handleReturnConfirm = async (e) => {
           e.preventDefault();
@@ -802,58 +803,58 @@ export default function DashboardPage() {
         };
 
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-            <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+            <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
+              <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسجيل استلام وإرجاع الفستان</h3>
                 <button onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
-              <form onSubmit={handleReturnConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-                <div className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
+              <form onSubmit={handleReturnConfirm} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
                   {/* Client and Dress info */}
-                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 space-y-1">
+                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-3 space-y-1">
                     <h4 className="text-xs font-black text-emerald-700">بيانات العروس والفستان المرتجع</h4>
-                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-700 mt-2">
+                    <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-slate-700 mt-1">
                       <div>العروس: <span className="font-extrabold">{selectedBrideForReturn.name}</span></div>
                       <div>الهاتف: <span className="font-mono">{selectedBrideForReturn.phone}</span></div>
-                      <div className="col-span-2 border-t border-slate-150 pt-2 mt-1">
+                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5">
                         الفستان الأساسي: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Return Checklist */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <h4 className="text-xs font-black text-rose-650 flex items-center gap-1.5">
                       <span>⚠️ يرجى جرد قائمة الملحقات والتأكد من استلامها كاملة:</span>
                     </h4>
-                    {accessoriesList.length > 0 ?
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {accessoriesList.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
                           const key = `${acc.name}_${idx}`;
                           return (
-                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                            <label key={idx} className="flex items-center gap-2 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
                                 type="checkbox"
                                 checked={!!returnCheckedAccessories[key]}
                                 onChange={(e) => setReturnCheckedAccessories({ ...returnCheckedAccessories, [key]: e.target.checked })}
-                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500"
+                              />
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
-                            </label>);
-
+                            </label>
+                          );
                         })}
-                      </div> :
-
-                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      </div>
+                    ) : (
+                      <div className="text-center py-3 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
-                    }
+                    )}
                   </div>
 
                   {/* Return Condition Notes */}
@@ -864,24 +865,24 @@ export default function DashboardPage() {
                       value={returnNotes}
                       onChange={(e) => setReturnNotes(e.target.value)}
                       placeholder="مثال: تم الإرجاع سليم وبحالة جيدة للغسيل..."
-                      className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-
+                      className="w-full h-12 min-h-[44px] p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
                   </div>
                 </div>
 
                 {/* Fixed Footer */}
-                <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
-                  <button type="submit" className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
+                <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                  <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 text-center">
                     تأكيد إرجاع الفستان وحفظ الملحقات
                   </button>
-                  <button type="button" onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
                     إلغاء
                   </button>
                 </div>
               </form>
             </div>
-          </div>);
-
+          </div>
+        );
       })()}
     </div>);
 

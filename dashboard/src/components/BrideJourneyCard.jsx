@@ -843,55 +843,62 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       </div>
 
       {/* Payment Popup Modal */}
-      {showPaymentModal &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-sm w-full border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] space-y-3 max-h-[min(90vh,580px)] overflow-y-auto scrollbar-thin my-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <CreditCard size={14} className="text-indigo-650 animate-pulse" />
                 <span>إتمام عملية الدفع للعروس</span>
               </h3>
               <button
-              onClick={() => setShowPaymentModal(false)}
-              className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-              
+                onClick={() => setShowPaymentModal(false)}
+                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={14} />
               </button>
             </div>
 
-            <form onSubmit={handleCreatePayment} className="space-y-4 text-slate-700">
+            <form onSubmit={handlePaymentSubmit} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-slate-500 block text-right">نوع الدفعة</label>
-                <input
-                type="text"
-                disabled
-                value={paymentType === 'fitting_fee' ? 'رسوم تجربة (قياس)' : 'مقدم حجز فستان'}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-500 focus:outline-none" />
-              
+                <label className="text-[10px] font-extrabold text-slate-500 block text-right">نوع المعاملة المالية</label>
+                <select
+                  value={paymentType}
+                  onChange={(e) => setPaymentType(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
+                >
+                  <option value="deposit">دفعة عربون حجز (Deposit)</option>
+                  <option value="balance">سداد متبقي الإيجار (Balance Payment)</option>
+                  <option value="security_deposit">مبلغ تأمين مسترد (Security Deposit)</option>
+                  <option value="trying_fee">رسوم بروفة قياس (Trying Fee)</option>
+                  <option value="late_fee">غرامة تأخير إرجاع (Late Fee)</option>
+                  <option value="damage_fee">رسوم تلفيات / تنظيف (Damage/Cleaning)</option>
+                  <option value="other">أخرى (Other)</option>
+                </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">المبلغ (ج.م)</label>
                   <input
-                  type="number"
-                  required
-                  placeholder="0.00"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-center font-mono" />
-                
+                    type="number"
+                    required
+                    placeholder="0.00"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-center font-mono"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة الدفع</label>
                   <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none">
-                  
-                    {PAYMENT_METHODS.map((pm) =>
-                  <option key={pm.id} value={pm.id}>{pm.label}</option>
-                  )}
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
+                  >
+                    {PAYMENT_METHODS.map((pm) => (
+                      <option key={pm.id} value={pm.id}>{pm.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -899,230 +906,231 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
               <div className="space-y-1">
                 <label className="text-[10px] font-extrabold text-slate-500 block text-right">ملاحظات وتفاصيل التحويل</label>
                 <textarea
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
-                placeholder="تفاصيل إضافية أو مرجع الحوالة..."
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-20" />
-              
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  placeholder="تفاصيل إضافية أو مرجع الحوالة..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14"
+                />
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-2.5 pt-1">
                 <button
-                type="submit"
-                disabled={isSubmittingPayment}
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-600/10 active:scale-95 text-center">
-                
+                  type="submit"
+                  disabled={isSubmittingPayment}
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-600/10 active:scale-95 text-center"
+                >
                   {isSubmittingPayment ? 'جاري التسجيل...' : 'تأكيد الدفع'}
                 </button>
                 <button
-                type="button"
-                onClick={() => setShowPaymentModal(false)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+                >
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Fitting Appointment Booking Popup Modal */}
-      {showFittingModal &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
+      {showFittingModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] my-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-3 sm:p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <CalIcon size={14} className="text-indigo-650 animate-pulse" />
                 <span>حجز موعد بروفة قياس جديدة</span>
               </h3>
               <button
-              onClick={() => setShowFittingModal(false)}
-              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-              
+                onClick={() => setShowFittingModal(false)}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={14} />
               </button>
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleFittingSubmit} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-              <div className="p-4 space-y-3 overflow-y-auto flex-grow text-right scrollbar-thin">
-                <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleFittingSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-3.5 sm:p-4 space-y-2.5 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">تاريخ موعد القياس</label>
                     <input
-                    type="date"
-                    required
-                    value={fittingDate}
-                    onChange={(e) => setFittingDate(e.target.value)}
-                    className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
-                    isFittingDateBlocked ? 'border-rose-300 bg-rose-50/20 text-rose-700' : 'bg-slate-50 border-slate-100'}`
-                    } />
-                  
-                    {isFittingDateBlocked &&
-                  <span className="text-[8.5px] font-bold text-rose-600 block mt-0.5 text-right">⚠️ هذا التاريخ غير متاح لتواجد الفستان بالأتيليه.</span>
-                  }
+                      type="date"
+                      required
+                      value={fittingDate}
+                      onChange={(e) => setFittingDate(e.target.value)}
+                      className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
+                        isFittingDateBlocked ? 'border-rose-300 bg-rose-50/20 text-rose-700' : 'bg-slate-50 border-slate-100'
+                      }`}
+                    />
+                    {isFittingDateBlocked && (
+                      <span className="text-[8.5px] font-bold text-rose-600 block mt-0.5 text-right">⚠️ هذا التاريخ غير متاح لتواجد الفستان بالأتيليه.</span>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">الوقت (الساعة)</label>
                     <select
-                    required
-                    value={fittingTime}
-                    onChange={(e) => setFittingTime(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-                    
-                      {["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"].map((t) =>
-                    <option key={t} value={t}>{t}</option>
-                    )}
+                      required
+                      value={fittingTime}
+                      onChange={(e) => setFittingTime(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
+                    >
+                      {["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"].map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
-                <div className="space-y-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100/80 text-right">
+                <div className="space-y-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100/80 text-right">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">فستان البروفة (الفستان المحجوز)</label>
                   {(() => {
-                  const booking = bride.bookings?.[0];
-                  const bookedDress = booking?.dress;
-                  if (bookedDress) {
-                    return (
-                      <div className="flex flex-col gap-1 mt-1">
+                    const booking = bride.bookings?.[0];
+                    const bookedDress = booking?.dress;
+                    if (bookedDress) {
+                      return (
+                        <div className="flex flex-col gap-0.5 mt-0.5">
                           <span className="text-xs font-black text-indigo-650">{bookedDress.name}</span>
-                          <span className="text-[9px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} | رسوم التجربة والقياس: {parseFloat(bookedDress.trying_fee || 0).toLocaleString()} ج.م</span>
-                        </div>);
-
-                  }
-                  return <span className="text-xs font-bold text-rose-500">لا يوجد فستان محجوز حالياً!</span>;
-                })()}
+                          <span className="text-[9px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} | رسوم التجربة: {parseFloat(bookedDress.trying_fee || 0).toLocaleString()} ج.م</span>
+                        </div>
+                      );
+                    }
+                    return <span className="text-xs font-bold text-rose-500">لا يوجد فستان محجوز حالياً!</span>;
+                  })()}
                 </div>
 
-                {parseFloat(tryingFee) > 0 &&
-              <div className="grid grid-cols-2 gap-3 bg-indigo-50/20 border border-indigo-150 p-2.5 rounded-2xl animate-fade-in">
+                {parseFloat(tryingFee) > 0 && (
+                  <div className="grid grid-cols-2 gap-2.5 bg-indigo-50/20 border border-indigo-150 p-2 rounded-2xl animate-fade-in">
                     <div className="space-y-1">
                       <label className="text-[10px] font-extrabold text-slate-500 block text-right">رسوم القياس المستحقة</label>
                       <input
-                    type="text"
-                    disabled
-                    value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right" />
-                  
+                        type="text"
+                        disabled
+                        value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع الرسوم</label>
                       <select
-                    value={fittingPaymentMethod}
-                    onChange={(e) => setFittingPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-                    
-                        {PAYMENT_METHODS.map((pm) =>
-                    <option key={pm.id} value={pm.id}>{pm.label}</option>
-                    )}
+                        value={fittingPaymentMethod}
+                        onChange={(e) => setFittingPaymentMethod(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
+                      >
+                        {PAYMENT_METHODS.map((pm) => (
+                          <option key={pm.id} value={pm.id}>{pm.label}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
-              }
+                )}
 
                 {/* Upload Receipt */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع (اختياري)</label>
                   <div className="flex items-center gap-2">
                     <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFittingReceipt(reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                    id="fitting-receipt-file-input" />
-                  
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setFittingReceipt(reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="fitting-receipt-file-input"
+                    />
                     <label
-                    htmlFor="fitting-receipt-file-input"
-                    className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-600 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-                    
+                      htmlFor="fitting-receipt-file-input"
+                      className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-600 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                    >
                       <CreditCard size={12} />
                       <span>{fittingReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                     </label>
-                    {fittingReceipt &&
-                  <button
-                    type="button"
-                    onClick={() => setFittingReceipt(null)}
-                    className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-                    
+                    {fittingReceipt && (
+                      <button
+                        type="button"
+                        onClick={() => setFittingReceipt(null)}
+                        className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                      >
                         <X size={12} />
                       </button>
-                  }
+                    )}
                   </div>
-                  {fittingReceipt &&
-                <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
-                      <img src={fittingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                  {fittingReceipt && (
+                    <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
+                      <img src={fittingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
                     </div>
-                }
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">ملاحظات إضافية</label>
                   <textarea
-                  value={fittingNotes}
-                  onChange={(e) => setFittingNotes(e.target.value)}
-                  placeholder="ملاحظات حول المقاسات أو تفاصيل الموعد..."
-                  className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
-                
+                    value={fittingNotes}
+                    onChange={(e) => setFittingNotes(e.target.value)}
+                    placeholder="ملاحظات حول المقاسات أو تفاصيل الموعد..."
+                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-12 min-h-[44px] text-right"
+                  />
                 </div>
               </div>
 
               {/* Fixed Footer Buttons */}
-              <div className="flex items-center gap-3 p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+              <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
-                type="submit"
-                disabled={isSubmitting || isFittingDateBlocked}
-                className={`flex-1 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center ${
-                isSubmitting || isFittingDateBlocked ?
-                'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' :
-                'bg-indigo-650 hover:bg-indigo-700 text-white shadow-indigo-600/10 active:scale-95'}`
-                }>
-                
+                  type="submit"
+                  disabled={isSubmitting || isFittingDateBlocked}
+                  className={`flex-1 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center ${
+                    isSubmitting || isFittingDateBlocked
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                      : 'bg-indigo-650 hover:bg-indigo-700 text-white shadow-indigo-600/10 active:scale-95'
+                  }`}
+                >
                   {isSubmitting ? 'جاري تسجيل الموعد...' : 'تأكيد وحجز موعد القياس'}
                 </button>
                 <button
-                type="button"
-                onClick={() => setShowFittingModal(false)}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="button"
+                  onClick={() => setShowFittingModal(false)}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+                >
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
+
       {/* Gown Booking Confirmation Modal */}
-      {showBookingModal &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
+      {showBookingModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] my-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-3 sm:p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <Heart size={14} className="text-rose-600 animate-pulse" />
                 <span>تأكيد حجز فستان للعروس</span>
               </h3>
               <button
-              onClick={() => setShowBookingModal(false)}
-              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-              
+                onClick={() => setShowBookingModal(false)}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={14} />
               </button>
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleBookingSubmit} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-              <div className="p-4 space-y-3 overflow-y-auto flex-grow text-right scrollbar-thin">
+            <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-3.5 sm:p-4 space-y-2.5 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
                 {/* Dress Selection with Fast Search */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">الفستان المراد حجزه</label>
@@ -1147,7 +1155,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   </div>
 
                   {/* Filtered dress buttons / selection list */}
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-32 overflow-y-auto scrollbar-thin">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
                     {dressesList
                       .filter((d) => {
                         if (!bookingDressSearch.trim()) return true;
@@ -1203,46 +1211,46 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   })()}
 
                   {(() => {
-                  if (!dressDetails || !dressDetails.bookings || dressDetails.bookings.length === 0) return null;
-                  const ranges = dressDetails.bookings.
-                  filter((b) => b.client_id !== bride.id).
-                  map((b) => {
-                    const city = b.client?.city ?? 'القاهرة';
-                    const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
-                    const daysBefore = isCairo ? 2 : 3;
-                    const daysAfter = 1;
+                    if (!dressDetails || !dressDetails.bookings || dressDetails.bookings.length === 0) return null;
+                    const ranges = dressDetails.bookings
+                      .filter((b) => b.client_id !== bride.id)
+                      .map((b) => {
+                        const city = b.client?.city ?? 'القاهرة';
+                        const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+                        const daysBefore = isCairo ? 2 : 3;
+                        const daysAfter = 1;
 
-                    const wDate = new Date(b.event_date.split(' ')[0]);
-                    const start = new Date(wDate);
-                    start.setDate(start.getDate() - daysBefore);
-                    const end = new Date(wDate);
-                    end.setDate(end.getDate() + daysAfter);
+                        const wDate = new Date(b.event_date.split(' ')[0]);
+                        const start = new Date(wDate);
+                        start.setDate(start.getDate() - daysBefore);
+                        const end = new Date(wDate);
+                        end.setDate(end.getDate() + daysAfter);
 
-                    const formatYMD = (d) => {
-                      const y = d.getFullYear();
-                      const m = String(d.getMonth() + 1).padStart(2, '0');
-                      const dd = String(d.getDate()).padStart(2, '0');
-                      return `${y}-${m}-\u200f${dd}`;
-                    };
-                    return {
-                      start: formatYMD(start),
-                      end: formatYMD(end),
-                      clientName: b.client?.name || 'عروس أخرى'
-                    };
-                  });
+                        const formatYMD = (d) => {
+                          const y = d.getFullYear();
+                          const m = String(d.getMonth() + 1).padStart(2, '0');
+                          const dd = String(d.getDate()).padStart(2, '0');
+                          return `${y}-${m}-${dd}`;
+                        };
+                        return {
+                          start: formatYMD(start),
+                          end: formatYMD(end),
+                          clientName: b.client?.name || 'عروس أخرى'
+                        };
+                      });
 
-                  if (ranges.length === 0) return null;
-                  return (
-                    <div className="mt-2 p-3 bg-rose-50/50 border border-rose-100 rounded-xl space-y-1.5 text-right">
+                    if (ranges.length === 0) return null;
+                    return (
+                      <div className="mt-1.5 p-2.5 bg-rose-50/50 border border-rose-100 rounded-xl space-y-1 text-right">
                         <span className="text-[9px] font-black text-rose-800 block">🔒 تواريخ عدم توفر الفستان (خارج الأتيليه):</span>
-                        {ranges.map((r, i) =>
-                      <div key={i} className="text-[8.5px] font-extrabold text-rose-700 leading-relaxed">
+                        {ranges.map((r, i) => (
+                          <div key={i} className="text-[8.5px] font-extrabold text-rose-700 leading-relaxed">
                             • من <span className="font-mono text-rose-800">{r.start}</span> إلى <span className="font-mono text-rose-800">{r.end}</span> (مع العروس: {r.clientName})
                           </div>
-                      )}
-                      </div>);
-
-                })()}
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Bride Phone Field */}
@@ -1261,53 +1269,53 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">تاريخ الفرح / المناسبة</label>
                   <input
-                  type="date"
-                  required
-                  value={bookingEventDate}
-                  onChange={(e) => setBookingEventDate(e.target.value)}
-                  className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
-                  isBookingDateBlocked ? 'border-rose-300 bg-rose-50/20 text-rose-700' : 'bg-slate-50 border-slate-150'}`
-                  } />
-                
-                  {isBookingDateBlocked &&
-                <span className="text-[8.5px] font-bold text-rose-600 block mt-0.5 text-right">⚠️ هذا التاريخ غير متاح لتواجد الفستان بالأتيليه.</span>
-                }
+                    type="date"
+                    required
+                    value={bookingEventDate}
+                    onChange={(e) => setBookingEventDate(e.target.value)}
+                    className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
+                      isBookingDateBlocked ? 'border-rose-300 bg-rose-50/20 text-rose-700' : 'bg-slate-50 border-slate-150'
+                    }`}
+                  />
+                  {isBookingDateBlocked && (
+                    <span className="text-[8.5px] font-bold text-rose-600 block mt-0.5 text-right">⚠️ هذا التاريخ غير متاح لتواجد الفستان بالأتيليه.</span>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">مبلغ الإيجار الإجمالي</label>
                     <input
-                    type="number"
-                    required
-                    value={bookingTotalAmount}
-                    onChange={(e) => setBookingTotalAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-                  
+                      type="number"
+                      required
+                      value={bookingTotalAmount}
+                      onChange={(e) => setBookingTotalAmount(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
                     <input
-                    type="number"
-                    required
-                    value={bookingDepositAmount}
-                    onChange={(e) => setBookingDepositAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-                  
+                      type="number"
+                      required
+                      value={bookingDepositAmount}
+                      onChange={(e) => setBookingDepositAmount(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع العربون</label>
                     <select
-                    value={bookingPaymentMethod}
-                    onChange={(e) => setBookingPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-                    
-                      {PAYMENT_METHODS.map((pm) =>
-                    <option key={pm.id} value={pm.id}>{pm.label}</option>
-                    )}
+                      value={bookingPaymentMethod}
+                      onChange={(e) => setBookingPaymentMethod(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
+                    >
+                      {PAYMENT_METHODS.map((pm) => (
+                        <option key={pm.id} value={pm.id}>{pm.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1315,104 +1323,104 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
                     <div className="flex items-center gap-2">
                       <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setBookingReceipt(reader.result);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="booking-receipt-file-input" />
-                    
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setBookingReceipt(reader.result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="booking-receipt-file-input"
+                      />
                       <label
-                      htmlFor="booking-receipt-file-input"
-                      className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-                      
+                        htmlFor="booking-receipt-file-input"
+                        className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                      >
                         <CreditCard size={10} />
                         <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
                       </label>
-                      {bookingReceipt &&
-                    <button
-                      type="button"
-                      onClick={() => setBookingReceipt(null)}
-                      className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-                      
+                      {bookingReceipt && (
+                        <button
+                          type="button"
+                          onClick={() => setBookingReceipt(null)}
+                          className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                        >
                           <X size={10} />
                         </button>
-                    }
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {bookingReceipt &&
-              <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
-                    <img src={bookingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                {bookingReceipt && (
+                  <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
+                    <img src={bookingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
                   </div>
-              }
+                )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">ملاحظات إضافية</label>
                   <textarea
-                  value={bookingNotes}
-                  onChange={(e) => setBookingNotes(e.target.value)}
-                  placeholder="ملاحظات وتعديلات الفستان المطلوبة..."
-                  className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
-                
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
+                    placeholder="ملاحظات وتعديلات الفستان المطلوبة..."
+                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-12 min-h-[44px] text-right"
+                  />
                 </div>
               </div>
 
               {/* Fixed Footer Buttons */}
-              <div className="flex items-center gap-3 p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+              <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
-                type="submit"
-                disabled={isSubmitting || isBookingDateBlocked}
-                className={`flex-1 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center ${
-                isSubmitting || isBookingDateBlocked ?
-                'bg-slate-350 text-slate-500 cursor-not-allowed shadow-none' :
-                'bg-rose-600 hover:bg-rose-700 text-white active:scale-95'}`
-                }>
-                
+                  type="submit"
+                  disabled={isSubmitting || isBookingDateBlocked}
+                  className={`flex-1 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center ${
+                    isSubmitting || isBookingDateBlocked
+                      ? 'bg-slate-350 text-slate-500 cursor-not-allowed shadow-none'
+                      : 'bg-rose-600 hover:bg-rose-700 text-white active:scale-95'
+                  }`}
+                >
                   {isSubmitting ? 'جاري الحفظ...' : 'تأكيد الحجز وتثبيت التاريخ'}
                 </button>
                 <button
-                type="button"
-                onClick={() => setShowBookingModal(false)}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-                
+                  type="button"
+                  onClick={() => setShowBookingModal(false)}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+                >
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Bride Journey Details Popup Modal */}
-      {showDetailsModal &&
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right animate-fade-in" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
+      {showDetailsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right animate-fade-in overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                 <CalIcon size={16} className="text-indigo-600 animate-pulse" />
                 <span>تفاصيل رحلة العروس والطلب الحالي</span>
               </h3>
               <button
-              onClick={() => setShowDetailsModal(false)}
-              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-              
+                onClick={() => setShowDetailsModal(false)}
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={16} />
               </button>
             </div>
 
             {/* Content */}
-            <div className="p-5 overflow-y-auto space-y-5 flex-grow scrollbar-thin">
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-h-0 scrollbar-thin">
               {/* Client Info Section */}
               <div className="bg-indigo-50/25 p-4 rounded-2xl border border-indigo-100/50 space-y-2">
                 <h4 className="text-xs font-black text-indigo-900 border-b border-indigo-100/60 pb-1.5 mb-2">👰🏻‍♀️ بيانات العروس الأساسية</h4>
@@ -1547,7 +1555,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
             </div>
           </div>
         </div>
-      }
+      )}
     </div>);
 
 }

@@ -1022,432 +1022,485 @@ export default function BridesPage() {
       </div>
 
       {/* Add Bride Modal */}
-      {isModalOpen &&
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700 overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-sm font-extrabold text-slate-800">تسجيل ملف عروس جديدة</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-605 transition-colors cursor-pointer">
+              <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleAddBrideSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
-              {/* Image Upload Option */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-extrabold text-slate-600 block">صورة العروس (اختياري)</label>
-                {imagePreviewUrl ?
-                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
-                    <img src={imagePreviewUrl} alt="Bride Preview" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => { setBrideImage(null); setImagePreviewUrl(null); }}
-                      className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer">
-
-                      <X size={10} />
-                    </button>
-                  </div> :
-
-                  <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
-                    <Plus size={16} className="text-indigo-500" />
-                    <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صورة العروس</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setBrideImage(file);
-                          setImagePreviewUrl(URL.createObjectURL(file));
-                        }
-                      }} />
-
-                  </label>
-                }
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">اسم العروس الكامل</label>
-                <input type="text" required placeholder="مثال: ريم عبدالله" value={newName} onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleAddBrideSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
+                {/* Image Upload Option */}
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
-                  <input
-                    type="text"
-                    list="egypt-cities-datalist"
-                    required
-                    placeholder="اختر أو اكتب المدينة..."
-                    value={newCity}
-                    onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">رقم الجوال</label>
-                  <input type="tel" required placeholder="مثال: 01012345678" value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
-                  <select value={newSource} onChange={(e) => setNewSource(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
-                    <option value="انستقرام">انستقرام</option>
-                    <option value="فيسبوك">فيسبوك</option>
-                    <option value="تيك توك">تيك توك</option>
-                    <option value="إحالة">إحالة / توصية</option>
-                    <option value="موقع">الموقع الإلكتروني</option>
-                    <option value="واتساب">واتساب</option>
-                    <option value="أخرى">أخرى</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">تاريخ الزيارة</label>
-                  <input type="date" required value={newVisitDate} onChange={(e) => setNewVisitDate(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
-                <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-              </div>
-
-              {/* Fast Dress Selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-extrabold text-slate-600">
-                    الفساتين المهتمة بها <span className="text-[10px] font-bold text-indigo-600">({selectedModels.length}/3 فساتين)</span>
-                  </label>
-                  {selectedModels.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedModels([])}
-                      className="text-[10px] text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
-                    >
-                      مسح المختار
-                    </button>
-                  )}
-                </div>
-
-                {/* Selected Chips */}
-                {selectedModels.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-indigo-50/50 rounded-2xl border border-indigo-100/60">
-                    {selectedModels.map((m) => (
-                      <span
-                        key={m}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[10px] font-bold shadow-xs"
+                  <label className="text-xs font-extrabold text-slate-600 block">صورة العروس (اختياري)</label>
+                  {imagePreviewUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                      <img src={imagePreviewUrl} alt="Bride Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setBrideImage(null); setImagePreviewUrl(null); }}
+                        className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer"
                       >
-                        <span>{m}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleModelSelection(m)}
-                          className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors cursor-pointer"
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Fast Search Bar */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
-                    value={brideDressSearch}
-                    onChange={(e) => setBrideDressSearch(e.target.value)}
-                    className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                  <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-                  {brideDressSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setBrideDressSearch('')}
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                    >
-                      <X size={12} />
-                    </button>
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-1 w-full py-2.5 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
+                      <Plus size={15} className="text-indigo-500" />
+                      <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صورة العروس</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setBrideImage(file);
+                            setImagePreviewUrl(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
                   )}
                 </div>
 
-                {/* Dresses List with instant filter */}
-                <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-50 rounded-2xl border border-slate-100 max-h-36 overflow-y-auto scrollbar-thin">
-                  {dressesList
-                    .filter((d) => {
-                      if (!brideDressSearch.trim()) return true;
-                      const q = brideDressSearch.toLowerCase().trim();
-                      return (
-                        d.name?.toLowerCase().includes(q) ||
-                        d.code?.toLowerCase().includes(q)
-                      );
-                    })
-                    .map((dress) => {
-                      const isSelected = selectedModels.includes(dress.name);
-                      return (
-                        <button
-                          type="button"
-                          key={dress.id}
-                          onClick={() => handleToggleModelSelection(dress.name)}
-                          className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
-                            isSelected
-                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
-                          }`}
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">اسم العروس الكامل</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: ريم عبدالله"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
+                    <input
+                      type="text"
+                      list="egypt-cities-datalist"
+                      required
+                      placeholder="اختر أو اكتب المدينة..."
+                      value={newCity}
+                      onChange={(e) => setNewCity(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">رقم الجوال</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="مثال: 01012345678"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
+                    <select
+                      value={newSource}
+                      onChange={(e) => setNewSource(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    >
+                      <option value="انستقرام">انستقرام</option>
+                      <option value="فيسبوك">فيسبوك</option>
+                      <option value="تيك توك">تيك توك</option>
+                      <option value="إحالة">إحالة / توصية</option>
+                      <option value="موقع">الموقع الإلكتروني</option>
+                      <option value="واتساب">واتساب</option>
+                      <option value="أخرى">أخرى</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">تاريخ الزيارة</label>
+                    <input
+                      type="date"
+                      required
+                      value={newVisitDate}
+                      onChange={(e) => setNewVisitDate(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
+                  <input
+                    type="date"
+                    value={newWeddingDate}
+                    onChange={(e) => setNewWeddingDate(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
+                </div>
+
+                {/* Fast Dress Selection */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-slate-600">
+                      الفساتين المهتمة بها <span className="text-[10px] font-bold text-indigo-600">({selectedModels.length}/3 فساتين)</span>
+                    </label>
+                    {selectedModels.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedModels([])}
+                        className="text-[10px] text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
+                      >
+                        مسح المختار
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Selected Chips */}
+                  {selectedModels.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-indigo-50/50 rounded-xl border border-indigo-100/60">
+                      {selectedModels.map((m) => (
+                        <span
+                          key={m}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[10px] font-bold shadow-xs"
                         >
-                          {dress.name} {dress.code ? <span className="opacity-70 font-mono text-[9px]">({dress.code})</span> : ''}
-                        </button>
-                      );
-                    })}
-                  {dressesList.filter((d) => {
-                    if (!brideDressSearch.trim()) return true;
-                    const q = brideDressSearch.toLowerCase().trim();
-                    return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
-                  }).length === 0 && (
-                    <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
-                      لا توجد فساتين مطابقة للبحث "{brideDressSearch}"
+                          <span>{m}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleModelSelection(m)}
+                            className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors cursor-pointer"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   )}
+
+                  {/* Fast Search Bar */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                      value={brideDressSearch}
+                      onChange={(e) => setBrideDressSearch(e.target.value)}
+                      className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                    <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                    {brideDressSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setBrideDressSearch('')}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dresses List with instant filter */}
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
+                    {dressesList
+                      .filter((d) => {
+                        if (!brideDressSearch.trim()) return true;
+                        const q = brideDressSearch.toLowerCase().trim();
+                        return (
+                          d.name?.toLowerCase().includes(q) ||
+                          d.code?.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((dress) => {
+                        const isSelected = selectedModels.includes(dress.name);
+                        return (
+                          <button
+                            type="button"
+                            key={dress.id}
+                            onClick={() => handleToggleModelSelection(dress.name)}
+                            className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
+                            }`}
+                          >
+                            {dress.name} {dress.code ? <span className="opacity-70 font-mono text-[9px]">({dress.code})</span> : ''}
+                          </button>
+                        );
+                      })}
+                    {dressesList.filter((d) => {
+                      if (!brideDressSearch.trim()) return true;
+                      const q = brideDressSearch.toLowerCase().trim();
+                      return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
+                        لا توجد فساتين مطابقة للبحث "{brideDressSearch}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="تفضيلات العروس..."
+                    className="w-full h-12 min-h-[44px] p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
-                <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="تفضيلات العروس..."
-                  className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-              </div>
-
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
-                <button type="submit" className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm">
+              <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 text-center">
                   حفظ ملف العروس
                 </button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Edit Bride Modal */}
-      {editingBride &&
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700" dir="rtl">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+      {editingBride && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700 overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-sm font-extrabold text-slate-800">تعديل بيانات العروس</h3>
               <button onClick={() => setEditingBride(null)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleEditBrideSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
-              {/* Image Upload Option */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-extrabold text-slate-600 block">صورة العروس (اختياري)</label>
-                {imagePreviewUrl ?
-                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
-                    <img src={imagePreviewUrl} alt="Bride Preview" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => { setBrideImage(null); setImagePreviewUrl(null); }}
-                      className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer">
-
-                      <X size={10} />
-                    </button>
-                  </div> :
-
-                  <label className="flex flex-col items-center justify-center gap-1.5 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
-                    <Plus size={16} className="text-indigo-500" />
-                    <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صورة جديدة للعروس</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setBrideImage(file);
-                          setImagePreviewUrl(URL.createObjectURL(file));
-                        }
-                      }} />
-
-                  </label>
-                }
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">اسم العروس</label>
-                <input type="text" required value={newName} onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleEditBrideSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
+                {/* Image Upload Option */}
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">رقم الهاتف</label>
-                  <input type="text" required value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
-                  <input
-                    type="text"
-                    list="egypt-cities-datalist"
-                    required
-                    placeholder="اختر أو اكتب المدينة..."
-                    value={newCity}
-                    onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
-                  <select value={newSource} onChange={(e) => setNewSource(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
-                    <option value="انستقرام">انستقرام</option>
-                    <option value="فيسبوك">فيسبوك</option>
-                    <option value="تيك توك">تيك توك</option>
-                    <option value="إحالة">إحالة / توصية</option>
-                    <option value="موقع">الموقع الإلكتروني</option>
-                    <option value="واتساب">واتساب</option>
-                    <option value="أخرى">أخرى</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
-                  <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                </div>
-              </div>
-
-              {/* Fast Dress Selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-extrabold text-slate-600">
-                    الفساتين المهتمة بها <span className="text-[10px] font-bold text-indigo-600">({selectedModels.length}/3 فساتين)</span>
-                  </label>
-                  {selectedModels.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedModels([])}
-                      className="text-[10px] text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
-                    >
-                      مسح المختار
-                    </button>
-                  )}
-                </div>
-
-                {/* Selected Chips */}
-                {selectedModels.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-indigo-50/50 rounded-2xl border border-indigo-100/60">
-                    {selectedModels.map((m) => (
-                      <span
-                        key={m}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[10px] font-bold shadow-xs"
+                  <label className="text-xs font-extrabold text-slate-600 block">صورة العروس (اختياري)</label>
+                  {imagePreviewUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                      <img src={imagePreviewUrl} alt="Bride Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setBrideImage(null); setImagePreviewUrl(null); }}
+                        className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-sm cursor-pointer"
                       >
-                        <span>{m}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleModelSelection(m)}
-                          className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors cursor-pointer"
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Fast Search Bar */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
-                    value={brideDressSearch}
-                    onChange={(e) => setBrideDressSearch(e.target.value)}
-                    className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
-                  />
-                  <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-                  {brideDressSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setBrideDressSearch('')}
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                    >
-                      <X size={12} />
-                    </button>
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-1 w-full py-2.5 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/20 transition-all">
+                      <Plus size={15} className="text-indigo-500" />
+                      <span className="text-[10px] font-bold text-slate-500">اضغط لرفع صورة جديدة للعروس</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setBrideImage(file);
+                            setImagePreviewUrl(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
                   )}
                 </div>
 
-                {/* Dresses List with instant filter */}
-                <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-50 rounded-2xl border border-slate-100 max-h-36 overflow-y-auto scrollbar-thin">
-                  {dressesList
-                    .filter((d) => {
-                      if (!brideDressSearch.trim()) return true;
-                      const q = brideDressSearch.toLowerCase().trim();
-                      return (
-                        d.name?.toLowerCase().includes(q) ||
-                        d.code?.toLowerCase().includes(q)
-                      );
-                    })
-                    .map((dress) => {
-                      const isSelected = selectedModels.includes(dress.name);
-                      return (
-                        <button
-                          type="button"
-                          key={dress.id}
-                          onClick={() => handleToggleModelSelection(dress.name)}
-                          className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
-                            isSelected
-                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
-                          }`}
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">اسم العروس</label>
+                  <input
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">رقم الهاتف</label>
+                    <input
+                      type="text"
+                      required
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
+                    <input
+                      type="text"
+                      list="egypt-cities-datalist"
+                      required
+                      placeholder="اختر أو اكتب المدينة..."
+                      value={newCity}
+                      onChange={(e) => setNewCity(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">مصدر العميل</label>
+                    <select
+                      value={newSource}
+                      onChange={(e) => setNewSource(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    >
+                      <option value="انستقرام">انستقرام</option>
+                      <option value="فيسبوك">فيسبوك</option>
+                      <option value="تيك توك">تيك توك</option>
+                      <option value="إحالة">إحالة / توصية</option>
+                      <option value="موقع">الموقع الإلكتروني</option>
+                      <option value="واتساب">واتساب</option>
+                      <option value="أخرى">أخرى</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
+                    <input
+                      type="date"
+                      value={newWeddingDate}
+                      onChange={(e) => setNewWeddingDate(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                {/* Fast Dress Selection */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-slate-600">
+                      الفساتين المهتمة بها <span className="text-[10px] font-bold text-indigo-600">({selectedModels.length}/3 فساتين)</span>
+                    </label>
+                    {selectedModels.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedModels([])}
+                        className="text-[10px] text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
+                      >
+                        مسح المختار
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Selected Chips */}
+                  {selectedModels.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-indigo-50/50 rounded-xl border border-indigo-100/60">
+                      {selectedModels.map((m) => (
+                        <span
+                          key={m}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[10px] font-bold shadow-xs"
                         >
-                          {dress.name} {dress.code ? <span className="opacity-70 font-mono text-[9px]">({dress.code})</span> : ''}
-                        </button>
-                      );
-                    })}
-                  {dressesList.filter((d) => {
-                    if (!brideDressSearch.trim()) return true;
-                    const q = brideDressSearch.toLowerCase().trim();
-                    return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
-                  }).length === 0 && (
-                    <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
-                      لا توجد فساتين مطابقة للبحث "{brideDressSearch}"
+                          <span>{m}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleModelSelection(m)}
+                            className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors cursor-pointer"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   )}
+
+                  {/* Fast Search Bar */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                      value={brideDressSearch}
+                      onChange={(e) => setBrideDressSearch(e.target.value)}
+                      className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
+                    <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                    {brideDressSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setBrideDressSearch('')}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dresses List with instant filter */}
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
+                    {dressesList
+                      .filter((d) => {
+                        if (!brideDressSearch.trim()) return true;
+                        const q = brideDressSearch.toLowerCase().trim();
+                        return (
+                          d.name?.toLowerCase().includes(q) ||
+                          d.code?.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((dress) => {
+                        const isSelected = selectedModels.includes(dress.name);
+                        return (
+                          <button
+                            type="button"
+                            key={dress.id}
+                            onClick={() => handleToggleModelSelection(dress.name)}
+                            className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
+                            }`}
+                          >
+                            {dress.name} {dress.code ? <span className="opacity-70 font-mono text-[9px]">({dress.code})</span> : ''}
+                          </button>
+                        );
+                      })}
+                    {dressesList.filter((d) => {
+                      if (!brideDressSearch.trim()) return true;
+                      const q = brideDressSearch.toLowerCase().trim();
+                      return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
+                        لا توجد فساتين مطابقة للبحث "{brideDressSearch}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="ملاحظات..."
+                    className="w-full h-12 min-h-[44px] p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
-                <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="ملاحظات..."
-                  className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-              </div>
-
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
-                <button type="submit" className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm">
+              <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 text-center">
                   حفظ التعديلات
                 </button>
-                <button type="button" onClick={() => setEditingBride(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                <button type="button" onClick={() => setEditingBride(null)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Delete Confirmation */}
       {deleteConfirm?.isOpen &&
@@ -1534,60 +1587,60 @@ export default function BridesPage() {
         };
 
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-            <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+            <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
+              <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسليم الفستان للعروس</h3>
                 <button onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
-              <form onSubmit={handlePickupConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-                <div className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
+              <form onSubmit={handlePickupConfirm} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
                   {/* Client and Dress info */}
-                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-1">
+                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-3 space-y-1">
                     <h4 className="text-xs font-black text-indigo-700">بيانات العروس والفستان</h4>
-                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-700 mt-2">
+                    <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-slate-700 mt-1">
                       <div>العروس: <span className="font-extrabold">{selectedBrideForPickup.name}</span></div>
                       <div>الهاتف: <span className="font-mono">{selectedBrideForPickup.phone}</span></div>
-                      <div className="col-span-2 border-t border-slate-150 pt-2 mt-1">
+                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5">
                         الفستان الأساسي: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Financial Summary */}
-                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-2">
+                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3 space-y-1.5">
                     <h4 className="text-xs font-black text-slate-700">ملخص الحساب المالي للفستان</h4>
                     <div className="grid grid-cols-3 gap-2 text-[9px] font-extrabold text-slate-500">
-                      <div className="bg-white p-2 rounded-lg border border-slate-100 text-center">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100 text-center">
                         <div className="text-slate-400 mb-0.5">الإجمالي</div>
                         <div className="text-slate-800 font-black text-xs">{parseFloat(booking?.total_amount || 0).toLocaleString()} ج.م</div>
                       </div>
-                      <div className="bg-white p-2 rounded-lg border border-slate-100 text-center">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100 text-center">
                         <div className="text-slate-400 mb-0.5">المدفوع سابقاً</div>
                         <div className="text-emerald-600 font-black text-xs">{totalPaid.toLocaleString()} ج.م</div>
                       </div>
-                      <div className="bg-white p-2 rounded-lg border border-slate-100 text-center">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100 text-center">
                         <div className="text-slate-400 mb-0.5">المتبقي</div>
                         <div className="text-rose-600 font-black text-xs">{remaining.toLocaleString()} ج.م</div>
                       </div>
                     </div>
 
                     {/* Payment Inputs */}
-                    {remaining > 0 &&
-                      <div className="pt-2 space-y-2">
+                    {remaining > 0 && (
+                      <div className="pt-1.5 space-y-1.5">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={recordPickupPayment}
                             onChange={(e) => setRecordPickupPayment(e.target.checked)}
-                            className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm" />
-
+                            className="w-3.5 h-3.5 text-indigo-650 border-slate-350 rounded-sm"
+                          />
                           <span className="text-[10px] font-bold text-slate-700">تسجيل سداد المبلغ المتبقي الآن</span>
                         </label>
-                        {recordPickupPayment &&
+                        {recordPickupPayment && (
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">مبلغ السداد</label>
@@ -1595,43 +1648,44 @@ export default function BridesPage() {
                                 type="number"
                                 value={pickupPaymentAmount}
                                 onChange={(e) => setPickupPaymentAmount(e.target.value)}
-                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-
+                                className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
+                              />
                             </div>
                             <div>
                               <label className="text-[9px] font-extrabold text-slate-500">طريقة الدفع</label>
                               <select
                                 value={pickupPaymentMethod}
                                 onChange={(e) => setPickupPaymentMethod(e.target.value)}
-                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5">
-
+                                className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
+                              >
                                 <option value="cash">نقداً (Cash)</option>
                                 <option value="card">فيزا / كارت (Card)</option>
                                 <option value="instapay">إنستا باي (InstaPay)</option>
                               </select>
                             </div>
                           </div>
-                        }
+                        )}
                       </div>
-                    }
+                    )}
 
                     {/* Insurance Input */}
-                    <div className="pt-1 border-t border-slate-150 mt-2 grid grid-cols-2 gap-2">
+                    <div className="pt-1 border-t border-slate-150 mt-1 grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[9px] font-extrabold text-slate-500">مبلغ التأمين المستلم</label>
                         <input
                           type="number"
                           value={pickupInsuranceAmount}
                           onChange={(e) => setPickupInsuranceAmount(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5" />
-
+                          className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
+                        />
                       </div>
-                      <div className="flex items-end text-[8px] text-slate-400 font-bold pb-2 leading-tight">
+                      <div className="flex items-end text-[8px] text-slate-400 font-bold pb-1 leading-tight">
                         * هذا المبلغ تأمين مسترد يتم إرجاعه للعميلة عند إرجاع الفستان سليم.
                       </div>
                     </div>
+
                     {/* Upload Receipt */}
-                    <div className="pt-2 border-t border-slate-150 mt-2 space-y-1">
+                    <div className="pt-1.5 border-t border-slate-150 mt-1 space-y-1">
                       <label className="text-[9px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع (اختياري)</label>
                       <div className="flex items-center gap-2">
                         <input
@@ -1648,76 +1702,76 @@ export default function BridesPage() {
                             }
                           }}
                           className="hidden"
-                          id="pickup-receipt-file-input" />
-
+                          id="pickup-receipt-file-input"
+                        />
                         <label
                           htmlFor="pickup-receipt-file-input"
-                          className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-
+                          className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                        >
                           <CreditCard size={12} className="inline mr-1" />
                           <span>{pickupReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                         </label>
-                        {pickupReceipt &&
+                        {pickupReceipt && (
                           <button
                             type="button"
                             onClick={() => setPickupReceipt(null)}
-                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-
+                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                          >
                             <X size={12} />
                           </button>
-                        }
+                        )}
                       </div>
-                      {pickupReceipt &&
-                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
-                          <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                      {pickupReceipt && (
+                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
+                          <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
                         </div>
-                      }
+                      )}
                     </div>
                   </div>
 
                   {/* Accessories Checklist */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <h4 className="text-xs font-black text-slate-700">قائمة إكسسوارات الفستان (تأكيد التسليم للعروس)</h4>
-                    {accessoriesList.length > 0 ?
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {accessoriesList.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
                           const key = `${acc.name}_${idx}`;
                           return (
-                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                            <label key={idx} className="flex items-center gap-2 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
                                 type="checkbox"
                                 checked={!!checkedAccessories[key]}
                                 onChange={(e) => setCheckedAccessories({ ...checkedAccessories, [key]: e.target.checked })}
-                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500"
+                              />
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
-                            </label>);
-
+                            </label>
+                          );
                         })}
-                      </div> :
-
-                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      </div>
+                    ) : (
+                      <div className="text-center py-3 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
-                    }
+                    )}
                   </div>
                 </div>
 
                 {/* Fixed Action Buttons Footer */}
-                <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
-                  <button type="submit" className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
+                <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                  <button type="submit" className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 text-center">
                     تأكيد تسليم الفستان والملحقات
                   </button>
-                  <button type="button" onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsPickupModalOpen(false); setSelectedBrideForPickup(null); }} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
                     إلغاء
                   </button>
                 </div>
               </form>
             </div>
-          </div>);
-
+          </div>
+        );
       })()}
 
       {/* Return stage Confirmation Modal */}
@@ -1730,8 +1784,8 @@ export default function BridesPage() {
         const accessoriesList = [
           ...(dress?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress.name })),
           ...(dress2?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress2.name })),
-          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))];
-
+          ...(dress3?.accessories || []).map((a) => ({ name: a.name || a, dressName: dress3.name }))
+        ];
 
         const handleReturnConfirm = async (e) => {
           e.preventDefault();
@@ -1766,58 +1820,58 @@ export default function BridesPage() {
         };
 
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-            <div className="bg-white rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+            <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-lg border border-slate-100 shadow-xl overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
+              <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-800">تسجيل استلام وإرجاع الفستان</h3>
                 <button onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
-              <form onSubmit={handleReturnConfirm} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-                <div className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
+              <form onSubmit={handleReturnConfirm} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
                   {/* Client and Dress info */}
-                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 space-y-1">
+                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-3 space-y-1">
                     <h4 className="text-xs font-black text-emerald-700">بيانات العروس والفستان المرتجع</h4>
-                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-700 mt-2">
+                    <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-slate-700 mt-1">
                       <div>العروس: <span className="font-extrabold">{selectedBrideForReturn.name}</span></div>
                       <div>الهاتف: <span className="font-mono">{selectedBrideForReturn.phone}</span></div>
-                      <div className="col-span-2 border-t border-slate-150 pt-2 mt-1">
+                      <div className="col-span-2 border-t border-slate-150 pt-1.5 mt-0.5">
                         الفستان الأساسي: <span className="font-extrabold">{dress?.name || '—'} (مقاس: {dress?.size || '—'})</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Return Checklist */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <h4 className="text-xs font-black text-rose-650 flex items-center gap-1.5">
                       <span>⚠️ يرجى جرد قائمة الملحقات والتأكد من استلامها كاملة:</span>
                     </h4>
-                    {accessoriesList.length > 0 ?
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {accessoriesList.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
                         {accessoriesList.map((acc, idx) => {
                           const key = `${acc.name}_${idx}`;
                           return (
-                            <label key={idx} className="flex items-center gap-2.5 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
+                            <label key={idx} className="flex items-center gap-2 p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-slate-100">
                               <input
                                 type="checkbox"
                                 checked={!!returnCheckedAccessories[key]}
                                 onChange={(e) => setReturnCheckedAccessories({ ...returnCheckedAccessories, [key]: e.target.checked })}
-                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500" />
-
+                                className="w-3.5 h-3.5 text-indigo-650 border-slate-250 rounded-sm focus:ring-indigo-500"
+                              />
                               <span className="text-[10px] font-bold text-slate-700">
                                 {acc.name} <span className="text-slate-400 font-normal">({acc.dressName})</span>
                               </span>
-                            </label>);
-
+                            </label>
+                          );
                         })}
-                      </div> :
-
-                      <div className="text-center py-4 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
+                      </div>
+                    ) : (
+                      <div className="text-center py-3 text-slate-400 text-xs font-bold bg-slate-50 border border-slate-100 rounded-2xl">
                         لا يوجد إكسسوارات مسجلة لهذا الفستان في النظام.
                       </div>
-                    }
+                    )}
                   </div>
 
                   {/* Return Condition Notes */}
@@ -1828,47 +1882,48 @@ export default function BridesPage() {
                       value={returnNotes}
                       onChange={(e) => setReturnNotes(e.target.value)}
                       placeholder="مثال: تم الإرجاع سليم وبحالة جيدة للغسيل..."
-                      className="w-full min-h-[60px] p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-
+                      className="w-full h-12 min-h-[44px] p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                    />
                   </div>
                 </div>
 
                 {/* Fixed Action Buttons Footer */}
-                <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
-                  <button type="submit" className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95">
+                <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+                  <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 text-center">
                     تأكيد إرجاع الفستان وحفظ الملحقات
                   </button>
-                  <button type="button" onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  <button type="button" onClick={() => { setIsReturnModalOpen(false); setSelectedBrideForReturn(null); }} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
                     إلغاء
                   </button>
                 </div>
               </form>
             </div>
-          </div>);
-
+          </div>
+        );
       })()}
+
       {/* Fitting Appointment Booking Popup Modal */}
-      {showFittingModal && selectedBrideForFitting &&
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
+      {showFittingModal && selectedBrideForFitting && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] my-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-3 sm:p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <Calendar size={14} className="text-indigo-650 animate-pulse" />
                 <span>حجز موعد بروفة قياس جديدة للعروس</span>
               </h3>
               <button
                 onClick={() => { setShowFittingModal(false); setSelectedBrideForFitting(null); }}
-                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={14} />
               </button>
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleFittingSubmit} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-              <div className="p-4 space-y-3 overflow-y-auto flex-grow text-right scrollbar-thin">
-                <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleFittingSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-3.5 sm:p-4 space-y-2.5 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">تاريخ موعد القياس</label>
                     <input
@@ -1876,8 +1931,8 @@ export default function BridesPage() {
                       required
                       value={fittingDate}
                       onChange={(e) => setFittingDate(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">الوقت (الساعة)</label>
@@ -1885,49 +1940,49 @@ export default function BridesPage() {
                       required
                       value={fittingTime}
                       onChange={(e) => setFittingTime(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-
-                      {["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"].map((t) =>
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
+                    >
+                      {["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"].map((t) => (
                         <option key={t} value={t}>{t}</option>
-                      )}
+                      ))}
                     </select>
                   </div>
                 </div>
 
-                <div className="space-y-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100/80 text-right">
+                <div className="space-y-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100/80 text-right">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">فستان البروفة (الفستان المحجوز)</label>
                   {(() => {
                     const booking = selectedBrideForFitting?.bookings?.[0];
                     const bookedDress = booking?.dress;
                     if (bookedDress) {
                       return (
-                        <div className="flex flex-col gap-1 mt-1">
+                        <div className="flex flex-col gap-0.5 mt-0.5">
                           <span className="text-xs font-black text-indigo-650">{bookedDress.name}</span>
-                          <span className="text-[9px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} | رسوم التجربة والقياس: {parseFloat(bookedDress.trying_fee || 0).toLocaleString()} ج.م</span>
-                        </div>);
-
+                          <span className="text-[9px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} | رسوم التجربة: {parseFloat(bookedDress.trying_fee || 0).toLocaleString()} ج.م</span>
+                        </div>
+                      );
                     }
                     return <span className="text-xs font-bold text-rose-500">لا يوجد فستان محجوز حالياً!</span>;
                   })()}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">رسوم القياس المستحقة</label>
                     <input
                       type="text"
                       disabled
                       value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right" />
-
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right"
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع الرسوم</label>
                     <select
                       value={fittingPaymentMethod}
                       onChange={(e) => setFittingPaymentMethod(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
+                    >
                       <option value="cash">نقدي (Cash)</option>
                       <option value="credit_card">فيزا / كارت (Visa / Card)</option>
                       <option value="instapay">إنستاباي (InstaPay)</option>
@@ -1953,30 +2008,30 @@ export default function BridesPage() {
                         }
                       }}
                       className="hidden"
-                      id="brides-fitting-receipt-file-input" />
-
+                      id="brides-fitting-receipt-file-input"
+                    />
                     <label
                       htmlFor="brides-fitting-receipt-file-input"
-                      className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-
+                      className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                    >
                       <CreditCard size={12} />
                       <span>{fittingReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
                     </label>
-                    {fittingReceipt &&
+                    {fittingReceipt && (
                       <button
                         type="button"
                         onClick={() => setFittingReceipt(null)}
-                        className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-
+                        className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                      >
                         <X size={12} />
                       </button>
-                    }
+                    )}
                   </div>
-                  {fittingReceipt &&
-                    <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
-                      <img src={fittingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                  {fittingReceipt && (
+                    <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
+                      <img src={fittingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
                     </div>
-                  }
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -1985,53 +2040,53 @@ export default function BridesPage() {
                     value={fittingNotes}
                     onChange={(e) => setFittingNotes(e.target.value)}
                     placeholder="ملاحظات حول المقاسات أو تفاصيل الموعد..."
-                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
-
+                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-12 min-h-[44px] text-right"
+                  />
                 </div>
               </div>
 
               {/* Fixed Footer Buttons */}
-              <div className="flex items-center gap-3 p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+              <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center">
-
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95"
+                >
                   تأكيد وحجز موعد القياس
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowFittingModal(false); setSelectedBrideForFitting(null); }}
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+                >
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Gown Booking Confirmation Modal */}
-      {showBookingModal && selectedBrideForBooking &&
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[85vh]">
+      {showBookingModal && selectedBrideForBooking && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] my-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-3 sm:p-3.5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
                 <Heart size={14} className="text-rose-600 animate-pulse" />
                 <span>تأكيد حجز فستان للعروس</span>
               </h3>
               <button
                 onClick={() => { setShowBookingModal(false); setSelectedBrideForBooking(null); }}
-                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-
+                className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
                 <X size={14} />
               </button>
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleBookingSubmit} className="flex flex-col flex-grow min-h-0 overflow-hidden">
-              <div className="p-4 space-y-3 overflow-y-auto flex-grow text-right scrollbar-thin">
+            <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-3.5 sm:p-4 space-y-2.5 overflow-y-auto flex-1 min-h-0 text-right scrollbar-thin">
                 {/* Dress Selection with Fast Search */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">الفستان المراد حجزه</label>
@@ -2056,7 +2111,7 @@ export default function BridesPage() {
                   </div>
 
                   {/* Filtered dress buttons / selection list */}
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-32 overflow-y-auto scrollbar-thin">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-24 sm:max-h-28 overflow-y-auto scrollbar-thin">
                     {dressesList
                       .filter((d) => {
                         if (!bookingDressSearch.trim()) return true;
@@ -2132,10 +2187,11 @@ export default function BridesPage() {
                     required
                     value={bookingEventDate}
                     onChange={(e) => setBookingEventDate(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">مبلغ الإيجار الإجمالي</label>
                     <input
@@ -2143,8 +2199,8 @@ export default function BridesPage() {
                       required
                       value={bookingTotalAmount}
                       onChange={(e) => setBookingTotalAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">العربون المدفوع</label>
@@ -2153,22 +2209,22 @@ export default function BridesPage() {
                       required
                       value={bookingDepositAmount}
                       onChange={(e) => setBookingDepositAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع العربون</label>
                     <select
                       value={bookingPaymentMethod}
                       onChange={(e) => setBookingPaymentMethod(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8">
-
-                      {PAYMENT_METHODS.map((pm) =>
+                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
+                    >
+                      {PAYMENT_METHODS.map((pm) => (
                         <option key={pm.id} value={pm.id}>{pm.label}</option>
-                      )}
+                      ))}
                     </select>
                   </div>
 
@@ -2189,33 +2245,33 @@ export default function BridesPage() {
                           }
                         }}
                         className="hidden"
-                        id="brides-booking-receipt-file-input" />
-
+                        id="brides-booking-receipt-file-input"
+                      />
                       <label
                         htmlFor="brides-booking-receipt-file-input"
-                        className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all">
-
+                        className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                      >
                         <CreditCard size={10} />
                         <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
                       </label>
-                      {bookingReceipt &&
+                      {bookingReceipt && (
                         <button
                           type="button"
                           onClick={() => setBookingReceipt(null)}
-                          className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs">
-
+                          className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
+                        >
                           <X size={10} />
                         </button>
-                      }
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {bookingReceipt &&
-                  <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[80px] flex items-center justify-center bg-slate-50 mt-1">
-                    <img src={bookingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
+                {bookingReceipt && (
+                  <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
+                    <img src={bookingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
                   </div>
-                }
+                )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-550 block text-right">ملاحظات إضافية</label>
@@ -2223,31 +2279,31 @@ export default function BridesPage() {
                     value={bookingNotes}
                     onChange={(e) => setBookingNotes(e.target.value)}
                     placeholder="ملاحظات وتعديلات الفستان المطلوبة..."
-                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-14 text-right" />
-
+                    className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none h-12 min-h-[44px] text-right"
+                  />
                 </div>
               </div>
 
               {/* Fixed Footer Buttons */}
-              <div className="flex items-center gap-3 p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+              <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95">
-
+                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md text-center active:scale-95"
+                >
                   تأكيد الحجز وتثبيت التاريخ
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowBookingModal(false); setSelectedBrideForBooking(null); }}
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center">
-
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-2xl text-xs font-bold transition-all cursor-pointer text-center"
+                >
                   إلغاء
                 </button>
               </div>
             </form>
           </div>
         </div>
-      }
+      )}
 
       {/* Excel Import Modal */}
       {isImportModalOpen && (
@@ -2368,12 +2424,12 @@ export default function BridesPage() {
 
       {/* Pay Remaining Modal */}
       {isPayRemainingModalOpen && selectedBrideForPayRemaining && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 text-right" dir="rtl">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-fade-in max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-3.5 animate-fade-in max-h-[min(90vh,620px)] sm:max-h-[min(88vh,660px)] overflow-y-auto scrollbar-thin my-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold">
-                  <CreditCard size={18} />
+                <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold">
+                  <CreditCard size={16} />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800">تسجيل سداد المبلغ المتبقي</h3>
@@ -2397,19 +2453,19 @@ export default function BridesPage() {
               const dressName = booking?.dress?.name || 'فستان زفاف';
 
               return (
-                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3.5 space-y-2">
+                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-2.5 space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-extrabold text-slate-700">
                     <span>الفستان: {dressName}</span>
                     <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full">
                       إجمالي الإيجار: {parseFloat(booking?.total_amount || 0).toLocaleString()} ج.م
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-extrabold pt-1">
-                    <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-extrabold pt-0.5">
+                    <div className="bg-white p-1.5 rounded-xl border border-slate-100 text-center">
                       <div className="text-slate-400 mb-0.5">المدفوع سابقاً</div>
                       <div className="text-emerald-600 font-black text-xs">{totalPaid.toLocaleString()} ج.م</div>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                    <div className="bg-white p-1.5 rounded-xl border border-slate-100 text-center">
                       <div className="text-slate-400 mb-0.5">المتبقي المطلوب</div>
                       <div className="text-rose-600 font-black text-xs">{remaining.toLocaleString()} ج.م</div>
                     </div>
@@ -2418,25 +2474,25 @@ export default function BridesPage() {
               );
             })()}
 
-            <form onSubmit={handlePayRemainingSubmit} className="space-y-4">
+            <form onSubmit={handlePayRemainingSubmit} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-700 block">مبلغ السداد (ج.م)</label>
+                <label className="text-[10px] font-extrabold text-slate-700 block">مبلغ السداد (ج.م)</label>
                 <input
                   type="number"
                   step="0.01"
                   required
                   value={payRemainingAmount}
                   onChange={(e) => setPayRemainingAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-700 block">طريقة الدفع</label>
+                <label className="text-[10px] font-extrabold text-slate-700 block">طريقة الدفع</label>
                 <select
                   value={payRemainingMethod}
                   onChange={(e) => setPayRemainingMethod(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
                 >
                   {PAYMENT_METHODS.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -2448,7 +2504,7 @@ export default function BridesPage() {
 
               {/* Receipt File Upload */}
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-700 block">رفع صورة الإيصال / الفاتورة (اختياري)</label>
+                <label className="text-[10px] font-extrabold text-slate-700 block">رفع صورة الإيصال / الفاتورة (اختياري)</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -2459,15 +2515,15 @@ export default function BridesPage() {
                       setPayRemainingReceiptPreview(URL.createObjectURL(file));
                     }
                   }}
-                  className="w-full text-xs text-slate-500 file:ml-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 rounded-2xl p-2 bg-slate-50"
+                  className="w-full text-xs text-slate-500 file:ml-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 rounded-xl p-1.5 bg-slate-50"
                 />
                 {payRemainingReceiptPreview && (
-                  <div className="relative mt-2 w-24 h-24 rounded-xl overflow-hidden border border-slate-200">
+                  <div className="relative mt-1 w-20 h-20 rounded-xl overflow-hidden border border-slate-200">
                     <img src={payRemainingReceiptPreview} alt="Receipt preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => { setPayRemainingReceipt(null); setPayRemainingReceiptPreview(null); }}
-                      className="absolute top-1 right-1 bg-rose-500 text-white p-1 rounded-full shadow-xs"
+                      className="absolute top-1 right-1 bg-rose-500 text-white p-0.5 rounded-full shadow-xs"
                     >
                       <X size={10} />
                     </button>
@@ -2476,28 +2532,28 @@ export default function BridesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-700 block">ملاحظات إضافية (اختياري)</label>
+                <label className="text-[10px] font-extrabold text-slate-700 block">ملاحظات إضافية (اختياري)</label>
                 <input
                   type="text"
                   placeholder="مثال: تم سداد باقي الفستان وحفظ الإيصال"
                   value={payRemainingNotes}
                   onChange={(e) => setPayRemainingNotes(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  className="w-full px-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-2.5 pt-1.5">
                 <button
                   type="submit"
                   disabled={isSubmittingPayRemaining}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 text-center"
+                  className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 text-center"
                 >
                   {isSubmittingPayRemaining ? 'جاري التسجيل...' : 'تأكيد وتسجيل الدفعة بالمالية 💰'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsPayRemainingModalOpen(false)}
-                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-all cursor-pointer"
                 >
                   إلغاء
                 </button>
