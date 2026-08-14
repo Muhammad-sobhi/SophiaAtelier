@@ -381,7 +381,7 @@ export default function FittingsPage() {
           <table class="info-table">
             <tr>
               <td><strong>العميلة:</strong> ${selectedFitting.client}</td>
-              <td><strong>الفستان المختار:</strong> ${selectedFitting.dress}</td>
+              <td><strong>الفستان المختار:</strong> ${selectedFitting.dress_2_name ? `${selectedFitting.dress} + ${selectedFitting.dress_2_name}` : selectedFitting.dress}</td>
             </tr>
             <tr>
               <td><strong>تاريخ الموعد:</strong> ${formatFittingDate(selectedFitting.date)}</td>
@@ -667,89 +667,35 @@ export default function FittingsPage() {
                     </div>
 
                     <div className="flex flex-col gap-2 pt-3 mt-1.5 border-t border-slate-50">
-                      <span className="text-slate-400 font-extrabold text-[10px] mb-1">الفساتين المتاحة للعروسة (تأكيد حجز خيار واحد فقط):</span>
+                      <span className="text-slate-400 font-extrabold text-[10px] mb-1">
+                        {selectedFitting.dress_2_name ? 'فساتين البروفة المحجوزة للعروسة (2 فستان):' : 'فستان البروفة المحجوز للعروسة:'}
+                      </span>
                       
-                      {/* Gown Option 1 */}
-                      <div className={`p-2.5 rounded-xl border flex flex-col gap-1.5 transition-all ${
-                    selectedFitting.dress_id === selectedFitting.booking?.dress_id ?
-                    'border-emerald-500 bg-emerald-50/30' :
-                    'border-slate-100 bg-slate-50'}`
-                    }>
+                      {/* Gown 1 */}
+                      <div className="p-3 rounded-2xl border border-indigo-100 bg-indigo-50/40 flex flex-col gap-1 text-right">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-slate-700">1. {selectedFitting.dress || 'فستان غير محدد'}</span>
-                          <span className="text-[8px] font-bold text-slate-400">(الرئيسي)</span>
+                          <span className="text-xs font-black text-indigo-700">1. {selectedFitting.dress || 'فستان غير محدد'}</span>
+                          <span className="text-[8.5px] font-extrabold text-indigo-600 bg-white px-2 py-0.5 rounded-lg border border-indigo-100">فستان 1</span>
                         </div>
-                        {selectedFitting.booking_id && selectedFitting.dress_id &&
-                      <button
-                        type="button"
-                        onClick={() => handleBookFittingDress(selectedFitting.booking_id, selectedFitting.dress_id)}
-                        disabled={selectedFitting.dress_id === selectedFitting.booking?.dress_id}
-                        className={`w-full py-1.5 rounded-lg text-[9px] font-extrabold transition-all text-center ${
-                        selectedFitting.dress_id === selectedFitting.booking?.dress_id ?
-                        'bg-emerald-600 text-white cursor-default' :
-                        'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'}`
-                        }>
-                        
-                            {selectedFitting.dress_id === selectedFitting.booking?.dress_id ? '✓ الفستان المؤكد حالياً' : 'تأكيد وحجز هذا الفستان'}
-                          </button>
-                      }
+                        <div className="text-[8.5px] font-bold text-slate-500 flex items-center justify-between mt-0.5">
+                          <span>{selectedFitting.booking?.dress?.code ? `كود: ${selectedFitting.booking?.dress?.code}` : 'الأساسي'} {selectedFitting.booking?.dress?.size ? `| مقاس: ${selectedFitting.booking?.dress?.size}` : ''}</span>
+                          <span className="text-emerald-600 font-black">✓ محجوز ومؤكد</span>
+                        </div>
                       </div>
 
-                      {/* Gown Option 2 */}
-                      {selectedFitting.dress_2_name &&
-                    <div className={`p-2.5 rounded-xl border flex flex-col gap-1.5 transition-all ${
-                    selectedFitting.dress_2_id === selectedFitting.booking?.dress_id ?
-                    'border-emerald-500 bg-emerald-50/30' :
-                    'border-slate-100 bg-slate-50'}`
-                    }>
+                      {/* Gown 2 */}
+                      {selectedFitting.dress_2_name && (
+                        <div className="p-3 rounded-2xl border border-purple-100 bg-purple-50/40 flex flex-col gap-1 text-right">
                           <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-slate-700">2. {selectedFitting.dress_2_name}</span>
-                            <span className="text-[8px] font-bold text-slate-400">(خيار ثانٍ)</span>
+                            <span className="text-xs font-black text-purple-700">2. {selectedFitting.dress_2_name}</span>
+                            <span className="text-[8.5px] font-extrabold text-purple-600 bg-white px-2 py-0.5 rounded-lg border border-purple-100">فستان 2</span>
                           </div>
-                          {selectedFitting.booking_id && selectedFitting.dress_2_id &&
-                      <button
-                        type="button"
-                        onClick={() => handleBookFittingDress(selectedFitting.booking_id, selectedFitting.dress_2_id)}
-                        disabled={selectedFitting.dress_2_id === selectedFitting.booking?.dress_id}
-                        className={`w-full py-1.5 rounded-lg text-[9px] font-extrabold transition-all text-center ${
-                        selectedFitting.dress_2_id === selectedFitting.booking?.dress_id ?
-                        'bg-emerald-600 text-white cursor-default' :
-                        'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'}`
-                        }>
-                        
-                              {selectedFitting.dress_2_id === selectedFitting.booking?.dress_id ? '✓ الفستان المؤكد حالياً' : 'تأكيد وحجز هذا الفستان'}
-                            </button>
-                      }
-                        </div>
-                    }
-
-                      {/* Gown Option 3 */}
-                      {selectedFitting.dress_3_name &&
-                    <div className={`p-2.5 rounded-xl border flex flex-col gap-1.5 transition-all ${
-                    selectedFitting.dress_3_id === selectedFitting.booking?.dress_id ?
-                    'border-emerald-500 bg-emerald-50/30' :
-                    'border-slate-100 bg-slate-50'}`
-                    }>
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-slate-700">3. {selectedFitting.dress_3_name}</span>
-                            <span className="text-[8px] font-bold text-slate-400">(خيار ثالث)</span>
+                          <div className="text-[8.5px] font-bold text-slate-500 flex items-center justify-between mt-0.5">
+                            <span>{selectedFitting.booking?.dress2?.code ? `كود: ${selectedFitting.booking?.dress2?.code}` : 'الإضافي'} {selectedFitting.booking?.dress2?.size ? `| مقاس: ${selectedFitting.booking?.dress2?.size}` : ''}</span>
+                            <span className="text-emerald-600 font-black">✓ محجوز ومؤكد</span>
                           </div>
-                          {selectedFitting.booking_id && selectedFitting.dress_3_id &&
-                      <button
-                        type="button"
-                        onClick={() => handleBookFittingDress(selectedFitting.booking_id, selectedFitting.dress_3_id)}
-                        disabled={selectedFitting.dress_3_id === selectedFitting.booking?.dress_id}
-                        className={`w-full py-1.5 rounded-lg text-[9px] font-extrabold transition-all text-center ${
-                        selectedFitting.dress_3_id === selectedFitting.booking?.dress_id ?
-                        'bg-emerald-600 text-white cursor-default' :
-                        'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'}`
-                        }>
-                        
-                              {selectedFitting.dress_3_id === selectedFitting.booking?.dress_id ? '✓ الفستان المؤكد حالياً' : 'تأكيد وحجز هذا الفستان'}
-                            </button>
-                      }
                         </div>
-                    }
+                      )}
                     </div>
                   </div>
                 </div>
@@ -812,7 +758,7 @@ export default function FittingsPage() {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
                 
                   {bookingsObjects.map((b) =>
-                <option key={b.id} value={b.id}>{b.client?.name} - {b.dress?.name} (حجز #{b.id})</option>
+                <option key={b.id} value={b.id}>{b.client?.name} - {b.dress?.name} {b.dress2 ? `+ ${b.dress2.name}` : ''} (حجز #{b.id})</option>
                 )}
                 </select>
               </div>
