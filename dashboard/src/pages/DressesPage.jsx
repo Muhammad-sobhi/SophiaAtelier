@@ -109,6 +109,7 @@ export default function DressesPage() {
   // Image upload states
   const [dressImages, setDressImages] = useState([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Accessories list states
   const [accessories, setAccessories] = useState(['']);
@@ -263,6 +264,7 @@ export default function DressesPage() {
     const validAccs = accessories.map((a) => a.trim()).filter((a) => a.length > 0);
 
     try {
+      setIsSaving(true);
       let dressId = null;
       const dressPayload = {
         code: newCode.trim() || null,
@@ -300,14 +302,16 @@ export default function DressesPage() {
         dressId = res.data?.id || res.id;
       }
 
-      // Upload images if any are selected
+      // Upload images/videos if any are selected
       if (dressImages.length > 0 && dressId) {
         const fd = new FormData();
         dressImages.forEach((img) => fd.append('images[]', img));
         try {
           await apiClient.postFormData(`/dresses/${dressId}/images`, fd);
         } catch (imgErr) {
-          console.error('Failed to upload images:', imgErr);
+          console.error('Failed to upload media:', imgErr);
+          const uploadMsg = imgErr?.data?.message || imgErr?.response?.data?.message || imgErr?.message || 'تعذر رفع بعض ملفات الصور أو الفيديو';
+          alert(`تم حفظ بيانات الفستان، لكن حدث خطأ أثناء رفع الوسائط: ${uploadMsg}`);
         }
       }
 
@@ -331,6 +335,8 @@ export default function DressesPage() {
       } else {
         alert('حدث خطأ أثناء حفظ الفستان. يرجى التأكد من البيانات والمحاولة مجدداً.');
       }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1290,9 +1296,10 @@ export default function DressesPage() {
               <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0 flex items-center gap-3">
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-md shadow-indigo-600/10 active:scale-95"
+                  disabled={isSaving}
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-md shadow-indigo-600/10 active:scale-95"
                 >
-                  حفظ الفستان بالكتالوج
+                  {isSaving ? 'جاري حفظ الفستان ورفع الوسائط...' : 'حفظ الفستان بالكتالوج'}
                 </button>
                 <button
                   type="button"

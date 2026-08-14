@@ -63,7 +63,7 @@ export default function ClientGallery() {
               data-delay={String(Math.min(i + 1, 6))}
             >
               <div className={styles.imageWrap}>
-                {/\.(mp4|mov|webm|avi)$/i.test(c.image || '') ? (
+                {/\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(c.image || '') ? (
                   <video
                     src={c.image}
                     className={styles.image}

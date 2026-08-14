@@ -11,6 +11,7 @@ import {
   Check,
   User,
   X,
+  Search,
   CreditCard } from
 'lucide-react';
 
@@ -107,6 +108,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   // Booking modal states
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingDressId, setBookingDressId] = useState('');
+  const [bookingDressSearch, setBookingDressSearch] = useState('');
+  const [bookingPhone, setBookingPhone] = useState(bride.phone || '');
   const [bookingEventDate, setBookingEventDate] = useState(bride.wedding_date || new Date().toISOString().split('T')[0]);
   const [bookingTotalAmount, setBookingTotalAmount] = useState('0');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('0');
@@ -114,6 +117,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [bookingReceipt, setBookingReceipt] = useState(null);
   const [bookingNotes, setBookingNotes] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  React.useEffect(() => {
+    setBookingPhone(bride.phone || '');
+  }, [bride.id, bride.phone]);
 
   React.useEffect(() => {
     if (showFittingModal) {
@@ -248,8 +255,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      const activePhone = bookingPhone.trim() || bride.phone || '';
       await apiClient.put(`/clients/${bride.id}/stage-action`, {
         action: 'confirm_booking',
+        phone: activePhone,
         dress_id: parseInt(bookingDressId),
         event_date: bookingEventDate,
         total_amount: parseFloat(bookingTotalAmount),
@@ -289,9 +298,11 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         console.error('Failed to fetch whatsapp template, using fallback:', err);
       }
 
-      const cleanPhone = bride.phone.replace(/[^\d]/g, '');
-      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      const cleanPhone = activePhone.replace(/[^\d]/g, '');
+      if (cleanPhone) {
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+      }
 
     } catch (err) {
       console.error(err);
@@ -1112,25 +1123,84 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
             {/* Scrollable Form Body */}
             <form onSubmit={handleBookingSubmit} className="flex flex-col flex-grow min-h-0 overflow-hidden">
               <div className="p-4 space-y-3 overflow-y-auto flex-grow text-right scrollbar-thin">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">اختر الفستان المراد حجزها</label>
-                  <select
-                  required
-                  value={bookingDressId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setBookingDressId(val);
-                    const selectedDress = dressesList.find((d) => d.id.toString() === val);
-                    if (selectedDress) {
-                      setBookingTotalAmount(parseFloat(selectedDress.rental_price || 0).toString());
-                    }
-                  }}
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right">
-                  
-                    {dressesList.map((d) =>
-                  <option key={d.id} value={d.id}>{d.name} (مقاس: {d.size || '—'} | {parseFloat(d.rental_price || 0).toLocaleString()} ج.م)</option>
-                  )}
-                  </select>
+                {/* Dress Selection with Fast Search */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">الفستان المراد حجزه</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                      value={bookingDressSearch}
+                      onChange={(e) => setBookingDressSearch(e.target.value)}
+                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
+                    />
+                    <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                    {bookingDressSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setBookingDressSearch('')}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={11} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filtered dress buttons / selection list */}
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-32 overflow-y-auto scrollbar-thin">
+                    {dressesList
+                      .filter((d) => {
+                        if (!bookingDressSearch.trim()) return true;
+                        const q = bookingDressSearch.toLowerCase().trim();
+                        return (
+                          d.name?.toLowerCase().includes(q) ||
+                          d.code?.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((d) => {
+                        const isSelected = bookingDressId === d.id.toString();
+                        return (
+                          <button
+                            type="button"
+                            key={d.id}
+                            onClick={() => {
+                              setBookingDressId(d.id.toString());
+                              if (d.rental_price) {
+                                setBookingTotalAmount(parseFloat(d.rental_price || 0).toString());
+                              }
+                            }}
+                            className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50 hover:border-rose-200'
+                            }`}
+                          >
+                            {d.name} {d.code ? <span className="opacity-75 font-mono text-[9px]">({d.code})</span> : ''}
+                          </button>
+                        );
+                      })}
+                    {dressesList.filter((d) => {
+                      if (!bookingDressSearch.trim()) return true;
+                      const q = bookingDressSearch.toLowerCase().trim();
+                      return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
+                        لا توجد فساتين مطابقة للبحث "{bookingDressSearch}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Currently selected dress indicator */}
+                  {(() => {
+                    const activeDress = dressesList.find((d) => d.id.toString() === bookingDressId);
+                    if (!activeDress) return null;
+                    return (
+                      <div className="text-[10px] font-extrabold text-rose-700 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                        <span>الفستان المختار: <strong className="font-black">{activeDress.name}</strong></span>
+                        {activeDress.code && <span className="font-mono text-[9.5px] text-rose-800">كود: {activeDress.code}</span>}
+                      </div>
+                    );
+                  })()}
 
                   {(() => {
                   if (!dressDetails || !dressDetails.bookings || dressDetails.bookings.length === 0) return null;
@@ -1173,6 +1243,19 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                       </div>);
 
                 })()}
+                </div>
+
+                {/* Bride Phone Field */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف العروس (واتساب)</label>
+                  <input
+                    type="tel"
+                    required
+                    value={bookingPhone}
+                    onChange={(e) => setBookingPhone(e.target.value)}
+                    placeholder="مثال: 01012345678"
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                  />
                 </div>
 
                 <div className="space-y-1">

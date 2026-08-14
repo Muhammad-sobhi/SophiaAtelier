@@ -78,7 +78,7 @@ export default function QuickView() {
             {images.length > 1 && (
               <div className={styles.thumbnails}>
                 {images.map((img, idx) => {
-                  const isVid = typeof img === 'string' && /\.(mp4|mov|webm|avi)$/i.test(img);
+                  const isVid = typeof img === 'string' && /\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(img);
                   return (
                     <button
                       key={idx}
@@ -104,7 +104,7 @@ export default function QuickView() {
             )}
 
             <div className={styles.mainImageWrap}>
-              {/\.(mp4|mov|webm|avi)$/i.test(activeImage || product.image || '') ? (
+              {/\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(activeImage || product.image || '') ? (
                 <video
                   src={activeImage || product.image}
                   className={styles.mainImage}

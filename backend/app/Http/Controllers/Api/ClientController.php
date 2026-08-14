@@ -192,6 +192,7 @@ class ClientController extends Controller
     {
         $request->validate([
             'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining',
+            'phone' => 'nullable|string|max:50',
             'dress_id' => 'nullable|integer|exists:dresses,id',
             'fitting_date' => 'nullable|date',
             'fitting_time' => 'nullable|string|max:20',
@@ -276,6 +277,10 @@ class ClientController extends Controller
                 break;
 
             case 'confirm_booking':
+                if ($request->filled('phone')) {
+                    $client->update(['phone' => $request->input('phone')]);
+                }
+
                 // Get or create booking
                 $booking = $client->bookings()->latest()->first();
                 if (!$booking) {

@@ -50,9 +50,59 @@ const formatDate = (dateStr) => {
   }
 };
 
+const ALL_EGYPT_CITIES = [
+  'القاهرة',
+  'الجيزة',
+  'الإسكندرية',
+  'طنطا',
+  'المنصورة',
+  'الزقازيق',
+  'بورسعيد',
+  'السويس',
+  'الإسماعيلية',
+  'دمياط',
+  'كفر الشيخ',
+  'دمنهور',
+  'المحلة الكبرى',
+  'بنها',
+  'شبين الكوم',
+  'الفيوم',
+  'بني سويف',
+  'المنيا',
+  'أسيوط',
+  'سوهاج',
+  'قنا',
+  'الأقصر',
+  'أسوان',
+  'الغردقة',
+  'شرم الشيخ',
+  'مرسى مطروح',
+  'التجمع الأول',
+  'التجمع الخامس',
+  'مدينة نصر',
+  'مصر الجديدة',
+  'المعادي',
+  'الشيخ زايد',
+  '6 أكتوبر',
+  'الشروق',
+  'مدينتي',
+  'بدر',
+  'العبور',
+  'حلوان'
+];
+
 export default function BridesPage() {
   const navigate = useNavigate();
   const [bridesList, setBridesList] = useState([]);
+  const allCitiesOptions = React.useMemo(() => {
+    const set = new Set(ALL_EGYPT_CITIES);
+    bridesList.forEach((b) => {
+      if (b.city && b.city.trim()) {
+        set.add(b.city.trim());
+      }
+    });
+    return Array.from(set);
+  }, [bridesList]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -73,6 +123,7 @@ export default function BridesPage() {
   const [newWeddingDate, setNewWeddingDate] = useState('');
   const [newNote, setNewNote] = useState('');
   const [selectedModels, setSelectedModels] = useState([]);
+  const [brideDressSearch, setBrideDressSearch] = useState('');
 
   const [isPickupModalOpen, setIsPickupModalOpen] = useState(false);
   const [selectedBrideForPickup, setSelectedBrideForPickup] = useState(null);
@@ -98,6 +149,8 @@ export default function BridesPage() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedBrideForBooking, setSelectedBrideForBooking] = useState(null);
   const [bookingDressId, setBookingDressId] = useState('');
+  const [bookingDressSearch, setBookingDressSearch] = useState('');
+  const [bookingPhone, setBookingPhone] = useState('');
   const [bookingEventDate, setBookingEventDate] = useState(new Date().toISOString().split('T')[0]);
   const [bookingTotalAmount, setBookingTotalAmount] = useState('3500');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('1000');
@@ -306,8 +359,10 @@ export default function BridesPage() {
     e.preventDefault();
     if (!selectedBrideForBooking) return;
     try {
+      const activePhone = bookingPhone.trim() || selectedBrideForBooking.phone || '';
       await apiClient.put(`/clients/${selectedBrideForBooking.id}/stage-action`, {
         action: 'confirm_booking',
+        phone: activePhone,
         dress_id: parseInt(bookingDressId),
         event_date: bookingEventDate,
         total_amount: parseFloat(bookingTotalAmount),
@@ -348,9 +403,11 @@ export default function BridesPage() {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
       }
 
-      const cleanPhone = selectedBrideForBooking.phone.replace(/[^\d]/g, '');
-      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      const cleanPhone = activePhone.replace(/[^\d]/g, '');
+      if (cleanPhone) {
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+      }
 
     } catch (err) {
       console.error(err);
@@ -386,16 +443,21 @@ export default function BridesPage() {
 
     try {
       const fd = new FormData();
-      fd.append('name', newName);
-      fd.append('phone', newPhone || '0000000000');
+      fd.append('name', newName.trim());
+      fd.append('phone', newPhone.trim() || '0000000000');
       fd.append('email', `${Date.now()}@atelier-bride.com`);
-      fd.append('city', newCity);
-      fd.append('address', newCity);
+      fd.append('city', newCity.trim());
+      fd.append('address', newCity.trim());
       fd.append('source', mappedSource);
       if (newWeddingDate) {
         fd.append('wedding_date', newWeddingDate);
       }
-      fd.append('notes', newNote);
+      let finalNote = newNote.trim();
+      if (selectedModels.length > 0) {
+        const modelsText = `الفساتين المهتمة بها: ${selectedModels.join(', ')}`;
+        finalNote = finalNote ? `${finalNote}\n${modelsText}` : modelsText;
+      }
+      fd.append('notes', finalNote);
       if (brideImage) {
         fd.append('image', brideImage);
       }
@@ -427,7 +489,19 @@ export default function BridesPage() {
     setNewPhone(b.phone || '');
     setNewSource(b.source || 'انستقرام');
     setNewWeddingDate(b.wedding_date || '');
-    setNewNote(b.notes || '');
+
+    // Extract selected models from notes if present
+    const modelMatch = b.notes?.match(/الفساتين المهتمة بها:\s*([^\n]+)/);
+    if (modelMatch && modelMatch[1]) {
+      const models = modelMatch[1].split(',').map((s) => s.trim()).filter(Boolean);
+      setSelectedModels(models);
+      setNewNote(b.notes.replace(/الفساتين المهتمة بها:\s*[^\n]+\n?/g, '').trim());
+    } else {
+      setSelectedModels([]);
+      setNewNote(b.notes || '');
+    }
+
+    setBrideDressSearch('');
     if (b.image_path) {
       setImagePreviewUrl(`${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${b.image_path}`);
     } else {
@@ -449,15 +523,21 @@ export default function BridesPage() {
     try {
       const fd = new FormData();
       fd.append('_method', 'PUT');
-      fd.append('name', newName);
-      fd.append('phone', newPhone || '0000000000');
-      fd.append('city', newCity);
-      fd.append('address', newCity);
+      fd.append('name', newName.trim());
+      fd.append('phone', newPhone.trim() || '0000000000');
+      fd.append('city', newCity.trim());
+      fd.append('address', newCity.trim());
       fd.append('source', mappedSource);
       if (newWeddingDate) {
         fd.append('wedding_date', newWeddingDate);
       }
-      fd.append('notes', newNote);
+      let finalNote = newNote.trim();
+      if (selectedModels.length > 0) {
+        const cleanNote = finalNote.replace(/الفساتين المهتمة بها:\s*[^\n]+\n?/g, '').trim();
+        const modelsText = `الفساتين المهتمة بها: ${selectedModels.join(', ')}`;
+        finalNote = cleanNote ? `${cleanNote}\n${modelsText}` : modelsText;
+      }
+      fd.append('notes', finalNote);
       if (brideImage) {
         fd.append('image', brideImage);
       }
@@ -481,6 +561,7 @@ export default function BridesPage() {
     setNewWeddingDate('');
     setNewNote('');
     setSelectedModels([]);
+    setBrideDressSearch('');
     setBrideImage(null);
     setImagePreviewUrl(null);
   };
@@ -733,7 +814,20 @@ export default function BridesPage() {
                     setIsReturnModalOpen(true);
                   } else if (actionInfo.action === 'confirm_booking') {
                     setSelectedBrideForBooking(bride);
+                    setBookingPhone(bride.phone || '');
+                    setBookingDressSearch('');
                     setBookingEventDate(bride.wedding_date || new Date().toISOString().split('T')[0]);
+                    const bookedDressId = bride.bookings?.[0]?.dress_id;
+                    if (bookedDressId) {
+                      setBookingDressId(bookedDressId.toString());
+                      const bDress = dressesList.find((d) => d.id === bookedDressId);
+                      if (bDress) {
+                        setBookingTotalAmount(parseFloat(bDress.rental_price || 0).toString());
+                      }
+                    } else if (dressesList.length > 0) {
+                      setBookingDressId(dressesList[0].id.toString());
+                      setBookingTotalAmount(parseFloat(dressesList[0].rental_price || 0).toString());
+                    }
                     setShowBookingModal(true);
                   } else if (actionInfo.action === 'schedule_fitting') {
                     setSelectedBrideForFitting(bride);
@@ -980,16 +1074,16 @@ export default function BridesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">المدينة</label>
-                  <select value={newCity} onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
-                    <option value="القاهرة">القاهرة</option>
-                    <option value="الجيزة">الجيزة</option>
-                    <option value="الإسكندرية">الإسكندرية</option>
-                    <option value="طنطا">طنطا</option>
-                    <option value="المنصورة">المنصورة</option>
-                    <option value="أخرى خارج القاهرة">أخرى خارج القاهرة</option>
-                  </select>
+                  <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
+                  <input
+                    type="text"
+                    list="egypt-cities-datalist"
+                    required
+                    placeholder="اختر أو اكتب المدينة..."
+                    value={newCity}
+                    onChange={(e) => setNewCity(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">رقم الجوال</label>
@@ -1025,24 +1119,104 @@ export default function BridesPage() {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
               </div>
 
-              {/* Dress Selection */}
-              {availableDresses.length > 0 &&
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-slate-600 block">الفساتين المهتمة بها (حتى 3)</label>
-                  <div className="flex flex-wrap gap-2 p-2.5 bg-slate-50 rounded-2xl border border-slate-100/50">
-                    {availableDresses.map((dress) => {
+              {/* Fast Dress Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-extrabold text-slate-600">
+                    الفساتين المهتمة بها <span className="text-[10px] font-bold text-indigo-600">({selectedModels.length}/3 فساتين)</span>
+                  </label>
+                  {selectedModels.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModels([])}
+                      className="text-[10px] text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
+                    >
+                      مسح المختار
+                    </button>
+                  )}
+                </div>
+
+                {/* Selected Chips */}
+                {selectedModels.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-indigo-50/50 rounded-2xl border border-indigo-100/60">
+                    {selectedModels.map((m) => (
+                      <span
+                        key={m}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[10px] font-bold shadow-xs"
+                      >
+                        <span>{m}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleModelSelection(m)}
+                          className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors cursor-pointer"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Fast Search Bar */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                    value={brideDressSearch}
+                    onChange={(e) => setBrideDressSearch(e.target.value)}
+                    className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
+                  <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                  {brideDressSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setBrideDressSearch('')}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Dresses List with instant filter */}
+                <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-50 rounded-2xl border border-slate-100 max-h-36 overflow-y-auto scrollbar-thin">
+                  {dressesList
+                    .filter((d) => {
+                      if (!brideDressSearch.trim()) return true;
+                      const q = brideDressSearch.toLowerCase().trim();
+                      return (
+                        d.name?.toLowerCase().includes(q) ||
+                        d.code?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((dress) => {
                       const isSelected = selectedModels.includes(dress.name);
                       return (
-                        <button type="button" key={dress.id} onClick={() => handleToggleModelSelection(dress.name)}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-155 text-slate-600 hover:bg-slate-100'}`
-                          }>
-                          {dress.name}
-                        </button>);
-
+                        <button
+                          type="button"
+                          key={dress.id}
+                          onClick={() => handleToggleModelSelection(dress.name)}
+                          className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
+                          }`}
+                        >
+                          {dress.name} {dress.code ? <span className="opacity-70 font-mono text-[9px]">({dress.code})</span> : ''}
+                        </button>
+                      );
                     })}
-                  </div>
+                  {dressesList.filter((d) => {
+                    if (!brideDressSearch.trim()) return true;
+                    const q = brideDressSearch.toLowerCase().trim();
+                    return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
+                      لا توجد فساتين مطابقة للبحث "{brideDressSearch}"
+                    </div>
+                  )}
                 </div>
-              }
+              </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-slate-600">ملاحظات</label>
@@ -1122,16 +1296,16 @@ export default function BridesPage() {
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">المدينة</label>
-                  <select value={newCity} onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
-                    <option value="القاهرة">القاهرة</option>
-                    <option value="الجيزة">الجيزة</option>
-                    <option value="الإسكندرية">الإسكندرية</option>
-                    <option value="طنطا">طنطا</option>
-                    <option value="المنصورة">المنصورة</option>
-                    <option value="أخرى خارج القاهرة">أخرى خارج القاهرة</option>
-                  </select>
+                  <label className="text-xs font-extrabold text-slate-600">المدينة / المحافظة</label>
+                  <input
+                    type="text"
+                    list="egypt-cities-datalist"
+                    required
+                    placeholder="اختر أو اكتب المدينة..."
+                    value={newCity}
+                    onChange={(e) => setNewCity(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
                 </div>
               </div>
 
@@ -1153,6 +1327,105 @@ export default function BridesPage() {
                   <label className="text-xs font-extrabold text-slate-600">تاريخ الزفاف (الفرح)</label>
                   <input type="date" value={newWeddingDate} onChange={(e) => setNewWeddingDate(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                </div>
+              </div>
+
+              {/* Fast Dress Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-extrabold text-slate-600">
+                    الفساتين المهتمة بها <span className="text-[10px] font-bold text-indigo-600">({selectedModels.length}/3 فساتين)</span>
+                  </label>
+                  {selectedModels.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModels([])}
+                      className="text-[10px] text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
+                    >
+                      مسح المختار
+                    </button>
+                  )}
+                </div>
+
+                {/* Selected Chips */}
+                {selectedModels.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-indigo-50/50 rounded-2xl border border-indigo-100/60">
+                    {selectedModels.map((m) => (
+                      <span
+                        key={m}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[10px] font-bold shadow-xs"
+                      >
+                        <span>{m}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleModelSelection(m)}
+                          className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors cursor-pointer"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Fast Search Bar */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                    value={brideDressSearch}
+                    onChange={(e) => setBrideDressSearch(e.target.value)}
+                    className="w-full pl-8 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                  />
+                  <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                  {brideDressSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setBrideDressSearch('')}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Dresses List with instant filter */}
+                <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-50 rounded-2xl border border-slate-100 max-h-36 overflow-y-auto scrollbar-thin">
+                  {dressesList
+                    .filter((d) => {
+                      if (!brideDressSearch.trim()) return true;
+                      const q = brideDressSearch.toLowerCase().trim();
+                      return (
+                        d.name?.toLowerCase().includes(q) ||
+                        d.code?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((dress) => {
+                      const isSelected = selectedModels.includes(dress.name);
+                      return (
+                        <button
+                          type="button"
+                          key={dress.id}
+                          onClick={() => handleToggleModelSelection(dress.name)}
+                          className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200'
+                          }`}
+                        >
+                          {dress.name} {dress.code ? <span className="opacity-70 font-mono text-[9px]">({dress.code})</span> : ''}
+                        </button>
+                      );
+                    })}
+                  {dressesList.filter((d) => {
+                    if (!brideDressSearch.trim()) return true;
+                    const q = brideDressSearch.toLowerCase().trim();
+                    return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
+                      لا توجد فساتين مطابقة للبحث "{brideDressSearch}"
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1758,18 +2031,97 @@ export default function BridesPage() {
             {/* Scrollable Form Body */}
             <form onSubmit={handleBookingSubmit} className="flex flex-col flex-grow min-h-0 overflow-hidden">
               <div className="p-4 space-y-3 overflow-y-auto flex-grow text-right scrollbar-thin">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">اختر الفستان المراد حجزها</label>
-                  <select
-                    required
-                    value={bookingDressId}
-                    onChange={(e) => setBookingDressId(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right">
-
-                    {dressesList.map((d) =>
-                      <option key={d.id} value={d.id}>{d.name} (مقاس: {d.size || '—'} | {parseFloat(d.rental_price || 0).toLocaleString()} ج.م)</option>
+                {/* Dress Selection with Fast Search */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">الفستان المراد حجزه</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                      value={bookingDressSearch}
+                      onChange={(e) => setBookingDressSearch(e.target.value)}
+                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
+                    />
+                    <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                    {bookingDressSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setBookingDressSearch('')}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={11} />
+                      </button>
                     )}
-                  </select>
+                  </div>
+
+                  {/* Filtered dress buttons / selection list */}
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 max-h-32 overflow-y-auto scrollbar-thin">
+                    {dressesList
+                      .filter((d) => {
+                        if (!bookingDressSearch.trim()) return true;
+                        const q = bookingDressSearch.toLowerCase().trim();
+                        return (
+                          d.name?.toLowerCase().includes(q) ||
+                          d.code?.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((d) => {
+                        const isSelected = bookingDressId === d.id.toString();
+                        return (
+                          <button
+                            type="button"
+                            key={d.id}
+                            onClick={() => {
+                              setBookingDressId(d.id.toString());
+                              if (d.rental_price) {
+                                setBookingTotalAmount(parseFloat(d.rental_price || 0).toString());
+                              }
+                            }}
+                            className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50 hover:border-rose-200'
+                            }`}
+                          >
+                            {d.name} {d.code ? <span className="opacity-75 font-mono text-[9px]">({d.code})</span> : ''}
+                          </button>
+                        );
+                      })}
+                    {dressesList.filter((d) => {
+                      if (!bookingDressSearch.trim()) return true;
+                      const q = bookingDressSearch.toLowerCase().trim();
+                      return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <div className="w-full text-center py-2 text-[10px] font-bold text-slate-400">
+                        لا توجد فساتين مطابقة للبحث "{bookingDressSearch}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Currently selected dress indicator */}
+                  {(() => {
+                    const activeDress = dressesList.find((d) => d.id.toString() === bookingDressId);
+                    if (!activeDress) return null;
+                    return (
+                      <div className="text-[10px] font-extrabold text-rose-700 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                        <span>الفستان المختار: <strong className="font-black">{activeDress.name}</strong></span>
+                        {activeDress.code && <span className="font-mono text-[9.5px] text-rose-800">كود: {activeDress.code}</span>}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Bride Phone Field */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف العروس (واتساب)</label>
+                  <input
+                    type="tel"
+                    required
+                    value={bookingPhone}
+                    onChange={(e) => setBookingPhone(e.target.value)}
+                    placeholder="مثال: 01012345678"
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -1780,7 +2132,6 @@ export default function BridesPage() {
                     value={bookingEventDate}
                     onChange={(e) => setBookingEventDate(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right" />
-
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -2154,6 +2505,13 @@ export default function BridesPage() {
           </div>
         </div>
       )}
+
+      {/* Egypt Cities Datalist for Creatable City Selection */}
+      <datalist id="egypt-cities-datalist">
+        {allCitiesOptions.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
     </div>
   );
 };

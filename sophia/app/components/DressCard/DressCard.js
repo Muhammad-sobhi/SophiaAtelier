@@ -85,7 +85,7 @@ export default function DressCard({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/\.(mp4|mov|webm|avi)$/i.test(currentImage) ? (
+        {/\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(currentImage) ? (
           <video src={currentImage} className={styles.image} muted loop autoPlay playsInline />
         ) : (
           <Image

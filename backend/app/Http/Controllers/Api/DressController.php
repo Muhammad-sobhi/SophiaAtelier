@@ -239,7 +239,27 @@ class DressController extends Controller
     {
         $request->validate([
             'images' => 'required|array|max:4',
-            'images.*' => 'required|file|mimes:jpeg,png,jpg,webp,mp4,mov,webm,avi|max:51200',
+            'images.*' => [
+                'required',
+                'file',
+                'max:51200',
+                function ($attribute, $value, $fail) {
+                    if (!$value || !$value->isValid()) {
+                        $fail('الملف المرفوع غير صالح أو تجاوز الحد الأقصى المسموح.');
+                        return;
+                    }
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm', 'avi', 'm4v', '3gp', '3gpp', 'mkv'];
+                    if (!in_array($ext, $allowed)) {
+                        $fail("صيغة الملف ({$ext}) غير مدعومة. الصيغ المتاحة: صور (JPG, PNG, WEBP) وفيديوهات (MP4, MOV, WEBM, AVI, M4V, 3GP).");
+                    }
+                }
+            ],
+        ], [
+            'images.required' => 'يرجى اختيار ملف صورة أو فيديو واحد على الأقل.',
+            'images.array' => 'صيغة البيانات غير صحيحة.',
+            'images.max' => 'يمكنك رفع حتى 4 ملفات فقط.',
+            'images.*.max' => 'حجم الملف يتجاوز الحد الأقصى المسموح (50 ميجابايت).',
         ]);
 
         $existing = $dress->images()->count();
