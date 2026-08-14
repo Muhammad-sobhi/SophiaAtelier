@@ -1016,15 +1016,38 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   </div>
                 </div>
 
-                <div className="space-y-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100/80 text-right">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">فستان البروفة (الفستان المحجوز)</label>
+                <div className="space-y-1.5 bg-slate-50 p-3 rounded-2xl border border-slate-100/80 text-right">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">
+                    {bride.bookings?.[0]?.dress2 ? 'فساتين البروفة (الفستانين المحجوزين للعروس)' : 'فستان البروفة (الفستان المحجوز)'}
+                  </label>
                   {(() => {
                     const booking = bride.bookings?.[0];
                     const bookedDress = booking?.dress;
+                    const bookedDress2 = booking?.dress2;
+                    if (bookedDress && bookedDress2) {
+                      return (
+                        <div className="space-y-2 mt-1">
+                          <div className="p-2 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between">
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-black text-indigo-700">1. {bookedDress.name}</span>
+                              <span className="text-[8.5px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} {bookedDress.code ? `(كود: ${bookedDress.code})` : ''}</span>
+                            </div>
+                            <span className="text-[9px] font-extrabold text-indigo-600 bg-white px-2 py-0.5 rounded-lg border border-indigo-100">فستان 1</span>
+                          </div>
+                          <div className="p-2 bg-purple-50/60 rounded-xl border border-purple-100 flex items-center justify-between">
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-black text-purple-700">2. {bookedDress2.name}</span>
+                              <span className="text-[8.5px] font-bold text-slate-500">مقاس: {bookedDress2.size || '—'} {bookedDress2.code ? `(كود: ${bookedDress2.code})` : ''}</span>
+                            </div>
+                            <span className="text-[9px] font-extrabold text-purple-600 bg-white px-2 py-0.5 rounded-lg border border-purple-100">فستان 2</span>
+                          </div>
+                        </div>
+                      );
+                    }
                     if (bookedDress) {
                       return (
                         <div className="flex flex-col gap-0.5 mt-0.5">
-                          <span className="text-xs font-black text-indigo-650">{bookedDress.name}</span>
+                          <span className="text-xs font-black text-indigo-650">{bookedDress.name} {bookedDress.code ? `(${bookedDress.code})` : ''}</span>
                           <span className="text-[9px] font-bold text-slate-500">مقاس: {bookedDress.size || '—'} | رسوم التجربة: {parseFloat(bookedDress.trying_fee || 0).toLocaleString()} ج.م</span>
                         </div>
                       );
@@ -1292,9 +1315,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                         const p1 = parseFloat(d1?.rental_price || 0);
                         const p2 = checked && d2 ? parseFloat(d2?.rental_price || 0) : 0;
                         setBookingTotalAmount((p1 + p2).toString());
-                        if (!bookingInsuranceAmount || bookingInsuranceAmount === '500' || bookingInsuranceAmount === '1000') {
-                          setBookingInsuranceAmount('5000');
-                        }
+                        setBookingInsuranceAmount(checked ? '10000' : '5000');
                       }}
                       className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
                     />

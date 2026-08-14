@@ -466,7 +466,9 @@ export default function FittingsPage() {
                       {f.status}
                     </span>
                   </div>
-                  <div className="text-[9px] text-slate-500 font-semibold mb-1 truncate">{f.dress}</div>
+                  <div className="text-[9px] text-slate-500 font-semibold mb-1 truncate">
+                    {f.dress_2_name ? `${f.dress} + ${f.dress_2_name}` : f.dress}
+                  </div>
                   <div className="flex items-center justify-between text-[8.5px] text-slate-400 font-bold">
                     <span className="flex items-center gap-1 font-mono">
                       <CalendarIcon size={9} />
@@ -491,7 +493,7 @@ export default function FittingsPage() {
                 </div>
                 <div>
                   <h1 className="text-sm font-extrabold text-slate-800">
-                    {selectedFitting.type} - للعروسة: <span className="text-indigo-650 font-black">{selectedFitting.client}</span> | الفستان: <span className="text-indigo-650 font-black">{selectedFitting.dress}</span>
+                    {selectedFitting.type} - للعروسة: <span className="text-indigo-650 font-black">{selectedFitting.client}</span> | الفستان: <span className="text-indigo-650 font-black">{selectedFitting.dress_2_name ? `${selectedFitting.dress} + ${selectedFitting.dress_2_name}` : selectedFitting.dress}</span>
                   </h1>
                   <p className="text-[10px] text-slate-450 font-bold mt-0.5">موعد البروفة: {formatFittingDate(selectedFitting.date)}</p>
                 </div>

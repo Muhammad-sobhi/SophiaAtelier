@@ -217,13 +217,18 @@ class Client extends Model
                 }
             }
 
-            // Only move to 'booking' stage if the booking status is 'confirmed'
+            // If a fitting is scheduled for this client/booking, move to fitting stage
+            if ($fittingsList->count() > 0) {
+                return 'fitting';
+            }
+
+            // Only stay in 'booking' stage if the booking is confirmed and no fitting is scheduled yet
             if ($latestBooking->status === 'confirmed') {
                 return 'booking';
             }
         }
 
-        // 2. Fitting stage (if fittings exist)
+        // 2. Fitting stage (if fittings exist without booking)
         if ($fittingsList->count() > 0) {
             return 'fitting';
         }
