@@ -643,50 +643,6 @@ export default function DashboardPage() {
                         * هذا المبلغ تأمين مسترد يتم إرجاعه للعميلة عند إرجاع الفستان سليم.
                       </p>
                     </div>
-
-                    {/* Upload Receipt */}
-                    <div className="pt-1.5 border-t border-slate-150 mt-1 space-y-1">
-                      <label className="text-[9px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع (اختياري)</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setPickupReceipt(reader.result);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                          className="hidden"
-                          id="dashboard-pickup-receipt-file-input"
-                        />
-                        <label
-                          htmlFor="dashboard-pickup-receipt-file-input"
-                          className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
-                        >
-                          <CreditCard size={12} className="inline mr-1" />
-                          <span>{pickupReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
-                        </label>
-                        {pickupReceipt && (
-                          <button
-                            type="button"
-                            onClick={() => setPickupReceipt(null)}
-                            className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
-                          >
-                            <X size={12} />
-                          </button>
-                        )}
-                      </div>
-                      {pickupReceipt && (
-                        <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
-                          <img src={pickupReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
-                        </div>
-                      )}
-                    </div>
                   </div>
 
                   {/* Accessories Checklist */}

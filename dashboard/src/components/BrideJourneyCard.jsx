@@ -1317,50 +1317,6 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   />
                 )}
 
-                {/* Upload Receipt */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال الدفع (اختياري)</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setFittingReceipt(reader.result);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="fitting-receipt-file-input"
-                    />
-                    <label
-                      htmlFor="fitting-receipt-file-input"
-                      className="flex-grow px-3 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-indigo-600 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
-                    >
-                      <CreditCard size={12} />
-                      <span>{fittingReceipt ? 'تغيير الإيصال المرفق' : 'رفع إيصال'}</span>
-                    </label>
-                    {fittingReceipt && (
-                      <button
-                        type="button"
-                        onClick={() => setFittingReceipt(null)}
-                        className="p-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  {fittingReceipt && (
-                    <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
-                      <img src={fittingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
-                    </div>
-                  )}
-                </div>
-
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">ملاحظات إضافية</label>
                   <textarea
@@ -1704,50 +1660,6 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   label="سداد وطرق دفع العربون"
                   required
                 />
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setBookingReceipt(reader.result);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="booking-receipt-file-input"
-                    />
-                    <label
-                      htmlFor="booking-receipt-file-input"
-                      className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
-                    >
-                      <CreditCard size={10} />
-                      <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
-                    </label>
-                    {bookingReceipt && (
-                      <button
-                        type="button"
-                        onClick={() => setBookingReceipt(null)}
-                        className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
-                      >
-                        <X size={10} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {bookingReceipt && (
-                  <div className="border border-slate-100 rounded-xl overflow-hidden max-h-[70px] flex items-center justify-center bg-slate-50 mt-1">
-                    <img src={bookingReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[65px]" />
-                  </div>
-                )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-500 block text-right">ملاحظات إضافية</label>
