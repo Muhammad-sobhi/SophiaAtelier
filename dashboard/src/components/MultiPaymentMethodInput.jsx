@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Trash2, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Plus, Trash2, CheckCircle2, AlertCircle, Sparkles, Paperclip, X, Eye } from 'lucide-react';
 
 export const PAYMENT_METHODS = [
   { id: 'cash', label: 'نقدي (Cash)' },
@@ -10,15 +10,19 @@ export const PAYMENT_METHODS = [
 ];
 
 export function MultiPaymentMethodInput({
-  payments = [{ amount: '', payment_method: 'cash' }],
+  payments = [{ amount: '', payment_method: 'cash', receipt_image: null }],
   onChange,
   totalExpected = null,
   label = 'طرق وتفاصيل السداد',
-  required = false
+  required = false,
+  allowReceipts = true
 }) {
   const currentPayments = Array.isArray(payments) && payments.length > 0
     ? payments
-    : [{ amount: '', payment_method: 'cash' }];
+    : [{ amount: '', payment_method: 'cash', receipt_image: null }];
+
+  const [previewImage, setPreviewImage] = useState(null);
+  const fileInputRefs = useRef({});
 
   const totalPaid = currentPayments.reduce((sum, p) => {
     const val = parseFloat(p.amount) || 0;
@@ -34,6 +38,35 @@ export function MultiPaymentMethodInput({
     onChange?.(updated);
   };
 
+  const handleReceiptChange = (index, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const updated = [...currentPayments];
+      updated[index] = {
+        ...updated[index],
+        receipt_image: dataUrl,
+        receipt_name: file.name
+      };
+      onChange?.(updated);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveReceipt = (index) => {
+    const updated = [...currentPayments];
+    updated[index] = {
+      ...updated[index],
+      receipt_image: null,
+      receipt_name: null
+    };
+    if (fileInputRefs.current[index]) {
+      fileInputRefs.current[index].value = '';
+    }
+    onChange?.(updated);
+  };
+
   const handleAddRow = () => {
     let defaultAmount = '';
     if (totalExpected && totalExpected > totalPaid) {
@@ -41,7 +74,7 @@ export function MultiPaymentMethodInput({
     }
     const updated = [
       ...currentPayments,
-      { amount: defaultAmount, payment_method: 'instapay' }
+      { amount: defaultAmount, payment_method: 'instapay', receipt_image: null }
     ];
     onChange?.(updated);
   };
@@ -58,7 +91,7 @@ export function MultiPaymentMethodInput({
     if (diff > 0) {
       const updated = [
         ...currentPayments,
-        { amount: diff.toString(), payment_method: 'cash' }
+        { amount: diff.toString(), payment_method: 'cash', receipt_image: null }
       ];
       onChange?.(updated);
     }
@@ -82,14 +115,14 @@ export function MultiPaymentMethodInput({
               <button
                 type="button"
                 onClick={() => handleRemoveRow(index)}
-                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer flex-shrink-0"
                 title="حذف هذه الطريقة"
               >
                 <Trash2 size={14} />
               </button>
             )}
 
-            <div className="flex-1">
+            <div className="flex-1 min-w-[120px]">
               <select
                 value={p.payment_method || 'cash'}
                 onChange={(e) => handleRowChange(index, 'payment_method', e.target.value)}
@@ -103,7 +136,7 @@ export function MultiPaymentMethodInput({
               </select>
             </div>
 
-            <div className="relative w-36">
+            <div className="relative w-28 sm:w-32 flex-shrink-0">
               <input
                 type="number"
                 step="any"
@@ -117,11 +150,62 @@ export function MultiPaymentMethodInput({
                 ج.م
               </span>
             </div>
+
+            {/* Receipt Upload per row */}
+            {allowReceipts && (
+              <div className="flex-shrink-0">
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={(el) => (fileInputRefs.current[index] = el)}
+                  onChange={(e) => handleReceiptChange(index, e.target.files?.[0])}
+                  className="hidden"
+                />
+
+                {p.receipt_image ? (
+                  <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-1.5 py-1 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewImage(p.receipt_image)}
+                      className="relative w-7 h-7 rounded-md overflow-hidden border border-emerald-300 hover:opacity-80 transition-opacity cursor-pointer group"
+                      title="عرض الإيصال"
+                    >
+                      <img
+                        src={p.receipt_image}
+                        alt="إيصال"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye size={10} className="text-white" />
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveReceipt(index)}
+                      className="p-1 text-rose-500 hover:bg-rose-100/60 rounded-md transition-colors cursor-pointer"
+                      title="حذف الإيصال"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRefs.current[index]?.click()}
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 px-2 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 transition-all cursor-pointer"
+                    title="إرفاق صورة إيصال خاص بهذه الدفعة"
+                  >
+                    <Paperclip size={12} />
+                    <span className="hidden sm:inline text-[9.5px]">إيصال</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
         <button
           type="button"
           onClick={handleAddRow}
@@ -158,6 +242,37 @@ export function MultiPaymentMethodInput({
           </div>
         )}
       </div>
+
+      {/* Lightbox / Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-3 max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl relative text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-xs font-black text-slate-800">معاينة صورة الإيصال</span>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-2 flex items-center justify-center overflow-auto max-h-[70vh]">
+              <img
+                src={previewImage}
+                alt="إيصال الدفع"
+                className="max-w-full max-h-[65vh] object-contain rounded-lg border border-slate-100 shadow-sm"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -116,6 +116,10 @@ class BookingController extends Controller
             foreach ($payments as $p) {
                 $amt = floatval($p['amount'] ?? 0);
                 $pm = $p['payment_method'] ?? 'cash';
+                $rowReceipt = !empty($p['receipt_image'])
+                    ? self::saveReceiptData($p['receipt_image'])
+                    : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
+
                 if ($amt > 0) {
                     \App\Models\Revenue::create([
                         'booking_id' => $booking->id,
@@ -124,7 +128,7 @@ class BookingController extends Controller
                         'payment_method' => $pm,
                         'payment_date' => $booking->booking_date ?: now()->toDateString(),
                         'notes' => 'عربون حجز فستان للعروس: ' . ($booking->client->name ?? ''),
-                        'receipt_path' => $receiptPath,
+                        'receipt_path' => $rowReceipt,
                     ]);
                 }
             }

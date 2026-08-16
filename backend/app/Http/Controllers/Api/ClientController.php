@@ -409,15 +409,18 @@ class ClientController extends Controller
                 }
 
                 $booking->save();
-
-                // Save revenue deposit: Support multiple split payments or single payment
                 $payments = $request->input('payments');
+
                 if (is_array($payments) && count($payments) > 0) {
                     $totalDeposit = 0;
                     $methods = [];
                     foreach ($payments as $p) {
                         $pAmt = floatval($p['amount'] ?? 0);
                         $pMethod = $p['payment_method'] ?? 'cash';
+                        $rowReceipt = !empty($p['receipt_image'])
+                            ? self::saveReceiptData($p['receipt_image'])
+                            : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
+
                         if ($pAmt > 0) {
                             $totalDeposit += $pAmt;
                             $methods[] = $pMethod;
@@ -428,7 +431,7 @@ class ClientController extends Controller
                                 'payment_method' => $pMethod,
                                 'payment_date' => now()->toDateString(),
                                 'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
-                                'receipt_path' => $receiptPath,
+                                'receipt_path' => $rowReceipt,
                             ]);
                         }
                     }
@@ -475,12 +478,12 @@ class ClientController extends Controller
             case 'mark_picked_up':
                 $booking = $client->bookings()->latest()->first();
                 if ($booking) {
-                    $insuranceAmount = floatval($request->input('insurance_amount', $booking->insurance_amount));
+                    $insuranceAmount = floatval($request->input('insurance_amount', 5000));
                     $booking->update([
                         'status' => 'picked_up',
-                        'insurance_amount' => $insuranceAmount
+                        'insurance_amount' => $insuranceAmount,
                     ]);
-                    // Update both dresses status to out
+
                     if ($booking->dress) {
                         $booking->dress->update(['status' => 'out']);
                     }
@@ -496,6 +499,10 @@ class ClientController extends Controller
                         foreach ($balancePayments as $bp) {
                             $bpAmt = floatval($bp['amount'] ?? 0);
                             $bpMethod = $bp['payment_method'] ?? 'cash';
+                            $rowReceipt = !empty($bp['receipt_image'])
+                                ? self::saveReceiptData($bp['receipt_image'])
+                                : (!empty($bp['receipt']) ? self::saveReceiptData($bp['receipt']) : $receiptPath);
+
                             if ($bpAmt > 0) {
                                 \App\Models\Revenue::create([
                                     'booking_id' => $booking->id,
@@ -504,7 +511,7 @@ class ClientController extends Controller
                                     'payment_method' => $bpMethod,
                                     'payment_date' => now()->toDateString(),
                                     'notes' => 'دفعة استلام الفستان النهائية للعروس: ' . $client->name,
-                                    'receipt_path' => $receiptPath,
+                                    'receipt_path' => $rowReceipt,
                                 ]);
                             }
                         }
@@ -516,6 +523,10 @@ class ClientController extends Controller
                         foreach ($insurancePayments as $ip) {
                             $ipAmt = floatval($ip['amount'] ?? 0);
                             $ipMethod = $ip['payment_method'] ?? 'cash';
+                            $rowReceipt = !empty($ip['receipt_image'])
+                                ? self::saveReceiptData($ip['receipt_image'])
+                                : (!empty($ip['receipt']) ? self::saveReceiptData($ip['receipt']) : $receiptPath);
+
                             if ($ipAmt > 0) {
                                 \App\Models\Revenue::create([
                                     'booking_id' => $booking->id,
@@ -524,7 +535,7 @@ class ClientController extends Controller
                                     'payment_method' => $ipMethod,
                                     'payment_date' => now()->toDateString(),
                                     'notes' => 'تأمين الفستان المسترد للعروس: ' . $client->name,
-                                    'receipt_path' => $receiptPath,
+                                    'receipt_path' => $rowReceipt,
                                 ]);
                             }
                         }
@@ -588,6 +599,10 @@ class ClientController extends Controller
                         foreach ($payments as $p) {
                             $pAmt = floatval($p['amount'] ?? 0);
                             $pMethod = $p['payment_method'] ?? 'cash';
+                            $rowReceipt = !empty($p['receipt_image'])
+                                ? self::saveReceiptData($p['receipt_image'])
+                                : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
+
                             if ($pAmt > 0) {
                                 \App\Models\Revenue::create([
                                     'booking_id' => $booking->id,
@@ -596,7 +611,7 @@ class ClientController extends Controller
                                     'payment_method' => $pMethod,
                                     'payment_date' => now()->toDateString(),
                                     'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
-                                    'receipt_path' => $receiptPath,
+                                    'receipt_path' => $rowReceipt,
                                 ]);
                             }
                         }

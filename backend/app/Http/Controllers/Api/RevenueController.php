@@ -43,6 +43,10 @@ class RevenueController extends Controller
             foreach ($payments as $p) {
                 $amt = floatval($p['amount'] ?? 0);
                 $method = $p['payment_method'] ?? 'cash';
+                $rowReceipt = !empty($p['receipt_image'])
+                    ? self::saveReceiptData($p['receipt_image'])
+                    : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
+
                 if ($amt > 0) {
                     $created[] = Revenue::create([
                         'booking_id' => $bookingId,
@@ -51,7 +55,7 @@ class RevenueController extends Controller
                         'payment_method' => $method,
                         'payment_date' => $paymentDate,
                         'notes' => $baseNotes,
-                        'receipt_path' => $receiptPath,
+                        'receipt_path' => $rowReceipt,
                     ]);
                 }
             }
