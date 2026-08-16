@@ -519,7 +519,7 @@ class ClientController extends Controller
                             if ($ipAmt > 0) {
                                 \App\Models\Revenue::create([
                                     'booking_id' => $booking->id,
-                                    'type' => 'security_deposit',
+                                    'type' => 'other',
                                     'amount' => $ipAmt,
                                     'payment_method' => $ipMethod,
                                     'payment_date' => now()->toDateString(),

@@ -35,7 +35,8 @@ class RevenueController extends Controller
             $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
             $created = [];
             $bookingId = $request->input('booking_id');
-            $type = $request->input('type', 'deposit');
+            $rawType = $request->input('type', 'deposit');
+            $type = in_array($rawType, ['deposit', 'balance', 'fitting_fee', 'other']) ? $rawType : 'other';
             $paymentDate = $request->input('payment_date', now()->toDateString());
             $baseNotes = $request->input('notes', '');
 
@@ -68,6 +69,10 @@ class RevenueController extends Controller
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
+
+        if (!in_array($validated['type'] ?? '', ['deposit', 'balance', 'fitting_fee', 'other'])) {
+            $validated['type'] = 'other';
+        }
 
         $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
         if ($receiptPath) {

@@ -77,7 +77,7 @@ export function MultiPaymentMethodInput({
 
       <div className="space-y-2">
         {currentPayments.map((p, index) => (
-          <div key={index} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+          <div key={`payment-row-${index}-${p.payment_method || 'pm'}`} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
             {currentPayments.length > 1 && (
               <button
                 type="button"
