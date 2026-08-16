@@ -141,6 +141,7 @@ export default function BridesPage() {
   // Fitting modal states
   const [showFittingModal, setShowFittingModal] = useState(false);
   const [selectedBrideForFitting, setSelectedBrideForFitting] = useState(null);
+  const [expectedFittingFee, setExpectedFittingFee] = useState(150);
   const [fittingDate, setFittingDate] = useState(new Date().toISOString().split('T')[0]);
   const [fittingTime, setFittingTime] = useState('01:00 م');
   const [fittingDressId, setFittingDressId] = useState('');
@@ -193,6 +194,7 @@ export default function BridesPage() {
   // Pay Remaining modal states
   const [isPayRemainingModalOpen, setIsPayRemainingModalOpen] = useState(false);
   const [selectedBrideForPayRemaining, setSelectedBrideForPayRemaining] = useState(null);
+  const [expectedRemainingAmount, setExpectedRemainingAmount] = useState(0);
   const [payRemainingAmount, setPayRemainingAmount] = useState('0');
   const [payRemainingMethod, setPayRemainingMethod] = useState('cash');
   const [payRemainingPayments, setPayRemainingPayments] = useState([{ amount: '0', payment_method: 'cash' }]);
@@ -206,6 +208,7 @@ export default function BridesPage() {
     const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
     const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
     setSelectedBrideForPayRemaining(bride);
+    setExpectedRemainingAmount(remaining);
     setPayRemainingAmount(remaining.toString());
     setPayRemainingMethod('cash');
     setPayRemainingPayments([{ amount: remaining.toString(), payment_method: 'cash' }]);
@@ -476,6 +479,7 @@ export default function BridesPage() {
       const fee = (selectedBrideForFitting.latest_dress_trying_fee && selectedBrideForFitting.latest_dress_trying_fee > 0)
         ? selectedBrideForFitting.latest_dress_trying_fee
         : (bookedDress ? parseFloat(bookedDress.trying_fee || 150) : 150);
+      setExpectedFittingFee(fee);
       setTryingFee(fee.toString());
       setFittingPayments([{ amount: fee.toString(), payment_method: 'cash' }]);
       const bookedDressId = selectedBrideForFitting.bookings?.[0]?.dress_id;
@@ -2555,7 +2559,7 @@ export default function BridesPage() {
                       const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
                       setTryingFee(total.toString());
                     }}
-                    totalExpected={parseFloat(tryingFee) || null}
+                    totalExpected={expectedFittingFee}
                     label="طرق وسداد رسوم القياس"
                     required
                   />
@@ -3238,7 +3242,7 @@ export default function BridesPage() {
                   const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
                   setPayRemainingAmount(total.toString());
                 }}
-                totalExpected={parseFloat(payRemainingAmount) || null}
+                totalExpected={expectedRemainingAmount}
                 label="طرق ومبالغ السداد"
                 required
               />

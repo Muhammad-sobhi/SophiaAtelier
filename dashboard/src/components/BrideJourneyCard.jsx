@@ -103,6 +103,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [fittingTime, setFittingTime] = useState('01:00 م');
   const [fittingDressId, setFittingDressId] = useState('');
   const [tryingFee, setTryingFee] = useState('150');
+  const [expectedFittingFee, setExpectedFittingFee] = useState(150);
   const [fittingPaymentMethod, setFittingPaymentMethod] = useState('cash');
   const [fittingPayments, setFittingPayments] = useState([{ amount: '150', payment_method: 'cash' }]);
   const [fittingNotes, setFittingNotes] = useState('');
@@ -153,7 +154,9 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         setFittingDressId(bookedDressId.toString());
         const bookedDress = bride.bookings?.[0]?.dress;
         if (bookedDress) {
-          const feeStr = parseFloat(bookedDress.trying_fee || 0).toString();
+          const fee = parseFloat(bookedDress.trying_fee || 0);
+          const feeStr = fee > 0 ? fee.toString() : '150';
+          setExpectedFittingFee(fee > 0 ? fee : 150);
           setTryingFee(feeStr);
           setFittingPayments([{ amount: feeStr, payment_method: 'cash' }]);
         }
@@ -1308,7 +1311,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                       const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
                       setTryingFee(total.toString());
                     }}
-                    totalExpected={parseFloat(tryingFee) || null}
+                    totalExpected={expectedFittingFee}
                     label="طرق وسداد رسوم القياس"
                     required
                   />
