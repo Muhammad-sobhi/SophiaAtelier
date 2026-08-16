@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 
@@ -1080,7 +1080,7 @@ export default function BridesPage() {
 
   const renderBrideCard = (bride, idx) => {
     const avatar = bride.image_path ?
-      `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${bride.image_path}` :
+      getStorageUrl(bride.image_path) :
       mockAvatars[idx % mockAvatars.length];
     
     const booking = bride.bookings?.[0];
@@ -1095,9 +1095,9 @@ export default function BridesPage() {
     if (dress) {
       if (Array.isArray(dress.images) && dress.images.length > 0) {
         const p = dress.images.find((x) => x.is_primary) || dress.images[0];
-        dressImg = typeof p === 'string' ? p : (p?.image_path || p?.image_url);
+        dressImg = getStorageUrl(p?.image_path || p?.image_url || p);
       }
-      if (!dressImg) dressImg = dress.primary_image || dress.image_path;
+      if (!dressImg) dressImg = getStorageUrl(dress.primary_image || dress.image_path);
     }
 
     return (
@@ -1111,8 +1111,15 @@ export default function BridesPage() {
           <div className="flex items-start justify-between gap-2 mb-2 pb-2 border-b border-slate-100/80">
             <div className="flex items-center gap-2 min-w-0">
               <div className="relative flex-shrink-0">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 shadow-2xs bg-slate-50 flex items-center justify-center">
-                  <img src={avatar} alt={bride.name} className="w-full h-full object-cover" />
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 shadow-2xs bg-slate-50 flex items-center justify-center relative">
+                  <img
+                    src={avatar}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = mockAvatars[idx % mockAvatars.length];
+                    }}
+                  />
                 </div>
                 {bride.source && (
                   <span
@@ -1182,13 +1189,20 @@ export default function BridesPage() {
           <div className="space-y-1.5 mb-2">
             {dressName ? (
               <div className="bg-slate-50/90 rounded-xl p-1.5 border border-slate-150 flex items-center gap-2 text-right">
-                <div className="w-8 h-10 rounded-lg overflow-hidden bg-white border border-slate-100 flex-shrink-0 flex items-center justify-center">
+                <div className="w-8 h-10 rounded-lg overflow-hidden bg-white border border-slate-100 flex-shrink-0 flex items-center justify-center relative">
                   {dressImg ? (
-                    <img
-                      src={dressImg.startsWith('http') ? dressImg : `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${dressImg.replace(/^(storage\/|public\/)/, '')}`}
-                      alt={dressName}
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={dressImg}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                      <span className="hidden w-full h-full items-center justify-center text-xs bg-slate-50">👗</span>
+                    </>
                   ) : (
                     <span className="text-xs">👗</span>
                   )}

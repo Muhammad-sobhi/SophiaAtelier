@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import {
   Phone,
   MapPin,
@@ -857,11 +857,9 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                     if (!img) {
                       img = targetDress.primary_image || targetDress.image_path || targetDress.image_url || targetDress.image;
                     }
-                    if (!img || typeof img !== 'string') return null;
+                    if (!img) return null;
 
-                    if (img.startsWith('http') || img.startsWith('data:')) return img;
-                    const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '');
-                    return `${baseUrl}/storage/${img.replace(/^(storage\/|public\/)/, '')}`;
+                    return getStorageUrl(img);
                   };
 
                   const img1 = getDressImg(dress1, dress1Name);
@@ -881,7 +879,18 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                           <div className="bg-slate-50/90 rounded-xl p-1.5 border border-slate-150 flex flex-col items-center text-center relative overflow-hidden group/d hover:border-indigo-300 transition-all shadow-2xs">
                             <div className="w-full h-14 rounded-lg overflow-hidden bg-white border border-slate-100 mb-1 flex items-center justify-center relative">
                               {img1 ? (
-                                <img src={img1} alt={dress1Name} className="w-full h-full object-cover group-hover/d:scale-105 transition-transform duration-300" />
+                                <>
+                                  <img
+                                    src={img1}
+                                    alt=""
+                                    className="w-full h-full object-cover group-hover/d:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                  <span className="hidden w-full h-full items-center justify-center text-lg bg-slate-50">👗</span>
+                                </>
                               ) : (
                                 <span className="text-lg">👗</span>
                               )}
@@ -899,7 +908,18 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                           <div className="bg-purple-50/40 rounded-xl p-1.5 border border-purple-150 flex flex-col items-center text-center relative overflow-hidden group/d hover:border-purple-300 transition-all shadow-2xs">
                             <div className="w-full h-14 rounded-lg overflow-hidden bg-white border border-purple-100 mb-1 flex items-center justify-center relative">
                               {img2 ? (
-                                <img src={img2} alt={dress2Name} className="w-full h-full object-cover group-hover/d:scale-105 transition-transform duration-300" />
+                                <>
+                                  <img
+                                    src={img2}
+                                    alt=""
+                                    className="w-full h-full object-cover group-hover/d:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                  <span className="hidden w-full h-full items-center justify-center text-lg bg-slate-50">✨</span>
+                                </>
                               ) : (
                                 <span className="text-lg">✨</span>
                               )}
@@ -915,9 +935,20 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                         </div>
                       ) : (
                         <div className="bg-slate-50/90 rounded-2xl p-2 border border-slate-150 flex items-center gap-2.5 text-right hover:border-indigo-300 transition-all shadow-2xs">
-                          <div className="w-11 h-14 rounded-xl overflow-hidden bg-white border border-slate-100 flex-shrink-0 flex items-center justify-center">
+                          <div className="w-11 h-14 rounded-xl overflow-hidden bg-white border border-slate-100 flex-shrink-0 flex items-center justify-center relative">
                             {img1 ? (
-                              <img src={img1} alt={dress1Name} className="w-full h-full object-cover" />
+                              <>
+                                <img
+                                  src={img1}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                                  }}
+                                />
+                                <span className="hidden w-full h-full items-center justify-center text-xl bg-slate-50">👗</span>
+                              </>
                             ) : (
                               <span className="text-xl">👗</span>
                             )}
@@ -1233,6 +1264,46 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
           المرحلة الحالية: {bride?.current_stage ? bride.current_stage.toUpperCase() : 'VISIT'}
         </span>
+      </div>
+
+      {/* Mobile Stage Stepper & Card View (md:hidden) */}
+      <div className="block md:hidden space-y-3">
+        {/* Horizontal Stage Stepper Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+          {STAGES.map((s) => {
+            const isCurrent = (bride?.current_stage || 'visit') === s.id;
+            const isSelected = selectedMobileStage === s.id;
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedMobileStage(s.id)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold whitespace-nowrap transition-all flex-shrink-0 cursor-pointer ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : isCurrent
+                    ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Icon size={12} />
+                <span>{s.label.split(' ')[0]}</span>
+                {isCurrent && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected Stage Card on Mobile */}
+        <div>
+          {(() => {
+            const currentStageObj = STAGES.find((s) => s.id === selectedMobileStage) || STAGES[0];
+            return renderColumn(currentStageObj.id, currentStageObj.label, currentStageObj.icon, currentStageObj.color);
+          })()}
+        </div>
       </div>
 
       {/* Desktop Grid containing 5 Columns */}

@@ -70,7 +70,20 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
                 {/* Thumbnail */}
                 <div className="relative w-14 h-18 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex-shrink-0">
                   {imageUrl ? (
-                    <img src={imageUrl} alt={dress.name} className="w-full h-full object-cover" />
+                    <>
+                      <img
+                        src={imageUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div className="hidden w-full h-full items-center justify-center bg-slate-50">
+                        <Sparkles size={16} className="text-slate-300" />
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Sparkles size={16} className="text-slate-300" />

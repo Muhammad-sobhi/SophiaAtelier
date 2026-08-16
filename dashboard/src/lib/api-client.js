@@ -9,11 +9,21 @@ function clearAuth() {
 export function getStorageUrl(path) {
   if (!path) return null;
   if (typeof path === 'object') {
-    path = path.image_path || path.image || path.url || '';
+    path = path.image_path || path.image || path.url || path.primary_image || '';
   }
   if (!path || typeof path !== 'string') return null;
 
-  if (path.startsWith('blob:')) return path;
+  if (path.startsWith('blob:') || path.startsWith('data:')) return path;
+
+  // If path contains localhost/127.0.0.1 and we are on a remote server domain, extract the relative storage path
+  if (path.includes('localhost') || path.includes('127.0.0.1')) {
+    const match = path.match(/(?:storage|uploads|images)\/.*$/);
+    if (match) {
+      path = match[0];
+    }
+  }
+
+  // If it's a valid remote external URL (not localhost), ensure HTTPS if page is HTTPS
   if (path.startsWith('http://') || path.startsWith('https://')) {
     if (typeof window !== 'undefined' && window.location.protocol === 'https:' && path.startsWith('http://')) {
       return path.replace('http://', 'https://');
@@ -21,8 +31,11 @@ export function getStorageUrl(path) {
     return path;
   }
 
-  const cleanPath = path.replace(/^\/?(storage\/)?/, '');
-  const fullUrl = `${API_BASE}/storage/${cleanPath}`;
+  // Base domain without /api suffix
+  const baseDomain = API_BASE.replace(/\/api\/?$/, '');
+  const cleanPath = path.replace(/^\/?(storage\/|public\/)?/, '');
+  const fullUrl = `${baseDomain}/storage/${cleanPath}`;
+
   if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fullUrl.startsWith('http://')) {
     return fullUrl.replace('http://', 'https://');
   }
