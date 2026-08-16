@@ -170,6 +170,7 @@ export default function BridesPage() {
   const [bookingDepositAmount, setBookingDepositAmount] = useState('1000');
   const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState('5000');
   const [bookingPaymentMethod, setBookingPaymentMethod] = useState('cash');
+  const [bookingPayments, setBookingPayments] = useState([{ amount: '1000', payment_method: 'cash' }]);
   const [bookingReceipt, setBookingReceipt] = useState(null);
   const [bookingNotes, setBookingNotes] = useState('');
   const [showConflictConfirmDialog, setShowConflictConfirmDialog] = useState(false);
