@@ -16,10 +16,11 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
+            'email' => 'required|string|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
+        $validated['email'] = strtolower(trim($validated['email']));
         $validated['password'] = Hash::make($validated['password']);
         $validated['role'] = 'staff';
 
@@ -35,11 +36,12 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'email' => 'required|string|email|max:255',
+            'password' => 'required|string|max:128',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $normalizedEmail = strtolower(trim($request->email));
+        $user = User::where('email', $normalizedEmail)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([

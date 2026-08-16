@@ -41,9 +41,15 @@ export default function DashboardLayout() {
     e.preventDefault();
     setError('');
 
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
+      setError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
+      return;
+    }
+
     try {
       const res = await apiClient.post('/auth/login', {
-        email,
+        email: cleanEmail,
         password
       });
 

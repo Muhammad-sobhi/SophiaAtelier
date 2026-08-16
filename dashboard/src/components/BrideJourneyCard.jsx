@@ -18,10 +18,7 @@ import {
   ExternalLink,
   Sparkles } from
 'lucide-react';
-
-
-
-
+import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
 
 
 
@@ -81,6 +78,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [customPayments, setCustomPayments] = useState([{ amount: '', payment_method: 'cash' }]);
   const [paymentType, setPaymentType] = useState('fitting_fee');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentReceipt, setPaymentReceipt] = useState(null);
@@ -128,6 +126,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [bookingDepositAmount, setBookingDepositAmount] = useState('0');
   const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState('5000');
   const [bookingPaymentMethod, setBookingPaymentMethod] = useState('instapay');
+  const [bookingPayments, setBookingPayments] = useState([{ amount: '0', payment_method: 'instapay' }]);
   const [bookingReceipt, setBookingReceipt] = useState(null);
   const [bookingNotes, setBookingNotes] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -362,6 +361,11 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     try {
       setIsSubmitting(true);
       const activePhone = bookingPhone.trim() || bride.phone || '';
+      const validPayments = bookingPayments.filter(p => parseFloat(p.amount) > 0);
+      const totalDepositCalculated = validPayments.length > 0
+        ? validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+        : parseFloat(bookingDepositAmount || '0');
+
       await apiClient.put(`/clients/${bride.id}/stage-action`, {
         action: 'confirm_booking',
         phone: activePhone,
@@ -372,9 +376,10 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         force_override: forceOverride,
         event_date: bookingEventDate,
         total_amount: parseFloat(bookingTotalAmount),
-        deposit_amount: parseFloat(bookingDepositAmount),
+        deposit_amount: totalDepositCalculated,
         insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
-        payment_method: bookingPaymentMethod,
+        payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : bookingPaymentMethod),
+        payments: validPayments,
         receipt_image: bookingReceipt,
         notes: bookingNotes
       });
@@ -637,19 +642,25 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     e?.preventDefault?.();
     try {
       setIsSubmittingPayment(true);
-      const amountNum = parseFloat(paymentAmount);
-      if (!isNaN(amountNum) && amountNum > 0) {
+      const validPayments = customPayments.filter(p => parseFloat(p.amount) > 0);
+      const totalAmt = validPayments.length > 0
+        ? validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+        : parseFloat(paymentAmount);
+
+      if (!isNaN(totalAmt) && totalAmt > 0) {
         await apiClient.post('/revenues', {
           booking_id: bride.bookings?.[0]?.id || null,
           type: paymentType,
-          amount: amountNum,
-          payment_method: paymentMethod,
+          amount: totalAmt,
+          payment_method: validPayments.length === 1 ? validPayments[0].payment_method : 'multiple',
+          payments: validPayments.length > 0 ? validPayments : [{ amount: totalAmt, payment_method: paymentMethod }],
           payment_date: new Date().toISOString().split('T')[0],
           notes: paymentNotes || (paymentType === 'fitting_fee' ? `رسوم قياس وتجربة للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`),
           receipt_image: paymentReceipt
         });
         setShowPaymentModal(false);
         setPaymentAmount('');
+        setCustomPayments([{ amount: '', payment_method: 'cash' }]);
         setPaymentMethod('cash');
         setPaymentNotes('');
         setPaymentReceipt(null);
@@ -669,7 +680,9 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     const fee = (bride.latest_dress_trying_fee && bride.latest_dress_trying_fee > 0)
       ? bride.latest_dress_trying_fee
       : (bookedDress ? parseFloat(bookedDress.trying_fee || 150) : 150);
-    setPaymentAmount(type === 'fitting_fee' ? fee.toString() : '');
+    const initialAmt = type === 'fitting_fee' ? fee.toString() : '';
+    setPaymentAmount(initialAmt);
+    setCustomPayments([{ amount: initialAmt, payment_method: 'cash' }]);
     setPaymentNotes(type === 'fitting_fee' ? `رسوم قياس وتجربة للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`);
     setPaymentMethod('cash');
     setPaymentReceipt(null);
@@ -1096,31 +1109,16 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">المبلغ (ج.م)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="0.00"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-center font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة الدفع</label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
-                  >
-                    {PAYMENT_METHODS.map((pm) => (
-                      <option key={pm.id} value={pm.id}>{pm.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <MultiPaymentMethodInput
+                payments={customPayments}
+                onChange={(updated) => {
+                  setCustomPayments(updated);
+                  const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                  setPaymentAmount(total > 0 ? total.toString() : '');
+                }}
+                label="طرق ومبالغ السداد"
+                required
+              />
 
               {/* Receipt Upload */}
               <div className="space-y-1">
@@ -1692,56 +1690,52 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع العربون</label>
-                    <select
-                      value={bookingPaymentMethod}
-                      onChange={(e) => setBookingPaymentMethod(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
-                    >
-                      {PAYMENT_METHODS.map((pm) => (
-                        <option key={pm.id} value={pm.id}>{pm.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                <MultiPaymentMethodInput
+                  payments={bookingPayments}
+                  onChange={(updated) => {
+                    setBookingPayments(updated);
+                    const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                    setBookingDepositAmount(total.toString());
+                  }}
+                  label="سداد وطرق دفع العربون"
+                  required
+                />
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setBookingReceipt(reader.result);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="hidden"
-                        id="booking-receipt-file-input"
-                      />
-                      <label
-                        htmlFor="booking-receipt-file-input"
-                        className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setBookingReceipt(reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="booking-receipt-file-input"
+                    />
+                    <label
+                      htmlFor="booking-receipt-file-input"
+                      className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                    >
+                      <CreditCard size={10} />
+                      <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
+                    </label>
+                    {bookingReceipt && (
+                      <button
+                        type="button"
+                        onClick={() => setBookingReceipt(null)}
+                        className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
                       >
-                        <CreditCard size={10} />
-                        <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
-                      </label>
-                      {bookingReceipt && (
-                        <button
-                          type="button"
-                          onClick={() => setBookingReceipt(null)}
-                          className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
-                        >
-                          <X size={10} />
-                        </button>
-                      )}
-                    </div>
+                        <X size={10} />
+                      </button>
+                    )}
                   </div>
                 </div>
 

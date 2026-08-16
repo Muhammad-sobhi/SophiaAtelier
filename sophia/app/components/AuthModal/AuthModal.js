@@ -60,6 +60,26 @@ export default function AuthModal({ isOpen, onClose }) {
     setLoading(true);
 
     try {
+      const cleanDigits = phone.replace(/[^\d]/g, '');
+      const validPhonePattern = /^\+?[0-9\s\-()]+$/;
+
+      if (phone.trim()) {
+        if (!validPhonePattern.test(phone.trim()) || cleanDigits.length < 8) {
+          setError(lang === 'ar' ? 'يرجى إدخال رقم هاتف صحيح مكون من 8 أرقام على الأقل' : 'Please enter a valid phone number with at least 8 digits');
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (email.trim()) {
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email.trim())) {
+          setError(lang === 'ar' ? 'يرجى إدخال بريد إلكتروني صالح' : 'Please enter a valid email address');
+          setLoading(false);
+          return;
+        }
+      }
+
       if (isRegister) {
         if (!name.trim() || !phone.trim()) {
           setError(lang === 'ar' ? 'يرجى إدخال الاسم ورقم الهاتف' : 'Please provide your name and phone number');
@@ -71,14 +91,14 @@ export default function AuthModal({ isOpen, onClose }) {
           setLoading(false);
           return;
         }
-        await registerBride({ name, phone, email, city });
+        await registerBride({ name: name.trim(), phone: phone.trim(), email: email.trim(), city });
       } else {
         if (!phone.trim() && !email.trim()) {
           setError(lang === 'ar' ? 'يرجى إدخال رقم الهاتف أو البريد' : 'Please enter your phone number or email');
           setLoading(false);
           return;
         }
-        await loginBride(phone, email);
+        await loginBride(phone.trim(), email.trim());
       }
       onClose();
     } catch (err) {

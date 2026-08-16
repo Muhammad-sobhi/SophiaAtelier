@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard } from 'lucide-react';
+import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 
 const BRIDE_STAGES = [
   { id: 'visit', label: 'طلب زيارة / تجربة', icon: Calendar },
@@ -191,6 +192,7 @@ export default function BridesPage() {
   const [selectedBrideForPayRemaining, setSelectedBrideForPayRemaining] = useState(null);
   const [payRemainingAmount, setPayRemainingAmount] = useState('0');
   const [payRemainingMethod, setPayRemainingMethod] = useState('cash');
+  const [payRemainingPayments, setPayRemainingPayments] = useState([{ amount: '0', payment_method: 'cash' }]);
   const [payRemainingReceipt, setPayRemainingReceipt] = useState(null);
   const [payRemainingReceiptPreview, setPayRemainingReceiptPreview] = useState(null);
   const [payRemainingNotes, setPayRemainingNotes] = useState('');
@@ -203,6 +205,7 @@ export default function BridesPage() {
     setSelectedBrideForPayRemaining(bride);
     setPayRemainingAmount(remaining.toString());
     setPayRemainingMethod('cash');
+    setPayRemainingPayments([{ amount: remaining.toString(), payment_method: 'cash' }]);
     setPayRemainingReceipt(null);
     setPayRemainingReceiptPreview(null);
     setPayRemainingNotes('');
@@ -211,7 +214,14 @@ export default function BridesPage() {
 
   const handlePayRemainingSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedBrideForPayRemaining || !payRemainingAmount || parseFloat(payRemainingAmount) <= 0) return;
+    if (!selectedBrideForPayRemaining) return;
+
+    const validPayments = payRemainingPayments.filter(p => parseFloat(p.amount) > 0);
+    const totalAmt = validPayments.length > 0
+      ? validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+      : parseFloat(payRemainingAmount || '0');
+
+    if (totalAmt <= 0) return;
 
     setIsSubmittingPayRemaining(true);
     try {
@@ -226,8 +236,9 @@ export default function BridesPage() {
 
       await apiClient.put(`/clients/${selectedBrideForPayRemaining.id}/stage-action`, {
         action: 'pay_remaining',
-        amount: parseFloat(payRemainingAmount),
-        payment_method: payRemainingMethod,
+        amount: totalAmt,
+        payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : payRemainingMethod),
+        payments: validPayments,
         notes: payRemainingNotes,
         receipt: receiptBase64
       });
@@ -248,6 +259,7 @@ export default function BridesPage() {
   const [selectedBrideForTryingFee, setSelectedBrideForTryingFee] = useState(null);
   const [tryingFeeAmount, setTryingFeeAmount] = useState('150');
   const [tryingFeeMethod, setTryingFeeMethod] = useState('cash');
+  const [tryingFeePayments, setTryingFeePayments] = useState([{ amount: '150', payment_method: 'cash' }]);
   const [tryingFeeType, setTryingFeeType] = useState('fitting_fee');
   const [tryingFeeNotes, setTryingFeeNotes] = useState('');
   const [tryingFeeReceipt, setTryingFeeReceipt] = useState(null);
@@ -262,6 +274,7 @@ export default function BridesPage() {
       : (bookedDress ? parseFloat(bookedDress.trying_fee || 150) : 150);
     setTryingFeeAmount(fee.toString());
     setTryingFeeMethod('cash');
+    setTryingFeePayments([{ amount: fee.toString(), payment_method: 'cash' }]);
     setTryingFeeNotes(`رسوم قياس وتجربة للعروس: ${bride.name}`);
     setTryingFeeReceipt(null);
     setShowTryingFeeModal(true);
@@ -272,13 +285,18 @@ export default function BridesPage() {
     if (!selectedBrideForTryingFee) return;
     try {
       setIsSubmittingTryingFee(true);
-      const amountNum = parseFloat(tryingFeeAmount);
-      if (!isNaN(amountNum) && amountNum > 0) {
+      const validPayments = tryingFeePayments.filter(p => parseFloat(p.amount) > 0);
+      const totalAmt = validPayments.length > 0
+        ? validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+        : parseFloat(tryingFeeAmount);
+
+      if (!isNaN(totalAmt) && totalAmt > 0) {
         await apiClient.post('/revenues', {
           booking_id: selectedBrideForTryingFee.bookings?.[0]?.id || null,
           type: tryingFeeType,
-          amount: amountNum,
-          payment_method: tryingFeeMethod,
+          amount: totalAmt,
+          payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : tryingFeeMethod),
+          payments: validPayments.length > 0 ? validPayments : [{ amount: totalAmt, payment_method: tryingFeeMethod }],
           payment_date: new Date().toISOString().split('T')[0],
           notes: tryingFeeNotes || `رسوم قياس وتجربة للعروس: ${selectedBrideForTryingFee.name}`,
           receipt_image: tryingFeeReceipt
@@ -468,6 +486,7 @@ export default function BridesPage() {
       setBookingInsuranceAmount('5000');
       setBookingDepositAmount('1000');
       setBookingPaymentMethod('cash');
+      setBookingPayments([{ amount: '1000', payment_method: 'cash' }]);
       setBookingPhone(selectedBrideForBooking.phone || '');
       setBookingPhone2(selectedBrideForBooking.phone2 || '');
       setBookingEventDate(selectedBrideForBooking.wedding_date || selectedBrideForBooking.bookings?.[0]?.event_date || new Date().toISOString().split('T')[0]);
@@ -638,6 +657,7 @@ export default function BridesPage() {
         dress_id: parseInt(fittingDressId),
         trying_fee: parseFloat(tryingFee || '0'),
         payment_method: fittingPaymentMethod,
+        payments: [{ amount: parseFloat(tryingFee || '0'), payment_method: fittingPaymentMethod }],
         notes: fittingNotes,
         receipt_image: fittingReceipt
       });
@@ -674,6 +694,11 @@ export default function BridesPage() {
 
     try {
       const activePhone = bookingPhone.trim() || selectedBrideForBooking.phone || '';
+      const validPayments = bookingPayments.filter(p => parseFloat(p.amount) > 0);
+      const totalDepositCalculated = validPayments.length > 0
+        ? validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+        : parseFloat(bookingDepositAmount || '0');
+
       await apiClient.put(`/clients/${selectedBrideForBooking.id}/stage-action`, {
         action: 'confirm_booking',
         phone: activePhone,
@@ -684,9 +709,10 @@ export default function BridesPage() {
         force_override: forceOverride,
         event_date: bookingEventDate,
         total_amount: parseFloat(bookingTotalAmount),
-        deposit_amount: parseFloat(bookingDepositAmount),
+        deposit_amount: totalDepositCalculated,
         insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
-        payment_method: bookingPaymentMethod,
+        payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : bookingPaymentMethod),
+        payments: validPayments,
         receipt_image: bookingReceipt,
         notes: bookingNotes
       });
@@ -2930,56 +2956,52 @@ export default function BridesPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع العربون</label>
-                    <select
-                      value={bookingPaymentMethod}
-                      onChange={(e) => setBookingPaymentMethod(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
-                    >
-                      {PAYMENT_METHODS.map((pm) => (
-                        <option key={pm.id} value={pm.id}>{pm.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                <MultiPaymentMethodInput
+                  payments={bookingPayments}
+                  onChange={(updated) => {
+                    setBookingPayments(updated);
+                    const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                    setBookingDepositAmount(total.toString());
+                  }}
+                  label="سداد وطرق دفع العربون"
+                  required
+                />
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setBookingReceipt(reader.result);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="hidden"
-                        id="brides-booking-receipt-file-input"
-                      />
-                      <label
-                        htmlFor="brides-booking-receipt-file-input"
-                        className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">إرفاق إيصال العربون (اختياري)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setBookingReceipt(reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="brides-booking-receipt-file-input"
+                    />
+                    <label
+                      htmlFor="brides-booking-receipt-file-input"
+                      className="flex-grow px-2 py-1.5 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[9px] font-bold text-indigo-650 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-center gap-1 transition-all"
+                    >
+                      <CreditCard size={10} />
+                      <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
+                    </label>
+                    {bookingReceipt && (
+                      <button
+                        type="button"
+                        onClick={() => setBookingReceipt(null)}
+                        className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
                       >
-                        <CreditCard size={10} />
-                        <span>{bookingReceipt ? 'تغيير الإيصال' : 'رفع إيصال'}</span>
-                      </label>
-                      {bookingReceipt && (
-                        <button
-                          type="button"
-                          onClick={() => setBookingReceipt(null)}
-                          className="p-1 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100/60 transition-all cursor-pointer text-xs"
-                        >
-                          <X size={10} />
-                        </button>
-                      )}
-                    </div>
+                        <X size={10} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -3232,32 +3254,17 @@ export default function BridesPage() {
             })()}
 
             <form onSubmit={handlePayRemainingSubmit} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-slate-700 block">مبلغ السداد (ج.م)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={payRemainingAmount}
-                  onChange={(e) => setPayRemainingAmount(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-slate-700 block">طريقة الدفع</label>
-                <select
-                  value={payRemainingMethod}
-                  onChange={(e) => setPayRemainingMethod(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
-                >
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <MultiPaymentMethodInput
+                payments={payRemainingPayments}
+                onChange={(updated) => {
+                  setPayRemainingPayments(updated);
+                  const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                  setPayRemainingAmount(total.toString());
+                }}
+                totalExpected={parseFloat(payRemainingAmount) || null}
+                label="طرق ومبالغ السداد"
+                required
+              />
 
               {/* Receipt File Upload */}
               <div className="space-y-1">
@@ -3355,33 +3362,16 @@ export default function BridesPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">المبلغ (ج.م)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="0.00"
-                    value={tryingFeeAmount}
-                    onChange={(e) => setTryingFeeAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-center font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة الدفع</label>
-                  <select
-                    value={tryingFeeMethod}
-                    onChange={(e) => setTryingFeeMethod(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
-                  >
-                    <option value="cash">نقدي (كاش)</option>
-                    <option value="instapay">إنستاباي (Instapay)</option>
-                    <option value="vodafone_cash">فودافون كاش</option>
-                    <option value="bank_transfer">تحويل بنكي</option>
-                    <option value="credit_card">فيزا / كارت</option>
-                  </select>
-                </div>
-              </div>
+              <MultiPaymentMethodInput
+                payments={tryingFeePayments}
+                onChange={(updated) => {
+                  setTryingFeePayments(updated);
+                  const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                  setTryingFeeAmount(total.toString());
+                }}
+                label="طرق ومبالغ السداد"
+                required
+              />
 
               {/* Receipt Upload */}
               <div className="space-y-1">

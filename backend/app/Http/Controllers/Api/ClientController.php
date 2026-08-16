@@ -44,13 +44,16 @@ class ClientController extends Controller
     {
         $request->validate([
             'client_id' => 'nullable|integer',
-            'phone' => 'nullable|string|min:7',
-            'email' => 'nullable|email',
+            'phone' => ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
+            'email' => 'nullable|email|max:255',
+        ], [
+            'phone.regex' => 'رقم الهاتف يجب أن يحتوي على أرقام فقط.',
+            'email.email' => 'يرجى إدخال بريد إلكتروني صالح.',
         ]);
 
         $clientId = $request->input('client_id');
-        $phone = $request->input('phone');
-        $email = $request->input('email');
+        $rawPhone = $request->input('phone');
+        $rawEmail = $request->input('email');
 
         if ($clientId) {
             $client = Client::with(['visits', 'fittings', 'bookings.dress', 'bookings.dress2', 'bookings.dress3'])->find($clientId);
@@ -59,33 +62,54 @@ class ClientController extends Controller
             }
         }
 
-        if (!$phone && !$email) {
+        if (!$rawPhone && !$rawEmail) {
             return response()->json([
                 'message' => 'يرجى إدخال رقم الهاتف أو البريد الإلكتروني للبحث'
             ], 422);
         }
 
+        $cleanPhone = $rawPhone ? preg_replace('/[^\d]/', '', $rawPhone) : null;
+        $cleanEmail = $rawEmail ? strtolower(trim($rawEmail)) : null;
+
+        // If phone is provided, ensure it has at least 8 digits
+        if ($rawPhone && strlen($cleanPhone) < 8) {
+            return response()->json([
+                'message' => 'يرجى إدخال رقم هاتف صحيح مكون من 8 أرقام على الأقل'
+            ], 422);
+        }
+
+        // Build exact matching variants for the phone number (Local, National, International formats)
+        $phoneVariants = [];
+        if ($cleanPhone) {
+            $rawNoZero = ltrim($cleanPhone, '0');
+            $phoneVariants = array_unique(array_filter([
+                $rawPhone,
+                $cleanPhone,
+                '+' . $cleanPhone,
+                $rawNoZero,
+                '0' . $rawNoZero,
+                '+20' . $rawNoZero,
+                '20' . $rawNoZero,
+                '+2' . '0' . $rawNoZero,
+            ]));
+        }
+
         $query = Client::query();
 
-        if ($phone && $email) {
-            $cleanPhone = preg_replace('/[^\d]/', '', $phone);
-            $query->where(function ($q) use ($phone, $cleanPhone, $email) {
-                $q->where('phone', $phone)
-                    ->orWhere('phone2', $phone)
-                    ->orWhere('phone', 'LIKE', "%{$cleanPhone}%")
-                    ->orWhere('phone2', 'LIKE', "%{$cleanPhone}%")
-                    ->orWhere('email', $email);
+        // Exact parameterized equality queries only — no wildcard/LIKE searches
+        if ($cleanPhone && $cleanEmail) {
+            $query->where(function ($q) use ($phoneVariants, $cleanEmail) {
+                $q->whereIn('phone', $phoneVariants)
+                    ->orWhereIn('phone2', $phoneVariants)
+                    ->orWhere('email', $cleanEmail);
             });
-        } elseif ($phone) {
-            $cleanPhone = preg_replace('/[^\d]/', '', $phone);
-            $query->where(function ($q) use ($phone, $cleanPhone) {
-                $q->where('phone', $phone)
-                    ->orWhere('phone2', $phone)
-                    ->orWhere('phone', 'LIKE', "%{$cleanPhone}%")
-                    ->orWhere('phone2', 'LIKE', "%{$cleanPhone}%");
+        } elseif ($cleanPhone) {
+            $query->where(function ($q) use ($phoneVariants) {
+                $q->whereIn('phone', $phoneVariants)
+                    ->orWhereIn('phone2', $phoneVariants);
             });
-        } elseif ($email) {
-            $query->where('email', $email);
+        } elseif ($cleanEmail) {
+            $query->where('email', $cleanEmail);
         }
 
         $client = $query->with(['visits', 'fittings', 'bookings.dress', 'bookings.dress2', 'bookings.dress3'])->first();
@@ -212,6 +236,7 @@ class ClientController extends Controller
             'trying_fee' => 'nullable|numeric|min:0',
             'amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:50',
+            'payments' => 'nullable|array',
             'sales_name' => 'nullable|string|max:255',
             'is_override' => 'nullable|boolean',
             'force_override' => 'nullable|boolean',
@@ -276,8 +301,26 @@ class ClientController extends Controller
                 $client->visits()->where('status', '!=', 'done')->update(['status' => 'done']);
 
                 $tryingFee = floatval($request->input('trying_fee', 0));
-                if ($tryingFee > 0) {
-                    $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+                $payments = $request->input('payments');
+                $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+
+                if (is_array($payments) && count($payments) > 0) {
+                    foreach ($payments as $p) {
+                        $pAmt = floatval($p['amount'] ?? 0);
+                        $pMethod = $p['payment_method'] ?? 'cash';
+                        if ($pAmt > 0) {
+                            \App\Models\Revenue::create([
+                                'booking_id' => $booking->id,
+                                'type' => 'fitting_fee',
+                                'amount' => $pAmt,
+                                'payment_method' => $pMethod,
+                                'payment_date' => now()->toDateString(),
+                                'notes' => 'رسوم تجربة وقياس للفستان للعروس: ' . $client->name,
+                                'receipt_path' => $receiptPath,
+                            ]);
+                        }
+                    }
+                } elseif ($tryingFee > 0) {
                     \App\Models\Revenue::create([
                         'booking_id' => $booking->id,
                         'type' => 'fitting_fee',
@@ -367,18 +410,46 @@ class ClientController extends Controller
 
                 $booking->save();
 
-                // Save revenue deposit if greater than 0
-                $deposit = floatval($request->input('deposit_amount', 0));
-                if ($deposit > 0) {
-                    \App\Models\Revenue::create([
-                        'booking_id' => $booking->id,
-                        'type' => 'deposit',
-                        'amount' => $deposit,
-                        'payment_method' => $request->input('payment_method', 'cash'),
-                        'payment_date' => now()->toDateString(),
-                        'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
-                        'receipt_path' => $receiptPath,
-                    ]);
+                // Save revenue deposit: Support multiple split payments or single payment
+                $payments = $request->input('payments');
+                if (is_array($payments) && count($payments) > 0) {
+                    $totalDeposit = 0;
+                    $methods = [];
+                    foreach ($payments as $p) {
+                        $pAmt = floatval($p['amount'] ?? 0);
+                        $pMethod = $p['payment_method'] ?? 'cash';
+                        if ($pAmt > 0) {
+                            $totalDeposit += $pAmt;
+                            $methods[] = $pMethod;
+                            \App\Models\Revenue::create([
+                                'booking_id' => $booking->id,
+                                'type' => 'deposit',
+                                'amount' => $pAmt,
+                                'payment_method' => $pMethod,
+                                'payment_date' => now()->toDateString(),
+                                'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
+                                'receipt_path' => $receiptPath,
+                            ]);
+                        }
+                    }
+                    if ($totalDeposit > 0) {
+                        $booking->deposit_amount = $totalDeposit;
+                        $booking->payment_method = count(array_unique($methods)) > 1 ? 'multiple' : ($methods[0] ?? 'cash');
+                        $booking->save();
+                    }
+                } else {
+                    $deposit = floatval($request->input('deposit_amount', 0));
+                    if ($deposit > 0) {
+                        \App\Models\Revenue::create([
+                            'booking_id' => $booking->id,
+                            'type' => 'deposit',
+                            'amount' => $deposit,
+                            'payment_method' => $request->input('payment_method', 'cash'),
+                            'payment_date' => now()->toDateString(),
+                            'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
+                            'receipt_path' => $receiptPath,
+                        ]);
+                    }
                 }
                 break;
 
@@ -467,18 +538,38 @@ class ClientController extends Controller
             case 'pay_remaining':
                 $booking = $client->bookings()->latest()->first();
                 if ($booking) {
-                    $payAmount = floatval($request->input('amount', 0));
-                    if ($payAmount > 0) {
-                        $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
-                        \App\Models\Revenue::create([
-                            'booking_id' => $booking->id,
-                            'type' => 'balance',
-                            'amount' => $payAmount,
-                            'payment_method' => $request->input('payment_method', 'cash'),
-                            'payment_date' => now()->toDateString(),
-                            'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
-                            'receipt_path' => $receiptPath,
-                        ]);
+                    $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+                    $payments = $request->input('payments');
+
+                    if (is_array($payments) && count($payments) > 0) {
+                        foreach ($payments as $p) {
+                            $pAmt = floatval($p['amount'] ?? 0);
+                            $pMethod = $p['payment_method'] ?? 'cash';
+                            if ($pAmt > 0) {
+                                \App\Models\Revenue::create([
+                                    'booking_id' => $booking->id,
+                                    'type' => 'balance',
+                                    'amount' => $pAmt,
+                                    'payment_method' => $pMethod,
+                                    'payment_date' => now()->toDateString(),
+                                    'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
+                                    'receipt_path' => $receiptPath,
+                                ]);
+                            }
+                        }
+                    } else {
+                        $payAmount = floatval($request->input('amount', 0));
+                        if ($payAmount > 0) {
+                            \App\Models\Revenue::create([
+                                'booking_id' => $booking->id,
+                                'type' => 'balance',
+                                'amount' => $payAmount,
+                                'payment_method' => $request->input('payment_method', 'cash'),
+                                'payment_date' => now()->toDateString(),
+                                'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
+                                'receipt_path' => $receiptPath,
+                            ]);
+                        }
                     }
                 }
                 break;

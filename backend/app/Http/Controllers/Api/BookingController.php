@@ -110,6 +110,36 @@ class BookingController extends Controller
         unset($validated['force_override']);
         $booking = Booking::create($validated);
 
+        // Record revenue deposit if provided
+        $payments = $request->input('payments');
+        if (is_array($payments) && count($payments) > 0) {
+            foreach ($payments as $p) {
+                $amt = floatval($p['amount'] ?? 0);
+                $pm = $p['payment_method'] ?? 'cash';
+                if ($amt > 0) {
+                    \App\Models\Revenue::create([
+                        'booking_id' => $booking->id,
+                        'type' => 'deposit',
+                        'amount' => $amt,
+                        'payment_method' => $pm,
+                        'payment_date' => $booking->booking_date ?: now()->toDateString(),
+                        'notes' => 'عربون حجز فستان للعروس: ' . ($booking->client->name ?? ''),
+                        'receipt_path' => $receiptPath,
+                    ]);
+                }
+            }
+        } elseif (($booking->deposit_amount ?? 0) > 0) {
+            \App\Models\Revenue::create([
+                'booking_id' => $booking->id,
+                'type' => 'deposit',
+                'amount' => $booking->deposit_amount,
+                'payment_method' => $booking->payment_method ?: 'cash',
+                'payment_date' => $booking->booking_date ?: now()->toDateString(),
+                'notes' => 'عربون حجز فستان للعروس: ' . ($booking->client->name ?? ''),
+                'receipt_path' => $receiptPath,
+            ]);
+        }
+
         // Create new booking notification
         \App\Models\Notification::create([
             'type' => 'new_appointment',
