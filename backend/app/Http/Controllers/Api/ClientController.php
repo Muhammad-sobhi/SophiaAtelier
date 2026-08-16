@@ -22,8 +22,11 @@ class ClientController extends Controller
             'bookings' => function ($q) {
                 $q->latest(); },
             'bookings.dress.accessories',
+            'bookings.dress.images',
             'bookings.dress2.accessories',
+            'bookings.dress2.images',
             'bookings.dress3.accessories',
+            'bookings.dress3.images',
             'bookings.revenues',
             'fittings'
         ]);

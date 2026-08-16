@@ -16,8 +16,11 @@ import {
   Scissors,
   Edit3,
   ExternalLink,
-  Sparkles } from
-'lucide-react';
+  Sparkles,
+  MessageCircle,
+  Bell,
+  Calendar
+} from 'lucide-react';
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
 
 
@@ -749,98 +752,189 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
         {/* Stage Content */}
         <div className="flex-1 min-h-[220px]">
-          {isActive ?
-          <div
-            onClick={() => setShowDetailsModal(true)}
-            className="bg-white rounded-2xl border border-slate-150 p-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative transition-all duration-300 hover:shadow-md flex flex-col justify-between h-full cursor-pointer hover:border-indigo-400">
-            
+          {isActive ? (
+            <div
+              onClick={() => setShowDetailsModal(true)}
+              className="bg-white rounded-3xl border border-slate-150/90 p-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full cursor-pointer hover:border-indigo-300 group"
+            >
               <div>
-                {/* Bride Image with Source Badge */}
-                <div className="relative w-full h-28 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 mb-3 flex-shrink-0">
-                  <img
-                  src={avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80'}
-                  alt={bride.name}
-                  className="w-full h-full object-cover" />
-                
-                  {bride.source &&
-                <span className="absolute bottom-2 right-2 bg-slate-900/80 text-white text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      {bride.source}
+                {/* 1. Bride Header: Centered Avatar + Source Badge + Name & VIP */}
+                <div className="flex flex-col items-center text-center mb-3 relative">
+                  <div className="relative mb-2">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md ring-2 ring-indigo-50 bg-slate-100 flex items-center justify-center">
+                      <img
+                        src={avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80'}
+                        alt={bride.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {bride.source && (
+                      <span
+                        className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-white text-white"
+                        style={{
+                          background: bride.source === 'instagram'
+                            ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+                            : bride.source === 'whatsapp'
+                            ? '#25D366'
+                            : bride.source === 'facebook'
+                            ? '#1877F2'
+                            : '#4f46e5'
+                        }}
+                        title={bride.source}
+                      >
+                        {bride.source === 'instagram' ? (
+                          <svg className="w-2.5 h-2.5 fill-white" viewBox="0 0 24 24">
+                            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                          </svg>
+                        ) : bride.source === 'whatsapp' ? (
+                          <MessageCircle size={11} className="text-white" />
+                        ) : (
+                          <Sparkles size={11} className="text-white" />
+                        )}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bride Name & VIP Badge */}
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    <h4 className="text-sm font-black text-slate-900 tracking-tight">{bride.name}</h4>
+                    <span className="text-[9px] font-black text-amber-800 bg-amber-100/90 border border-amber-300/80 px-1.5 py-0.2 rounded-md shadow-2xs">
+                      VIP
                     </span>
-                }
+                  </div>
+
+                  {/* Phone & Location */}
+                  <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 mt-1 flex-wrap justify-center">
+                    <a
+                      href={`tel:${bride.phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 hover:text-indigo-650 transition-colors font-mono text-slate-700"
+                    >
+                      <span>{bride.phone || '—'}{bride.phone2 ? ` / ${bride.phone2}` : ''}</span>
+                      <Phone size={10} className="text-slate-400" />
+                    </a>
+                    <span className="flex items-center gap-1">
+                      <span>{bride.city || 'القاهرة'}</span>
+                      <MapPin size={10} className="text-slate-400" />
+                    </span>
+                  </div>
                 </div>
 
-                {/* Bride Details */}
-                <div className="mb-3 space-y-1">
-                  <h4 className="text-xs font-black text-slate-800 tracking-tight text-right">{bride.name}</h4>
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-550 justify-end">
-                    <span className="font-mono">{bride.phone || '—'}{bride.phone2 ? ` / ${bride.phone2}` : ''}</span>
-                    <Phone size={10} className="text-slate-400" />
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-550 justify-end">
-                    <span>{bride.city || 'Cairo'}</span>
-                    <MapPin size={10} className="text-slate-400" />
-                  </div>
-                </div>
-
-                {/* Gown Info if selected */}
+                {/* 2. Dress Cards (Side-by-Side Grid if 2 dresses, or Single Centered Card) */}
                 {(bride.latest_dress_name || bride.bookings?.[0]?.dress || bride.bookings?.[0]?.dress2) && (() => {
                   const booking = bride.bookings?.[0];
-                  const dress1Name = booking?.dress?.name || bride.latest_dress_name;
-                  const dress2Name = booking?.dress2?.name;
+                  const dress1 = booking?.dress;
+                  const dress2 = booking?.dress2;
+                  const dress1Name = dress1?.name || bride.latest_dress_name || 'فستان زفاف';
+                  const dress2Name = dress2?.name;
+
+                  const getDressImg = (d) => {
+                    if (!d) return null;
+                    const img = d.images?.[0]?.image_path || d.image_url || d.image_path;
+                    if (!img) return null;
+                    if (img.startsWith('http') || img.startsWith('data:')) return img;
+                    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+                    return `${baseUrl}/storage/${img.replace(/^(storage\/|public\/)/, '')}`;
+                  };
+
+                  const img1 = getDressImg(dress1);
+                  const img2 = getDressImg(dress2);
+
                   return (
-                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[9px] font-extrabold text-slate-650 mb-3 text-right">
-                      <span className="text-[7.5px] text-slate-400 block mb-0.5 uppercase tracking-wider">تفاصيل الفساتين</span>
-                      <div className="flex justify-between items-center">
-                        <span className="text-blue-600 font-mono truncate max-w-[130px]">{dress1Name}</span>
-                        <span className="text-slate-400">الفستان 1:</span>
+                    <div className="space-y-2 mb-3">
+                      {/* Dress cards */}
+                      <div className={`grid ${dress2Name ? 'grid-cols-2' : 'grid-cols-1'} gap-2 text-right`}>
+                        {/* Dress 1 */}
+                        <div className="bg-slate-50/90 rounded-2xl p-2 border border-slate-150 flex flex-col items-center text-center relative overflow-hidden group/d hover:border-indigo-300 transition-all shadow-2xs">
+                          <div className="w-full h-24 rounded-xl overflow-hidden bg-white border border-slate-100 mb-1.5 flex items-center justify-center relative">
+                            {img1 ? (
+                              <img src={img1} alt={dress1Name} className="w-full h-full object-cover group-hover/d:scale-105 transition-transform duration-300" />
+                            ) : (
+                              <span className="text-2xl">👗</span>
+                            )}
+                            <span className="absolute bottom-1 right-1 bg-indigo-600/90 backdrop-blur-xs text-white text-[7.5px] font-black px-1.5 py-0.5 rounded-md">
+                              فستان رئيسي
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black text-slate-800 truncate max-w-full block leading-tight">{dress1Name}</span>
+                          {dress1?.code && (
+                            <span className="text-[8px] font-bold text-slate-400 font-mono mt-0.5">كود: {dress1.code}</span>
+                          )}
+                        </div>
+
+                        {/* Dress 2 if present */}
+                        {dress2Name && (
+                          <div className="bg-purple-50/40 rounded-2xl p-2 border border-purple-150 flex flex-col items-center text-center relative overflow-hidden group/d hover:border-purple-300 transition-all shadow-2xs">
+                            <div className="w-full h-24 rounded-xl overflow-hidden bg-white border border-purple-100 mb-1.5 flex items-center justify-center relative">
+                              {img2 ? (
+                                <img src={img2} alt={dress2Name} className="w-full h-full object-cover group-hover/d:scale-105 transition-transform duration-300" />
+                              ) : (
+                                <span className="text-2xl">✨</span>
+                              )}
+                              <span className="absolute bottom-1 right-1 bg-purple-600/90 backdrop-blur-xs text-white text-[7.5px] font-black px-1.5 py-0.5 rounded-md">
+                                فستان إضافي
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-black text-purple-900 truncate max-w-full block leading-tight">{dress2Name}</span>
+                            {dress2?.code && (
+                              <span className="text-[8px] font-bold text-purple-400 font-mono mt-0.5">كود: {dress2.code}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {dress2Name && (
-                        <div className="flex justify-between items-center mt-0.5">
-                          <span className="text-purple-600 font-mono truncate max-w-[130px]">{dress2Name}</span>
-                          <span className="text-slate-400">الفستان 2:</span>
-                        </div>
-                      )}
+
+                      {/* Sales Specialist Pill */}
                       {booking?.sales_name && (
-                        <div className="flex justify-between items-center mt-0.5 border-t border-slate-100 pt-0.5">
-                          <span className="text-amber-700 font-medium">{booking.sales_name}</span>
-                          <span className="text-slate-400">السيلز:</span>
+                        <div className="bg-slate-50/80 px-2.5 py-1.5 rounded-xl border border-slate-150 flex items-center justify-between text-right">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-[10px]">
+                              👩🏻‍💼
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[9.5px] font-black text-slate-800 block leading-tight">{booking.sales_name}</span>
+                              <span className="text-[7.5px] font-bold text-slate-400 block leading-none">مستشارة مبيعات</span>
+                            </div>
+                          </div>
+                          <span className="text-[8px] font-extrabold text-indigo-650 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-150">
+                            السيلز
+                          </span>
                         </div>
                       )}
+
+                      {/* Date Chip */}
+                      {(bride.wedding_date || booking?.event_date || bride.latest_visit_date) && (
+                        <div className="bg-white px-2.5 py-1.5 rounded-xl border border-slate-150 flex items-center justify-between text-[9.5px] font-bold text-slate-700">
+                          <div className="flex items-center gap-1 font-mono text-slate-800">
+                            <Calendar size={11} className="text-indigo-600" />
+                            <span>{bride.wedding_date || booking?.event_date || bride.latest_visit_date}</span>
+                          </div>
+                          <span className="text-slate-400 text-[8px]">تاريخ المناسبة:</span>
+                        </div>
+                      )}
+
+                      {/* Conflict Override warning if present */}
                       {booking?.is_override && (
-                        <div className="mt-1 text-[8px] font-black text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-100 text-center">
+                        <div className="text-[8px] font-black text-rose-700 bg-rose-50/80 border border-rose-200 px-2 py-1 rounded-xl text-center">
                           ⚠️ تم تأكيد الحجز بتجاوز التعارض
-                        </div>
-                      )}
-                      {bride.latest_visit_date && (
-                        <div className="flex justify-between items-center mt-0.5">
-                          <span>{bride.latest_visit_date}</span>
-                          <span className="text-slate-400">التاريخ:</span>
                         </div>
                       )}
                     </div>
                   );
                 })()}
 
-                {/* Pickup details and blockout periods */}
+                {/* 3. Status Pill */}
                 {stageId === 'picked_up' && (
-                  <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-150/70 text-[9px] text-amber-900 mb-3 space-y-1 text-right">
-                    <div className="flex justify-between items-center font-bold">
-                      <span className="font-extrabold text-amber-700">
-                        {bride.bookings?.[0]?.status === 'picked_up' || bride.bookings?.[0]?.status === 'out' ? 'تم التسليم' : 'بانتظار الاستلام'}
-                      </span>
-                      <span>حالة الفستان:</span>
-                    </div>
-                    {bride.wedding_date && (
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold">{bride.wedding_date}</span>
-                        <span>تاريخ الزفاف:</span>
-                      </div>
-                    )}
+                  <div className="flex justify-center mb-2.5">
+                    <span className="text-[9.5px] font-black px-3 py-0.5 rounded-full border shadow-2xs text-center bg-amber-50 text-amber-800 border-amber-200">
+                      {bride.bookings?.[0]?.status === 'picked_up' || bride.bookings?.[0]?.status === 'out'
+                        ? '✓ تم تسليم الفستان'
+                        : 'بانتظار الاستلام ✨'}
+                    </span>
                   </div>
                 )}
               </div>
               
-              {/* Action Button Area */}
+              {/* 4. Action Button Area */}
               <div className="mt-2 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                 {(() => {
                 if (stageId === 'visit') {
@@ -977,10 +1071,11 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
                   if (!isDelivered) {
                     return (
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {isPickupOverdue && (
-                          <div className="text-[8px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center leading-tight">
-                            ⚠️ تنبيه: حان موعد استلام الفستان / تأخرت العروس!
+                          <div className="text-[9px] font-black text-rose-800 bg-rose-50/90 border border-rose-200 p-2 rounded-xl text-center leading-tight flex items-center justify-center gap-1 shadow-2xs">
+                            <Bell size={11} className="text-rose-600 animate-bounce" />
+                            <span>تنبيه: حان موعد الاستلام اليوم / تأخرت العروس!</span>
                           </div>
                         )}
                         <button
@@ -993,17 +1088,17 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                               handleStageAction('mark_picked_up');
                             }
                           }}
-                          className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                          className="w-full py-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 disabled:opacity-50 text-white rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md shadow-rose-600/20 active:scale-95 flex items-center justify-center gap-1.5 text-center"
                         >
-                          <span>تسليم الفستان للعروس 📦</span>
+                          <span>تسليم الفستان 👗</span>
                         </button>
                         <button
                           disabled={isSubmitting}
                           onClick={handleSendPickupReminderWhatsApp}
-                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-1.5"
                         >
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
-                          <span>تذكير بموعد الاستلام 📲</span>
+                          <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-4 h-4" style={{ filter: 'brightness(0) invert(1)' }} />
+                          <span>إرسال تذكير واتساب 💬</span>
                         </button>
                       </div>
                     );
@@ -1053,14 +1148,15 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 return null;
               })()}
               </div>
-            </div> :
-
-          <div className="h-full border border-dashed border-slate-200/80 rounded-2xl flex items-center justify-center p-4 bg-slate-50/30">
+            </div>
+          ) : (
+            <div className="h-full border border-dashed border-slate-200/80 rounded-2xl flex items-center justify-center p-4 bg-slate-50/30">
               <span className="text-[10px] text-slate-400 font-bold">لا توجد مرحلة حالية</span>
             </div>
-          }
+          )}
         </div>
-      </div>);
+      </div>
+    );
 
   };
 
