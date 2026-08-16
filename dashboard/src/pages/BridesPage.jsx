@@ -133,6 +133,8 @@ export default function BridesPage() {
   const [pickupPaymentAmount, setPickupPaymentAmount] = useState('0');
   const [pickupInsuranceAmount, setPickupInsuranceAmount] = useState('0');
   const [pickupPaymentMethod, setPickupPaymentMethod] = useState('cash');
+  const [pickupRemainingPayments, setPickupRemainingPayments] = useState([{ amount: '0', payment_method: 'cash' }]);
+  const [pickupInsurancePayments, setPickupInsurancePayments] = useState([{ amount: '5000', payment_method: 'cash' }]);
   const [recordPickupPayment, setRecordPickupPayment] = useState(true);
   const [pickupReceipt, setPickupReceipt] = useState(null);
 
@@ -144,6 +146,7 @@ export default function BridesPage() {
   const [fittingDressId, setFittingDressId] = useState('');
   const [tryingFee, setTryingFee] = useState('150');
   const [fittingPaymentMethod, setFittingPaymentMethod] = useState('cash');
+  const [fittingPayments, setFittingPayments] = useState([{ amount: '150', payment_method: 'cash' }]);
   const [fittingNotes, setFittingNotes] = useState('');
   const [fittingReceipt, setFittingReceipt] = useState(null);
 
@@ -436,8 +439,12 @@ export default function BridesPage() {
 
       const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) || parseFloat(booking?.deposit_amount || 0);
       const remaining = parseFloat(booking?.total_amount || 0) - totalPaid;
-      setPickupPaymentAmount(remaining > 0 ? remaining.toString() : '0');
-      setPickupInsuranceAmount(booking?.insurance_amount?.toString() || '0');
+      const remStr = remaining > 0 ? remaining.toString() : '0';
+      const insStr = (booking?.insurance_amount ?? 5000).toString();
+      setPickupPaymentAmount(remStr);
+      setPickupRemainingPayments([{ amount: remStr, payment_method: 'cash' }]);
+      setPickupInsuranceAmount(insStr);
+      setPickupInsurancePayments([{ amount: insStr, payment_method: 'cash' }]);
     }
   }, [selectedBrideForPickup]);
 
@@ -465,6 +472,12 @@ export default function BridesPage() {
       setFittingPaymentMethod('cash');
       setFittingDate(new Date().toISOString().split('T')[0]);
       setFittingTime('01:00 م');
+      const bookedDress = selectedBrideForFitting.bookings?.[0]?.dress || selectedBrideForFitting.visits?.[0]?.dress;
+      const fee = (selectedBrideForFitting.latest_dress_trying_fee && selectedBrideForFitting.latest_dress_trying_fee > 0)
+        ? selectedBrideForFitting.latest_dress_trying_fee
+        : (bookedDress ? parseFloat(bookedDress.trying_fee || 150) : 150);
+      setTryingFee(fee.toString());
+      setFittingPayments([{ amount: fee.toString(), payment_method: 'cash' }]);
       const bookedDressId = selectedBrideForFitting.bookings?.[0]?.dress_id;
       if (bookedDressId) {
         setFittingDressId(bookedDressId.toString());
@@ -650,14 +663,19 @@ export default function BridesPage() {
     e.preventDefault();
     if (!selectedBrideForFitting) return;
     try {
+      const validPayments = fittingPayments.filter(p => parseFloat(p.amount) > 0);
+      const totalFee = validPayments.length > 0
+        ? validPayments.reduce((s, p) => s + parseFloat(p.amount), 0)
+        : parseFloat(tryingFee || '0');
+
       await apiClient.put(`/clients/${selectedBrideForFitting.id}/stage-action`, {
         action: 'schedule_fitting',
         fitting_date: fittingDate,
         fitting_time: fittingTime,
         dress_id: parseInt(fittingDressId),
-        trying_fee: parseFloat(tryingFee || '0'),
-        payment_method: fittingPaymentMethod,
-        payments: [{ amount: parseFloat(tryingFee || '0'), payment_method: fittingPaymentMethod }],
+        trying_fee: totalFee,
+        payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : fittingPaymentMethod),
+        payments: validPayments,
         notes: fittingNotes,
         receipt_image: fittingReceipt
       });
@@ -2069,36 +2087,17 @@ export default function BridesPage() {
         const handlePickupConfirm = async (e) => {
           e.preventDefault();
           try {
-            // 1. Record Pickup Payment
-            if (recordPickupPayment && parseFloat(pickupPaymentAmount) > 0 && booking) {
-              await apiClient.post('/revenues', {
-                booking_id: booking.id,
-                type: 'balance',
-                amount: parseFloat(pickupPaymentAmount),
-                payment_method: pickupPaymentMethod,
-                payment_date: new Date().toISOString().split('T')[0],
-                notes: 'دفعة استلام الفستان النهائية',
-                receipt_image: pickupReceipt
-              });
-            }
+            const validBal = recordPickupPayment ? pickupRemainingPayments.filter(p => parseFloat(p.amount) > 0) : [];
+            const validIns = pickupInsurancePayments.filter(p => parseFloat(p.amount) > 0);
+            const totalIns = validIns.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 
-            // 2. Record Insurance Deposit (if entered)
-            if (parseFloat(pickupInsuranceAmount) > 0 && booking) {
-              await apiClient.post('/revenues', {
-                booking_id: booking.id,
-                type: 'other',
-                amount: parseFloat(pickupInsuranceAmount),
-                payment_method: pickupPaymentMethod,
-                payment_date: new Date().toISOString().split('T')[0],
-                notes: 'تأمين الفستان المسترد',
-                receipt_image: pickupReceipt
-              });
-            }
-
-            // 3. Mark stage picked_up
+            // Send to stage-action PUT which handles recording revenues and marking picked_up
             await apiClient.put(`/clients/${selectedBrideForPickup.id}/stage-action`, {
               action: 'mark_picked_up',
-              insurance_amount: parseFloat(pickupInsuranceAmount)
+              insurance_amount: totalIns,
+              balance_payments: validBal,
+              insurance_payments: validIns,
+              receipt_image: pickupReceipt
             });
 
             setIsPickupModalOpen(false);
@@ -2155,7 +2154,7 @@ export default function BridesPage() {
 
                     {/* Payment Inputs */}
                     {remaining > 0 && (
-                      <div className="pt-1.5 space-y-1.5">
+                      <div className="pt-1.5 space-y-1.5 border-t border-slate-150">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -2166,47 +2165,35 @@ export default function BridesPage() {
                           <span className="text-[10px] font-bold text-slate-700">تسجيل سداد المبلغ المتبقي الآن</span>
                         </label>
                         {recordPickupPayment && (
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[9px] font-extrabold text-slate-500">مبلغ السداد</label>
-                              <input
-                                type="number"
-                                value={pickupPaymentAmount}
-                                onChange={(e) => setPickupPaymentAmount(e.target.value)}
-                                className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[9px] font-extrabold text-slate-500">طريقة الدفع</label>
-                              <select
-                                value={pickupPaymentMethod}
-                                onChange={(e) => setPickupPaymentMethod(e.target.value)}
-                                className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
-                              >
-                                <option value="cash">نقداً (Cash)</option>
-                                <option value="card">فيزا / كارت (Card)</option>
-                                <option value="instapay">إنستا باي (InstaPay)</option>
-                              </select>
-                            </div>
-                          </div>
+                          <MultiPaymentMethodInput
+                            payments={pickupRemainingPayments}
+                            onChange={(updated) => {
+                              setPickupRemainingPayments(updated);
+                              const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                              setPickupPaymentAmount(total.toString());
+                            }}
+                            totalExpected={remaining}
+                            label="طرق ومبالغ سداد المتبقي"
+                          />
                         )}
                       </div>
                     )}
 
                     {/* Insurance Input */}
-                    <div className="pt-1 border-t border-slate-150 mt-1 grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[9px] font-extrabold text-slate-500">مبلغ التأمين المستلم</label>
-                        <input
-                          type="number"
-                          value={pickupInsuranceAmount}
-                          onChange={(e) => setPickupInsuranceAmount(e.target.value)}
-                          className="w-full px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 mt-0.5"
-                        />
-                      </div>
-                      <div className="flex items-end text-[8px] text-slate-400 font-bold pb-1 leading-tight">
+                    <div className="pt-2 border-t border-slate-150">
+                      <MultiPaymentMethodInput
+                        payments={pickupInsurancePayments}
+                        onChange={(updated) => {
+                          setPickupInsurancePayments(updated);
+                          const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                          setPickupInsuranceAmount(total.toString());
+                        }}
+                        totalExpected={parseFloat(pickupInsuranceAmount) || null}
+                        label="طرق ومبلغ التأمين المستلم (تأمين مسترد)"
+                      />
+                      <p className="text-[8.5px] text-slate-400 font-bold mt-1 text-right">
                         * هذا المبلغ تأمين مسترد يتم إرجاعه للعميلة عند إرجاع الفستان سليم.
-                      </div>
+                      </p>
                     </div>
 
                     {/* Upload Receipt */}
@@ -2560,29 +2547,19 @@ export default function BridesPage() {
                   })()}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">رسوم القياس المستحقة</label>
-                    <input
-                      type="text"
-                      disabled
-                      value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع الرسوم</label>
-                    <select
-                      value={fittingPaymentMethod}
-                      onChange={(e) => setFittingPaymentMethod(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
-                    >
-                      <option value="cash">نقدي (Cash)</option>
-                      <option value="credit_card">فيزا / كارت (Visa / Card)</option>
-                      <option value="instapay">إنستاباي (InstaPay)</option>
-                    </select>
-                  </div>
-                </div>
+                {parseFloat(tryingFee) > 0 && (
+                  <MultiPaymentMethodInput
+                    payments={fittingPayments}
+                    onChange={(updated) => {
+                      setFittingPayments(updated);
+                      const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                      setTryingFee(total.toString());
+                    }}
+                    totalExpected={parseFloat(tryingFee) || null}
+                    label="طرق وسداد رسوم القياس"
+                    required
+                  />
+                )}
 
                 {/* Upload Receipt */}
                 <div className="space-y-1">

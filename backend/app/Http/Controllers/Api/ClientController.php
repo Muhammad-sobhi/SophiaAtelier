@@ -475,9 +475,10 @@ class ClientController extends Controller
             case 'mark_picked_up':
                 $booking = $client->bookings()->latest()->first();
                 if ($booking) {
+                    $insuranceAmount = floatval($request->input('insurance_amount', $booking->insurance_amount));
                     $booking->update([
                         'status' => 'picked_up',
-                        'insurance_amount' => floatval($request->input('insurance_amount', $booking->insurance_amount))
+                        'insurance_amount' => $insuranceAmount
                     ]);
                     // Update both dresses status to out
                     if ($booking->dress) {
@@ -485,6 +486,48 @@ class ClientController extends Controller
                     }
                     if ($booking->dress2) {
                         $booking->dress2->update(['status' => 'out']);
+                    }
+
+                    $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
+
+                    // 1. Record balance payment(s)
+                    $balancePayments = $request->input('balance_payments');
+                    if (is_array($balancePayments) && count($balancePayments) > 0) {
+                        foreach ($balancePayments as $bp) {
+                            $bpAmt = floatval($bp['amount'] ?? 0);
+                            $bpMethod = $bp['payment_method'] ?? 'cash';
+                            if ($bpAmt > 0) {
+                                \App\Models\Revenue::create([
+                                    'booking_id' => $booking->id,
+                                    'type' => 'balance',
+                                    'amount' => $bpAmt,
+                                    'payment_method' => $bpMethod,
+                                    'payment_date' => now()->toDateString(),
+                                    'notes' => 'دفعة استلام الفستان النهائية للعروس: ' . $client->name,
+                                    'receipt_path' => $receiptPath,
+                                ]);
+                            }
+                        }
+                    }
+
+                    // 2. Record insurance security deposit payment(s)
+                    $insurancePayments = $request->input('insurance_payments');
+                    if (is_array($insurancePayments) && count($insurancePayments) > 0) {
+                        foreach ($insurancePayments as $ip) {
+                            $ipAmt = floatval($ip['amount'] ?? 0);
+                            $ipMethod = $ip['payment_method'] ?? 'cash';
+                            if ($ipAmt > 0) {
+                                \App\Models\Revenue::create([
+                                    'booking_id' => $booking->id,
+                                    'type' => 'security_deposit',
+                                    'amount' => $ipAmt,
+                                    'payment_method' => $ipMethod,
+                                    'payment_date' => now()->toDateString(),
+                                    'notes' => 'تأمين الفستان المسترد للعروس: ' . $client->name,
+                                    'receipt_path' => $receiptPath,
+                                ]);
+                            }
+                        }
                     }
                 }
                 break;

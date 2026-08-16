@@ -6,6 +6,7 @@ import {
   Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, Filter, Search,
   Sparkles, Trash2
 } from 'lucide-react';
+import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 
 
 
@@ -99,6 +100,7 @@ export default function FinancePage() {
   const [newAmount, setNewAmount] = useState('');
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newPaymentMethod, setNewPaymentMethod] = useState('cash');
+  const [revenueSplitPayments, setRevenueSplitPayments] = useState([{ amount: '', payment_method: 'cash' }]);
   const [newReceiptImage, setNewReceiptImage] = useState(null);
 
   // Cleaning Orders State
@@ -206,10 +208,16 @@ export default function FinancePage() {
 
     try {
       if (isRevenue) {
+        const validPayments = revenueSplitPayments.filter(p => parseFloat(p.amount) > 0);
+        const totalRev = validPayments.length > 0
+          ? validPayments.reduce((s, p) => s + parseFloat(p.amount), 0)
+          : amountVal;
+
         await apiClient.post('/revenues', {
           type: newCategory === 'shop' ? 'deposit' : 'other',
-          amount: amountVal,
-          payment_method: newPaymentMethod,
+          amount: totalRev,
+          payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : newPaymentMethod),
+          payments: validPayments.length > 0 ? validPayments : [{ amount: totalRev, payment_method: newPaymentMethod }],
           payment_date: newDate,
           notes: newDesc,
           receipt_image: newReceiptImage
@@ -236,6 +244,7 @@ export default function FinancePage() {
       setNewType('مصروف');
       setNewCategory('other');
       setNewAmount('');
+      setRevenueSplitPayments([{ amount: '', payment_method: 'cash' }]);
       setNewDate(new Date().toISOString().split('T')[0]);
       setNewPaymentMethod('cash');
       setNewReceiptImage(null);
@@ -903,47 +912,73 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              {/* Amount & Date */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">المبلغ (ج.م)</label>
-                  <input
-                  type="number"
-                  required
-                  placeholder="مثال: 500"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
-                
+              {/* Amount & Payment Method for Revenue vs Expense */}
+              {newType === 'إيراد' ? (
+                <div className="space-y-3">
+                  <MultiPaymentMethodInput
+                    payments={revenueSplitPayments}
+                    onChange={(updated) => {
+                      setRevenueSplitPayments(updated);
+                      const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                      setNewAmount(total > 0 ? total.toString() : '');
+                    }}
+                    label="طرق ومبالغ الإيراد"
+                    required
+                  />
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">التاريخ</label>
+                    <input
+                      type="date"
+                      required
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-600">المبلغ (ج.م)</label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="مثال: 500"
+                        value={newAmount}
+                        onChange={(e) => setNewAmount(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                      />
+                    </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">التاريخ</label>
-                  <input
-                  type="date"
-                  required
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
-                
-                </div>
-              </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-600">التاريخ</label>
+                      <input
+                        type="date"
+                        required
+                        value={newDate}
+                        onChange={(e) => setNewDate(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                      />
+                    </div>
+                  </div>
 
-              {/* Payment Method */}
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">طريقة السداد / الدفع</label>
-                <select
-                value={newPaymentMethod}
-                onChange={(e) => setNewPaymentMethod(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
-                
-                  <option value="credit_card">فيزا / كارت</option>
-                  <option value="instapay">إنستاباي (InstaPay)</option>
-                  <option value="vodafone_cash">فودافون كاش</option>
-                  <option value="bank_transfer">تحويل بنكي</option>
-                  <option value="cash">نقدي (كاش)</option>
-                </select>
-              </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">طريقة السداد / الدفع</label>
+                    <select
+                      value={newPaymentMethod}
+                      onChange={(e) => setNewPaymentMethod(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                    >
+                      <option value="credit_card">فيزا / كارت</option>
+                      <option value="instapay">إنستاباي (InstaPay)</option>
+                      <option value="vodafone_cash">فودافون كاش</option>
+                      <option value="bank_transfer">تحويل بنكي</option>
+                      <option value="cash">نقدي (كاش)</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               {/* Upload Receipt */}
               <div className="space-y-2">

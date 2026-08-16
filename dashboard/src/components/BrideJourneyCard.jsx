@@ -104,6 +104,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [fittingDressId, setFittingDressId] = useState('');
   const [tryingFee, setTryingFee] = useState('150');
   const [fittingPaymentMethod, setFittingPaymentMethod] = useState('cash');
+  const [fittingPayments, setFittingPayments] = useState([{ amount: '150', payment_method: 'cash' }]);
   const [fittingNotes, setFittingNotes] = useState('');
   const [dressesList, setDressesList] = useState([]);
   const [dressDetails, setDressDetails] = useState(null);
@@ -152,7 +153,9 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         setFittingDressId(bookedDressId.toString());
         const bookedDress = bride.bookings?.[0]?.dress;
         if (bookedDress) {
-          setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+          const feeStr = parseFloat(bookedDress.trying_fee || 0).toString();
+          setTryingFee(feeStr);
+          setFittingPayments([{ amount: feeStr, payment_method: 'cash' }]);
         }
       }
     }
@@ -164,7 +167,9 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
           if (!bride.bookings?.[0]?.dress_id) {
             setFittingDressId(list[0].id.toString());
             const fee = parseFloat(list[0].trying_fee || 0);
-            setTryingFee(fee > 0 ? fee.toString() : '0');
+            const feeStr = fee > 0 ? fee.toString() : '0';
+            setTryingFee(feeStr);
+            setFittingPayments([{ amount: feeStr, payment_method: 'cash' }]);
           }
           setBookingDressId(list[0].id.toString());
           setBookingTotalAmount(parseFloat(list[0].rental_price || 0).toString());
@@ -316,18 +321,26 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      const validPayments = fittingPayments.filter(p => parseFloat(p.amount) > 0);
+      const totalFee = validPayments.length > 0
+        ? validPayments.reduce((s, p) => s + parseFloat(p.amount), 0)
+        : parseFloat(tryingFee || '0');
+
       await apiClient.put(`/clients/${bride.id}/stage-action`, {
         action: 'schedule_fitting',
         fitting_date: fittingDate,
         fitting_time: fittingTime,
         dress_id: parseInt(fittingDressId),
-        trying_fee: parseFloat(tryingFee || '0'),
-        payment_method: fittingPaymentMethod,
+        trying_fee: totalFee,
+        payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : fittingPaymentMethod),
+        payments: validPayments,
         notes: fittingNotes,
         receipt_image: fittingReceipt
       });
       setShowFittingModal(false);
       setFittingReceipt(null);
+      setFittingNotes('');
+      onStageUpdate?.();
       setFittingNotes('');
       onStageUpdate?.();
     } catch (err) {
@@ -1288,29 +1301,17 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                 </div>
 
                 {parseFloat(tryingFee) > 0 && (
-                  <div className="grid grid-cols-2 gap-2.5 bg-indigo-50/20 border border-indigo-150 p-2 rounded-2xl animate-fade-in">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold text-slate-500 block text-right">رسوم القياس المستحقة</label>
-                      <input
-                        type="text"
-                        disabled
-                        value={`${parseFloat(tryingFee).toLocaleString()} ج.م`}
-                        className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-black text-indigo-650 text-right"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold text-slate-500 block text-right">طريقة دفع الرسوم</label>
-                      <select
-                        value={fittingPaymentMethod}
-                        onChange={(e) => setFittingPaymentMethod(e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right pr-8"
-                      >
-                        {PAYMENT_METHODS.map((pm) => (
-                          <option key={pm.id} value={pm.id}>{pm.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  <MultiPaymentMethodInput
+                    payments={fittingPayments}
+                    onChange={(updated) => {
+                      setFittingPayments(updated);
+                      const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                      setTryingFee(total.toString());
+                    }}
+                    totalExpected={parseFloat(tryingFee) || null}
+                    label="طرق وسداد رسوم القياس"
+                    required
+                  />
                 )}
 
                 {/* Upload Receipt */}
