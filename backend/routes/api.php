@@ -221,6 +221,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::apiResource('revenues', RevenueController::class);
     Route::apiResource('expenses', ExpenseController::class);
     Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
+    Route::post('/finance/transfer', [FinanceController::class, 'transfer']);
+    Route::post('/finance/deposit', [FinanceController::class, 'deposit']);
+    Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
     Route::get('/clients/export/csv', [ClientController::class, 'exportCsv']);
 
     // Leave request status approval — admin only

@@ -89,8 +89,11 @@ class DashboardController extends Controller
         }, 'bookings' => function ($q) {
             $q->with([
                 'dress.accessories',
+                'dress.images',
                 'dress2.accessories',
+                'dress2.images',
                 'dress3.accessories',
+                'dress3.images',
                 'revenues'
             ])->latest();
         }, 'fittings'])

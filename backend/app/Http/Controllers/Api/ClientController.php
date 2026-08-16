@@ -59,7 +59,7 @@ class ClientController extends Controller
         $rawEmail = $request->input('email');
 
         if ($clientId) {
-            $client = Client::with(['visits', 'fittings', 'bookings.dress', 'bookings.dress2', 'bookings.dress3'])->find($clientId);
+            $client = Client::with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images'])->find($clientId);
             if ($client) {
                 return response()->json($client);
             }
@@ -115,7 +115,7 @@ class ClientController extends Controller
             $query->where('email', $cleanEmail);
         }
 
-        $client = $query->with(['visits', 'fittings', 'bookings.dress', 'bookings.dress2', 'bookings.dress3'])->first();
+        $client = $query->with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images'])->first();
 
         if (!$client) {
             return response()->json([
@@ -134,8 +134,11 @@ class ClientController extends Controller
             'bookings' => function ($q) {
                 $q->latest(); },
             'bookings.dress.accessories',
+            'bookings.dress.images',
             'bookings.dress2.accessories',
+            'bookings.dress2.images',
             'bookings.dress3.accessories',
+            'bookings.dress3.images',
             'bookings.revenues',
             'fittings',
         ]);

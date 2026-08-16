@@ -1082,121 +1082,176 @@ export default function BridesPage() {
     const avatar = bride.image_path ?
       `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${bride.image_path}` :
       mockAvatars[idx % mockAvatars.length];
-    let actionInfo = STAGE_ACTIONS_CONFIG[bride.current_stage];
-    if (bride.current_stage === 'picked_up') {
-      const booking = bride.bookings?.[0];
-      if (booking?.status === 'picked_up' || booking?.status === 'out') {
-        actionInfo = { label: 'تسجيل إرجاع الفستان', action: 'mark_returned', color: 'bg-blue-600 hover:bg-blue-700' };
-      } else {
-        actionInfo = { label: 'تسليم الفستان للعروس', action: 'mark_picked_up', color: 'bg-rose-600 hover:bg-rose-700' };
+    
+    const booking = bride.bookings?.[0];
+    const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
+    const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
+    const stage = bride.current_stage || 'visit';
+
+    // Dress resolution
+    const dress = booking?.dress;
+    const dressName = dress?.name || bride.latest_dress_name;
+    let dressImg = null;
+    if (dress) {
+      if (Array.isArray(dress.images) && dress.images.length > 0) {
+        const p = dress.images.find((x) => x.is_primary) || dress.images[0];
+        dressImg = typeof p === 'string' ? p : (p?.image_path || p?.image_url);
       }
+      if (!dressImg) dressImg = dress.primary_image || dress.image_path;
     }
 
     return (
       <div
         key={bride.id}
-        className="bg-white rounded-2xl border border-slate-150 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-md transition-all relative group">
-
+        onClick={() => setSelectedBrideDetails(bride)}
+        className="bg-white rounded-3xl border border-slate-150/90 p-3 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between hover:border-indigo-300 relative group cursor-pointer"
+      >
         <div>
-          {/* Top Row: Avatar & Stage Badge */}
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-100 shadow-xs flex-shrink-0 bg-slate-50">
-              <img src={avatar} alt={bride.name} className="w-full h-full object-cover" />
+          {/* 1. Header: Avatar + Bride Name + Phone on Right, Stage Pill & Admin on Left */}
+          <div className="flex items-start justify-between gap-2 mb-2 pb-2 border-b border-slate-100/80">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="relative flex-shrink-0">
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 shadow-2xs bg-slate-50 flex items-center justify-center">
+                  <img src={avatar} alt={bride.name} className="w-full h-full object-cover" />
+                </div>
+                {bride.source && (
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-2xs border border-white text-white text-[7px]"
+                    style={{
+                      background: bride.source === 'instagram'
+                        ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+                        : bride.source === 'whatsapp'
+                        ? '#25D366'
+                        : bride.source === 'facebook'
+                        ? '#1877F2'
+                        : '#4f46e5'
+                    }}
+                    title={bride.source}
+                  >
+                    {bride.source === 'whatsapp' ? '💬' : bride.source === 'instagram' ? '📷' : '★'}
+                  </span>
+                )}
+              </div>
+
+              <div className="min-w-0 text-right">
+                <div className="flex items-center gap-1">
+                  <h4 className="text-xs font-black text-slate-800 tracking-tight truncate">{bride.name}</h4>
+                  <span className="text-[7.5px] font-black text-amber-800 bg-amber-100/90 border border-amber-300/80 px-1 py-0.2 rounded shadow-2xs">VIP</span>
+                </div>
+                <a
+                  href={`tel:${bride.phone}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[9px] font-bold text-slate-500 hover:text-indigo-650 font-mono block truncate"
+                >
+                  {bride.phone || '—'}
+                </a>
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <span className={`text-[8.5px] font-extrabold px-2.5 py-1 rounded-full border ${stageColor(bride.current_stage)}`}>
+
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-full border ${stageColor(bride.current_stage)}`}>
                 {stageLabel(bride.current_stage)}
               </span>
-              {/* Admin actions overlay on hover */}
-              {isAdmin &&
-                <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleEditBrideClick(bride)}
-                    className="p-1 text-indigo-650 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
-                    title="تعديل">
-
-                    <Edit3 size={12} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteBride(bride.id)}
-                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                    title="حذف">
-
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              }
+              <div className="flex items-center gap-1">
+                <span className="text-[7.5px] font-bold text-slate-400">
+                  {bride.city || 'القاهرة'}
+                </span>
+                {isAdmin && (
+                  <div className="flex items-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleEditBrideClick(bride)}
+                      className="p-0.5 text-indigo-600 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                      title="تعديل"
+                    >
+                      <Edit3 size={11} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBride(bride.id)}
+                      className="p-0.5 text-rose-500 hover:bg-rose-50 rounded transition-all cursor-pointer"
+                      title="حذف"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Bride Details */}
-          <div className="mb-3 space-y-1 text-right">
-            <h4 className="text-xs font-black text-slate-800 tracking-tight">{bride.name}</h4>
-            <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold justify-start">
-              <Phone size={10} className="text-slate-400" />
-              <span className="font-mono">{bride.phone || '—'}{bride.phone2 ? ` / ${bride.phone2}` : ''}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold justify-start">
-              <MapPin size={10} className="text-slate-400" />
-              <span>{bride.city || 'Cairo'}</span>
-            </div>
-            {bride.wedding_date &&
-              <div className="text-[8.5px] font-bold text-indigo-650 bg-indigo-50/50 p-1.5 rounded-lg border border-indigo-100 leading-tight block w-full mt-1">
-                👰🏻‍♀️ موعد الزفاف: {formatDate(bride.wedding_date)}
+          {/* 2. Middle Section: Dress Preview & Wedding Date */}
+          <div className="space-y-1.5 mb-2">
+            {dressName ? (
+              <div className="bg-slate-50/90 rounded-xl p-1.5 border border-slate-150 flex items-center gap-2 text-right">
+                <div className="w-8 h-10 rounded-lg overflow-hidden bg-white border border-slate-100 flex-shrink-0 flex items-center justify-center">
+                  {dressImg ? (
+                    <img
+                      src={dressImg.startsWith('http') ? dressImg : `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/storage/${dressImg.replace(/^(storage\/|public\/)/, '')}`}
+                      alt={dressName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xs">👗</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9.5px] font-black text-slate-800 truncate block leading-tight">{dressName}</span>
+                  {dress?.code && (
+                    <span className="text-[7px] font-bold text-slate-400 font-mono block mt-0.5">كود: {dress.code}</span>
+                  )}
+                </div>
               </div>
-            }
-            <div className="text-[8px] text-slate-400 font-extrabold bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md inline-block mt-1">
-              المصدر: {bride.source || 'Walk-in'}
-            </div>
+            ) : null}
+
+            {/* Wedding Date chip */}
+            {bride.wedding_date && (
+              <div className="bg-indigo-50/40 px-2 py-1 rounded-xl border border-indigo-100 flex items-center justify-between text-[8.5px] font-bold text-slate-700">
+                <div className="flex items-center gap-1 font-mono font-black text-indigo-900">
+                  <Calendar size={10} className="text-indigo-600" />
+                  <span>{String(bride.wedding_date).split('T')[0]}</span>
+                </div>
+                <span className="text-indigo-500 text-[7.5px] font-extrabold">موعد الزفاف 👰🏻‍♀️</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Stage Action & Pay Remaining Buttons */}
-        <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
-          {(() => {
-            const booking = bride.bookings?.[0];
-            const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
-            const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
-
-            if (booking && remaining > 0) {
-              return (
-                <button
-                  type="button"
-                  onClick={() => handleOpenPayRemaining(bride)}
-                  className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[9.5px] font-black transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5 active:scale-95 mb-1.5"
-                >
-                  <CreditCard size={13} />
-                  <span>سداد المبلغ المتبقي ({remaining.toLocaleString()} ج.م)</span>
-                </button>
-              );
-            }
-            return null;
-          })()}
+        {/* 3. Action Area (Compact buttons) */}
+        <div className="mt-1.5 pt-2 border-t border-slate-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+          {booking && remaining > 0 && (
+            <button
+              type="button"
+              onClick={() => handleOpenPayRemaining(bride)}
+              className="w-full py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[9.5px] font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 active:scale-95"
+            >
+              <CreditCard size={11} />
+              <span>سداد المتبقي ({remaining.toLocaleString()} ج.م)</span>
+            </button>
+          )}
 
           {(() => {
-            const stage = bride.current_stage || 'visit';
-
             if (stage === 'visit') {
               return (
-                <div className="space-y-1.5">
-                  <button
-                    onClick={() => handleConfirmVisitWhatsApp(bride)}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                  >
-                    <span>تأكيد موعد الزيارة 💬</span>
-                  </button>
-                  <button
-                    onClick={() => handleOpenBookingModal(bride)}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                  >
-                    <span>حجز فستان الزفاف 👗</span>
-                  </button>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleConfirmVisitWhatsApp(bride)}
+                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                    >
+                      <span>تأكيد الزيارة 💬</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenBookingModal(bride)}
+                      className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                    >
+                      <span>حجز فستان 👗</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleOpenTryingFee(bride)}
-                    className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
+                    className="w-full py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[8.5px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
                   >
-                    <CreditCard size={11} className="text-slate-500" />
+                    <CreditCard size={10} className="text-slate-500" />
                     <span>تسجيل رسوم القياس 💰</span>
                   </button>
                 </div>
@@ -1214,79 +1269,84 @@ export default function BridesPage() {
               }
 
               return (
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {isWeddingNear && (
-                    <div className="text-[8px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center leading-tight">
+                    <div className="text-[7.5px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1 rounded-lg text-center leading-tight">
                       ⚠️ موعد الزفاف قريب (أقل من أسبوعين) ولم يتم تحديد بروفة بعد!
                     </div>
                   )}
-                  <button
-                    onClick={() => {
-                      setSelectedBrideForFitting(bride);
-                      const bookedDressId = bride.bookings?.[0]?.dress_id;
-                      if (bookedDressId) {
-                        setFittingDressId(bookedDressId.toString());
-                        const bookedDress = bride.bookings?.[0]?.dress;
-                        if (bookedDress) {
-                          setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setSelectedBrideForFitting(bride);
+                        const bookedDressId = bride.bookings?.[0]?.dress_id;
+                        if (bookedDressId) {
+                          setFittingDressId(bookedDressId.toString());
+                          const bookedDress = bride.bookings?.[0]?.dress;
+                          if (bookedDress) {
+                            setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+                          }
                         }
-                      }
-                      setShowFittingModal(true);
-                    }}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                  >
-                    <span>حجز موعد قياس 📐</span>
-                  </button>
-                  <button
-                    onClick={() => handleOpenBookingModal(bride)}
-                    className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
-                  >
-                    <Edit3 size={11} className="text-slate-500" />
-                    <span>تعديل الحجز / استبدال الفستان ✏️</span>
-                  </button>
+                        setShowFittingModal(true);
+                      }}
+                      className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                    >
+                      <span>حجز موعد قياس 📐</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenBookingModal(bride)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[8.5px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200 flex-shrink-0"
+                      title="تعديل الحجز / استبدال الفستان"
+                    >
+                      <Edit3 size={10} className="text-slate-500" />
+                      <span>تعديل</span>
+                    </button>
+                  </div>
                 </div>
               );
             }
 
             if (stage === 'fitting') {
               return (
-                <div className="space-y-1.5">
-                  <button
-                    onClick={() => {
-                      setSelectedBrideForFitting(bride);
-                      const bookedDressId = bride.bookings?.[0]?.dress_id;
-                      if (bookedDressId) {
-                        setFittingDressId(bookedDressId.toString());
-                        const bookedDress = bride.bookings?.[0]?.dress;
-                        if (bookedDress) {
-                          setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setSelectedBrideForFitting(bride);
+                        const bookedDressId = bride.bookings?.[0]?.dress_id;
+                        if (bookedDressId) {
+                          setFittingDressId(bookedDressId.toString());
+                          const bookedDress = bride.bookings?.[0]?.dress;
+                          if (bookedDress) {
+                            setTryingFee(parseFloat(bookedDress.trying_fee || 0).toString());
+                          }
                         }
-                      }
-                      setShowFittingModal(true);
-                    }}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
-                  >
-                    <span>إضافة بروفة إضافية 📐</span>
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await apiClient.put(`/clients/${bride.id}/stage-action`, { action: 'end_fitting' });
-                        fetchBrides();
-                      } catch (e) {
-                        console.error(e);
-                      }
-                    }}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
-                  >
-                    <span>إنهاء البروفة ✂️</span>
-                  </button>
+                        setShowFittingModal(true);
+                      }}
+                      className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                    >
+                      <span>بروفة إضافية 📐</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await apiClient.put(`/clients/${bride.id}/stage-action`, { action: 'end_fitting' });
+                          fetchBrides();
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                    >
+                      <span>إنهاء البروفة ✂️</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => navigate('/dashboard/fittings')}
-                    className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
+                    className="w-full py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[8.5px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
                   >
-                    <Ruler size={11} className="text-slate-500" />
+                    <Ruler size={10} className="text-slate-500" />
                     <span>كارت القياسات والترزي 🪡</span>
                   </button>
                 </div>
@@ -1294,9 +1354,7 @@ export default function BridesPage() {
             }
 
             if (stage === 'picked_up') {
-              const booking = bride.bookings?.[0];
               const isDelivered = booking?.status === 'picked_up' || booking?.status === 'out';
-
               const weddingDate = bride.wedding_date || booking?.event_date;
               let isPickupOverdue = false;
               if (weddingDate && !isDelivered) {
@@ -1309,42 +1367,44 @@ export default function BridesPage() {
 
               if (!isDelivered) {
                 return (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {isPickupOverdue && (
-                      <div className="text-[8px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center leading-tight">
-                        ⚠️ تنبيه: حان موعد استلام الفستان / تأخرت العروس!
+                      <div className="text-[7.5px] font-black text-rose-700 bg-rose-50 border border-rose-200 p-1 rounded-lg text-center leading-tight">
+                        ⚠️ تنبيه: حان موعد استلام الفستان!
                       </div>
                     )}
-                    <button
-                      onClick={() => {
-                        setSelectedBrideForPickup(bride);
-                        setIsPickupModalOpen(true);
-                      }}
-                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
-                    >
-                      <span>تسليم الفستان للعروس 📦</span>
-                    </button>
-                    <button
-                      onClick={() => handleSendPickupReminderWhatsApp(bride)}
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                    >
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
-                      <span>تذكير بموعد الاستلام 📲</span>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setSelectedBrideForPickup(bride);
+                          setIsPickupModalOpen(true);
+                        }}
+                        className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[9.5px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                      >
+                        <span>تسليم الفستان للعروس 📦</span>
+                      </button>
+                      <button
+                        onClick={() => handleSendPickupReminderWhatsApp(bride)}
+                        className="w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer flex-shrink-0 shadow-2xs"
+                        title="تذكير بموعد الاستلام واتساب"
+                      >
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
+                      </button>
+                    </div>
                   </div>
                 );
               } else {
                 return (
-                  <div className="space-y-1.5">
-                    <div className="text-[8.5px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg text-center">
-                      📦 الفستان في حوزة العروسة (خارج الأتيليه)
+                  <div className="space-y-1">
+                    <div className="text-[8px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg text-center">
+                      📦 الفستان خارج الأتيليه
                     </div>
                     <button
                       onClick={() => {
                         setSelectedBrideForReturn(bride);
                         setIsReturnModalOpen(true);
                       }}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                      className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9.5px] font-extrabold transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1"
                     >
                       <span>تسجيل إرجاع الفستان 🔄</span>
                     </button>
@@ -1355,8 +1415,8 @@ export default function BridesPage() {
 
             if (stage === 'returned') {
               return (
-                <div className="space-y-1.5">
-                  <div className="text-[8.5px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg text-center">
+                <div className="space-y-1">
+                  <div className="text-[8px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg text-center">
                     ✓ تم استلام الفستان بنجاح
                   </div>
                   <button
@@ -1372,7 +1432,7 @@ export default function BridesPage() {
                       const phone = (bride.phone || '').replace(/[^\d]/g, '');
                       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold transition-all cursor-pointer shadow-xs"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9.5px] font-extrabold transition-all cursor-pointer shadow-2xs"
                   >
                     <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="w-3.5 h-3.5" style={{ filter: 'brightness(0) invert(1)' }} />
                     <span>إرسال تهنئة الزفاف 💐</span>
@@ -1384,8 +1444,8 @@ export default function BridesPage() {
             return null;
           })()}
         </div>
-      </div>);
-
+      </div>
+    );
   };
 
   return (
