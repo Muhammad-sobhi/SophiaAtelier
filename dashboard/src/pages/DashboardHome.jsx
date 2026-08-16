@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-
-
-
-
   Search,
   Gem,
-
+  Sparkles,
   X,
   CreditCard
-} from
-  'lucide-react';
+} from 'lucide-react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { BrideJourneyCard } from '@/components/BrideJourneyCard';
 import { DressLifecycleCard } from '@/components/DressLifecycleCard';
@@ -279,20 +274,20 @@ export default function DashboardPage() {
 
       {/* 1. Daily Statistics Bar (Top Position) */}
       <div className="bg-white border border-slate-150 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-black text-slate-600 shadow-xs flex-shrink-0">
-        <div key="stat-brides" className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
           <span>إجمالي العرائس: <strong className="text-slate-800">{totalBrides}</strong></span>
         </div>
-        <div key="stat-bookings" className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
           <span>الحجوزات النشطة: <strong className="text-slate-800">{activeBookingsCount}</strong></span>
         </div>
-        <div key="stat-fittings" className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
           <span>مواعيد القياس: <strong className="text-slate-800">{fittingsCount}</strong></span>
         </div>
         {isAdmin && (
-          <div key="stat-revenue" className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
             <span>إيرادات الشهر: <strong className="text-rose-600 font-mono">{monthlyRevenue.toLocaleString()} ج.م</strong></span>
           </div>
@@ -421,6 +416,7 @@ export default function DashboardPage() {
         <div className="col-span-12 sm:col-span-9 lg:col-span-10">
           {selectedBride ? (
             <BrideJourneyCard
+              key={selectedBride.id}
               bride={selectedBride}
               onStageUpdate={() => { fetchBrides(); fetchDresses(); }}
               avatar={selectedBride.image_path
@@ -437,81 +433,131 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 4. Dress Journey Section (Slim Cubes Selector + Scrollbar + Natural Height Dress Card) */}
-      <div className="grid grid-cols-12 gap-4 flex-shrink-0">
-        {/* Dress Cubes Selector (Horizontal on Mobile, Vertical on Desktop with scrollbar) */}
-        <div className="col-span-12 sm:col-span-3 lg:col-span-2 bg-white border border-slate-150 rounded-2xl p-2.5 shadow-xs flex flex-col items-center max-h-[420px] sm:max-h-[480px]">
-          <div className="w-full flex items-center justify-between mb-2 flex-shrink-0">
-            <span className="text-[10px] font-black text-slate-500">الفساتين ({filteredDresses.length})</span>
+      {/* 4. Dress Journey Section (Smart Selector + Compact Lifecycle Card) */}
+      <div className="space-y-2.5 flex-shrink-0">
+        {/* Dress Lifecycle Stage Summary KPIs */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-2.5 flex items-center justify-between text-right">
+            <div>
+              <span className="text-[9px] font-extrabold text-emerald-700 block">جاهز للاستخدام ✨</span>
+              <span className="text-sm sm:text-base font-black text-emerald-900 font-mono">
+                {dresses.filter((d) => d.current_stage === 'ready').length}
+              </span>
+            </div>
+            <div className="w-7 h-7 rounded-xl bg-emerald-100/80 flex items-center justify-center text-emerald-700 font-bold text-xs">
+              👗
+            </div>
           </div>
-          {/* Live Search Input Box */}
-          <div className="w-full relative mb-2 flex-shrink-0">
-            <input
-              type="text"
-              placeholder="اسم / كود الفستان..."
-              value={dressSearch}
-              onChange={(e) => setDressSearch(e.target.value)}
-              className="w-full pr-7 pl-2 py-1 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-slate-700 placeholder:text-slate-400"
-            />
-            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+
+          <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-2.5 flex items-center justify-between text-right">
+            <div>
+              <span className="text-[9px] font-extrabold text-blue-700 block">محجوز / مؤجر 🛍️</span>
+              <span className="text-sm sm:text-base font-black text-blue-900 font-mono">
+                {dresses.filter((d) => d.current_stage === 'booked').length}
+              </span>
+            </div>
+            <div className="w-7 h-7 rounded-xl bg-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-xs">
+              💍
+            </div>
           </div>
-          <div className="w-full flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto items-center justify-start gap-2.5 p-1 scrollbar-thin select-none flex-grow min-h-0">
-            {filteredDresses.map((d) => {
-              const isActive = selectedDressId === d.id;
-              const imageUrl = getStorageUrl(d.image_path || d.images?.[0]?.image_path);
-              const stageColors = {
-                'ready': 'border-emerald-500 bg-emerald-50',
-                'booked': 'border-blue-500 bg-blue-50',
-                'dry_clean': 'border-purple-500 bg-purple-50',
-              };
-              const stageClass = stageColors[d.current_stage] || 'border-slate-200 bg-slate-50';
 
-              return (
-                <div key={d.id} className="relative group flex-shrink-0">
-                  {/* Rounded Square Cube */}
-                  <button
-                    onClick={() => setSelectedDressId(d.id)}
-                    title={d.name}
-                    className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-pointer ${isActive
-                        ? 'border-violet-600 ring-4 ring-violet-600/20 scale-110 shadow-md'
-                        : `${stageClass} hover:scale-105 opacity-85 hover:opacity-100`
-                      }`}
-                  >
-                    {imageUrl ? (
-                      <img src={imageUrl} alt={d.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
-                        <Gem size={14} />
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Tooltip on Hover */}
-                  <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2.5 hidden sm:group-hover:flex items-center z-[100] pointer-events-none drop-shadow-md">
-                    <div className="bg-slate-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl whitespace-nowrap flex items-center gap-1.5">
-                      <span>{d.name}</span>
-                      <span className="text-[9px] opacity-75">({d.current_stage === 'ready' ? 'جاهز' : d.current_stage === 'booked' ? 'محجوز' : 'دراي كلين'})</span>
-                    </div>
-                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mr-1" />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-2.5 flex items-center justify-between text-right">
+            <div>
+              <span className="text-[9px] font-extrabold text-purple-700 block">دراي كلين وصيانة 🧼</span>
+              <span className="text-sm sm:text-base font-black text-purple-900 font-mono">
+                {dresses.filter((d) => d.current_stage === 'dry_clean').length}
+              </span>
+            </div>
+            <div className="w-7 h-7 rounded-xl bg-purple-100/80 flex items-center justify-center text-purple-700 font-bold text-xs">
+              ✨
+            </div>
           </div>
         </div>
 
-        {/* Expanded Wide Dress Lifecycle Card with natural height */}
-        <div className="col-span-12 sm:col-span-9 lg:col-span-10">
-          {selectedDress ? (
-            <DressLifecycleCard
-              dress={selectedDress}
-              onStageUpdate={() => { fetchDresses(); fetchBrides(); }}
-            />
-          ) : (
-            <div className="h-[300px] border border-dashed rounded-2xl bg-white flex items-center justify-center p-6 text-slate-300 font-bold text-xs">
-              حدد فستان لعرض حالته
+        {/* Main Grid: Selector + Stage Card */}
+        <div className="grid grid-cols-12 gap-3 sm:gap-4 items-start">
+          {/* Dress Selector List (Compact with details) */}
+          <div className="col-span-12 sm:col-span-4 lg:col-span-3 bg-white border border-slate-150 rounded-3xl p-3 shadow-xs flex flex-col max-h-[360px]">
+            <div className="w-full flex items-center justify-between mb-2 flex-shrink-0">
+              <span className="text-[10px] font-black text-slate-700">قائمة الفساتين ({filteredDresses.length})</span>
             </div>
-          )}
+            {/* Live Search Input Box */}
+            <div className="w-full relative mb-2 flex-shrink-0">
+              <input
+                type="text"
+                placeholder="بحث بالاسم أو الكود..."
+                value={dressSearch}
+                onChange={(e) => setDressSearch(e.target.value)}
+                className="w-full pr-7 pl-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-slate-700 placeholder:text-slate-400"
+              />
+              <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+            </div>
+
+            {/* Scrollable Dress Cards List */}
+            <div className="w-full flex flex-col gap-1.5 overflow-y-auto pr-0.5 p-0.5 scrollbar-thin select-none flex-grow min-h-0">
+              {filteredDresses.length === 0 ? (
+                <div className="text-[10px] text-slate-400 font-bold text-center py-4">
+                  لا توجد فساتين مطابقة
+                </div>
+              ) : (
+                filteredDresses.map((d) => {
+                  const isActive = selectedDressId === d.id;
+                  const imageUrl = getStorageUrl(d.image_path || d.images?.[0]?.image_path);
+                  const stageBadge = {
+                    'ready': { label: 'جاهز', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                    'booked': { label: 'محجوز', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    'dry_clean': { label: 'دراي كلين', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+                  }[d.current_stage] || { label: '—', color: 'bg-slate-50 text-slate-500 border-slate-200' };
+
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => setSelectedDressId(d.id)}
+                      className={`w-full flex items-center gap-2 p-1.5 rounded-xl border text-right transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-violet-50/90 border-violet-500 shadow-2xs ring-1 ring-violet-500/30'
+                          : 'bg-white border-slate-150 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="w-8 h-10 rounded-lg overflow-hidden border border-slate-200 flex-shrink-0 bg-slate-50">
+                        {imageUrl ? (
+                          <img src={imageUrl} alt={d.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Sparkles size={11} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9.5px] font-black text-slate-800 truncate block leading-tight">{d.name}</span>
+                        {d.code && (
+                          <span className="text-[7.5px] font-mono text-slate-400 font-bold block mt-0.5">#{d.code}</span>
+                        )}
+                      </div>
+                      <span className={`text-[7px] font-extrabold px-1.5 py-0.2 rounded border ${stageBadge.color} flex-shrink-0`}>
+                        {stageBadge.label}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Expanded Wide Dress Lifecycle Card */}
+          <div className="col-span-12 sm:col-span-8 lg:col-span-9">
+            {selectedDress ? (
+              <DressLifecycleCard
+                key={selectedDress.id}
+                dress={selectedDress}
+                onStageUpdate={() => { fetchDresses(); fetchBrides(); }}
+              />
+            ) : (
+              <div className="h-[200px] border border-dashed rounded-3xl bg-white flex items-center justify-center p-6 text-slate-300 font-bold text-xs">
+                حدد فستان لعرض حالته ومسار حركته
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

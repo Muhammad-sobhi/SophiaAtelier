@@ -157,13 +157,10 @@ export default function DashboardLayout() {
           fixed inset-y-0 right-0 z-50 transform md:relative md:translate-x-0 transition-transform duration-300 ease-in-out flex-shrink-0
           ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
         `}>
-          {/* Overlay for mobile sidebar */}
-          {isSidebarOpen && (
-            <div 
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs md:hidden z-[-1]" 
-            />
-          )}
+          <div 
+            onClick={() => setIsSidebarOpen(false)}
+            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs md:hidden z-[-1] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+          />
           <Sidebar onClose={() => setIsSidebarOpen(false)} />
         </div>
 

@@ -131,10 +131,7 @@ export function Sidebar({ onClose }) {
                   'bg-indigo-50/90 text-indigo-600 shadow-xs' :
                   'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`
                   }>
-                  
-                  {isActive && (
-                    <div key="active-bar" className="absolute right-0 top-1/4 bottom-1/4 w-1 bg-indigo-600 rounded-l-md" />
-                  )}
+                  <span className={`absolute right-0 top-1/4 bottom-1/4 w-1 bg-indigo-600 rounded-l-md transition-opacity ${isActive ? 'opacity-100' : 'opacity-0'}`} />
                   <Icon size={18} className={isActive ? 'text-indigo-600' : 'text-slate-400'} />
                   <span className="truncate">{item.label}</span>
                 </Link>

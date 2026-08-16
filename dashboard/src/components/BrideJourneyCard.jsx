@@ -1226,7 +1226,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
           <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
-            متابعة رحلة العروس: <span className="text-indigo-650">{bride?.name}</span>
+            <span>متابعة رحلة العروس: </span>
+            <span className="text-indigo-650">{bride?.name}</span>
           </h3>
         </div>
         <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
@@ -1236,9 +1237,11 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
       {/* Desktop Grid containing 5 Columns */}
       <div className="hidden md:grid md:grid-cols-5 gap-4">
-        {STAGES.map((stage) =>
-          renderColumn(stage.id, stage.label, stage.icon, stage.color)
-        )}
+        {STAGES.map((stage) => (
+          <React.Fragment key={stage.id}>
+            {renderColumn(stage.id, stage.label, stage.icon, stage.color)}
+          </React.Fragment>
+        ))}
       </div>
 
       {/* Payment Popup Modal */}

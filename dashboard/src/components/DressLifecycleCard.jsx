@@ -58,61 +58,71 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
     const isActive = dress?.current_stage === stageId;
 
     return (
-      <div key={stageId} className="flex flex-col space-y-3">
-        <div className={`p-2.5 rounded-xl border border-slate-100 font-extrabold text-[11px] text-center ${colorClasses}`}>
+      <div key={stageId} className="flex flex-col space-y-2">
+        <div className={`py-1.5 px-2.5 rounded-xl border border-slate-100 font-extrabold text-[10px] text-center ${colorClasses}`}>
           {label}
         </div>
 
-        <div className="flex-1 min-h-[220px]">
+        <div className="flex-1 min-h-[140px]">
           {isActive ? (
-            <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative transition-all duration-300 hover:shadow-md">
-              <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 mb-3.5">
-                {imageUrl ? (
-                  <img src={imageUrl} alt={dress.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Sparkles size={24} className="text-slate-300" />
-                  </div>
-                )}
+            <div className="bg-white rounded-2xl border border-slate-150 p-2.5 shadow-xs relative transition-all duration-300 hover:shadow-md flex flex-col justify-between h-full">
+              <div className="flex items-start gap-2.5 mb-2">
+                {/* Thumbnail */}
+                <div className="relative w-14 h-18 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex-shrink-0">
+                  {imageUrl ? (
+                    <img src={imageUrl} alt={dress.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Sparkles size={16} className="text-slate-300" />
+                    </div>
+                  )}
 
-                {dress.trying_fee > 0 && (
-                  <div className="absolute top-2 right-2 bg-rose-600/90 text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-sm">
-                    رسوم قياس: {dress.trying_fee.toLocaleString()} ج.م
-                  </div>
-                )}
-              </div>
-
-              <div className="mb-3">
-                <h4 className="text-xs font-black text-slate-800 mb-0.5">{dress.name}</h4>
-                {dress.designer && (
-                  <span className="text-[10px] font-bold text-slate-400">الديزاينر: {dress.designer}</span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-[10px] font-extrabold text-slate-650 mb-3.5">
-                <div className="flex items-center gap-1.5">
-                  <Ruler size={10} className="text-slate-400" />
-                  <span>مقاس: {dress.size || '—'}</span>
+                  {dress.trying_fee > 0 && (
+                    <div className="absolute top-0.5 right-0.5 bg-rose-600/90 text-white text-[6.5px] font-black px-1 py-0.2 rounded shadow-2xs">
+                      رسوم قياس
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <DollarSign size={10} className="text-slate-400" />
-                  <span>إيجار: {parseFloat(dress.rental_price || 0).toLocaleString()} ج.م</span>
-                </div>
-                {dress.latest_booking_client && (
-                  <div className="col-span-2 text-[9px] text-slate-500 font-bold bg-slate-50 rounded-lg p-1.5 border border-slate-100 mt-1">
-                    العميلة: {dress.latest_booking_client}
+
+                {/* Info Block */}
+                <div className="flex-1 min-w-0 text-right space-y-0.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <h4 className="text-xs font-black text-slate-800 truncate leading-tight">{dress.name}</h4>
+                    {dress.code && (
+                      <span className="text-[7.5px] font-mono font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1 py-0.2 rounded flex-shrink-0">
+                        #{dress.code}
+                      </span>
+                    )}
                   </div>
-                )}
+                  {dress.designer && (
+                    <span className="text-[8.5px] font-bold text-slate-400 block truncate">المصمم: {dress.designer}</span>
+                  )}
+                  <div className="flex items-center gap-2 text-[8.5px] font-extrabold text-slate-600 flex-wrap pt-0.5">
+                    <div className="flex items-center gap-0.5">
+                      <Ruler size={9} className="text-slate-400" />
+                      <span>مقاس: {dress.size || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 text-indigo-650">
+                      <DollarSign size={9} className="text-indigo-400" />
+                      <span>إيجار: {parseFloat(dress.rental_price || 0).toLocaleString()} ج.م</span>
+                    </div>
+                  </div>
+                  {dress.latest_booking_client && (
+                    <div className="text-[8px] text-slate-600 font-bold bg-slate-50 rounded-lg px-1.5 py-0.5 border border-slate-150 truncate mt-1">
+                      العميلة: {dress.latest_booking_client}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {actions.length > 0 && (
-                <div className="flex flex-col gap-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100">
                   {actions.map((act) => (
                     <button
                       key={act.action}
                       onClick={() => act.action && handleStageAction(act.action)}
                       disabled={act.disabled}
-                      className={`w-full py-2.5 text-white rounded-xl text-[10px] font-extrabold transition-all duration-300 active:scale-95 cursor-pointer shadow-xs ${act.color}`}
+                      className={`flex-1 py-1.5 text-white rounded-xl text-[9px] font-extrabold transition-all duration-300 active:scale-95 cursor-pointer shadow-2xs ${act.color}`}
                     >
                       {act.label}
                     </button>
@@ -121,8 +131,8 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
               )}
             </div>
           ) : (
-            <div className="h-full border border-dashed border-slate-200/60 rounded-2xl flex items-center justify-center bg-slate-50/20 p-4 min-h-[220px]">
-              <span className="text-[10px] font-bold text-slate-300">—</span>
+            <div className="h-full border border-dashed border-slate-200/70 rounded-2xl flex items-center justify-center bg-slate-50/20 p-2 min-h-[140px]">
+              <span className="text-[9px] font-bold text-slate-300">—</span>
             </div>
           )}
         </div>
@@ -131,9 +141,9 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
   };
 
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-100 p-4 sm:p-6 shadow-xs animate-fade-in h-full" dir="rtl">
+    <div className="bg-white rounded-3xl border border-slate-150 p-3 sm:p-4 shadow-xs animate-fade-in h-full" dir="rtl">
       {/* Mobile Stage Selector Tabs */}
-      <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-3 mb-4 border-b border-slate-100 scrollbar-none">
+      <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-2 mb-3 border-b border-slate-100 scrollbar-none">
         {DRESS_STAGES.map((s) => {
           const isSelected = selectedMobileStage === s.id;
           const isCurrentStage = dress?.current_stage === s.id;
@@ -157,17 +167,17 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
       </div>
 
       {/* Desktop Grid containing 3 Columns */}
-      <div className="hidden md:grid md:grid-cols-3 gap-6 text-right">
-        {renderColumn('ready', 'جاهز (جاهز للاستخدام)', 'border-emerald-100 bg-emerald-50/30 text-emerald-700')}
-        {renderColumn('booked', 'محجوز (محجوز / مستأجر)', 'border-blue-100 bg-blue-50/30 text-blue-700')}
-        {renderColumn('dry_clean', 'دراي كلين (تنظيف / صيانة)', 'border-purple-100 bg-purple-50/30 text-purple-700')}
+      <div className="hidden md:grid md:grid-cols-3 gap-3 text-right">
+        {renderColumn('ready', 'جاهز (جاهز للاستخدام)', 'border-emerald-100 bg-emerald-50/40 text-emerald-700')}
+        {renderColumn('booked', 'محجوز (محجوز / مستأجر)', 'border-blue-100 bg-blue-50/40 text-blue-700')}
+        {renderColumn('dry_clean', 'دراي كلين (تنظيف / صيانة)', 'border-purple-100 bg-purple-50/40 text-purple-700')}
       </div>
 
       {/* Mobile Single Selected Stage Display */}
       <div className="block md:hidden text-right">
-        {selectedMobileStage === 'ready' && renderColumn('ready', 'جاهز (جاهز للاستخدام)', 'border-emerald-100 bg-emerald-50/30 text-emerald-700')}
-        {selectedMobileStage === 'booked' && renderColumn('booked', 'محجوز (محجوز / مستأجر)', 'border-blue-100 bg-blue-50/30 text-blue-700')}
-        {selectedMobileStage === 'dry_clean' && renderColumn('dry_clean', 'دراي كلين (تنظيف / صيانة)', 'border-purple-100 bg-purple-50/30 text-purple-700')}
+        {selectedMobileStage === 'ready' && renderColumn('ready', 'جاهز (جاهز للاستخدام)', 'border-emerald-100 bg-emerald-50/40 text-emerald-700')}
+        {selectedMobileStage === 'booked' && renderColumn('booked', 'محجوز (محجوز / مستأجر)', 'border-blue-100 bg-blue-50/40 text-blue-700')}
+        {selectedMobileStage === 'dry_clean' && renderColumn('dry_clean', 'دراي كلين (تنظيف / صيانة)', 'border-purple-100 bg-purple-50/40 text-purple-700')}
       </div>
     </div>
   );
