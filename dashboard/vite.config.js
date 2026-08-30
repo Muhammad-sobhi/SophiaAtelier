@@ -8,7 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'react/jsx-dev-runtime': path.resolve(__dirname, './src/jsx-dev-runtime-shim.js'),
     },
   },
 })

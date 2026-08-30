@@ -243,6 +243,7 @@ class ClientController extends Controller
             'amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:50',
             'payments' => 'nullable|array',
+            'insurance_payments' => 'nullable|array',
             'sales_name' => 'nullable|string|max:255',
             'is_override' => 'nullable|boolean',
             'force_override' => 'nullable|boolean',
@@ -633,6 +634,37 @@ class ClientController extends Controller
                                 'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
                                 'receipt_path' => $receiptPath,
                             ]);
+                        }
+                    }
+
+                    // Handle insurance payments if provided
+                    $insurancePayments = $request->input('insurance_payments');
+                    if (is_array($insurancePayments) && count($insurancePayments) > 0) {
+                        $totalInsurance = 0;
+                        foreach ($insurancePayments as $ip) {
+                            $iAmt = floatval($ip['amount'] ?? 0);
+                            $iMethod = $ip['payment_method'] ?? 'cash';
+                            $iReceipt = !empty($ip['receipt_image'])
+                                ? self::saveReceiptData($ip['receipt_image'])
+                                : (!empty($ip['receipt']) ? self::saveReceiptData($ip['receipt']) : null);
+
+                            if ($iAmt > 0) {
+                                \App\Models\Revenue::create([
+                                    'booking_id' => $booking->id,
+                                    'type' => 'security_deposit',
+                                    'amount' => $iAmt,
+                                    'payment_method' => $iMethod,
+                                    'payment_date' => now()->toDateString(),
+                                    'notes' => 'تأمين مسترد للعروس: ' . $client->name . ' (يُسترد عند إعادة الفستان)',
+                                    'receipt_path' => $iReceipt,
+                                ]);
+                                $totalInsurance += $iAmt;
+                            }
+                        }
+                        // Update booking's insurance_amount if it differs
+                        if ($totalInsurance > 0) {
+                            $booking->insurance_amount = $totalInsurance;
+                            $booking->save();
                         }
                     }
                 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
-import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard } from 'lucide-react';
+import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard, LayoutGrid, User, Clock, CheckCircle2, AlertCircle, PhoneCall, ChevronRight, ChevronLeft, Sparkles, MessageCircle, Eye, Tag, Filter } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 
 const BRIDE_STAGES = [
@@ -203,11 +203,32 @@ export default function BridesPage() {
   const [payRemainingReceiptPreview, setPayRemainingReceiptPreview] = useState(null);
   const [payRemainingNotes, setPayRemainingNotes] = useState('');
   const [isSubmittingPayRemaining, setIsSubmittingPayRemaining] = useState(false);
+  // Insurance states (within pay remaining modal)
+  const [insuranceEnabled, setInsuranceEnabled] = useState(false);
+  const [insuranceAmount, setInsuranceAmount] = useState('5000');
+  const [insurancePayments, setInsurancePayments] = useState([{ amount: '5000', payment_method: 'cash', receipt_image: null }]);
+
+  // Booked Dresses Modal
+  const [isBookedDressesModalOpen, setIsBookedDressesModalOpen] = useState(false);
+  const [bookedDressesSearch, setBookedDressesSearch] = useState('');
+  const [bookedDressesMonthFilter, setBookedDressesMonthFilter] = useState('all');
+  const [bookedDressesDateFilter, setBookedDressesDateFilter] = useState('');
+  const [bookedDressesDateType, setBookedDressesDateType] = useState('wedding');
+  const [bookedDressesPage, setBookedDressesPage] = useState(1);
+  const [bookedDressesPerPage, setBookedDressesPerPage] = useState(9);
+  const bookedDressesScrollRef = React.useRef(null);
+
+  useEffect(() => {
+    setBookedDressesPage(1);
+  }, [bookedDressesSearch, bookedDressesMonthFilter, bookedDressesDateFilter, bookedDressesDateType, bookedDressesPerPage]);
 
   const handleOpenPayRemaining = (bride) => {
     const booking = bride.bookings?.[0];
     const totalPaid = booking?.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) ?? parseFloat(booking?.deposit_amount || 0);
     const remaining = booking ? Math.max(0, parseFloat(booking?.total_amount || 0) - totalPaid) : 0;
+    const defaultIns = (booking?.insurance_amount && parseFloat(booking.insurance_amount) > 0)
+      ? booking.insurance_amount.toString()
+      : '5000';
     setSelectedBrideForPayRemaining(bride);
     setExpectedRemainingAmount(remaining);
     setPayRemainingAmount(remaining.toString());
@@ -216,6 +237,9 @@ export default function BridesPage() {
     setPayRemainingReceipt(null);
     setPayRemainingReceiptPreview(null);
     setPayRemainingNotes('');
+    setInsuranceEnabled(false);
+    setInsuranceAmount(defaultIns);
+    setInsurancePayments([{ amount: defaultIns, payment_method: 'cash', receipt_image: null }]);
     setIsPayRemainingModalOpen(true);
   };
 
@@ -241,13 +265,22 @@ export default function BridesPage() {
         });
       }
 
+      const validInsPayments = insuranceEnabled
+        ? insurancePayments.filter(p => parseFloat(p.amount) > 0)
+        : [];
+      const totalInsAmt = validInsPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
       await apiClient.put(`/clients/${selectedBrideForPayRemaining.id}/stage-action`, {
         action: 'pay_remaining',
         amount: totalAmt,
         payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : payRemainingMethod),
         payments: validPayments,
         notes: payRemainingNotes,
-        receipt: receiptBase64
+        receipt: receiptBase64,
+        ...(insuranceEnabled && validInsPayments.length > 0 && {
+          insurance_amount: totalInsAmt,
+          insurance_payments: validInsPayments,
+        }),
       });
 
       setIsPayRemainingModalOpen(false);
@@ -1008,9 +1041,20 @@ export default function BridesPage() {
   }, [bridesList]);
 
   const filteredBrides = bridesList.filter((b) => {
+    const q = searchQuery.toLowerCase().trim();
+    const cleanQ = q.replace(/\//g, '-');
+    const weddingDateStr = String(b.wedding_date || '');
+    const formattedWeddingDate = formatDate(b.wedding_date);
+
     const matchesSearch =
-      b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b.phone && b.phone.includes(searchQuery));
+      !q ||
+      b.name.toLowerCase().includes(q) ||
+      (b.phone && b.phone.includes(q)) ||
+      (b.phone2 && b.phone2.includes(q)) ||
+      (b.city && b.city.toLowerCase().includes(q)) ||
+      (b.address && b.address.toLowerCase().includes(q)) ||
+      weddingDateStr.includes(cleanQ) ||
+      formattedWeddingDate.includes(cleanQ);
 
     let matchesMonth = true;
     if (selectedWeddingMonth !== 'all') {
@@ -1031,6 +1075,272 @@ export default function BridesPage() {
 
     return matchesSearch && matchesMonth;
   });
+
+  // All active booked dresses collected from all brides in bridesList
+  const allBookedDressesList = React.useMemo(() => {
+    const dresses = [];
+
+    bridesList.forEach((bride) => {
+      // Exclude brides who already returned their dress
+      if (bride.current_stage === 'returned') return;
+
+      const bookings = Array.isArray(bride.bookings) && bride.bookings.length > 0 ? bride.bookings : [];
+      bookings.forEach((booking) => {
+        if (booking.status === 'returned' || booking.status === 'cancelled') return;
+
+        const eventDate = booking.event_date || bride.wedding_date || '';
+
+        const getDress = (dressObj, dressId, fallbackName) => {
+          if (dressObj && typeof dressObj === 'object' && Object.keys(dressObj).length > 0) return dressObj;
+          if (dressId) {
+            const found = dressesList.find((d) => String(d.id) === String(dressId));
+            if (found) return found;
+          }
+          if (fallbackName) {
+            return { id: dressId || 'unknown', name: fallbackName, code: '' };
+          }
+          return null;
+        };
+
+        // Dress 1
+        const d1 = getDress(booking.dress, booking.dress_id, bride.latest_dress_name || 'فستان 1');
+        if (d1) {
+          dresses.push({
+            id: `b-${booking.id || 'x'}-d1-${d1.id || '1'}`,
+            dress: d1,
+            bride,
+            booking,
+            eventDate,
+            slot: 'فستان 1'
+          });
+        }
+
+        // Dress 2
+        const d2 = getDress(booking.dress2, booking.dress_2_id, null);
+        if (d2) {
+          dresses.push({
+            id: `b-${booking.id || 'x'}-d2-${d2.id || '2'}`,
+            dress: d2,
+            bride,
+            booking,
+            eventDate,
+            slot: 'فستان 2 (إضافي)'
+          });
+        }
+
+        // Dress 3
+        const d3 = getDress(booking.dress3, booking.dress_3_id, null);
+        if (d3) {
+          dresses.push({
+            id: `b-${booking.id || 'x'}-d3-${d3.id || '3'}`,
+            dress: d3,
+            bride,
+            booking,
+            eventDate,
+            slot: 'فستان 3 (إضافي)'
+          });
+        }
+      });
+    });
+
+    return dresses.sort((a, b) => {
+      if (!a.eventDate) return 1;
+      if (!b.eventDate) return -1;
+      return new Date(a.eventDate) - new Date(b.eventDate);
+    });
+  }, [bridesList, dressesList]);
+
+  // Pre-month-filtered list: applies date picker + text search but NOT month chip
+  // Used to compute accurate per-month counts that reflect active filters
+  const bookedDressesPreMonthFiltered = React.useMemo(() => {
+    return allBookedDressesList.filter((item) => {
+      // Date picker filter
+      if (bookedDressesDateFilter) {
+        const targetDate = bookedDressesDateFilter;
+        let eventDateIso = '';
+        if (item.eventDate) {
+          try {
+            const d = new Date(item.eventDate);
+            if (!isNaN(d.getTime())) {
+              eventDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+          } catch {}
+        }
+        let bookingDateIso = '';
+        const bDate = item.booking?.booking_date || item.booking?.created_at;
+        if (bDate) {
+          try {
+            const d = new Date(bDate);
+            if (!isNaN(d.getTime())) {
+              bookingDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+          } catch {}
+        }
+        if (bookedDressesDateType === 'wedding') {
+          if (eventDateIso !== targetDate) return false;
+        } else if (bookedDressesDateType === 'booking') {
+          if (bookingDateIso !== targetDate) return false;
+        } else {
+          if (eventDateIso !== targetDate && bookingDateIso !== targetDate) return false;
+        }
+      }
+      // Text search filter
+      if (bookedDressesSearch.trim()) {
+        const q = bookedDressesSearch.toLowerCase().trim();
+        const cleanQ = q.replace(/\//g, '-');
+        const eventDateStr = String(item.eventDate || '');
+        const bookingDateStr = String(item.booking?.booking_date || item.booking?.created_at || '');
+        const dateMatch =
+          eventDateStr.includes(cleanQ) ||
+          bookingDateStr.includes(cleanQ) ||
+          formatDate(item.eventDate).includes(cleanQ) ||
+          formatDate(item.booking?.booking_date || item.booking?.created_at).includes(cleanQ);
+        return (
+          String(item.dress?.name || '').toLowerCase().includes(q) ||
+          String(item.dress?.code || '').toLowerCase().includes(q) ||
+          String(item.bride?.name || '').toLowerCase().includes(q) ||
+          String(item.bride?.phone || '').toLowerCase().includes(q) ||
+          String(item.bride?.phone2 || '').toLowerCase().includes(q) ||
+          String(item.bride?.city || item.bride?.address || '').toLowerCase().includes(q) ||
+          String(item.booking?.sales_name || '').toLowerCase().includes(q) ||
+          String(item.booking?.notes || '').toLowerCase().includes(q) ||
+          dateMatch
+        );
+      }
+      return true;
+    });
+  }, [allBookedDressesList, bookedDressesDateFilter, bookedDressesDateType, bookedDressesSearch]);
+
+  // Unique month filters — counts reflect active date picker + search (not month chip itself)
+  const bookedDressesMonthsOptions = React.useMemo(() => {
+    const monthsMap = new Map();
+    bookedDressesPreMonthFiltered.forEach((item) => {
+      if (item.eventDate) {
+        try {
+          const d = new Date(item.eventDate);
+          if (!isNaN(d.getTime())) {
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            monthsMap.set(key, (monthsMap.get(key) || 0) + 1);
+          }
+        } catch {}
+      }
+    });
+    return Array.from(monthsMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, count]) => {
+        const [y, m] = key.split('-');
+        const date = new Date(parseInt(y), parseInt(m) - 1, 1);
+        const label = date.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+        return { key, label, count };
+      });
+  }, [bookedDressesPreMonthFiltered]);
+
+  // Filtered booked dresses across ALL dresses in the atelier
+  const filteredBookedDresses = React.useMemo(() => {
+    return allBookedDressesList.filter((item) => {
+      // 1. Exact Date filter (Picker)
+      if (bookedDressesDateFilter) {
+        const targetDate = bookedDressesDateFilter; // "YYYY-MM-DD"
+        
+        let eventDateIso = '';
+        if (item.eventDate) {
+          try {
+            const d = new Date(item.eventDate);
+            if (!isNaN(d.getTime())) {
+              eventDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+          } catch {}
+        }
+
+        let bookingDateIso = '';
+        const bDate = item.booking?.booking_date || item.booking?.created_at;
+        if (bDate) {
+          try {
+            const d = new Date(bDate);
+            if (!isNaN(d.getTime())) {
+              bookingDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+          } catch {}
+        }
+
+        if (bookedDressesDateType === 'wedding') {
+          if (eventDateIso !== targetDate) return false;
+        } else if (bookedDressesDateType === 'booking') {
+          if (bookingDateIso !== targetDate) return false;
+        } else {
+          // 'all' / either
+          if (eventDateIso !== targetDate && bookingDateIso !== targetDate) return false;
+        }
+      }
+
+      // 2. Month filter
+      if (bookedDressesMonthFilter !== 'all') {
+        if (!item.eventDate) return false;
+        try {
+          const d = new Date(item.eventDate);
+          if (isNaN(d.getTime())) return false;
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          if (key !== bookedDressesMonthFilter) return false;
+        } catch {
+          return false;
+        }
+      }
+
+      // 3. Search query filter - searches across ALL fields including dates
+      if (bookedDressesSearch.trim()) {
+        const q = bookedDressesSearch.toLowerCase().trim();
+        const cleanQ = q.replace(/\//g, '-');
+        const dName = String(item.dress?.name || '').toLowerCase();
+        const dCode = String(item.dress?.code || '').toLowerCase();
+        const bName = String(item.bride?.name || '').toLowerCase();
+        const bPhone = String(item.bride?.phone || '').toLowerCase();
+        const bPhone2 = String(item.bride?.phone2 || '').toLowerCase();
+        const bCity = String(item.bride?.city || item.bride?.address || '').toLowerCase();
+        const salesName = String(item.booking?.sales_name || '').toLowerCase();
+        const notes = String(item.booking?.notes || '').toLowerCase();
+        
+        // Date search in text
+        const eventDateStr = String(item.eventDate || '');
+        const bookingDateStr = String(item.booking?.booking_date || item.booking?.created_at || '');
+        const formattedEventDate = formatDate(item.eventDate);
+        const formattedBookingDate = formatDate(item.booking?.booking_date || item.booking?.created_at);
+
+        const dateMatch =
+          eventDateStr.includes(cleanQ) ||
+          bookingDateStr.includes(cleanQ) ||
+          formattedEventDate.includes(cleanQ) ||
+          formattedBookingDate.includes(cleanQ);
+
+        return (
+          dName.includes(q) ||
+          dCode.includes(q) ||
+          bName.includes(q) ||
+          bPhone.includes(q) ||
+          bPhone2.includes(q) ||
+          bCity.includes(q) ||
+          salesName.includes(q) ||
+          notes.includes(q) ||
+          dateMatch
+        );
+      }
+
+      return true;
+    });
+  }, [allBookedDressesList, bookedDressesMonthFilter, bookedDressesSearch, bookedDressesDateFilter, bookedDressesDateType]);
+
+  // Pagination for Booked Dresses Modal
+  const totalBookedDressesPages = bookedDressesPerPage === 'all'
+    ? 1
+    : Math.ceil(filteredBookedDresses.length / Number(bookedDressesPerPage)) || 1;
+
+  const paginatedBookedDresses = React.useMemo(() => {
+    if (bookedDressesPerPage === 'all') return filteredBookedDresses;
+    const perPage = Number(bookedDressesPerPage);
+    const start = (bookedDressesPage - 1) * perPage;
+    return filteredBookedDresses.slice(start, start + perPage);
+  }, [filteredBookedDresses, bookedDressesPage, bookedDressesPerPage]);
+
+
 
   const activeBrides = filteredBrides.filter((b) => b.current_stage !== 'returned');
   const previousBrides = filteredBrides.filter((b) => b.current_stage === 'returned');
@@ -1542,6 +1852,19 @@ export default function BridesPage() {
             </button>
           ))}
         </div>
+        
+        <button
+          onClick={() => {
+            setBookedDressesMonthFilter(selectedWeddingMonth);
+            setBookedDressesSearch('');
+            setBookedDressesPage(1);
+            setIsBookedDressesModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all flex-shrink-0 whitespace-nowrap cursor-pointer active:scale-95 shadow-xs"
+        >
+          <LayoutGrid size={16} />
+          <span>الفساتين المحجوزة ({allBookedDressesList.length})</span>
+        </button>
       </div>
 
       {/* Active Brides Section */}
@@ -3190,6 +3513,72 @@ export default function BridesPage() {
                 required
               />
 
+              {/* ── Insurance Section ── */}
+              <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${insuranceEnabled ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-slate-50/60'}`}>
+                {/* Toggle header */}
+                <button
+                  type="button"
+                  onClick={() => setInsuranceEnabled(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-colors ${insuranceEnabled ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-400 group-hover:bg-amber-100 group-hover:text-amber-600'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <span className={`text-[11px] font-extrabold transition-colors ${insuranceEnabled ? 'text-amber-700' : 'text-slate-600 group-hover:text-amber-700'}`}>
+                      تأمين مسترد (اختياري)
+                    </span>
+                    {insuranceEnabled && (
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                        يُسترد عند إعادة الفستان
+                      </span>
+                    )}
+                  </div>
+                  <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5 ${insuranceEnabled ? 'bg-amber-500 justify-end' : 'bg-slate-300 justify-start'}`}>
+                    <div className="w-3 h-3 bg-white rounded-full shadow-sm" />
+                  </div>
+                </button>
+
+                {/* Expanded insurance form */}
+                {insuranceEnabled && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-amber-200/60">
+                    {/* Amount row */}
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <div className="relative w-36 flex-shrink-0">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={insuranceAmount}
+                          onChange={(e) => {
+                            setInsuranceAmount(e.target.value);
+                            setInsurancePayments(prev =>
+                              prev.map((p, i) => i === 0 ? { ...p, amount: e.target.value } : p)
+                            );
+                          }}
+                          className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-amber-200 rounded-lg text-xs font-black text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-400 text-left font-mono"
+                        />
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-slate-400 pointer-events-none">ج.م</span>
+                      </div>
+                      <label className="text-[10px] font-extrabold text-amber-700">مبلغ التأمين</label>
+                    </div>
+
+                    {/* Payment method + receipt rows */}
+                    <MultiPaymentMethodInput
+                      payments={insurancePayments}
+                      onChange={(updated) => {
+                        setInsurancePayments(updated);
+                        const total = updated.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                        setInsuranceAmount(total.toString());
+                      }}
+                      totalExpected={parseFloat(insuranceAmount) || 0}
+                      label="طريقة سداد التأمين"
+                      required={false}
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[10px] font-extrabold text-slate-700 block">ملاحظات إضافية (اختياري)</label>
                 <input
@@ -3339,6 +3728,543 @@ export default function BridesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Booked Dresses Modal */}
+      {isBookedDressesModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4 text-right overflow-y-auto" dir="rtl">
+          <div className="bg-white rounded-3xl w-full max-w-6xl border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col h-[90vh] max-h-[92vh] overflow-hidden my-auto">
+            {/* Header */}
+            <div className="p-3.5 sm:p-5 border-b border-slate-100 bg-slate-50/90 rounded-t-3xl flex-shrink-0 flex flex-col gap-3">
+              {/* Top Row: Title, Count, Close */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-xs flex-shrink-0">
+                    <LayoutGrid size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                      <span>الفساتين المحجوزة</span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-black">
+                        {filteredBookedDresses.length} {filteredBookedDresses.length === allBookedDressesList.length ? 'فستان' : `من أصل ${allBookedDressesList.length} فستان`}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-bold">
+                      عرض جميع الفساتين المحجوزة النشطة وتفاصيلها ومواعيد الزفاف
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setIsBookedDressesModalOpen(false);
+                    setBookedDressesSearch('');
+                    setBookedDressesDateFilter('');
+                    setBookedDressesPage(1);
+                  }}
+                  className="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all cursor-pointer shadow-xs"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Middle Row: Text Search Input & Date Search Picker */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                {/* Live Text Search */}
+                <div className="relative sm:col-span-7">
+                  <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={bookedDressesSearch}
+                    onChange={(e) => {
+                      setBookedDressesSearch(e.target.value);
+                      setBookedDressesPage(1);
+                    }}
+                    placeholder="بحث بالاسم، الكود، العروس، الهاتف، أو التاريخ (مثال: 15-08-2026)..."
+                    className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all shadow-2xs"
+                  />
+                  {bookedDressesSearch && (
+                    <button
+                      onClick={() => {
+                        setBookedDressesSearch('');
+                        setBookedDressesPage(1);
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Date Picker Input */}
+                <div className="sm:col-span-5 flex items-center gap-1.5">
+                  <div className="relative flex-1">
+                    <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={bookedDressesDateFilter}
+                      onChange={(e) => {
+                        setBookedDressesDateFilter(e.target.value);
+                        setBookedDressesPage(1);
+                      }}
+                      className="w-full pl-7 pr-8 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all shadow-2xs cursor-pointer"
+                      title="البحث بتاريخ محدد"
+                    />
+                    {bookedDressesDateFilter && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookedDressesDateFilter('');
+                          setBookedDressesPage(1);
+                        }}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 text-xs font-bold p-0.5 cursor-pointer"
+                        title="إلغاء فلتر التاريخ"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Date Target Selector (Wedding / Booking date) */}
+                  <select
+                    value={bookedDressesDateType}
+                    onChange={(e) => {
+                      setBookedDressesDateType(e.target.value);
+                      setBookedDressesPage(1);
+                    }}
+                    className="px-2 py-2 bg-white border border-slate-200 rounded-2xl text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-400 transition-all shadow-2xs cursor-pointer flex-shrink-0"
+                    title="نوع التاريخ المراد مطابقته"
+                  >
+                    <option value="wedding">موعد الزفاف 👰🏻‍♀️</option>
+                    <option value="booking">تاريخ الحجز 📅</option>
+                    <option value="all">أي تاريخ</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Quick Date Presets & Active Date Indicator */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 flex-shrink-0">
+                    <Clock size={11} className="text-slate-400" />
+                    اختصارات التاريخ:
+                  </span>
+                  
+                  {/* Today Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date();
+                      const y = today.getFullYear();
+                      const m = String(today.getMonth() + 1).padStart(2, '0');
+                      const d = String(today.getDate()).padStart(2, '0');
+                      const todayStr = `${y}-${m}-${d}`;
+                      setBookedDressesDateFilter(bookedDressesDateFilter === todayStr ? '' : todayStr);
+                      setBookedDressesPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-[10.5px] font-black transition-all cursor-pointer whitespace-nowrap ${
+                      bookedDressesDateFilter === new Date().toISOString().split('T')[0]
+                        ? 'bg-rose-600 text-white shadow-2xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80'
+                    }`}
+                  >
+                    اليوم
+                  </button>
+
+                  {/* Tomorrow Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      const y = tomorrow.getFullYear();
+                      const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+                      const d = String(tomorrow.getDate()).padStart(2, '0');
+                      const tomorrowStr = `${y}-${m}-${d}`;
+                      setBookedDressesDateFilter(bookedDressesDateFilter === tomorrowStr ? '' : tomorrowStr);
+                      setBookedDressesPage(1);
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-[10.5px] font-black bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    غداً
+                  </button>
+
+                  {/* Clear date if set */}
+                  {bookedDressesDateFilter && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookedDressesDateFilter('');
+                        setBookedDressesPage(1);
+                      }}
+                      className="px-2 py-1 rounded-xl text-[10px] font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <X size={11} />
+                      <span>مسح التاريخ المحدد ({formatDate(bookedDressesDateFilter)})</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Per Page Quick Selector */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[10px] font-bold text-slate-400">في الصفحة:</span>
+                  <select
+                    value={bookedDressesPerPage}
+                    onChange={(e) => {
+                      setBookedDressesPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value));
+                      setBookedDressesPage(1);
+                    }}
+                    className="bg-white border border-slate-200 rounded-xl px-2 py-1 text-[10.5px] font-bold text-slate-700 focus:outline-none focus:border-rose-400 cursor-pointer shadow-2xs"
+                  >
+                    <option value="6">6</option>
+                    <option value="9">9</option>
+                    <option value="12">12</option>
+                    <option value="24">24</option>
+                    <option value="all">عرض الكل</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Bottom Row: Month Selector Chips inside Modal */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 border-t border-slate-200/60 pt-2">
+                <button
+                  onClick={() => {
+                    setBookedDressesMonthFilter('all');
+                    setBookedDressesPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    bookedDressesMonthFilter === 'all'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+                  }`}
+                >
+                  <span>جميع الشهور</span>
+                  <span className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ${
+                    bookedDressesMonthFilter === 'all' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {allBookedDressesList.length}
+                  </span>
+                </button>
+
+                {bookedDressesMonthsOptions.map((m) => (
+                  <button
+                    key={`modal-m-${m.key}`}
+                    onClick={() => {
+                      setBookedDressesMonthFilter(m.key);
+                      setBookedDressesPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      bookedDressesMonthFilter === m.key
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+                    }`}
+                  >
+                    <span>{m.label}</span>
+                    <span className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ${
+                      bookedDressesMonthFilter === m.key ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {m.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Body Cards Container - SEPARATED SCROLLABLE WRAPPER & GRID */}
+            <div className="p-4 sm:p-6 overflow-y-auto min-h-0 flex-1 bg-slate-50/80 scrollbar-thin">
+              {paginatedBookedDresses.length === 0 ? (
+                <div className="py-16 flex flex-col items-center justify-center text-slate-400">
+                  <Package size={52} className="mb-3 opacity-20 text-slate-500" />
+                  <p className="text-sm font-extrabold text-slate-600">لا توجد فساتين محجوزة مطابقة لهذا الاختيار</p>
+                  <p className="text-xs text-slate-400 font-semibold mt-1">جرب اختيار "جميع الشهور" أو مسح عبارة البحث</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
+                  {paginatedBookedDresses.map((item, idx) => {
+                    const dress = item.dress || {};
+                    const bride = item.bride || {};
+                    const booking = item.booking || {};
+
+                    // Robust Image Resolution
+                    let rawImagePath = null;
+                    if (Array.isArray(dress.images) && dress.images.length > 0) {
+                      const primary = dress.images.find((img) => img.is_primary) || dress.images[0];
+                      rawImagePath = primary?.image_path || primary?.image || primary?.url;
+                    }
+                    if (!rawImagePath && dress.main_image) rawImagePath = dress.main_image;
+                    if (!rawImagePath && dress.image_path) rawImagePath = dress.image_path;
+                    if (!rawImagePath && dress.image) rawImagePath = dress.image;
+                    const imageUrl = rawImagePath ? getStorageUrl(rawImagePath) : 'https://placehold.co/400x500/f8fafc/94a3b8?text=No+Image';
+
+                    // Financial calculations
+                    const totalAmount = Number(booking.total_amount) || 0;
+                    const revenuesSum = Array.isArray(booking.revenues)
+                      ? booking.revenues.reduce((sum, rev) => sum + (Number(rev?.amount) || 0), 0)
+                      : 0;
+                    const deposit = Number(booking.deposit_amount) || 0;
+                    const totalPaid = revenuesSum > 0 ? revenuesSum : deposit;
+                    const remaining = Math.max(0, totalAmount - totalPaid);
+                    const isFullyPaid = totalAmount > 0 && remaining <= 0;
+
+                    return (
+                      <div
+                        key={item.id || `item-${idx}`}
+                        className="bg-white rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col overflow-hidden group"
+                      >
+                        {/* Image Header with Overlay Badges */}
+                        <div className="h-52 bg-slate-100 relative overflow-hidden flex-shrink-0">
+                          <img
+                            src={imageUrl}
+                            alt={dress.name || 'فستان'}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            onError={(e) => {
+                              e.target.src = 'https://placehold.co/400x500/f8fafc/94a3b8?text=No+Image';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent" />
+
+                          {/* Code Badge & Slot */}
+                          <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                            <span className="bg-white/95 backdrop-blur-md text-slate-800 font-black text-[10.5px] px-2.5 py-1 rounded-xl shadow-xs border border-white/50">
+                              كود: {dress.code || 'بدون كود'}
+                            </span>
+                            {item.slot && (
+                              <span className="bg-rose-600/90 backdrop-blur-md text-white font-black text-[9.5px] px-2 py-1 rounded-xl shadow-xs">
+                                {item.slot}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Stage Badge */}
+                          <div className="absolute top-2.5 left-2.5">
+                            <span className={`font-black text-[9.5px] px-2.5 py-1 rounded-xl backdrop-blur-md shadow-xs ${
+                              bride.current_stage === 'picked_up'
+                                ? 'bg-amber-500/90 text-white'
+                                : bride.current_stage === 'fitting'
+                                ? 'bg-purple-600/90 text-white'
+                                : 'bg-indigo-600/90 text-white'
+                            }`}>
+                              {bride.current_stage === 'picked_up' ? 'مستلم خارج الأتيليه' : bride.current_stage === 'fitting' ? 'غرفة القياس' : 'حجز مؤكد'}
+                            </span>
+                          </div>
+
+                          {/* Dress Name overlay */}
+                          <div className="absolute bottom-2.5 right-3 left-3 text-white">
+                            <h4 className="text-sm font-black line-clamp-1 drop-shadow-sm">{dress.name || 'فستان غير معروف'}</h4>
+                          </div>
+                        </div>
+
+                        {/* Card Details */}
+                        <div className="p-4 flex flex-col gap-3 flex-1 justify-between bg-white text-right">
+                          {/* Dates Grid */}
+                          <div className="grid grid-cols-2 gap-2 bg-slate-50/90 p-2.5 rounded-2xl border border-slate-100 text-xs">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <Clock size={11} className="text-slate-400" />
+                                تاريخ الحجز:
+                              </span>
+                              <span className="font-black text-slate-700 text-[11px]">
+                                {booking.booking_date || booking.created_at ? formatDate(booking.booking_date || booking.created_at) : 'غير مسجل'}
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
+                                <Calendar size={11} className="text-rose-500" />
+                                موعد الزفاف:
+                              </span>
+                              <span className="font-black text-rose-700 text-[11px]">
+                                {item.eventDate ? formatDate(item.eventDate) : 'غير محدد'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Payment Status Block */}
+                          <div className="p-3 rounded-2xl bg-indigo-50/40 border border-indigo-100/60 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10.5px] font-black text-indigo-950 flex items-center gap-1.5">
+                                <CreditCard size={12} className="text-indigo-600" />
+                                حالة السداد
+                              </span>
+                              {isFullyPaid ? (
+                                <span className="text-[9.5px] font-black px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg flex items-center gap-1">
+                                  <CheckCircle2 size={11} />
+                                  خالص السداد
+                                </span>
+                              ) : remaining > 0 ? (
+                                <span className="text-[9.5px] font-black px-2 py-0.5 bg-amber-100 text-amber-800 rounded-lg flex items-center gap-1">
+                                  <AlertCircle size={11} />
+                                  متبقي {remaining.toLocaleString()} ج.م
+                                </span>
+                              ) : (
+                                <span className="text-[9.5px] font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded-lg">
+                                  غير محدد
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1 pt-1.5 text-center border-t border-indigo-100/40">
+                              <div>
+                                <div className="text-[9px] text-slate-400 font-bold">الإجمالي</div>
+                                <div className="text-[11px] font-black text-slate-700">{totalAmount.toLocaleString()} ج.م</div>
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-emerald-600 font-bold">المدفوع</div>
+                                <div className="text-[11px] font-black text-emerald-700">{totalPaid.toLocaleString()} ج.م</div>
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-rose-500 font-bold">المتبقي</div>
+                                <div className="text-[11px] font-black text-rose-700">{remaining.toLocaleString()} ج.م</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Bride Details Block */}
+                          <div className="pt-2.5 border-t border-slate-100 flex flex-col gap-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+                                  <User size={11} />
+                                </div>
+                                <span className="font-black text-slate-800 text-xs truncate max-w-[130px]">{bride.name || 'بدون اسم'}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                                <MapPin size={10} className="text-slate-400" />
+                                <span className="truncate max-w-[90px]">{bride.city || bride.address || 'غير محدد'}</span>
+                              </div>
+                            </div>
+
+                            {/* Phone Numbers with call/WhatsApp buttons */}
+                            <div className="flex items-center justify-between text-[11px] bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100">
+                              <div className="flex items-center gap-1.5 font-bold text-slate-700" dir="ltr">
+                                <Phone size={11} className="text-emerald-600" />
+                                <span>{bride.phone || 'لا يوجد رقم'}</span>
+                                {bride.phone2 && <span className="text-[9.5px] text-slate-400">/ {bride.phone2}</span>}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {bride.phone && (
+                                  <a
+                                    href={`https://wa.me/${bride.phone.replace(/[^\d]/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-md transition-colors"
+                                  >
+                                    واتساب
+                                  </a>
+                                )}
+                                {bride.phone && (
+                                  <a
+                                    href={`tel:${bride.phone}`}
+                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-md transition-colors"
+                                  >
+                                    اتصال
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white flex-shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="text-slate-500 font-bold text-[11px]">
+                  {filteredBookedDresses.length === 0 ? (
+                    'لا توجد نتائج'
+                  ) : bookedDressesPerPage === 'all' ? (
+                    `عرض جميع الـ ${filteredBookedDresses.length} فستان`
+                  ) : (
+                    `عرض ${(bookedDressesPage - 1) * Number(bookedDressesPerPage) + 1} - ${Math.min(bookedDressesPage * Number(bookedDressesPerPage), filteredBookedDresses.length)} من أصل ${filteredBookedDresses.length} فستان`
+                  )}
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[11px] font-semibold">لكل صفحة:</span>
+                  <select
+                    value={bookedDressesPerPage}
+                    onChange={(e) => {
+                      setBookedDressesPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value));
+                      setBookedDressesPage(1);
+                    }}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-400"
+                  >
+                    <option value="6">6</option>
+                    <option value="9">9</option>
+                    <option value="12">12</option>
+                    <option value="24">24</option>
+                    <option value="48">48</option>
+                    <option value="all">عرض الكل</option>
+                  </select>
+                </div>
+              </div>
+
+              {totalBookedDressesPages > 1 && bookedDressesPerPage !== 'all' && (
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={bookedDressesPage === 1}
+                    onClick={() => setBookedDressesPage(1)}
+                    className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-colors cursor-pointer"
+                    title="الصفحة الأولى"
+                  >
+                    «
+                  </button>
+                  <button
+                    disabled={bookedDressesPage === 1}
+                    onClick={() => setBookedDressesPage((p) => Math.max(1, p - 1))}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    السابق
+                  </button>
+
+                  {/* Page numbers with smart window */}
+                  {Array.from({ length: totalBookedDressesPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalBookedDressesPages || Math.abs(p - bookedDressesPage) <= 2)
+                    .map((p, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      return (
+                        <React.Fragment key={p}>
+                          {prev && p - prev > 1 && (
+                            <span className="px-1 text-slate-400 font-bold">...</span>
+                          )}
+                          <button
+                            onClick={() => setBookedDressesPage(p)}
+                            className={`w-7 h-7 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                              bookedDressesPage === p
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                  <button
+                    disabled={bookedDressesPage === totalBookedDressesPages}
+                    onClick={() => setBookedDressesPage((p) => Math.min(totalBookedDressesPages, p + 1))}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    التالي
+                  </button>
+                  <button
+                    disabled={bookedDressesPage === totalBookedDressesPages}
+                    onClick={() => setBookedDressesPage(totalBookedDressesPages)}
+                    className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-colors cursor-pointer"
+                    title="الصفحة الأخيرة"
+                  >
+                    »
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
