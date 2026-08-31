@@ -175,7 +175,7 @@ export function MultiPaymentMethodInput({
                         alt="إيصال"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <div className="absolute inset-0 bg-black/30 opacity-100 md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center transition-opacity">
                         <Eye size={10} className="text-white" />
                       </div>
                     </button>

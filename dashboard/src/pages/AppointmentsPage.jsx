@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -308,8 +309,8 @@ export default function AppointmentsPage() {
         if (client) {
           const dressName = client.dress_name || '';
           const message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${client.client_name}* 🤍،\nنشكركِ جداً على اختياركِ لفساتين صوفيا لمشاركتكِ فرحتكِ! 🥰🌸\n\nنود تأكيد استلام فستان زفافكِ *${dressName}* بحالة سليمة وجيدة اليوم، وتم إرجاع مبلغ التأمين بالكامل. 💰✔️\n\nسعدنا جداً بخدمتكِ وكونكِ إحدى جميلات فساتين صوفيا، ويسعدنا جداً مشاركتنا صور زفافكِ الجميلة بالفستان إذا رغبتِ! 📸👰🏻‍♀️🤍\n\nنتمنى لكِ حياة زوجية سعيدة ومليئة بالحب والفرح! ✨🎀`;
-          const cleanPhone = client.client_phone.replace(/[^\d]/g, '');
-          const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+          const cleanPhone = formatWhatsAppNumber(client.client_phone);
+          const whatsappUrl = `https://wa.me/${encodeURIComponent(cleanPhone)}?text=${encodeURIComponent(message)}`;
           window.open(whatsappUrl, '_blank');
         }
       }
@@ -344,8 +345,8 @@ export default function AppointmentsPage() {
 
         const message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${event.client_name}* 🤍،\nيسعدنا جداً تأكيد موعدكِ معنا لتجربة فستان أحلامكِ!\n\n📅 *تفاصيل الموعد:*\n• *التاريخ:* ${visitDate}\n• *الوقت:* ${visitTime}\n\n🌸 *شروط وقواعد فساتين صوفيا:*\n( مسموح ب دخول فردين فقط مع العروسه ladies only )\n(الدخول ب أولوية الحضور)\n• *رسوم التجربة والقياس:* ${tryingFeeVal}\n\nAddress ⤵️\nالتجمع الاول الياسمين ٢ \nفيلا 161 الباب الجانبي للفيلا بيكون شمال باب الفيلا (basement) \n⬅️اليافطه السودا161\n\nLocation📍\nhttps://maps.app.goo.gl/RUyaQk3v1rZR4gVC6\n\nنحن بانتظار تشريفكِ لتنيري المكان ✨🎀`;
 
-        const cleanPhone = event.client_phone.replace(/[^\d]/g, '');
-        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        const cleanPhone = formatWhatsAppNumber(event.client_phone);
+        const whatsappUrl = `https://wa.me/${encodeURIComponent(cleanPhone)}?text=${encodeURIComponent(message)}`;
 
         window.open(whatsappUrl, '_blank');
       }
@@ -457,9 +458,9 @@ export default function AppointmentsPage() {
       console.error('Failed to fetch whatsapp template:', err);
     }
 
-    const cleanPhone = (event.client_phone || '').replace(/[^\d]/g, '');
+    const cleanPhone = formatWhatsAppNumber(event.client_phone);
     if (cleanPhone) {
-      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/${encodeURIComponent(cleanPhone)}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
     }
   };

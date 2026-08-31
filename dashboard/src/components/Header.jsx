@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2 } from 'lucide-react';
+import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2, Settings, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/lib/api-client';import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
+import { apiClient } from '@/lib/api-client';
+import { formatWhatsAppNumber } from '@/lib/whatsapp';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
 
 const typeStyles = {
   info: { icon: Bell, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -35,11 +38,14 @@ export function Header({ onMenuClick }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const notifRef = useRef(null);
+  const profileRef = useRef(null);
   const searchRef = useRef(null);
   const searchTimerRef = useRef(undefined);
 
@@ -66,6 +72,9 @@ export function Header({ onMenuClick }) {
     function handleClickOutside(event) {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
       }
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowSearchResults(false);
@@ -267,7 +276,8 @@ export function Header({ onMenuClick }) {
     }
 
     if (phone) {
-      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      const formatted = formatWhatsAppNumber(phone);
+      const whatsappUrl = `https://wa.me/${encodeURIComponent(formatted)}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
     }
   };
@@ -283,7 +293,8 @@ export function Header({ onMenuClick }) {
     }
   };
 
-  return (/*#__PURE__*/
+  return (<>
+    {/*#__PURE__*/
     _jsxDEV("div", { className: "flex items-center justify-between py-3 px-3 sm:px-6 bg-white border-b border-slate-100 flex-shrink-0 select-none text-right", dir: "rtl", children: [/*#__PURE__*/
 
       _jsxDEV("div", { className: "flex items-center gap-2 sm:gap-3", children: [
@@ -413,7 +424,7 @@ export function Header({ onMenuClick }) {
                               {!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 flex-shrink-0"></span>}
                               <button
                                 onClick={(e) => deleteNotification(e, notif.id)}
-                                className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-rose-50"
+                                className="text-slate-400 hover:text-rose-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-rose-50"
                                 title="حذف الإشعار"
                               >
                                 <Trash2 size={13} />
@@ -449,19 +460,62 @@ export function Header({ onMenuClick }) {
 
 
         currentUser && /*#__PURE__*/
-        _jsxDEV("div", { className: "flex items-center gap-3 border-r border-slate-100 pr-4", children: [/*#__PURE__*/
-          _jsxDEV("div", { className: "text-right", children: [/*#__PURE__*/
-            _jsxDEV("h4", { className: "text-xs font-extrabold text-slate-800 leading-tight", children: currentUser.name }, void 0, false), /*#__PURE__*/
-            _jsxDEV("span", { className: "text-[9px] font-bold text-slate-400", children:
-              currentUser.role === 'admin' ? 'مدير النظام' : currentUser.role }, void 0, false
+        _jsxDEV("div", { className: "relative border-r border-slate-100 pr-4", ref: profileRef, children: [/*#__PURE__*/
+          _jsxDEV("button", {
+            onClick: () => setIsProfileDropdownOpen(!isProfileDropdownOpen),
+            className: "flex items-center gap-3 text-right hover:bg-slate-50 p-1.5 rounded-2xl transition-colors cursor-pointer", children: [/*#__PURE__*/
+            _jsxDEV("div", { className: "text-right", children: [/*#__PURE__*/
+              _jsxDEV("h4", { className: "text-xs font-extrabold text-slate-800 leading-tight", children: currentUser.name }, void 0, false), /*#__PURE__*/
+              _jsxDEV("span", { className: "text-[9px] font-bold text-slate-400", children:
+                currentUser.role === 'admin' ? 'مدير النظام' : currentUser.role }, void 0, false
+              )] }, void 0, true
+            ), /*#__PURE__*/
+            _jsxDEV("div", { className: "w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-xs shadow-sm", children:
+              currentUser.name?.charAt(0) || 'A' }, void 0, false
             )] }, void 0, true
-          ), /*#__PURE__*/
-          _jsxDEV("div", { className: "w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-xs shadow-sm", children:
-            currentUser.name?.charAt(0) || 'A' }, void 0, false
+          ),
+          
+          isProfileDropdownOpen && (
+            <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden py-2 animate-fade-in">
+              <div className="px-4 py-2 border-b border-slate-50 mb-1">
+                <p className="text-xs font-extrabold text-slate-800 truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+              </div>
+              
+              {currentUser.role === 'admin' && (
+                <button
+                  onClick={() => {
+                    setIsProfileDropdownOpen(false);
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Settings size={14} />
+                  <span>إعدادات الحساب</span>
+                </button>
+              )}
+              
+              <button
+                onClick={() => {
+                  setIsProfileDropdownOpen(false);
+                  handleLogout();
+                }}
+                className="w-full text-right px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <LogOut size={14} />
+                <span>تسجيل الخروج</span>
+              </button>
+            </div>
           )] }, void 0, true
         )] }, void 0, true
-
       )] }, void 0, true
-    ));
-
+      )}
+      
+      <ProfileSettingsModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+      />
+    </>
+  );
 }

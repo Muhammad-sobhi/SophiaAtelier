@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard, LayoutGrid, User, Clock, CheckCircle2, AlertCircle, PhoneCall, ChevronRight, ChevronLeft, Sparkles, MessageCircle, Eye, Tag, Filter } from 'lucide-react';
@@ -355,7 +356,7 @@ export default function BridesPage() {
   };
 
   const handleSendPickupReminderWhatsApp = async (bride) => {
-    const phone = (bride.phone || '').replace(/[^\d]/g, '');
+    const phone = formatWhatsAppNumber(bride.phone);
     if (!phone) {
       alert('لا يوجد رقم هاتف مسجل للعروس');
       return;
@@ -380,7 +381,7 @@ export default function BridesPage() {
       }
     } catch (err) {}
 
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(`https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const handleConfirmVisitWhatsApp = async (bride) => {
@@ -412,9 +413,9 @@ export default function BridesPage() {
         }
       } catch (err) {}
 
-      const cleanPhone = (bride.phone || '').replace(/[^\d]/g, '');
+      const cleanPhone = formatWhatsAppNumber(bride.phone);
       if (cleanPhone) {
-        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+        window.open(`https://wa.me/${encodeURIComponent(cleanPhone)}?text=${encodeURIComponent(message)}`, '_blank');
       }
     } catch (e) {
       console.error(e);
@@ -812,9 +813,9 @@ export default function BridesPage() {
         console.error('Failed to fetch whatsapp template, using fallback:', err);
       }
 
-      const cleanPhone = activePhone.replace(/[^\d]/g, '');
+      const cleanPhone = formatWhatsAppNumber(activePhone);
       if (cleanPhone) {
-        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        const whatsappUrl = `https://wa.me/${encodeURIComponent(cleanPhone)}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
       }
 
@@ -1754,8 +1755,8 @@ export default function BridesPage() {
                           message = t.body.replace(/\{\{client_name\}\}/g, bride.name);
                         }
                       } catch (e) {}
-                      const phone = (bride.phone || '').replace(/[^\d]/g, '');
-                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                      const phone = formatWhatsAppNumber(bride.phone);
+                      window.open(`https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(message)}`, '_blank');
                     }}
                     className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9.5px] font-extrabold transition-all cursor-pointer shadow-2xs"
                   >

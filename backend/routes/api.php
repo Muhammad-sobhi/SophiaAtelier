@@ -140,6 +140,7 @@ Route::get('/storage-debug/{path}', function ($path) {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::put('/auth/profile', [\App\Http\Controllers\Api\ProfileController::class, 'update']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/dashboard/brides-summary', [DashboardController::class, 'bridesSummary']);

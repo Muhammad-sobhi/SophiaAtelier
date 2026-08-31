@@ -156,8 +156,7 @@ export default function EmployeesPage() {
 
   const handleAddEmployeeSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
-    if (!editingEmployee && !password.trim()) return;
+    if (!name.trim()) return;
 
     try {
       if (editingEmployee) {
@@ -299,7 +298,7 @@ export default function EmployeesPage() {
                   </div>
 
                   {isAdmin &&
-                <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                <div className="flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button
                     onClick={() => handleEditEmployeeClick(emp)}
                     className="p-2 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all cursor-pointer"
@@ -503,24 +502,28 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">البريد الإلكتروني للولوج</label>
+                  <label className="text-xs font-extrabold text-slate-600">
+                    البريد الإلكتروني للولوج
+                    <span className="text-[9px] font-bold text-slate-400 mr-1">(اختياري)</span>
+                  </label>
                   <input
                   type="email"
-                  required
                   placeholder="employee@atelier.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
+                  {!email && <p className="text-[9px] text-amber-500 font-bold mt-0.5">⚠️ بدون بريد إلكتروني لن يتمكن الموظف من الدخول للوحة التحكم</p>}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">
-                    كلمة المرور {editingEmployee && '(اتركيها فارغة لعدم التغيير)'}
+                    كلمة المرور
+                    <span className="text-[9px] font-bold text-slate-400 mr-1">
+                      {editingEmployee ? '(اتركيها فارغة لعدم التغيير)' : '(اختياري)'}
+                    </span>
                   </label>
                   <input
                   type="password"
-                  required={!editingEmployee}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
