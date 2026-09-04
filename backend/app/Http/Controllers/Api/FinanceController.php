@@ -144,4 +144,40 @@ class FinanceController extends Controller
             'expense' => $expense,
         ], 201);
     }
+
+    public function summary(Request $request): JsonResponse
+    {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $revQuery = Revenue::whereNotIn('type', ['insurance', 'transfer_in', 'capital_deposit']);
+        $expQuery = Expense::whereNotIn('category', ['owner_withdrawal', 'transfer_out', 'purchase']);
+        $insQuery = Revenue::where('type', 'insurance');
+
+        if ($startDate) {
+            $revQuery->where('payment_date', '>=', $startDate);
+            $expQuery->where('date', '>=', $startDate);
+            $insQuery->where('payment_date', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $revQuery->where('payment_date', '<=', $endDate);
+            $expQuery->where('date', '<=', $endDate);
+            $insQuery->where('payment_date', '<=', $endDate);
+        }
+
+        $netRevenue = $revQuery->sum('amount');
+        $netExpense = $expQuery->sum('amount');
+        $heldInsurances = $insQuery->sum('amount');
+        $totalAssets = \App\Models\Dress::sum('purchase_price');
+        $netProfit = $netRevenue - $netExpense;
+
+        return response()->json([
+            'net_revenue' => round($netRevenue, 2),
+            'net_expense' => round($netExpense, 2),
+            'net_profit' => round($netProfit, 2),
+            'held_insurances' => round($heldInsurances, 2),
+            'total_assets' => round($totalAssets, 2),
+        ]);
+    }
 }

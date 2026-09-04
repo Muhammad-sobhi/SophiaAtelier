@@ -537,7 +537,7 @@ class ClientController extends Controller
                             if ($ipAmt > 0) {
                                 \App\Models\Revenue::create([
                                     'booking_id' => $booking->id,
-                                    'type' => 'other',
+                                    'type' => 'insurance',
                                     'amount' => $ipAmt,
                                     'payment_method' => $ipMethod,
                                     'payment_date' => now()->toDateString(),
@@ -586,7 +586,7 @@ class ClientController extends Controller
 
                         \App\Models\Revenue::create([
                             'booking_id' => $booking->id,
-                            'type' => 'other',
+                            'type' => 'insurance',
                             'amount' => -$refundAmount,
                             'payment_method' => $paymentMethod,
                             'payment_date' => now()->toDateString(),
@@ -954,6 +954,36 @@ class ClientController extends Controller
             ], 500);
         }
     }
-}
+    public function revertStage(Request $request, \App\Models\Booking $booking)
+    {
+        $newStatus = $request->input('status'); // The status to revert back to
+        $validStatuses = ['pending', 'confirmed', 'picked_up', 'returned', 'cancelled'];
+        
+        if (!in_array($newStatus, $validStatuses)) {
+            return response()->json(['success' => false, 'message' => 'حالة غير صالحة'], 400);
+        }
 
+        $oldStatus = $booking->status;
+
+        // Revert dress statuses if transitioning backward
+        if ($oldStatus === 'returned' && $newStatus === 'picked_up') {
+            // Revert from dry_clean to out
+            if ($booking->dress) $booking->dress->update(['status' => 'out']);
+            if ($booking->dress2) $booking->dress2->update(['status' => 'out']);
+        } elseif ($oldStatus === 'picked_up' && $newStatus === 'confirmed') {
+            // Revert from out to booked/available (assuming available for simplicity or booked)
+            // It's safer to just set it back to available or booked
+            if ($booking->dress) $booking->dress->update(['status' => 'available']);
+            if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+        }
+
+        $booking->update(['status' => $newStatus]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم استرجاع الحالة بنجاح',
+            'booking' => $booking->fresh(['dress', 'dress2', 'revenues'])
+        ]);
+    }
+}
 

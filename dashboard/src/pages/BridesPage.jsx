@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { Search, Plus, X, Trash2, Edit3, Calendar, Ruler, Heart, Package, RotateCcw, Phone, MapPin, CreditCard, LayoutGrid, User, Clock, CheckCircle2, AlertCircle, PhoneCall, ChevronRight, ChevronLeft, Sparkles, MessageCircle, Eye, Tag, Filter } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
+import { BookingFinancesModal } from '@/components/BookingFinancesModal';
 
 const BRIDE_STAGES = [
   { id: 'visit', label: 'طلب زيارة / تجربة', icon: Calendar },
@@ -110,6 +111,7 @@ export default function BridesPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [editingBride, setEditingBride] = useState(null);
+  const [financesBrideId, setFinancesBrideId] = useState(null);
   const [availableDresses, setAvailableDresses] = useState([]);
 
   // Bride Image upload state
@@ -212,6 +214,7 @@ export default function BridesPage() {
   // Booked Dresses Modal
   const [isBookedDressesModalOpen, setIsBookedDressesModalOpen] = useState(false);
   const [bookedDressesSearch, setBookedDressesSearch] = useState('');
+  const [bookedDressesSearchType, setBookedDressesSearchType] = useState('all');
   const [bookedDressesMonthFilter, setBookedDressesMonthFilter] = useState('all');
   const [bookedDressesDateFilter, setBookedDressesDateFilter] = useState('');
   const [bookedDressesDateType, setBookedDressesDateType] = useState('wedding');
@@ -569,10 +572,10 @@ export default function BridesPage() {
         current_stage: c.current_stage || 'visit',
         image_path: c.image_path,
         date: c.created_at ? new Date(c.created_at).toISOString().split('T')[0] : '--',
-        wedding_date: c.wedding_date || c.bookings?.[0]?.event_date || '',
+        wedding_date: (c.wedding_date || c.bookings?.[0]?.event_date) ? String(c.wedding_date || c.bookings?.[0]?.event_date).substring(0, 10) : '',
         bookings: c.bookings || [],
         visits: c.visits || [],
-        latest_visit_date: c.latest_visit_date || c.visits?.[0]?.visit_date || '',
+        latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
         latest_visit_time: c.latest_visit_time || c.visits?.[0]?.time_slot || '',
         latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
         latest_dress_trying_fee: c.latest_dress_trying_fee ?? 0
@@ -1196,12 +1199,28 @@ export default function BridesPage() {
           bookingDateStr.includes(cleanQ) ||
           formatDate(item.eventDate).includes(cleanQ) ||
           formatDate(item.booking?.booking_date || item.booking?.created_at).includes(cleanQ);
+
+        const dCode = String(item.dress?.code || '').toLowerCase();
+        const bPhone = String(item.bride?.phone || '').toLowerCase();
+        const bPhone2 = String(item.bride?.phone2 || '').toLowerCase();
+        const bName = String(item.bride?.name || '').toLowerCase();
+
+        if (bookedDressesSearchType === 'dress_code') {
+          return dCode === q;
+        }
+        if (bookedDressesSearchType === 'phone') {
+          return bPhone === q || bPhone2 === q || bPhone.includes(q) || bPhone2.includes(q);
+        }
+        if (bookedDressesSearchType === 'client_name') {
+          return bName.includes(q);
+        }
+
         return (
           String(item.dress?.name || '').toLowerCase().includes(q) ||
-          String(item.dress?.code || '').toLowerCase().includes(q) ||
-          String(item.bride?.name || '').toLowerCase().includes(q) ||
-          String(item.bride?.phone || '').toLowerCase().includes(q) ||
-          String(item.bride?.phone2 || '').toLowerCase().includes(q) ||
+          dCode.includes(q) ||
+          bName.includes(q) ||
+          bPhone.includes(q) ||
+          bPhone2.includes(q) ||
           String(item.bride?.city || item.bride?.address || '').toLowerCase().includes(q) ||
           String(item.booking?.sales_name || '').toLowerCase().includes(q) ||
           String(item.booking?.notes || '').toLowerCase().includes(q) ||
@@ -1210,7 +1229,7 @@ export default function BridesPage() {
       }
       return true;
     });
-  }, [allBookedDressesList, bookedDressesDateFilter, bookedDressesDateType, bookedDressesSearch]);
+  }, [allBookedDressesList, bookedDressesDateFilter, bookedDressesDateType, bookedDressesSearch, bookedDressesSearchType]);
 
   // Unique month filters — counts reflect active date picker + search (not month chip itself)
   const bookedDressesMonthsOptions = React.useMemo(() => {
@@ -1312,6 +1331,16 @@ export default function BridesPage() {
           formattedEventDate.includes(cleanQ) ||
           formattedBookingDate.includes(cleanQ);
 
+        if (bookedDressesSearchType === 'dress_code') {
+          return dCode === q;
+        }
+        if (bookedDressesSearchType === 'phone') {
+          return bPhone === q || bPhone2 === q || bPhone.includes(q) || bPhone2.includes(q);
+        }
+        if (bookedDressesSearchType === 'client_name') {
+          return bName.includes(q);
+        }
+
         return (
           dName.includes(q) ||
           dCode.includes(q) ||
@@ -1327,7 +1356,7 @@ export default function BridesPage() {
 
       return true;
     });
-  }, [allBookedDressesList, bookedDressesMonthFilter, bookedDressesSearch, bookedDressesDateFilter, bookedDressesDateType]);
+  }, [allBookedDressesList, bookedDressesMonthFilter, bookedDressesSearch, bookedDressesSearchType, bookedDressesDateFilter, bookedDressesDateType]);
 
   // Pagination for Booked Dresses Modal
   const totalBookedDressesPages = bookedDressesPerPage === 'all'
@@ -1415,7 +1444,7 @@ export default function BridesPage() {
     return (
       <div
         key={bride.id}
-        onClick={() => setSelectedBrideDetails(bride)}
+        onClick={() => setEditingBride(bride)}
         className="bg-white rounded-3xl border border-slate-150/90 p-3 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between hover:border-indigo-300 relative group cursor-pointer"
       >
         <div>
@@ -1821,7 +1850,7 @@ export default function BridesPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 max-w-full">
+        <div className="flex flex-wrap items-center gap-2 py-1 max-w-full">
           <button
             onClick={() => { setSelectedWeddingMonth('all'); setActivePage(1); setArchivePage(1); }}
             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
@@ -2210,9 +2239,22 @@ export default function BridesPage() {
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[min(90vh,640px)] sm:max-h-[min(88vh,700px)] my-auto">
             <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
               <h3 className="text-sm font-extrabold text-slate-800">تعديل بيانات العروس</h3>
-              <button onClick={() => setEditingBride(null)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFinancesBrideId(editingBride.id);
+                    setEditingBride(null);
+                  }}
+                  className="px-3 py-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw size={12} />
+                  <span>تعديل المبالغ والحالة</span>
+                </button>
+                <button type="button" onClick={() => setEditingBride(null)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleEditBrideSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -3774,33 +3816,49 @@ export default function BridesPage() {
               {/* Middle Row: Text Search Input & Date Search Picker */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
                 {/* Live Text Search */}
-                <div className="relative sm:col-span-7">
-                  <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={bookedDressesSearch}
+                <div className="sm:col-span-7 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
+                  <select
+                    value={bookedDressesSearchType}
                     onChange={(e) => {
-                      setBookedDressesSearch(e.target.value);
+                      setBookedDressesSearchType(e.target.value);
                       setBookedDressesPage(1);
                     }}
-                    placeholder="بحث بالاسم، الكود، العروس، الهاتف، أو التاريخ (مثال: 15-08-2026)..."
-                    className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all shadow-2xs"
-                  />
-                  {bookedDressesSearch && (
-                    <button
-                      onClick={() => {
-                        setBookedDressesSearch('');
+                    className="px-2 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-bold text-slate-700 focus:outline-none focus:border-rose-400 transition-all shadow-2xs cursor-pointer flex-shrink-0"
+                    title="نوع البحث"
+                  >
+                    <option value="all">بحث عام</option>
+                    <option value="dress_code">كود الفستان</option>
+                    <option value="client_name">اسم العروس</option>
+                    <option value="phone">رقم الهاتف</option>
+                  </select>
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={bookedDressesSearch}
+                      onChange={(e) => {
+                        setBookedDressesSearch(e.target.value);
                         setBookedDressesPage(1);
                       }}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
+                      placeholder="بحث بالاسم، الكود، الهاتف..."
+                      className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all shadow-2xs"
+                    />
+                    {bookedDressesSearch && (
+                      <button
+                        onClick={() => {
+                          setBookedDressesSearch('');
+                          setBookedDressesPage(1);
+                        }}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Date Picker Input */}
-                <div className="sm:col-span-5 flex items-center gap-1.5">
+                <div className="sm:col-span-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
                   <div className="relative flex-1">
                     <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 pointer-events-none" />
                     <input
@@ -4276,6 +4334,22 @@ export default function BridesPage() {
           <option key={c} value={c} />
         ))}
       </datalist>
+
+      {/* Finances & Stage Revert Modal */}
+      {financesBrideId && (() => {
+        const selectedClient = bridesList.find(b => b.id === financesBrideId) || allBrides.find(b => b.id === financesBrideId);
+        return selectedClient ? (
+          <BookingFinancesModal
+            isOpen={true}
+            client={selectedClient}
+            booking={selectedClient?.bookings?.[0]}
+            onClose={() => setFinancesBrideId(null)}
+            onUpdate={() => {
+              fetchBrides();
+            }}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

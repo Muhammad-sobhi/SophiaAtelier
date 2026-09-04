@@ -27,7 +27,7 @@ use App\Http\Controllers\Api\FaqController;
 use Illuminate\Support\Facades\Route;
 
 // Rate-limited login route
-Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
 
 // Public routes (rate-limited)
 Route::post('/public/register-client', [ClientController::class, 'store'])->middleware('throttle:5,1');
@@ -153,6 +153,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/clients/import-excel', [ClientController::class, 'importExcel']);
     Route::apiResource('clients', ClientController::class);
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
+    Route::put('/bookings/{booking}/revert-stage', [ClientController::class, 'revertStage']);
 
     Route::apiResource('dresses', DressController::class)->except(['index', 'show']);
     Route::put('/dresses/{dress}/stage-action', [DressController::class, 'stageAction']);
@@ -166,7 +167,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('fittings', FittingController::class);
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('reviews', ReviewController::class);
+    Route::apiResource('revenues', RevenueController::class);
+    Route::apiResource('expenses', ExpenseController::class);
+    Route::apiResource('cleaning-orders', CleaningOrderController::class);
     Route::apiResource('faqs', FaqController::class);
+
+    // Finance endpoints
+    Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
+    Route::get('/finance/summary', [FinanceController::class, 'summary']);
+    Route::post('/finance/transfer', [FinanceController::class, 'transfer']);
+    Route::post('/finance/deposit', [FinanceController::class, 'deposit']);
+    Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
 
     // Employee read routes (staff & admin)
     Route::get('/employees', [EmployeeController::class, 'index']);
@@ -219,12 +230,6 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
 
     // Finance & Payroll — admin only
-    Route::apiResource('revenues', RevenueController::class);
-    Route::apiResource('expenses', ExpenseController::class);
-    Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
-    Route::post('/finance/transfer', [FinanceController::class, 'transfer']);
-    Route::post('/finance/deposit', [FinanceController::class, 'deposit']);
-    Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
     Route::get('/clients/export/csv', [ClientController::class, 'exportCsv']);
 
     // Leave request status approval — admin only
@@ -234,9 +239,6 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
     Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
     Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
-
-    // Cleaning Orders — admin only
-    Route::apiResource('cleaning-orders', CleaningOrderController::class);
 
     // Reports — admin only
     Route::get('/reports/sales', [ReportController::class, 'sales']);

@@ -36,7 +36,7 @@ class RevenueController extends Controller
             $created = [];
             $bookingId = $request->input('booking_id');
             $rawType = $request->input('type', 'deposit');
-            $type = in_array($rawType, ['deposit', 'balance', 'fitting_fee', 'other']) ? $rawType : 'other';
+            $type = in_array($rawType, ['deposit', 'balance', 'fitting_fee', 'insurance', 'other']) ? $rawType : 'other';
             $paymentDate = $request->input('payment_date', now()->toDateString());
             $baseNotes = $request->input('notes', '');
 
@@ -74,7 +74,7 @@ class RevenueController extends Controller
             'receipt_image' => 'nullable',
         ]);
 
-        if (!in_array($validated['type'] ?? '', ['deposit', 'balance', 'fitting_fee', 'other'])) {
+        if (!in_array($validated['type'] ?? '', ['deposit', 'balance', 'fitting_fee', 'insurance', 'other'])) {
             $validated['type'] = 'other';
         }
 
@@ -100,7 +100,7 @@ class RevenueController extends Controller
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
             'type' => 'nullable|string|max:50',
-            'amount' => 'sometimes|required|numeric|min:0',
+            'amount' => 'sometimes|required|numeric',
             'payment_method' => 'nullable|string|max:100',
             'payment_date' => 'sometimes|required|date',
             'notes' => 'nullable|string',

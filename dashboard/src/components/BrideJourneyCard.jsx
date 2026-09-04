@@ -22,6 +22,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
+import { BookingFinancesModal } from './BookingFinancesModal';
 
 
 
@@ -73,6 +74,7 @@ const PAYMENT_METHODS = [
 export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, onReturnClick }) {
   const navigate = useNavigate();
   const [selectedMobileStage, setSelectedMobileStage] = useState(bride?.current_stage || 'visit');
+  const [showFinancesModal, setShowFinancesModal] = useState(false);
 
   React.useEffect(() => {
     setSelectedMobileStage(bride?.current_stage || 'visit');
@@ -1253,7 +1255,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   return (
     <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] space-y-4" dir="rtl">
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
           <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
@@ -1261,9 +1263,21 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
             <span className="text-indigo-650">{bride?.name}</span>
           </h3>
         </div>
-        <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
-          المرحلة الحالية: {bride?.current_stage ? bride.current_stage.toUpperCase() : 'VISIT'}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Settings / Finances Button */}
+          <button 
+            type="button"
+            onClick={() => setShowFinancesModal(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs text-[9px] font-bold cursor-pointer"
+          >
+            <Edit3 size={11} className="text-slate-500" />
+            <span>تعديل وحسابات</span>
+          </button>
+
+          <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
+            المرحلة الحالية: {bride?.current_stage ? bride.current_stage.toUpperCase() : 'VISIT'}
+          </span>
+        </div>
       </div>
 
       {/* Mobile Stage Stepper & Card View (md:hidden) */}
@@ -2148,6 +2162,16 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Finances & Stage Revert Modal */}
+      {showFinancesModal && (
+        <BookingFinancesModal
+          isOpen={showFinancesModal}
+          booking={bride.bookings?.[0]}
+          onClose={() => setShowFinancesModal(false)}
+          onUpdate={onStageUpdate}
+        />
       )}
     </div>);
 

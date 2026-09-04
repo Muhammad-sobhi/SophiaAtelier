@@ -209,8 +209,14 @@ export default function FinancePage() {
   const [cleaningDate, setCleaningDate] = useState(new Date().toISOString().split('T')[0]);
   const [cleaningNotes, setCleaningNotes] = useState('');
 
-  // Numeric totals
-  const [totals, setTotals] = useState({ revenue: 0, expenses: 0 });
+  // Numeric totals from backend
+  const [totals, setTotals] = useState({ 
+    net_revenue: 0, 
+    net_expense: 0, 
+    net_profit: 0, 
+    held_insurances: 0, 
+    total_assets: 0 
+  });
 
   const buildQS = useCallback(() => {
     const p = { per_page: '500' };
@@ -222,9 +228,10 @@ export default function FinancePage() {
   const loadData = useCallback(async () => {
     try {
       const qs = buildQS();
-      const [revRes, expRes] = await Promise.all([
+      const [revRes, expRes, summaryRes] = await Promise.all([
       apiClient.get(`/revenues?${qs}`),
-      apiClient.get(`/expenses?${qs}`)]
+      apiClient.get(`/expenses?${qs}`),
+      apiClient.get(`/finance/summary?${qs}`)]
       );
 
       const revList = Array.isArray(revRes) ? revRes : revRes.data || [];
@@ -288,9 +295,15 @@ export default function FinancePage() {
       combined.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
       setAllTransactions(combined);
 
-      let revSum = 0,expSum = 0;
-      combined.forEach((t) => {if (t.isRevenue) revSum += t.rawAmount;else expSum += t.rawAmount;});
-      setTotals({ revenue: revSum, expenses: expSum });
+      if (summaryRes) {
+        setTotals({
+          net_revenue: summaryRes.net_revenue || 0,
+          net_expense: summaryRes.net_expense || 0,
+          net_profit: summaryRes.net_profit || 0,
+          held_insurances: summaryRes.held_insurances || 0,
+          total_assets: summaryRes.total_assets || 0,
+        });
+      }
     } catch (e) {
       console.error('Failed to load finance data:', e);
     }
@@ -522,12 +535,12 @@ export default function FinancePage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
-  const net = totals.revenue - totals.expenses;
   const summaryCards = [
-  { label: 'إجمالي الإيرادات', value: `${totals.revenue.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
-  { label: 'إجمالي المصروفات', value: `${totals.expenses.toLocaleString()} ج.م`, icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
-  { label: 'الرصيد الصافي', value: `${net.toLocaleString()} ج.م`, icon: DollarSign, colorClass: net >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: net >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
-  { label: 'عدد المعاملات', value: `${allTransactions.length} معاملة`, icon: Shield, colorClass: 'text-cyan-600', bgClass: 'bg-cyan-50' }];
+  { label: 'صافي الأرباح', value: `${totals.net_profit.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
+  { label: 'المبيعات / الإيرادات', value: `${totals.net_revenue.toLocaleString()} ج.م`, icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
+  { label: 'المصروفات التشغيلية', value: `${totals.net_expense.toLocaleString()} ج.م`, icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
+  { label: 'إجمالي الأصول (الفساتين)', value: `${totals.total_assets.toLocaleString()} ج.م`, icon: Building2, colorClass: 'text-sky-600', bgClass: 'bg-sky-50' },
+  { label: 'التأمينات المحتجزة (أمانات)', value: `${totals.held_insurances.toLocaleString()} ج.م`, icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' }];
 
 
   return (
@@ -635,8 +648,8 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* KPI Cards (2 Columns on Mobile, 4 Columns on Desktop) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 flex-shrink-0">
+      {/* KPI Cards (2 Columns on Mobile, 5 Columns on Desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 flex-shrink-0">
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
