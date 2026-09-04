@@ -109,15 +109,7 @@ class DressController extends Controller
             }
         }
 
-        // Auto-create an expense record for the dress purchase price
-        if (!empty($validated['purchase_price']) && $validated['purchase_price'] > 0) {
-            \App\Models\Expense::create([
-                'category'    => 'purchase',
-                'amount'      => $validated['purchase_price'],
-                'description' => 'شراء فستان: ' . $dress->name,
-                'date'        => !empty($validated['purchase_date']) ? $validated['purchase_date'] : now()->toDateString(),
-            ]);
-        }
+
 
         return response()->json($dress->load(['category', 'collection', 'designer', 'images', 'accessories']), 201);
     }
@@ -184,27 +176,6 @@ class DressController extends Controller
 
         $dress->update($validated);
 
-        if (array_key_exists('purchase_price', $validated) && $validated['purchase_price'] > 0) {
-            $expense = \App\Models\Expense::where('category', 'purchase')
-                ->where('description', 'LIKE', '%' . $dress->name . '%')
-                ->first();
-
-            $expenseDate = !empty($validated['purchase_date']) ? $validated['purchase_date'] : now()->toDateString();
-
-            if ($expense) {
-                $expense->update([
-                    'amount' => $validated['purchase_price'],
-                    'date'   => $expenseDate,
-                ]);
-            } else {
-                \App\Models\Expense::create([
-                    'category'    => 'purchase',
-                    'amount'      => $validated['purchase_price'],
-                    'description' => 'شراء فستان: ' . $dress->name,
-                    'date'        => $expenseDate,
-                ]);
-            }
-        }
 
         if ($request->has('accessories')) {
             $dress->accessories()->delete();
