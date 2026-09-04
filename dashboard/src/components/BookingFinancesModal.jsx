@@ -21,7 +21,11 @@ export function BookingFinancesModal({ isOpen, onClose, client, booking, onUpdat
   useEffect(() => {
     if (isOpen) {
       apiClient.get('/dresses?per_page=1000').then(res => setDresses(res.data || res.dresses || []));
-      
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && client) {
       // Initialize Booking Form
       if (booking) {
         setBookingForm({
@@ -60,7 +64,7 @@ export function BookingFinancesModal({ isOpen, onClose, client, booking, onUpdat
         });
       }
     }
-  }, [isOpen, booking, client]);
+  }, [isOpen, client?.id]);
 
   if (!isOpen || !client) return null;
 
