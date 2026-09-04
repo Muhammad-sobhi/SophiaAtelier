@@ -150,9 +150,9 @@ class FinanceController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $revQuery = Revenue::whereNotIn('type', ['insurance', 'transfer_in', 'capital_deposit']);
+        $revQuery = Revenue::whereNotIn('type', ['insurance', 'security_deposit', 'transfer_in', 'capital_deposit']);
         $expQuery = Expense::whereNotIn('category', ['owner_withdrawal', 'transfer_out', 'purchase']);
-        $insQuery = Revenue::where('type', 'insurance');
+        $insQuery = Revenue::whereIn('type', ['insurance', 'security_deposit']);
 
         if ($startDate) {
             $revQuery->where('payment_date', '>=', $startDate);
