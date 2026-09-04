@@ -505,7 +505,7 @@ export default function AttendancePage() {
 
                   <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
                     <span className="bg-slate-200/60 px-3 py-1 rounded-xl text-[10px] font-bold">
-                      من {leave.start_date} إلى {leave.end_date}
+                      من {leave.start_date?.split('T')[0]} إلى {leave.end_date?.split('T')[0]}
                     </span>
                     <span className="text-indigo-600 font-bold text-[10px]">
                       {leave.type === 'paid_leave' && 'إجازة مدفوعة'}
