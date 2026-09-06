@@ -45,6 +45,19 @@ class DressController extends Controller
             $query->where('is_website_visible', filter_var($request->input('is_website_visible'), FILTER_VALIDATE_BOOLEAN));
         }
 
+        if ($request->has('is_best_seller')) {
+            $query->where('is_best_seller', filter_var($request->input('is_best_seller'), FILTER_VALIDATE_BOOLEAN));
+        }
+
+        if ($request->boolean('best_sellers_only')) {
+            $query->where('is_best_seller', true)->orderBy('best_seller_sort', 'asc')->orderBy('id', 'desc');
+            if ($request->input('per_page') === 'all') {
+                return response()->json($query->get());
+            }
+            $perPage = (int) $request->input('per_page', 50);
+            return response()->json($query->paginate($perPage));
+        }
+
         if ($request->input('per_page') === 'all') {
             return response()->json($query->latest()->get());
         }
@@ -94,6 +107,8 @@ class DressController extends Controller
             'accessories' => 'nullable|array',
             'new_collection' => 'nullable|boolean',
             'is_website_visible' => 'nullable|boolean',
+            'is_best_seller' => 'nullable|boolean',
+            'best_seller_sort' => 'nullable|integer',
         ]);
 
         $dress = Dress::create($validated);
@@ -172,6 +187,8 @@ class DressController extends Controller
             'accessories' => 'nullable|array',
             'new_collection' => 'nullable|boolean',
             'is_website_visible' => 'nullable|boolean',
+            'is_best_seller' => 'nullable|boolean',
+            'best_seller_sort' => 'nullable|integer',
         ]);
 
         $dress->update($validated);
@@ -371,6 +388,73 @@ class DressController extends Controller
             'clean_code' => $cleanCode,
             'cleared_soft_deleted_count' => $deletedCount,
             'active_dresses_count' => $activeCount,
+        ]);
+    }
+
+    /**
+     * Get public best seller dresses sorted manually.
+     * GET /api/public/best-sellers
+     */
+    public function bestSellers(Request $request): JsonResponse
+    {
+        $dresses = Dress::where('is_best_seller', true)
+            ->where('is_website_visible', true)
+            ->with(['category', 'collection', 'designer', 'images'])
+            ->orderBy('best_seller_sort', 'asc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return response()->json($dresses);
+    }
+
+    /**
+     * Toggle a dress's best seller status.
+     * PATCH /api/dresses/{dress}/best-seller
+     */
+    public function toggleBestSeller(Request $request, Dress $dress): JsonResponse
+    {
+        $newState = !$dress->is_best_seller;
+        $dress->is_best_seller = $newState;
+
+        if ($newState) {
+            $maxSort = Dress::where('is_best_seller', true)->max('best_seller_sort') ?? 0;
+            $dress->best_seller_sort = $maxSort + 1;
+        } else {
+            $dress->best_seller_sort = null;
+        }
+
+        $dress->save();
+
+        return response()->json([
+            'message' => $newState ? 'تمت إضافة الفستان إلى الأكثر طلباً بنجاح' : 'تمت إزالة الفستان من الأكثر طلباً',
+            'is_best_seller' => $dress->is_best_seller,
+            'best_seller_sort' => $dress->best_seller_sort,
+            'dress' => $dress->load(['category', 'collection', 'designer', 'images', 'accessories']),
+        ]);
+    }
+
+    /**
+     * Reorder best seller dresses.
+     * POST /api/dresses/best-sellers/reorder
+     */
+    public function reorderBestSellers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'exists:dresses,id'],
+        ]);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated) {
+            foreach ($validated['ids'] as $index => $id) {
+                Dress::where('id', $id)->update([
+                    'is_best_seller' => true,
+                    'best_seller_sort' => $index + 1,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'message' => 'تم حفظ ترتيب الفساتين الأكثر طلباً بنجاح',
         ]);
     }
 }

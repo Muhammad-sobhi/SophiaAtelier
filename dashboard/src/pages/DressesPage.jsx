@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
-import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft, Calendar } from 'lucide-react';
+import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft, Calendar, ArrowUp, ArrowDown, GripVertical, Star, Check } from 'lucide-react';
 
 const DRESS_STAGES = [
 { id: 'ready', label: 'جاهز', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
@@ -10,6 +10,12 @@ const DRESS_STAGES = [
 
 
 export default function DressesPage() {
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'best_sellers'
+  const [bestSellersList, setBestSellersList] = useState([]);
+  const [isLoadingBestSellers, setIsLoadingBestSellers] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+
   const [dressesList, setDressesList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState([]);
@@ -50,6 +56,7 @@ export default function DressesPage() {
   const [newColorAr, setNewColorAr] = useState('');
   const [newNewCollection, setNewNewCollection] = useState(false);
   const [isWebsiteVisible, setIsWebsiteVisible] = useState(true);
+  const [isBestSeller, setIsBestSeller] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [codeError, setCodeError] = useState('');
 
@@ -82,6 +89,7 @@ export default function DressesPage() {
     setNewColorAr('');
     setNewNewCollection(false);
     setIsWebsiteVisible(true);
+    setIsBestSeller(false);
     setCodeError('');
     setIsAddingNewCategory(false);
     setNewCategoryName('');
@@ -172,6 +180,7 @@ export default function DressesPage() {
 
   useEffect(() => {
     loadDependencies();
+    fetchBestSellers();
   }, []);
 
   useEffect(() => {
@@ -288,7 +297,8 @@ export default function DressesPage() {
         color_ar: newColorAr || newColor,
         accessories: validAccs,
         new_collection: newNewCollection ? 1 : 0,
-        is_website_visible: isWebsiteVisible ? 1 : 0
+        is_website_visible: isWebsiteVisible ? 1 : 0,
+        is_best_seller: isBestSeller ? 1 : 0,
       };
 
       if (editingDress) {
@@ -316,6 +326,7 @@ export default function DressesPage() {
       }
 
       fetchDresses();
+      fetchBestSellers();
       loadDependencies();
       setIsModalOpen(false);
       setEditingDress(null);
@@ -352,6 +363,97 @@ export default function DressesPage() {
     }
   };
 
+  const fetchBestSellers = async () => {
+    try {
+      setIsLoadingBestSellers(true);
+      const res = await apiClient.get('/dresses', {
+        params: {
+          best_sellers_only: 1,
+          per_page: 'all'
+        }
+      });
+      const list = Array.isArray(res) ? res : res.data || [];
+      setBestSellersList(list);
+    } catch (err) {
+      console.error('Failed to fetch best sellers:', err);
+    } finally {
+      setIsLoadingBestSellers(false);
+    }
+  };
+
+  const handleToggleBestSeller = async (dress) => {
+    try {
+      const willBeBestSeller = !dress.is_best_seller;
+      setDressesList((prev) =>
+        prev.map((d) => (d.id === dress.id ? { ...d, is_best_seller: willBeBestSeller } : d))
+      );
+      await apiClient.patch(`/dresses/${dress.id}/best-seller`);
+      fetchDresses();
+      fetchBestSellers();
+    } catch (e) {
+      console.error('Failed to toggle best seller:', e);
+      fetchDresses();
+      fetchBestSellers();
+    }
+  };
+
+  const saveBestSellersOrder = async (orderedList) => {
+    try {
+      setIsReordering(true);
+      const ids = orderedList.map((d) => d.id);
+      await apiClient.post('/dresses/best-sellers/reorder', { ids });
+      fetchBestSellers();
+      fetchDresses();
+    } catch (err) {
+      console.error('Failed to save best sellers order:', err);
+      alert('تعذر حفظ ترتيب الفساتين الأكثر طلباً.');
+      fetchBestSellers();
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
+  const handleMoveUp = async (index) => {
+    if (index === 0) return;
+    const updated = [...bestSellersList];
+    const [item] = updated.splice(index, 1);
+    updated.splice(index - 1, 0, item);
+    setBestSellersList(updated);
+    await saveBestSellersOrder(updated);
+  };
+
+  const handleMoveDown = async (index) => {
+    if (index >= bestSellersList.length - 1) return;
+    const updated = [...bestSellersList];
+    const [item] = updated.splice(index, 1);
+    updated.splice(index + 1, 0, item);
+    setBestSellersList(updated);
+    await saveBestSellersOrder(updated);
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const updated = [...bestSellersList];
+    const [moved] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, moved);
+
+    setBestSellersList(updated);
+    setDraggedIndex(null);
+    await saveBestSellersOrder(updated);
+  };
+
   const handleEditClick = (dress) => {
     setEditingDress(dress);
     setNewCode(dress.code || '');
@@ -383,6 +485,7 @@ export default function DressesPage() {
     setNewColorAr(dress.color_ar || dress.color || 'أوف وايت');
     setNewNewCollection(dress.new_collection === true || dress.new_collection === 1 || dress.new_collection === '1');
     setIsWebsiteVisible(dress.is_website_visible !== false && dress.is_website_visible !== 0);
+    setIsBestSeller(dress.is_best_seller === true || dress.is_best_seller === 1 || dress.is_best_seller === '1');
     setSelectedCategoryId(dress.category_id ? dress.category_id.toString() : '');
     setSelectedCollectionId(dress.collection_id ? dress.collection_id.toString() : '');
     setIsAddingNewCategory(false);
@@ -600,33 +703,229 @@ export default function DressesPage() {
         </div>
       </div>
 
-      {/* Dresses Grid */}
+      {/* Dresses Container */}
       <div className="flex-1 bg-white rounded-3xl p-5 border border-slate-100 flex flex-col overflow-hidden shadow-sm">
-        <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <h2 className="text-xs font-extrabold text-slate-600">
-            كتالوج الفساتين المتاحة ({paginationMeta.total || filteredDresses.length})
-          </h2>
-
+        {/* Navigation Tabs Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-500">العرض في الصفحة:</span>
-            <select
-              value={perPage}
-              onChange={(e) => {
-                const newLimit = e.target.value;
-                setPerPage(newLimit);
-                setCurrentPage(1);
-                fetchDresses(1, newLimit);
-              }}
-              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'all'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+              }`}
             >
-              <option value="12">12 فستان</option>
-              <option value="15">15 فستان</option>
-              <option value="24">24 فستان</option>
-              <option value="48">48 فستان</option>
-              <option value="all">عرض الكل (Show All)</option>
-            </select>
+              <span>كتالوج الفساتين</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-white text-slate-700'}`}>
+                {paginationMeta.total || filteredDresses.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('best_sellers');
+                fetchBestSellers();
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'best_sellers'
+                  ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
+                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100/70 border border-amber-200/60'
+              }`}
+            >
+              <Star size={13} className={activeTab === 'best_sellers' ? 'fill-white text-white' : 'fill-amber-500 text-amber-500'} />
+              <span>ترتيب الأكثر طلباً (Best Sellers)</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${activeTab === 'best_sellers' ? 'bg-white/20 text-white' : 'bg-amber-200/70 text-amber-900'}`}>
+                {bestSellersList.length}
+              </span>
+            </button>
           </div>
+
+          {activeTab === 'all' && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-500">العرض في الصفحة:</span>
+              <select
+                value={perPage}
+                onChange={(e) => {
+                  const newLimit = e.target.value;
+                  setPerPage(newLimit);
+                  setCurrentPage(1);
+                  fetchDresses(1, newLimit);
+                }}
+                className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="12">12 فستان</option>
+                <option value="15">15 فستان</option>
+                <option value="24">24 فستان</option>
+                <option value="48">48 فستان</option>
+                <option value="all">عرض الكل (Show All)</option>
+              </select>
+            </div>
+          )}
+
+          {activeTab === 'best_sellers' && (
+            <div className="flex items-center gap-2">
+              {isReordering && (
+                <span className="text-[11px] font-bold text-amber-600 animate-pulse flex items-center gap-1">
+                  <span>جاري حفظ الترتيب...</span>
+                </span>
+              )}
+              <span className="text-[11px] font-semibold text-slate-400">
+                (اسحب الفستان أو اضغط الأسهم للترتيب)
+              </span>
+            </div>
+          )}
         </div>
+
+        {activeTab === 'best_sellers' ? (
+          <div className="flex-grow overflow-y-auto pr-1 scrollbar-thin select-none">
+            {isLoadingBestSellers ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-xs font-bold text-slate-400">جاري تحميل الفساتين الأكثر طلباً...</p>
+              </div>
+            ) : bestSellersList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-80 text-center p-6 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 mb-3">
+                  <Star size={28} className="fill-amber-400 text-amber-500" />
+                </div>
+                <h3 className="text-sm font-extrabold text-slate-700 mb-1">لا توجد فساتين محددة كـ "أكثر طلباً" بعد</h3>
+                <p className="text-xs text-slate-500 max-w-md mb-4">
+                  يمكنك الذهاب إلى تبويب "كتالوج الفساتين" والضغط على زر (إضافة للأكثر طلباً ★) لأي فستان لإضافته هنا وترتيبه.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('all')}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  الذهاب إلى كتالوج الفساتين
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 pb-4">
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200/70 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-900 font-bold">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-amber-500 flex-shrink-0" />
+                    <span>اسحب الفساتين لإعادة ترتيبها يدوياً، أو استخدم أزرار ⬆️ ⬇️. يتم حفظ الترتيب تلقائياً وينعكس فوراً على الموقع الإلكتروني.</span>
+                  </div>
+                  <span className="bg-amber-200/80 text-amber-950 px-2.5 py-1 rounded-full text-[11px] font-black self-start sm:self-auto flex-shrink-0">
+                    {bestSellersList.length} فستان
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {bestSellersList.map((dress, index) => {
+                    const firstMedia = dress.images?.[0]?.image_path ? dress.images[0].image_path : null;
+                    const mediaUrl = firstMedia ? getStorageUrl(firstMedia) : null;
+                    const isVideo = firstMedia && /\.(mp4|mov|webm|avi)$/i.test(firstMedia);
+
+                    return (
+                      <div
+                        key={dress.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDrop={(e) => handleDrop(e, index)}
+                        className={`flex items-center justify-between p-3.5 bg-white border rounded-2xl transition-all shadow-xs ${
+                          draggedIndex === index
+                            ? 'opacity-40 border-dashed border-amber-400 scale-[0.99]'
+                            : 'border-slate-200/80 hover:border-amber-300 hover:shadow-sm'
+                        }`}
+                      >
+                        {/* Drag Handle + Rank + Media + Dress Details */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Drag handle */}
+                          <div className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-amber-600 p-1 flex-shrink-0">
+                            <GripVertical size={18} />
+                          </div>
+
+                          {/* Rank Badge */}
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white font-black text-xs flex items-center justify-center shadow-xs flex-shrink-0">
+                            #{index + 1}
+                          </div>
+
+                          {/* Media Thumbnail */}
+                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
+                            {mediaUrl ? (
+                              isVideo ? (
+                                <video src={mediaUrl} className="w-full h-full object-cover" muted />
+                              ) : (
+                                <img src={mediaUrl} alt={dress.name} className="w-full h-full object-cover" />
+                              )
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                <Sparkles size={16} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-black text-slate-800 truncate">{dress.name}</h4>
+                              {dress.name_ar && dress.name_ar !== dress.name && (
+                                <span className="text-[10px] font-semibold text-slate-400 truncate">({dress.name_ar})</span>
+                              )}
+                              {dress.code && (
+                                <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                                  #{dress.code}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold text-slate-500 mt-1">
+                              {dress.category?.name && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-600">
+                                  {dress.category.name}
+                                </span>
+                              )}
+                              <span>سعر الإيجار: {dress.rental_price ? `${Number(dress.rental_price).toLocaleString()} ج.م` : 'غير محدد'}</span>
+                              <span className={dress.is_website_visible ? 'text-emerald-600' : 'text-slate-400'}>
+                                {dress.is_website_visible ? '🌐 معروض بالموقع' : '👁️ مخفي'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reorder Buttons & Remove Button */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 mr-2">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveUp(index)}
+                            disabled={index === 0}
+                            className="p-2 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-600 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            title="تحريك لأعلى"
+                          >
+                            <ArrowUp size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleMoveDown(index)}
+                            disabled={index === bestSellersList.length - 1}
+                            className="p-2 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-600 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            title="تحريك لأسفل"
+                          >
+                            <ArrowDown size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBestSeller(dress)}
+                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all cursor-pointer text-xs font-bold flex items-center gap-1"
+                            title="إزالة من قائمة الأكثر طلباً"
+                          >
+                            <X size={14} />
+                            <span className="hidden sm:inline">إزالة</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
 
         <div className="flex-grow overflow-y-auto pr-1 scrollbar-thin select-none">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-1 animate-fade-in">
@@ -655,12 +954,31 @@ export default function DressesPage() {
                           <Sparkles size={24} className="text-slate-300" />
                         </div>
                       )}
-                      {/* Trying Fee Overlay */}
-                      {dress.trying_fee > 0 &&
-                      <div className="absolute top-2 right-2 bg-rose-600/90 text-white text-[8.5px] font-black px-2 py-0.5 rounded-full shadow-xs">
-                          رسوم قياس: {dress.trying_fee.toLocaleString()} ج.م
-                        </div>
-                      }
+                      {/* Top Right Badges & Controls: Best Seller + Trying Fee */}
+                      <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleBestSeller(dress);
+                          }}
+                          className={`px-2 py-0.5 rounded-full text-[8.5px] font-black shadow-sm transition-all cursor-pointer flex items-center gap-1 ${
+                            dress.is_best_seller
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white ring-1 ring-white hover:from-amber-600 hover:to-yellow-600 shadow-amber-500/30'
+                              : 'bg-black/50 backdrop-blur-xs text-white/90 hover:bg-black/70'
+                          }`}
+                          title={dress.is_best_seller ? `فستان أكثر طلباً (الترتيب: #${dress.best_seller_sort || '-'}) - انقر للإلغاء` : 'تمييز كفستان أكثر طلباً'}
+                        >
+                          <Star size={10} className={dress.is_best_seller ? 'fill-amber-200 text-amber-200' : 'text-slate-300'} />
+                          <span>{dress.is_best_seller ? `أكثر طلباً #${dress.best_seller_sort || ''}` : 'إضافة للأكثر طلباً'}</span>
+                        </button>
+
+                        {dress.trying_fee > 0 && (
+                          <div className="bg-rose-600/90 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                            رسوم قياس: {dress.trying_fee.toLocaleString()} ج.م
+                          </div>
+                        )}
+                      </div>
                       {/* New Collection Badge */}
                       {(dress.new_collection === true || dress.new_collection === 1 || dress.new_collection === '1') &&
                       <div className="absolute bottom-2 right-2 bg-gradient-to-r from-amber-500 to-yellow-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-sm">
@@ -799,6 +1117,8 @@ export default function DressesPage() {
               </button>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 
@@ -1175,8 +1495,8 @@ export default function DressesPage() {
                   </div>
                 </div>
 
-                {/* New Collection & Website Visibility Checkboxes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-right">
+                {/* New Collection, Website Visibility & Best Seller Checkboxes */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-right">
                   <div className="flex items-center gap-2 py-1 bg-amber-50/50 p-3 rounded-2xl border border-amber-100/60">
                     <input
                       type="checkbox"
@@ -1186,7 +1506,7 @@ export default function DressesPage() {
                       className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
                     />
                     <label htmlFor="new_collection" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
-                      ✨ تشكيلة جديدة (New Collection)
+                      ✨ تشكيلة جديدة
                     </label>
                   </div>
 
@@ -1199,7 +1519,20 @@ export default function DressesPage() {
                       className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
                     />
                     <label htmlFor="is_website_visible" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
-                      🌐 إظهار الفستان بالموقع الإلكتروني
+                      🌐 معروض بالموقع
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2 py-1 bg-gradient-to-r from-amber-50 to-yellow-50 p-3 rounded-2xl border border-amber-200/80">
+                    <input
+                      type="checkbox"
+                      id="is_best_seller"
+                      checked={isBestSeller}
+                      onChange={(e) => setIsBestSeller(e.target.checked)}
+                      className="w-4 h-4 text-amber-600 border-slate-300 rounded focus:ring-amber-500 cursor-pointer"
+                    />
+                    <label htmlFor="is_best_seller" className="text-xs font-extrabold text-amber-900 cursor-pointer select-none flex items-center gap-1">
+                      <span>⭐ الأكثر طلباً</span>
                     </label>
                   </div>
                 </div>

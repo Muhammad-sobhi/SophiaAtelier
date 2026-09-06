@@ -40,6 +40,7 @@ Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
 Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionController::class, 'publicIndex']);
 Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryController::class, 'publicIndex']);
 Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
+Route::get('/public/best-sellers', [DressController::class, 'bestSellers']);
 Route::get('/public/system-status', function () {
     if (function_exists('opcache_reset')) {
         @opcache_reset();
@@ -155,6 +156,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
     Route::put('/bookings/{booking}/revert-stage', [ClientController::class, 'revertStage']);
 
+    Route::post('/dresses/best-sellers/reorder', [DressController::class, 'reorderBestSellers']);
+    Route::patch('/dresses/{dress}/best-seller', [DressController::class, 'toggleBestSeller']);
     Route::apiResource('dresses', DressController::class)->except(['index', 'show']);
     Route::put('/dresses/{dress}/stage-action', [DressController::class, 'stageAction']);
 
