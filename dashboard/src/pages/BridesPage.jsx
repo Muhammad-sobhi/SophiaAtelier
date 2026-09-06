@@ -1444,7 +1444,7 @@ export default function BridesPage() {
     return (
       <div
         key={bride.id}
-        onClick={() => setEditingBride(bride)}
+        onClick={() => handleEditBrideClick(bride)}
         className="bg-white rounded-3xl border border-slate-150/90 p-3 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between hover:border-indigo-300 relative group cursor-pointer"
       >
         <div>
