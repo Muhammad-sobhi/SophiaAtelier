@@ -238,10 +238,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     // Leave request status approval — admin only
     Route::put('/leave-requests/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus']);
 
-    // Employee Loans — admin only (create, update, delete)
-    Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
-    Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
-    Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
+    // Employee Loans write routes moved to admin+manager group below
 
     // Reports — admin only
     Route::get('/reports/sales', [ReportController::class, 'sales']);
@@ -251,4 +248,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/reports/revenue', [ReportController::class, 'revenue']);
     Route::get('/reports/client-sources', [ReportController::class, 'clientSources']);
     Route::get('/reports/executive-summary', [ReportController::class, 'executiveSummary']);
+});
+
+// Employee Loans write — admin & manager
+Route::middleware(['auth:sanctum', 'role:admin,manager'])->group(function () {
+    Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
+    Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
+    Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
 });
