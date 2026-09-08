@@ -8,11 +8,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserHasRole
 {
-    public function handle(Request $request, Closure $next, string $roles): Response
+    public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        $rolesArray = explode(',', $roles);
-
-        if (! $request->user() || ! in_array($request->user()->role, $rolesArray)) {
+        if (! $request->user() || ! in_array($request->user()->role, $roles)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
