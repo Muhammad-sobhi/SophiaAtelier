@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
 import { useScrollAnimation } from '../ScrollAnimations/useScrollAnimation';
 import { useStore } from '../../context/StoreContext';
 import { getStorageUrl } from '../../lib/api';
@@ -19,6 +19,21 @@ export default function ClientGallery() {
   const { clientGallery, t } = useStore();
   const trackRef = useRef(null);
   const sectionRef = useScrollAnimation();
+  const [selectedMedia, setSelectedMedia] = useState(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setSelectedMedia(null);
+    };
+    if (selectedMedia) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [selectedMedia]);
 
   const scroll = (dir) => {
     if (!trackRef.current) return;
@@ -55,39 +70,55 @@ export default function ClientGallery() {
         </button>
 
         <div className={styles.track} ref={trackRef}>
-          {displayClients.map((c, i) => (
-            <div
-              key={`${c.id}-${i}`}
-              className={styles.card}
-              data-animate="fade-up"
-              data-delay={String(Math.min(i + 1, 6))}
-            >
-              <div className={styles.imageWrap}>
-                {/\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(c.image || '') ? (
-                  <video
-                    src={c.image}
-                    className={styles.image}
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                  />
-                ) : (
-                  <Image
-                    src={c.image}
-                    alt={c.name}
-                    width={380}
-                    height={520}
-                    unoptimized={c.image.includes('/storage/')}
-                    className={styles.image}
-                  />
-                )}
-                <div className={styles.nameOverlay}>
-                  <span className={styles.clientName}>{c.name}</span>
+          {displayClients.map((c, i) => {
+            const isVideo = /\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(c.image || '');
+            return (
+              <div
+                key={`${c.id}-${i}`}
+                className={styles.card}
+                data-animate="fade-up"
+                data-delay={String(Math.min(i + 1, 6))}
+                onClick={() => setSelectedMedia({ ...c, isVideo })}
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${c.name}`}
+              >
+                <div className={styles.imageWrap}>
+                  {isVideo ? (
+                    <video
+                      src={c.image}
+                      className={styles.image}
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                    />
+                  ) : (
+                    <Image
+                      src={c.image}
+                      alt={c.name}
+                      width={380}
+                      height={520}
+                      unoptimized={c.image.includes('/storage/')}
+                      className={styles.image}
+                    />
+                  )}
+
+                  {/* Reel / Video Badge */}
+                  {isVideo && (
+                    <div className={styles.videoBadge}>
+                      <Play size={10} className={styles.playIcon} />
+                      <span>REEL</span>
+                    </div>
+                  )}
+
+                  <div className={styles.nameOverlay}>
+                    <span className={styles.clientName}>{c.name}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <button
@@ -98,6 +129,51 @@ export default function ClientGallery() {
           <ChevronRight size={20} strokeWidth={1.5} />
         </button>
       </div>
+
+      {/* Lightbox / Video Modal */}
+      {selectedMedia && (
+        <div
+          className={styles.lightboxOverlay}
+          onClick={() => setSelectedMedia(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className={styles.lightboxContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className={styles.closeBtn}
+              onClick={() => setSelectedMedia(null)}
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+
+            <div className={styles.mediaContainer}>
+              {selectedMedia.isVideo ? (
+                <video
+                  src={selectedMedia.image}
+                  className={styles.lightboxVideo}
+                  controls
+                  autoPlay
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={selectedMedia.image}
+                  alt={selectedMedia.name}
+                  className={styles.lightboxImage}
+                />
+              )}
+            </div>
+
+            <div className={styles.lightboxCaption}>
+              <span className={styles.lightboxName}>{selectedMedia.name}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
