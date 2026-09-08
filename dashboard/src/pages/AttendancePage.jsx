@@ -900,7 +900,9 @@ export default function AttendancePage() {
                     <div key={idx} className="flex justify-between items-center text-[11px]">
                       <div className="flex items-center gap-1.5">
                         <span>غياب بدون عذر — {rec.date}:</span>
-                        <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
+                        {isAdmin && (
+                          <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
+                        )}
                       </div>
                       <span className="font-bold text-rose-600">-{selectedPayslip.daily_rate} ج.م</span>
                     </div>
@@ -923,7 +925,9 @@ export default function AttendancePage() {
                     <div key={idx} className="flex justify-between items-center text-[11px]">
                       <div className="flex items-center gap-1.5">
                         <span>ساعات ناقصة — {rec.date} ({rec.shortage_hours} س):</span>
-                        <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
+                        {isAdmin && (
+                          <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
+                        )}
                       </div>
                       <span className="font-bold text-rose-600">-{(rec.shortage_hours * selectedPayslip.hourly_rate).toFixed(2)} ج.م</span>
                     </div>
@@ -944,10 +948,12 @@ export default function AttendancePage() {
                     <div key={idx} className="flex justify-between items-center text-[11px]">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-amber-600">سلفة بتاريخ {loan.date}{loan.reason ? ` (${loan.reason})` : ''}:</span>
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => setEditingLoan(loan)} className="text-blue-500 hover:text-blue-700 p-0.5 rounded" title="تعديل"><Edit2 size={13} /></button>
-                          <button onClick={() => handleDeleteLoan(loan.id)} className="text-red-500 hover:text-red-700 p-0.5 rounded" title="حذف"><Trash2 size={13} /></button>
-                        </div>
+                        {isAdmin && (
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => setEditingLoan(loan)} className="text-blue-500 hover:text-blue-700 p-0.5 rounded" title="تعديل"><Edit2 size={13} /></button>
+                            <button onClick={() => handleDeleteLoan(loan.id)} className="text-red-500 hover:text-red-700 p-0.5 rounded" title="حذف"><Trash2 size={13} /></button>
+                          </div>
+                        )}
                       </div>
                       <span className="font-bold text-amber-700">-{loan.amount.toLocaleString()} ج.م</span>
                     </div>
