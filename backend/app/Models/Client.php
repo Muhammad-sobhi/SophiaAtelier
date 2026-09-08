@@ -163,6 +163,17 @@ class Client extends Model
                 return 'picked_up';
             }
 
+            // ── Fittings table takes priority over date-based inference ──
+            // If explicit fittings exist in DB (even for Excel imports), trust them.
+            if ($fittingsList->count() > 0) {
+                $hasActiveFitting = $fittingsList->contains(fn($f) => $f->status !== 'completed');
+                if ($hasActiveFitting) {
+                    return 'fitting';
+                }
+                // All fittings completed → ready for pickup
+                return 'picked_up';
+            }
+
             // Extract return / pickup date from notes if saved during excel import
             $notes = $latestBooking->notes ?? '';
             $isExcelImport = ($this->source === 'excel_import' || str_contains($notes, 'استيراد') || str_contains($notes, 'يوم الاستلام:'));
@@ -193,7 +204,7 @@ class Client extends Model
                     $pickupDate = $evt->copy()->subDays($daysBefore)->format('Y-m-d');
                 }
 
-                // Apply Excel import rules ONLY for Excel imported data:
+                // Apply Excel import rules ONLY when no explicit fittings exist:
                 if ($pickupDate) {
                     if ($pickupDate < '2026-08-02') {
                         if ($returnDate && $returnDate <= $today) {
@@ -215,21 +226,6 @@ class Client extends Model
                 if ($calcReturn <= $today && $latestBooking->status === 'returned') {
                     return 'returned';
                 }
-            }
-
-            // Fitting stage handling:
-            if ($fittingsList->count() > 0) {
-                // If there are active/scheduled fittings, client is in 'fitting' stage
-                $hasActiveFitting = $fittingsList->contains(function ($f) {
-                    return $f->status !== 'completed';
-                });
-
-                if ($hasActiveFitting) {
-                    return 'fitting';
-                }
-
-                // If all fittings are completed, move to 'picked_up' stage (ready for pickup / delivery)
-                return 'picked_up';
             }
 
             // Only stay in 'booking' stage if the booking is confirmed and no fitting is scheduled yet
