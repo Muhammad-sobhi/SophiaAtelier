@@ -9,7 +9,9 @@ import {
   Printer,
   TrendingDown,
   Banknote,
-  X
+  X,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 
 
@@ -98,6 +100,9 @@ export default function AttendancePage() {
   const [loanAmount, setLoanAmount] = useState('');
   const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
   const [loanReason, setLoanReason] = useState('');
+
+  // Edit Loan State
+  const [editingLoan, setEditingLoan] = useState(null);
 
   useEffect(() => {
     // Check if user is admin
@@ -276,6 +281,68 @@ export default function AttendancePage() {
       setPayrollList(Array.isArray(res) ? res : []);
     } catch (err) {
       console.error('Failed to create loan:', err);
+      alert('حدث خطأ أثناء إضافة السلفة');
+    }
+  };
+
+  const handleUpdateLoan = async (e) => {
+    e.preventDefault();
+    if (!editingLoan) return;
+    try {
+      await apiClient.put(`/employee-loans/${editingLoan.id}`, {
+        amount: parseFloat(editingLoan.amount),
+        date: editingLoan.date,
+        reason: editingLoan.reason
+      });
+      alert('تم تحديث السلفة بنجاح');
+      setEditingLoan(null);
+      
+      const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
+      const list = Array.isArray(res) ? res : (res.data || []);
+      setPayrollList(list);
+      if (selectedPayslip) {
+        const updated = list.find(p => p.employee_id === selectedPayslip.employee_id);
+        setSelectedPayslip(updated || null);
+      }
+    } catch (err) {
+      console.error('Failed to update loan:', err);
+      alert('حدث خطأ أثناء تحديث السلفة');
+    }
+  };
+
+  const handleDeleteLoan = async (loanId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذه السلفة؟')) return;
+    try {
+      await apiClient.delete(`/employee-loans/${loanId}`);
+      alert('تم حذف السلفة بنجاح');
+      
+      const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
+      const list = Array.isArray(res) ? res : (res.data || []);
+      setPayrollList(list);
+      if (selectedPayslip) {
+        const updated = list.find(p => p.employee_id === selectedPayslip.employee_id);
+        setSelectedPayslip(updated || null);
+      }
+    } catch (err) {
+      console.error('Failed to delete loan:', err);
+      alert('حدث خطأ أثناء حذف السلفة');
+    }
+  };
+
+  const handleDeleteAttendance = async (attId) => {
+    if (!window.confirm('هل أنت متأكد من حذف سجل الحضور هذا؟')) return;
+    try {
+      await apiClient.delete(`/attendance/${attId}`);
+      const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
+      const list = Array.isArray(res) ? res : (res.data || []);
+      setPayrollList(list);
+      if (selectedPayslip) {
+        const updated = list.find(p => p.employee_id === selectedPayslip.employee_id);
+        setSelectedPayslip(updated || null);
+      }
+    } catch (err) {
+      console.error('Failed to delete attendance:', err);
+      alert('حدث خطأ أثناء حذف سجل الحضور');
     }
   };
 
@@ -826,18 +893,47 @@ export default function AttendancePage() {
 
               <div className="bg-rose-50/50 border border-rose-100 p-3.5 rounded-2xl space-y-1.5">
                 <p className="font-extrabold text-rose-700 text-[11px]">تفاصيل الخصومات والاستقطاعات:</p>
-                <div className="flex justify-between text-[11px]">
-                  <span>خصم غياب بدون عذر ({selectedPayslip.absent_days} يوم):</span>
-                  <span className="font-bold text-rose-600">-{selectedPayslip.unexcused_absence_deduction} ج.م</span>
-                </div>
+
+                {/* Absent days — per record */}
+                {selectedPayslip.absent_records?.length > 0 ? (
+                  selectedPayslip.absent_records.map((rec, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span>غياب بدون عذر — {rec.date}:</span>
+                        <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
+                      </div>
+                      <span className="font-bold text-rose-600">-{selectedPayslip.daily_rate} ج.م</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between text-[11px]">
+                    <span>خصم غياب بدون عذر ({selectedPayslip.absent_days} يوم):</span>
+                    <span className="font-bold text-rose-600">-{selectedPayslip.unexcused_absence_deduction} ج.م</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-[11px]">
                   <span>خصم إجازة غير مدفوعة ({selectedPayslip.unpaid_leave_days} يوم):</span>
                   <span className="font-bold text-rose-600">-{selectedPayslip.unpaid_leave_deduction} ج.م</span>
                 </div>
-                <div className="flex justify-between text-[11px]">
-                  <span>خصم الساعات الناقصة ({selectedPayslip.shortage_hours} ساعة):</span>
-                  <span className="font-bold text-rose-600">-{selectedPayslip.shortage_deduction} ج.م</span>
-                </div>
+
+                {/* Shortage hours — per record */}
+                {selectedPayslip.shortage_records?.length > 0 ? (
+                  selectedPayslip.shortage_records.map((rec, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span>ساعات ناقصة — {rec.date} ({rec.shortage_hours} س):</span>
+                        <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
+                      </div>
+                      <span className="font-bold text-rose-600">-{(rec.shortage_hours * selectedPayslip.hourly_rate).toFixed(2)} ج.م</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between text-[11px]">
+                    <span>خصم الساعات الناقصة ({selectedPayslip.shortage_hours} ساعة):</span>
+                    <span className="font-bold text-rose-600">-{selectedPayslip.shortage_deduction} ج.م</span>
+                  </div>
+                )}
               </div>
 
               {/* Loan Deductions Section */}
@@ -845,8 +941,14 @@ export default function AttendancePage() {
                 <div className="bg-amber-50/50 border border-amber-200 p-3.5 rounded-2xl space-y-1.5">
                   <p className="font-extrabold text-amber-700 text-[11px]">خصم سلفة / إقراض:</p>
                   {selectedPayslip.loan_details?.map((loan, idx) => (
-                    <div key={idx} className="flex justify-between text-[11px]">
-                      <span className="text-amber-600">سلفة بتاريخ {loan.date}{loan.reason ? ` (${loan.reason})` : ''}:</span>
+                    <div key={idx} className="flex justify-between items-center text-[11px]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-amber-600">سلفة بتاريخ {loan.date}{loan.reason ? ` (${loan.reason})` : ''}:</span>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => setEditingLoan(loan)} className="text-blue-500 hover:text-blue-700 p-0.5 rounded" title="تعديل"><Edit2 size={13} /></button>
+                          <button onClick={() => handleDeleteLoan(loan.id)} className="text-red-500 hover:text-red-700 p-0.5 rounded" title="حذف"><Trash2 size={13} /></button>
+                        </div>
+                      </div>
                       <span className="font-bold text-amber-700">-{loan.amount.toLocaleString()} ج.م</span>
                     </div>
                   ))}
@@ -960,6 +1062,80 @@ export default function AttendancePage() {
           </div>
         </div>
       }
-    </div>);
 
+      {/* Edit Loan Modal */}
+      {editingLoan && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-l from-blue-600 to-indigo-700 p-6 flex justify-between items-center text-white">
+              <h2 className="text-xl font-extrabold flex items-center gap-2">
+                <Edit2 size={24} className="text-blue-200" />
+                تعديل السلفة
+              </h2>
+              <button
+                onClick={() => setEditingLoan(null)}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateLoan} className="space-y-4 p-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">المبلغ (ج.م)</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="0.01"
+                  value={editingLoan.amount}
+                  onChange={(e) => setEditingLoan({...editingLoan, amount: e.target.value})}
+                  className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all font-bold"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">التاريخ</label>
+                <input
+                  type="date"
+                  required
+                  value={editingLoan.date}
+                  onChange={(e) => setEditingLoan({...editingLoan, date: e.target.value})}
+                  className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">السبب / ملاحظات (اختياري)</label>
+                <textarea
+                  rows="2"
+                  value={editingLoan.reason || ''}
+                  onChange={(e) => setEditingLoan({...editingLoan, reason: e.target.value})}
+                  className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all resize-none"
+                  placeholder="مثال: سلفة زواج، سلفة طوارئ..."
+                ></textarea>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingLoan(null)}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all"
+                >
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
 }

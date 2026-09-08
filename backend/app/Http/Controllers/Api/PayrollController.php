@@ -64,14 +64,18 @@ class PayrollController extends Controller
             $pendingLoans = EmployeeLoan::where('employee_id', $employee->id)
                 ->where('status', 'approved')
                 ->where('deducted_from_salary', false)
+                ->whereMonth('date', $month)
+                ->whereYear('date', $year)
                 ->get();
 
             $presentDays = 0;
             $absentDays = 0;
+            $absentRecords = [];
             $totalWorkedHours = 0.0;
             $totalLateMinutes = 0;
             $totalOvertimeHours = 0.0;
             $shortageHours = 0.0;
+            $shortageRecords = [];
 
             foreach ($attendances as $att) {
                 if (in_array($att->status, ['present', 'late', 'half_day'])) {
@@ -83,10 +87,22 @@ class PayrollController extends Controller
 
                     // Standard shift is 8 hours
                     if ($worked > 0 && $worked < 8.0) {
-                        $shortageHours += (8.0 - $worked);
+                        $shortage = round(8.0 - $worked, 2);
+                        $shortageHours += $shortage;
+                        $shortageRecords[] = [
+                            'id' => $att->id,
+                            'date' => $att->date->format('Y-m-d'),
+                            'worked_hours' => $worked,
+                            'shortage_hours' => $shortage,
+                        ];
                     }
                 } elseif ($att->status === 'absent') {
                     $absentDays++;
+                    $absentRecords[] = [
+                        'id' => $att->id,
+                        'date' => $att->date->format('Y-m-d'),
+                        'status' => $att->status,
+                    ];
                 }
             }
 
@@ -127,6 +143,13 @@ class PayrollController extends Controller
             $overtimePay = round($totalOvertimeHours * $hourlyRate * 1.25, 2);
             $netSalary = round(max(0, $monthlySalary - $totalDeductions + $overtimePay), 2);
 
+            // Skip if employee has absolutely no activity for this month
+            $hasActivity = $presentDays > 0 || $absentDays > 0 || $paidLeaveDays > 0 || $unpaidLeaveDays > 0 || $pendingLoans->count() > 0 || $totalOvertimeHours > 0 || $shortageHours > 0;
+            
+            if (!$hasActivity) {
+                continue;
+            }
+
             $report[] = [
                 'employee_id' => $employee->id,
                 'employee_name' => $employee->name,
@@ -150,8 +173,10 @@ class PayrollController extends Controller
                 'shortage_hours' => round($shortageHours, 2),
                 'total_overtime_hours' => round($totalOvertimeHours, 2),
                 'unexcused_absence_deduction' => $unexcusedAbsenceDeduction,
+                'absent_records' => $absentRecords,
                 'unpaid_leave_deduction' => $unpaidLeaveDeduction,
                 'shortage_deduction' => $shortageDeduction,
+                'shortage_records' => $shortageRecords,
                 'loan_deduction' => round($loanDeduction, 2),
                 'loan_details' => $loanDetails,
                 'total_deductions' => $totalDeductions,
