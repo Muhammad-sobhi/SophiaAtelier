@@ -675,6 +675,8 @@ class ClientController extends Controller
         }
 
         // Refresh and return updated stage
+        // Must unset loaded relations so current_stage recomputes from fresh DB data
+        $client->unsetRelation('fittings')->unsetRelation('bookings')->unsetRelation('visits');
         $client->refresh();
         return response()->json([
             'message' => 'Action completed',
