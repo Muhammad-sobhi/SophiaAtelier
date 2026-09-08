@@ -111,8 +111,12 @@ class PayrollController extends Controller
             $unpaidLeaveDays = 0;
 
             foreach ($approvedLeaves as $leave) {
-                $leaveStart = Carbon::parse($leave->start_date)->clamp($startDate, $endDate);
-                $leaveEnd = Carbon::parse($leave->end_date)->clamp($startDate, $endDate);
+                $ls = Carbon::parse($leave->start_date);
+                $le = Carbon::parse($leave->end_date);
+                $leaveStart = $ls->lt($startDate) ? $startDate->copy() : $ls;
+                $leaveStart = $leaveStart->gt($endDate) ? $endDate->copy() : $leaveStart;
+                $leaveEnd = $le->gt($endDate) ? $endDate->copy() : $le;
+                $leaveEnd = $leaveEnd->lt($startDate) ? $startDate->copy() : $leaveEnd;
                 $count = $leaveStart->diffInDays($leaveEnd) + 1;
 
                 if (in_array($leave->type, ['paid_leave', 'sick_leave', 'official_holiday'])) {
