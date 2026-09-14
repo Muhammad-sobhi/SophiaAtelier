@@ -16,6 +16,17 @@ class DressController extends Controller
     {
         $query = Dress::with(['category', 'collection', 'designer', 'images', 'accessories'])->withCount('bookings');
 
+        if ($request->boolean('with_bookings')) {
+            $query->with([
+                'bookings' => function($q) {
+                    $q->where('status', '!=', 'cancelled')->with('client');
+                },
+                'secondBookings' => function($q) {
+                    $q->where('status', '!=', 'cancelled')->with('client');
+                }
+            ]);
+        }
+
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
@@ -138,6 +149,9 @@ class DressController extends Controller
             'images', 
             'accessories', 
             'bookings' => function($q) {
+                $q->where('status', '!=', 'cancelled')->with('client');
+            },
+            'secondBookings' => function($q) {
                 $q->where('status', '!=', 'cancelled')->with('client');
             }
         ]);

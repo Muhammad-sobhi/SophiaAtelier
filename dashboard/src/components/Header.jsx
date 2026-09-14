@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
-import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
 
 const typeStyles = {
   info: { icon: Bell, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -97,8 +96,6 @@ export function Header({ onMenuClick }) {
   useEffect(() => {
     if (currentUser) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 15000);
-      return () => clearInterval(interval);
     }
   }, [currentUser, fetchNotifications]);
 
@@ -293,223 +290,178 @@ export function Header({ onMenuClick }) {
     }
   };
 
-  return (<>
-    {/*#__PURE__*/
-    _jsxDEV("div", { className: "flex items-center justify-between py-3 px-3 sm:px-6 bg-white border-b border-slate-100 flex-shrink-0 select-none text-right", dir: "rtl", children: [/*#__PURE__*/
+  return (
+    <>
+      <div className="flex items-center justify-between py-3 px-3 sm:px-6 bg-white border-b border-slate-100 flex-shrink-0 select-none text-right" dir="rtl">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {onMenuClick && (
+            <button
+              onClick={onMenuClick}
+              className="md:hidden p-2 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
+          )}
+        </div>
 
-      _jsxDEV("div", { className: "flex items-center gap-2 sm:gap-3", children: [
-        onMenuClick && /*#__PURE__*/
-        _jsxDEV("button", {
-          onClick: onMenuClick,
-          className: "md:hidden p-2 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 transition-colors cursor-pointer", children: /*#__PURE__*/
-
-          _jsxDEV(Menu, { size: 20 }, void 0, false) }, void 0, false
-        ), /*#__PURE__*/
-
-
-
-        _jsxDEV("div", { className: "w-32 xs:w-48 sm:w-80 relative", ref: searchRef, children: [/*#__PURE__*/
-          _jsxDEV("input", {
-            type: "text",
-            placeholder: "ابحث عن عروس أو فستان...",
-            value: searchQuery,
-            onChange: (e) => handleSearch(e.target.value),
-            onFocus: () => searchResults.length > 0 && setShowSearchResults(true),
-            className: "w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-700 shadow-sm" }, void 0, false
-          ), /*#__PURE__*/
-          _jsxDEV(Search, { className: "absolute right-3.5 top-1/2 transform -translate-y-1/2 text-slate-400", size: 16 }, void 0, false),
-          showSearchResults && /*#__PURE__*/
-          _jsxDEV("div", { className: "absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 py-2 max-h-60 overflow-y-auto", children:
-            searchResults.map((result) => /*#__PURE__*/
-            _jsxDEV("button", {
-
-              onClick: () => {
-                navigate(result.path);
-                setShowSearchResults(false);
-                setSearchQuery('');
-              },
-              className: "w-full px-4 py-2.5 text-right hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer", children: [/*#__PURE__*/
-
-              _jsxDEV("span", { className: `text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                result.type === 'client' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`, children:
-
-                result.type === 'client' ? 'عروس' : 'فستان' }, void 0, false
-              ), /*#__PURE__*/
-              _jsxDEV("span", { className: "text-xs font-semibold text-slate-700", children: result.label }, void 0, false)] }, `${result.type}-${result.id}`, true
-            )
-            ) }, void 0, false
-          ),
-
-          isSearching && /*#__PURE__*/
-          _jsxDEV("div", { className: "absolute left-3 top-1/2 -translate-y-1/2", children: /*#__PURE__*/
-            _jsxDEV("div", { className: "w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" }, void 0, false) }, void 0, false
-          )] }, void 0, true
-
-        )] }, void 0, true
-
-      ), /*#__PURE__*/
-
-
-      _jsxDEV("div", { className: "flex items-center gap-4", children: [/*#__PURE__*/
-
-        _jsxDEV("div", { className: "relative", ref: notifRef, children: [/*#__PURE__*/
-          _jsxDEV("button", {
-            onClick: () => setIsNotifOpen(!isNotifOpen),
-            className: "w-10 h-10 rounded-2xl border border-slate-100/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-all cursor-pointer relative active:scale-95", children: [/*#__PURE__*/
-
-            _jsxDEV(Bell, { size: 18 }, void 0, false),
-            unreadCount > 0 && /*#__PURE__*/
-            _jsxDEV("span", { className: "absolute -top-1 -left-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-white animate-bounce", children:
-              unreadCount }, void 0, false
-            )] }, void 0, true
-
-          ),
-
-
-          isNotifOpen && (
-            <div className="absolute left-0 mt-2.5 w-84 bg-white rounded-3xl border border-slate-100 shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50 bg-slate-50/50">
-                <span className="text-xs font-extrabold text-slate-800">
-                  التنبيهات ({unreadCount})
+        <div className="flex items-center gap-4">
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className="w-10 h-10 rounded-2xl border border-slate-100/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-all cursor-pointer relative active:scale-95"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -left-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-white animate-bounce">
+                  {unreadCount}
                 </span>
-                <div className="flex items-center gap-2">
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={markAllRead}
-                      className="text-[10px] text-indigo-600 hover:text-indigo-700 font-extrabold cursor-pointer"
-                    >
-                      قراءة الكل
-                    </button>
-                  )}
-                  {filteredNotifications.length > 0 && (
-                    <button
-                      onClick={deleteAllNotifications}
-                      className="text-[10px] text-rose-600 hover:text-rose-700 font-extrabold cursor-pointer flex items-center gap-0.5"
-                    >
-                      <Trash2 size={11} />
-                      مسح الكل
-                    </button>
+              )}
+            </button>
+
+            {isNotifOpen && (
+              <div className="absolute left-0 mt-2.5 w-84 bg-white rounded-3xl border border-slate-100 shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50 bg-slate-50/50">
+                  <span className="text-xs font-extrabold text-slate-800">
+                    التنبيهات ({unreadCount})
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllRead}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-700 font-extrabold cursor-pointer"
+                      >
+                        قراءة الكل
+                      </button>
+                    )}
+                    {filteredNotifications.length > 0 && (
+                      <button
+                        onClick={deleteAllNotifications}
+                        className="text-[10px] text-rose-600 hover:text-rose-700 font-extrabold cursor-pointer flex items-center gap-0.5"
+                      >
+                        <Trash2 size={11} />
+                        مسح الكل
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-50 scrollbar-thin">
+                  {filteredNotifications.length > 0 ? (
+                    filteredNotifications.map((notif) => {
+                      const ts = typeStyles[notif.type] || typeStyles['info'];
+                      const IconComponent = ts.icon;
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={async () => {
+                            if (!notif.read) {
+                              await toggleNotifStatus(notif.id);
+                            }
+                            if (notif.page) {
+                              navigate(notif.page);
+                            }
+                            setIsNotifOpen(false);
+                          }}
+                          className={`p-3.5 flex items-start gap-3 hover:bg-slate-50/50 transition-colors cursor-pointer relative group ${
+                            notif.read ? 'opacity-60' : 'bg-indigo-50/5'
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${ts.bg} ${ts.color}`}>
+                            <IconComponent size={14} />
+                          </div>
+                          <div className="flex-grow min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-extrabold text-slate-700 truncate">{notif.title}</p>
+                              <div className="flex items-center gap-1.5">
+                                {!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 flex-shrink-0"></span>}
+                                <button
+                                  onClick={(e) => deleteNotification(e, notif.id)}
+                                  className="text-slate-400 hover:text-rose-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-rose-50"
+                                  title="حذف الإشعار"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-relaxed truncate">{notif.desc}</p>
+                            {notif.originalType === 'pickup_reminder' && (
+                              <button
+                                onClick={(e) => sendWhatsAppReminder(e, notif)}
+                                className="mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start"
+                              >
+                                <span>إرسال تذكير واتساب</span>
+                              </button>
+                            )}
+                            <span className="text-[8px] text-slate-400 font-bold mt-1.5 flex items-center gap-1">
+                              <Clock size={10} /> {notif.time}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-8 text-center text-slate-400 text-[11px] font-bold">
+                      لا توجد تنبيهات جديدة حالياً
+                    </div>
                   )}
                 </div>
               </div>
+            )}
+          </div>
 
-              <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-50 scrollbar-thin">
-                {filteredNotifications.length > 0 ? (
-                  filteredNotifications.map((notif) => {
-                    const ts = typeStyles[notif.type] || typeStyles['info'];
-                    const IconComponent = ts.icon;
-                    return (
-                      <div
-                        key={notif.id}
-                        onClick={async () => {
-                          if (!notif.read) {
-                            await toggleNotifStatus(notif.id);
-                          }
-                          if (notif.page) {
-                            navigate(notif.page);
-                          }
-                          setIsNotifOpen(false);
-                        }}
-                        className={`p-3.5 flex items-start gap-3 hover:bg-slate-50/50 transition-colors cursor-pointer relative group ${
-                          notif.read ? 'opacity-60' : 'bg-indigo-50/5'
-                        }`}
-                      >
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${ts.bg} ${ts.color}`}>
-                          <IconComponent size={14} />
-                        </div>
-                        <div className="flex-grow min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-extrabold text-slate-700 truncate">{notif.title}</p>
-                            <div className="flex items-center gap-1.5">
-                              {!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 flex-shrink-0"></span>}
-                              <button
-                                onClick={(e) => deleteNotification(e, notif.id)}
-                                className="text-slate-400 hover:text-rose-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-rose-50"
-                                title="حذف الإشعار"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-relaxed truncate">{notif.desc}</p>
-                          {notif.originalType === 'pickup_reminder' && (
-                            <button
-                              onClick={(e) => sendWhatsAppReminder(e, notif)}
-                              className="mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 self-start"
-                            >
-                              <span>إرسال تذكير واتساب</span>
-                            </button>
-                          )}
-                          <span className="text-[8px] text-slate-400 font-bold mt-1.5 flex items-center gap-1">
-                            <Clock size={10} /> {notif.time}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="p-8 text-center text-slate-400 text-[11px] font-bold">
-                    لا توجد تنبيهات جديدة حالياً
-                  </div>
-                )}
-              </div>
-            </div>
-          )] }, void 0, true
-
-        ),
-
-
-        currentUser && /*#__PURE__*/
-        _jsxDEV("div", { className: "relative border-r border-slate-100 pr-4", ref: profileRef, children: [/*#__PURE__*/
-          _jsxDEV("button", {
-            onClick: () => setIsProfileDropdownOpen(!isProfileDropdownOpen),
-            className: "flex items-center gap-3 text-right hover:bg-slate-50 p-1.5 rounded-2xl transition-colors cursor-pointer", children: [/*#__PURE__*/
-            _jsxDEV("div", { className: "text-right", children: [/*#__PURE__*/
-              _jsxDEV("h4", { className: "text-xs font-extrabold text-slate-800 leading-tight", children: currentUser.name }, void 0, false), /*#__PURE__*/
-              _jsxDEV("span", { className: "text-[9px] font-bold text-slate-400", children:
-                currentUser.role === 'admin' ? 'مدير النظام' : currentUser.role }, void 0, false
-              )] }, void 0, true
-            ), /*#__PURE__*/
-            _jsxDEV("div", { className: "w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-xs shadow-sm", children:
-              currentUser.name?.charAt(0) || 'A' }, void 0, false
-            )] }, void 0, true
-          ),
-          
-          isProfileDropdownOpen && (
-            <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden py-2 animate-fade-in">
-              <div className="px-4 py-2 border-b border-slate-50 mb-1">
-                <p className="text-xs font-extrabold text-slate-800 truncate">{currentUser.name}</p>
-                <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
-              </div>
-              
-              {currentUser.role === 'admin' && (
-                <button
-                  onClick={() => {
-                    setIsProfileDropdownOpen(false);
-                    setIsProfileModalOpen(true);
-                  }}
-                  className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-2 cursor-pointer"
-                >
-                  <Settings size={14} />
-                  <span>إعدادات الحساب</span>
-                </button>
-              )}
-              
+          {currentUser && (
+            <div className="relative border-r border-slate-100 pr-4" ref={profileRef}>
               <button
-                onClick={() => {
-                  setIsProfileDropdownOpen(false);
-                  handleLogout();
-                }}
-                className="w-full text-right px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-2 cursor-pointer"
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-3 text-right hover:bg-slate-50 p-1.5 rounded-2xl transition-colors cursor-pointer"
               >
-                <LogOut size={14} />
-                <span>تسجيل الخروج</span>
+                <div className="text-right">
+                  <h4 className="text-xs font-extrabold text-slate-800 leading-tight">{currentUser.name}</h4>
+                  <span className="text-[9px] font-bold text-slate-400">
+                    {currentUser.role === 'admin' ? 'مدير النظام' : currentUser.role}
+                  </span>
+                </div>
+                <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-xs shadow-sm">
+                  {currentUser.name?.charAt(0) || 'A'}
+                </div>
               </button>
+
+              {isProfileDropdownOpen && (
+                <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden py-2 animate-fade-in">
+                  <div className="px-4 py-2 border-b border-slate-50 mb-1">
+                    <p className="text-xs font-extrabold text-slate-800 truncate">{currentUser.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+                  </div>
+
+                  {currentUser.role === 'admin' && (
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        setIsProfileModalOpen(true);
+                      }}
+                      className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                      <Settings size={14} />
+                      <span>إعدادات الحساب</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setIsProfileDropdownOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-right px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <LogOut size={14} />
+                    <span>تسجيل الخروج</span>
+                  </button>
+                </div>
+              )}
             </div>
-          )] }, void 0, true
-        )] }, void 0, true
-      )] }, void 0, true
-      )}
+          )}
+        </div>
+      </div>
       
       <ProfileSettingsModal
         isOpen={isProfileModalOpen}

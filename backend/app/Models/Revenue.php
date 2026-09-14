@@ -31,8 +31,16 @@ class Revenue extends Model
     {
         return [
             'amount' => 'decimal:2',
-            'payment_date' => 'date',
+            'payment_date' => 'date:Y-m-d',
         ];
+    }
+
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        if ($date->format('H:i:s') === '00:00:00') {
+            return $date->format('Y-m-d');
+        }
+        return $date->format('Y-m-d H:i');
     }
 
     public function booking(): BelongsTo

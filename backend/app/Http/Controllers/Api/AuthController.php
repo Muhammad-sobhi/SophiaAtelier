@@ -54,6 +54,8 @@ class AuthController extends Controller
         $employee = \App\Models\Employee::where('email', $user->email)->first();
         $user->permissions = $employee ? ($employee->permissions ?? []) : [];
 
+        \App\Services\ActivityLogger::log('تسجيل دخول للنظام', 'User', $user->id, ['email' => $user->email], $user->name);
+
         return response()->json([
             'user' => $user,
             'token' => $token,
@@ -62,9 +64,15 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        if ($user) {
+            \App\Services\ActivityLogger::log('تسجيل خروج من النظام', 'User', $user->id, null, $user->name);
+            $user->currentAccessToken()->delete();
+        }
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json([
+            'message' => 'Logged out successfully',
+        ]);
     }
 
     public function me(Request $request): JsonResponse

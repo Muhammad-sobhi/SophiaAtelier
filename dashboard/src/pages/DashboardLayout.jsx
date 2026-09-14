@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { LogIn, Lock, Mail, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { ToastContainer } from '@/components/ui/Toast';
 
 export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -166,11 +167,12 @@ export default function DashboardLayout() {
 
         <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden">
           <Header onMenuClick={() => setIsSidebarOpen(true)} />
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </div>
         </div>
       </div>
+      <ToastContainer />
     </div>
   );
 }

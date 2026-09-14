@@ -23,6 +23,22 @@ const FaqsPage = lazy(() => import('./pages/FaqsPage'));
 const TasksPage = lazy(() => import('./pages/TasksPage'));
 const VisitsPage = lazy(() => import('./pages/VisitsPage'));
 const WhatsappTemplatesPage = lazy(() => import('./pages/WhatsappTemplatesPage'));
+const LogsPage = lazy(() => import('./pages/LogsPage'));
+
+const AdminRoute = ({ children }) => {
+  const userStr = typeof window !== 'undefined' ? localStorage.getItem('atelier_current_employee') : null;
+  let isAdmin = false;
+  if (userStr) {
+    try {
+      const u = JSON.parse(userStr);
+      isAdmin = u.role === 'admin' || u.role === 'owner';
+    } catch {}
+  }
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
 
 const PageFallback = () => (
   <div className="flex items-center justify-center p-12 text-slate-400 text-xs font-semibold" dir="rtl">
@@ -56,6 +72,7 @@ export default function App() {
             <Route path="tasks" element={<TasksPage />} />
             <Route path="visits" element={<VisitsPage />} />
             <Route path="whatsapp-templates" element={<WhatsappTemplatesPage />} />
+            <Route path="logs" element={<AdminRoute><LogsPage /></AdminRoute>} />
           </Route>
         </Routes>
       </Suspense>

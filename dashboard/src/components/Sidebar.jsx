@@ -18,6 +18,7 @@ import {
   Star,
   HelpCircle,
   Layers,
+  ShieldCheck,
   Image as ImageIcon } from
 'lucide-react';
 
@@ -34,6 +35,7 @@ const menuItems = [
 { icon: UserCheck, label: 'الموظفين', path: '/dashboard/employees' },
 { icon: Clock, label: 'الحضور والرواتب', path: '/dashboard/attendance' },
 { icon: BarChart3, label: 'التقارير', path: '/dashboard/reports' },
+{ icon: ShieldCheck, label: 'سجل النشاطات', path: '/dashboard/logs', adminOnly: true },
 { icon: MessageSquare, label: 'قوالب الرسائل', path: '/dashboard/whatsapp-templates' },
 { icon: Mail, label: 'رسائل تواصل معنا', path: '/dashboard/contact-messages' },
 { icon: Star, label: 'آراء العملاء', path: '/dashboard/reviews' },
@@ -83,7 +85,11 @@ export function Sidebar({ onClose }) {
   // Filter menu items by permissions
   const filteredMenuItems = menuItems.filter((item) => {
     if (!currentUser) return false;
-    if (currentUser.role === 'admin' || currentUser.permissions?.includes('*')) {
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'owner';
+    if (item.adminOnly) {
+      return isAdmin;
+    }
+    if (isAdmin || currentUser.permissions?.includes('*')) {
       return true;
     }
     if (item.path === '/dashboard' || item.path === '/dashboard/faqs') {

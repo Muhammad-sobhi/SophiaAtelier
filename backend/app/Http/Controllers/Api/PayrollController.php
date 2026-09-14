@@ -52,11 +52,11 @@ class PayrollController extends Controller
                 ->where('status', 'approved')
                 ->where(function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                          ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                          ->orWhere(function ($q2) use ($startDate, $endDate) {
-                              $q2->where('start_date', '<=', $startDate->format('Y-m-d'))
-                                 ->where('end_date', '>=', $endDate->format('Y-m-d'));
-                          });
+                        ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                        ->orWhere(function ($q2) use ($startDate, $endDate) {
+                            $q2->where('start_date', '<=', $startDate->format('Y-m-d'))
+                                ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                        });
                 })->get();
 
             // Fetch approved, undeducted loans for this employee
@@ -149,7 +149,7 @@ class PayrollController extends Controller
 
             // Skip if employee has absolutely no activity for this month
             $hasActivity = $presentDays > 0 || $absentDays > 0 || $paidLeaveDays > 0 || $unpaidLeaveDays > 0 || $pendingLoans->count() > 0 || $totalOvertimeHours > 0 || $shortageHours > 0;
-            
+
             if (!$hasActivity) {
                 continue;
             }

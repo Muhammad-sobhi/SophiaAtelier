@@ -42,9 +42,6 @@ Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryCon
 Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
 Route::get('/public/best-sellers', [DressController::class, 'bestSellers']);
 Route::get('/public/system-status', function () {
-    if (function_exists('opcache_reset')) {
-        @opcache_reset();
-    }
     return response()->json([
         'status' => 'online',
         'dress_code_auto_release' => true,
@@ -52,9 +49,7 @@ Route::get('/public/system-status', function () {
         'server_time' => now()->toDateTimeString(),
     ]);
 });
-Route::get('/dresses', [DressController::class, 'index']);
-Route::get('/dresses/release-code/{code}', [DressController::class, 'releaseCode']);
-Route::get('/dresses/{dress}', [DressController::class, 'show']);
+Route::get('/public/dresses', [DressController::class, 'publicIndex']);
 
 // Direct file serving route for uploads (bypasses web server symlink issues completely)
 Route::get('/storage/{path}', function ($path) {
@@ -87,53 +82,6 @@ Route::get('/storage/{path}', function ($path) {
     return response()->file($foundPath, [
         'Content-Type' => $mime,
         'Cache-Control' => 'public, max-age=31536000',
-        'Access-Control-Allow-Origin' => '*',
-    ]);
-})->where('path', '.*');
-
-// Debug endpoint to verify storage file existence (remove in production if desired)
-Route::get('/storage-debug/{path}', function ($path) {
-    $cleanPath = ltrim($path, '/');
-    $cleanPath = preg_replace('#^storage/#', '', $cleanPath);
-
-    $locations = [
-        'storage/app/public/' . $cleanPath => storage_path('app/public/' . $cleanPath),
-        'storage/app/' . $cleanPath => storage_path('app/' . $cleanPath),
-        'public/storage/' . $cleanPath => public_path('storage/' . $cleanPath),
-    ];
-
-    $results = [];
-    foreach ($locations as $label => $fullPath) {
-        $results[$label] = [
-            'full_path' => $fullPath,
-            'exists' => file_exists($fullPath),
-            'is_file' => is_file($fullPath),
-            'readable' => is_readable($fullPath),
-            'size' => file_exists($fullPath) && is_file($fullPath) ? filesize($fullPath) : null,
-        ];
-    }
-
-    // Also check if parent directories exist
-    $parentDir = storage_path('app/public/' . dirname($cleanPath));
-    $results['parent_directory'] = [
-        'path' => $parentDir,
-        'exists' => is_dir($parentDir),
-        'writable' => is_writable($parentDir),
-    ];
-
-    // List files in the relevant subdirectory
-    $subDir = storage_path('app/public/' . explode('/', $cleanPath)[0]);
-    $dirContents = [];
-    if (is_dir($subDir)) {
-        $files = array_slice(scandir($subDir), 0, 20); // first 20 files
-        $dirContents = $files;
-    }
-
-    return response()->json([
-        'requested_path' => $path,
-        'clean_path' => $cleanPath,
-        'locations' => $results,
-        'directory_sample' => $dirContents,
     ]);
 })->where('path', '.*');
 
@@ -158,7 +106,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/dresses/best-sellers/reorder', [DressController::class, 'reorderBestSellers']);
     Route::patch('/dresses/{dress}/best-seller', [DressController::class, 'toggleBestSeller']);
-    Route::apiResource('dresses', DressController::class)->except(['index', 'show']);
+    Route::get('/dresses/{dress}/availability-check', [DressController::class, 'checkAvailability']);
+    Route::apiResource('dresses', DressController::class);
     Route::put('/dresses/{dress}/stage-action', [DressController::class, 'stageAction']);
 
     Route::apiResource('categories', CategoryController::class);
@@ -175,12 +124,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('cleaning-orders', CleaningOrderController::class);
     Route::apiResource('faqs', FaqController::class);
 
+    // Reports endpoints
+    Route::get('/reports/sales', [ReportController::class, 'sales']);
+    Route::get('/reports/sales-by-stage', [ReportController::class, 'salesByStage']);
+    Route::get('/reports/conversion', [ReportController::class, 'conversion']);
+    Route::get('/reports/top-dresses', [ReportController::class, 'topDresses']);
+    Route::get('/reports/worst-dresses', [ReportController::class, 'worstDresses']);
+    Route::get('/reports/revenue', [ReportController::class, 'revenue']);
+    Route::get('/reports/client-sources', [ReportController::class, 'clientSources']);
+    Route::get('/reports/executive-summary', [ReportController::class, 'executiveSummary']);
+
     // Finance endpoints
     Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
     Route::get('/finance/summary', [FinanceController::class, 'summary']);
-    Route::post('/finance/transfer', [FinanceController::class, 'transfer']);
-    Route::post('/finance/deposit', [FinanceController::class, 'deposit']);
-    Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
 
     // Employee read routes (staff & admin)
     Route::get('/employees', [EmployeeController::class, 'index']);
@@ -224,35 +180,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Admin-only Protected Routes
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::post('/finance/transfer', [FinanceController::class, 'transfer']);
+    Route::post('/finance/deposit', [FinanceController::class, 'deposit']);
+    Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
+
+    Route::get('/activity-logs', [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
+
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::get('/dashboard/executive', [DashboardController::class, 'executive']);
-
-    // Employee management (create, update, delete) — admin only
-    Route::post('/employees', [EmployeeController::class, 'store']);
-    Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
-    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
-
-    // Finance & Payroll — admin only
-    Route::get('/clients/export/csv', [ClientController::class, 'exportCsv']);
-
-    // Leave request status approval — admin only
-    Route::put('/leave-requests/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus']);
-
-    // Employee Loans write routes moved to admin+manager group below
-
-    // Reports — admin only
-    Route::get('/reports/sales', [ReportController::class, 'sales']);
-    Route::get('/reports/conversion', [ReportController::class, 'conversion']);
-    Route::get('/reports/top-dresses', [ReportController::class, 'topDresses']);
-    Route::get('/reports/worst-dresses', [ReportController::class, 'worstDresses']);
-    Route::get('/reports/revenue', [ReportController::class, 'revenue']);
-    Route::get('/reports/client-sources', [ReportController::class, 'clientSources']);
-    Route::get('/reports/executive-summary', [ReportController::class, 'executiveSummary']);
-});
-
-// Employee Loans write — admin & manager
-Route::middleware(['auth:sanctum', 'role:admin,manager'])->group(function () {
-    Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
-    Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
-    Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
 });

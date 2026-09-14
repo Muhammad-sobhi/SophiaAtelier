@@ -4,7 +4,7 @@ import {
   Ruler,
   Scissors,
   Calendar as CalendarIcon,
-
+  ChevronRight,
   Plus,
   X,
   Info,
@@ -12,8 +12,8 @@ import {
   Printer,
   Trash2,
   Check,
-  AlertCircle } from
-'lucide-react';
+  AlertCircle
+} from 'lucide-react';
 
 
 
@@ -127,14 +127,10 @@ const formatFittingDate = (dateStr) => {
 export default function FittingsPage() {
   const [fittingsList, setFittingsList] = useState([]);
   const [selectedFitting, setSelectedFitting] = useState(null);
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [alertMessage, setAlertMessage] = useState(
-
-
-
-
-    null);
+  const [alertMessage, setAlertMessage] = useState(null);
 
   // Dropdown lists from database
   const [bookingsObjects, setBookingsObjects] = useState([]);
@@ -211,6 +207,7 @@ export default function FittingsPage() {
 
   const handleSelectFitting = (fitting) => {
     setSelectedFitting(fitting);
+    setMobileShowDetail(true);
   };
 
   const handleAlterationToggle = async (field) => {
@@ -285,6 +282,7 @@ export default function FittingsPage() {
     try {
       await apiClient.delete(`/fittings/${deleteConfirm.id}`);
       fetchFittings();
+      setMobileShowDetail(false);
     } catch (e) {
       console.error(e);
     }
@@ -311,6 +309,7 @@ export default function FittingsPage() {
       });
       fetchFittings();
       setIsModalOpen(false);
+      setMobileShowDetail(false);
       resetForm();
     } catch (err) {
       console.error('Failed to schedule fitting:', err);
@@ -429,13 +428,13 @@ export default function FittingsPage() {
   };
 
   return (
-    <div className="h-full p-6 md:p-8 space-y-4 bg-slate-50/30 text-right overflow-hidden flex flex-col" dir="rtl">
+    <div className="h-full p-3 sm:p-4 md:p-8 space-y-4 bg-slate-50/30 text-right overflow-y-auto lg:overflow-hidden flex flex-col" dir="rtl">
       
       {/* Page Title & Selection Sidebar wrapper */}
-      <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 flex-1 min-h-0 overflow-visible lg:overflow-hidden">
         
         {/* Sidebar: Fittings List (NARROWER w-64) */}
-        <div className="w-full lg:w-64 bg-white rounded-3xl p-4 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.01)] flex flex-col space-y-4 flex-shrink-0">
+        <div className={`w-full lg:w-64 bg-white rounded-3xl p-4 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.01)] flex flex-col space-y-4 flex-shrink-0 ${mobileShowDetail ? 'hidden lg:flex' : 'flex'}`}>
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-extrabold text-slate-800">قائمة البروفات المجدولة</h2>
             <button
@@ -483,8 +482,21 @@ export default function FittingsPage() {
 
         {/* Detail Panel Area (WIDER) */}
         {selectedFitting ?
-        <div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-1">
+        <div className={`flex-1 flex flex-col space-y-4 overflow-y-auto pr-0 lg:pr-1 ${mobileShowDetail ? 'flex' : 'hidden lg:flex'}`}>
             
+            {/* Mobile Back Button to list */}
+            <div className="lg:hidden flex items-center justify-between pb-1">
+              <button
+                type="button"
+                onClick={() => setMobileShowDetail(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-650 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                <ChevronRight size={16} />
+                <span>العودة لقائمة البروفات</span>
+              </button>
+              <span className="text-[11px] font-bold text-slate-400">تفاصيل البروفة المحددة</span>
+            </div>
+
             {/* Header detail controls */}
             <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.01)] flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
               <div className="flex items-center gap-3 flex-grow">
@@ -731,7 +743,7 @@ export default function FittingsPage() {
 
           </div> :
 
-        <div className="flex-1 bg-white rounded-3xl border border-slate-100 flex items-center justify-center p-10 text-slate-350 font-bold text-xs">
+        <div className={`flex-1 bg-white rounded-3xl border border-slate-100 items-center justify-center p-10 text-slate-350 font-bold text-xs ${mobileShowDetail ? 'flex' : 'hidden lg:flex'}`}>
             لا توجد بروفات مجدولة مسجلة في قاعدة البيانات حالياً.
           </div>
         }

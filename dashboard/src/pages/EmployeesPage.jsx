@@ -43,7 +43,7 @@ export default function EmployeesPage() {
 
   // Form fields
   const [name, setName] = useState('');
-  const [position, setPosition] = useState('');
+  const [role, setRole] = useState('');
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('');
   const [payCycle, setPayCycle] = useState('monthly');
@@ -81,7 +81,7 @@ export default function EmployeesPage() {
       setEmployeesList(data.map((emp) => ({
         id: emp.id,
         name: emp.name || '',
-        position: emp.position || emp.role || 'موظف',
+        role: emp.role || emp.position || 'موظف',
         phone: emp.phone || '',
         salary: emp.salary ? `${parseFloat(emp.salary).toLocaleString()} ج.م` : '0 ج.م',
         payCycle: emp.pay_cycle || 'monthly',
@@ -115,7 +115,7 @@ export default function EmployeesPage() {
   const handleEditEmployeeClick = (emp) => {
     setEditingEmployee(emp);
     setName(emp.name);
-    setPosition(emp.position);
+    setRole(emp.role || '');
     setPhone(emp.phone);
     setSalary(emp.salary.replace(' ج.م', '').replace(/,/g, ''));
     setPayCycle(emp.payCycle || 'monthly');
@@ -132,7 +132,7 @@ export default function EmployeesPage() {
   const handleOpenAddModal = () => {
     setEditingEmployee(null);
     setName('');
-    setPosition('');
+    setRole('');
     setPhone('');
     setSalary('');
     setPayCycle('monthly');
@@ -162,7 +162,7 @@ export default function EmployeesPage() {
       if (editingEmployee) {
         await apiClient.put(`/employees/${editingEmployee.id}`, {
           name,
-          position: position || 'موظف',
+          role: role || 'موظف',
           phone,
           salary: parseFloat(salary.replace(/,/g, '')) || 0,
           pay_cycle: payCycle,
@@ -177,7 +177,7 @@ export default function EmployeesPage() {
         setEmployeesList((prev) => prev.map((emp) => emp.id === editingEmployee.id ? {
           ...emp,
           name,
-          position: position || 'موظف',
+          role: role || 'موظف',
           phone,
           salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
           payCycle,
@@ -192,7 +192,7 @@ export default function EmployeesPage() {
       } else {
         const res = await apiClient.post('/employees', {
           name,
-          position: position || 'موظف',
+          role: role || 'موظف',
           phone,
           salary: parseFloat(salary.replace(/,/g, '')) || 0,
           pay_cycle: payCycle,
@@ -207,7 +207,7 @@ export default function EmployeesPage() {
         const newEmp = {
           id: res.data?.id || Date.now(),
           name,
-          position: position || 'موظف',
+          role: role || 'موظف',
           phone,
           salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
           payCycle,
@@ -227,7 +227,7 @@ export default function EmployeesPage() {
 
     setIsModalOpen(false);
     setName('');
-    setPosition('');
+    setRole('');
     setPhone('');
     setSalary('');
     setPayCycle('monthly');
@@ -293,7 +293,7 @@ export default function EmployeesPage() {
                     </div>
                     <div>
                       <h3 className="font-extrabold text-slate-800 text-xs">{emp.name}</h3>
-                      <span className="inline-block text-[9px] text-indigo-600 bg-indigo-50 border border-indigo-150/40 px-2 py-0.5 rounded-md font-bold mt-0.5">{emp.position}</span>
+                      <span className="inline-block text-[9px] text-indigo-600 bg-indigo-50 border border-indigo-150/40 px-2 py-0.5 rounded-md font-bold mt-0.5">{emp.role}</span>
                     </div>
                   </div>
 
@@ -441,8 +441,8 @@ export default function EmployeesPage() {
                   type="text"
                   required
                   placeholder="مثال: خياطة أزياء"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 
                 </div>

@@ -100,9 +100,11 @@ export function MultiPaymentMethodInput({
   return (
     <div className="space-y-2 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/80 text-right">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-150">
-          إجمالي المدفوع: {totalPaid.toLocaleString()} ج.م
-        </span>
+        {currentPayments.length > 1 ? (
+          <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-150">
+            إجمالي المدفوع: {totalPaid.toLocaleString()} ج.م
+          </span>
+        ) : <div />}
         <label className="text-[11px] font-extrabold text-slate-700 block">
           {label} {required && <span className="text-rose-500">*</span>}
         </label>

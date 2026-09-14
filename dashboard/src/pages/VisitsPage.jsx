@@ -13,7 +13,7 @@ import { Search, SlidersHorizontal, Plus, ChevronLeft, ChevronRight, X, Calendar
 
 
 const MARKETING_SOURCES = [
-{ value: 'انستقرام', label: 'انستقرام' },
+{ value: 'انستجرام', label: 'انستجرام' },
 { value: 'سنابشات', label: 'سنابشات' },
 { value: 'جوجل', label: 'جوجل' },
 { value: 'تيك توك', label: 'تيك توك' },
@@ -58,7 +58,7 @@ export default function VisitsPage() {
   // Form states
   const [newClient, setNewClient] = useState('');
   const [newDate, setNewDate] = useState('2026-07-12');
-  const [newSource, setNewSource] = useState('انستقرام');
+  const [newSource, setNewSource] = useState('انستجرام');
   const [newStatus, setNewStatus] = useState('وصل');
   const [selectedTriedDresses, setSelectedTriedDresses] = useState([]);
   const [selectedBookedDresses, setSelectedBookedDresses] = useState([]);
@@ -138,7 +138,7 @@ export default function VisitsPage() {
     // Reset Form
     setNewClient('');
     setNewDate('2026-07-12');
-    setNewSource('انستقرام');
+    setNewSource('انستجرام');
     setNewStatus('وصل');
     setSelectedTriedDresses([]);
     setSelectedBookedDresses([]);
@@ -352,7 +352,7 @@ export default function VisitsPage() {
     setIsModalOpen(false);
     setNewClient('');
     setNewDate(selectedDateStr);
-    setNewSource('انستقرام');
+    setNewSource('انستجرام');
     setNewStatus('وصل');
     setSelectedTriedDresses([]);
     setSelectedBookedDresses([]);
@@ -983,7 +983,7 @@ export default function VisitsPage() {
                   onChange={(e) => setNewSource(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none text-slate-700">
                   
-                    <option value="انستقرام">انستقرام (Instagram)</option>
+                    <option value="انستجرام">انستجرام (Instagram)</option>
                     <option value="فيسبوك">فيسبوك (Facebook)</option>
                     <option value="تيك توك">تيك توك (TikTok)</option>
                     <option value="إحالة">عميلة سابقة / إحالة</option>

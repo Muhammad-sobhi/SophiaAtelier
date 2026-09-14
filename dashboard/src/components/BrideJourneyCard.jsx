@@ -22,7 +22,8 @@ import {
   Calendar
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
-import { BookingFinancesModal } from './BookingFinancesModal';
+import { UnifiedStageModal } from './bride-journey/UnifiedStageModal';
+import { cleanDate } from '@/lib/utils';
 
 
 
@@ -74,7 +75,7 @@ const PAYMENT_METHODS = [
 export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, onReturnClick }) {
   const navigate = useNavigate();
   const [selectedMobileStage, setSelectedMobileStage] = useState(bride?.current_stage || 'visit');
-  const [showFinancesModal, setShowFinancesModal] = useState(false);
+  const [stageModal, setStageModal] = useState({ isOpen: false, stage: 'booking' });
 
   React.useEffect(() => {
     setSelectedMobileStage(bride?.current_stage || 'visit');
@@ -104,7 +105,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
   // Fitting modal states
   const [showFittingModal, setShowFittingModal] = useState(false);
-  const [fittingDate, setFittingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [fittingDate, setFittingDate] = useState(cleanDate(new Date().toISOString()));
   const [fittingTime, setFittingTime] = useState('01:00 م');
   const [fittingDressId, setFittingDressId] = useState('');
   const [tryingFee, setTryingFee] = useState('150');
@@ -128,7 +129,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [employeesList, setEmployeesList] = useState([]);
   const [bookingPhone, setBookingPhone] = useState(bride.phone || '');
   const [bookingPhone2, setBookingPhone2] = useState(bride.phone2 || '');
-  const [bookingEventDate, setBookingEventDate] = useState(bride.wedding_date || new Date().toISOString().split('T')[0]);
+  const [bookingEventDate, setBookingEventDate] = useState(cleanDate(bride.wedding_date || new Date().toISOString()));
   const [bookingTotalAmount, setBookingTotalAmount] = useState('0');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('0');
   const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState('5000');
@@ -216,7 +217,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       setBookingPaymentMethod('instapay');
       setBookingPhone(bride.phone || '');
       setBookingPhone2(bride.phone2 || '');
-      setBookingEventDate(bride.wedding_date || new Date().toISOString().split('T')[0]);
+      setBookingEventDate(cleanDate(bride.wedding_date || new Date().toISOString()));
     }
   }, [showBookingModal, bride.id]);
 
@@ -510,7 +511,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     try {
       setIsSubmitting(true);
       await apiClient.put(`/clients/${bride.id}/stage-action`, { action });
-      onStageUpdate?.();
+      await onStageUpdate?.();
 
       // ── Always fetch FRESH client data from API before building WhatsApp message ──
       let freshBride = bride;
@@ -1264,14 +1265,14 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          {/* Settings / Finances Button */}
+          {/* Settings / Stage Edit Button */}
           <button 
             type="button"
-            onClick={() => setShowFinancesModal(true)}
+            onClick={() => setStageModal({ isOpen: true, stage: bride?.current_stage || 'booking' })}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs text-[9px] font-bold cursor-pointer"
           >
             <Edit3 size={11} className="text-slate-500" />
-            <span>تعديل وحسابات</span>
+            <span>تعديل المرحلة</span>
           </button>
 
           <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
@@ -1477,8 +1478,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                     <input
                       type="date"
                       required
-                      value={fittingDate}
-                      onChange={(e) => setFittingDate(e.target.value)}
+                      value={cleanDate(fittingDate)}
+                      onChange={(e) => setFittingDate(cleanDate(e.target.value))}
                       className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
                         isFittingDateBlocked ? 'border-rose-300 bg-rose-50/20 text-rose-700' : 'bg-slate-50 border-slate-100'
                       }`}
@@ -1847,8 +1848,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   <input
                     type="date"
                     required
-                    value={bookingEventDate}
-                    onChange={(e) => setBookingEventDate(e.target.value)}
+                    value={cleanDate(bookingEventDate)}
+                    onChange={(e) => setBookingEventDate(cleanDate(e.target.value))}
                     className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right ${
                       (isBookingDateBlocked || isBookingDate2Blocked) ? 'border-amber-300 bg-amber-50/20 text-amber-900' : 'bg-slate-50 border-slate-150'
                     }`}
@@ -2164,13 +2165,14 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         </div>
       )}
 
-      {/* Finances & Stage Revert Modal */}
-      {showFinancesModal && (
-        <BookingFinancesModal
-          isOpen={showFinancesModal}
-          booking={bride.bookings?.[0]}
-          onClose={() => setShowFinancesModal(false)}
-          onUpdate={onStageUpdate}
+      {/* Stage Edit Modal (Screenshot 1 Design) */}
+      {stageModal.isOpen && (
+        <UnifiedStageModal
+          isOpen={stageModal.isOpen}
+          bride={bride}
+          stage={stageModal.stage}
+          onClose={() => setStageModal({ isOpen: false, stage: 'booking' })}
+          onSuccess={onStageUpdate}
         />
       )}
     </div>);

@@ -10,13 +10,21 @@ class Visit extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot'];
+    protected $fillable = ['client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'sales_name'];
 
     protected function casts(): array
     {
         return [
-            'visit_date' => 'date',
+            'visit_date' => 'date:Y-m-d',
         ];
+    }
+
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        if ($date->format('H:i:s') === '00:00:00') {
+            return $date->format('Y-m-d');
+        }
+        return $date->format('Y-m-d H:i');
     }
 
     public function client(): BelongsTo

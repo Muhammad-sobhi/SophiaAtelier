@@ -107,8 +107,8 @@ export function ProfileSettingsModal({ isOpen, onClose, currentUser }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity animate-fade-in text-slate-700 font-sans">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col" dir="rtl">
+    <div className="fixed inset-0 z-[10010] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700 font-sans overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] w-full max-w-md border border-slate-100 overflow-hidden flex flex-col my-auto" dir="rtl">
         <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-2">
             <ShieldCheck className="text-indigo-600" size={20} />

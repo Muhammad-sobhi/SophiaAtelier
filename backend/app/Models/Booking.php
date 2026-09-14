@@ -35,13 +35,23 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
-            'booking_date' => 'date',
-            'event_date' => 'date',
+            'booking_date' => 'date:Y-m-d',
+            'event_date' => 'date:Y-m-d',
+            'pickup_scheduled_on' => 'date:Y-m-d',
+            'return_scheduled_on' => 'date:Y-m-d',
             'total_amount' => 'decimal:2',
             'deposit_amount' => 'decimal:2',
             'insurance_amount' => 'decimal:2',
             'is_override' => 'boolean',
         ];
+    }
+
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        if ($date->format('H:i:s') === '00:00:00') {
+            return $date->format('Y-m-d');
+        }
+        return $date->format('Y-m-d H:i');
     }
 
     public function client(): BelongsTo
@@ -197,3 +207,5 @@ class Booking extends Model
         return null;
     }
 }
+
+

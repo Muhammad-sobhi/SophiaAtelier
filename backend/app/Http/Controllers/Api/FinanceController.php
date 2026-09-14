@@ -79,6 +79,12 @@ class FinanceController extends Controller
                 'receipt_path' => $receiptPath,
             ]);
 
+            \App\Services\ActivityLogger::log('مناقلة مالية بين الخزائن', 'Finance', null, [
+                'amount' => $validated['amount'],
+                'from' => $validated['from_method'],
+                'to' => $validated['to_method'],
+            ]);
+
             return response()->json([
                 'message' => 'تم التحويل بين الخزائن بنجاح',
                 'expense' => $expense,
@@ -110,6 +116,11 @@ class FinanceController extends Controller
             'receipt_path' => $receiptPath,
         ]);
 
+        \App\Services\ActivityLogger::log('إيداع رصيد بالخزينة', 'Finance', $revenue->id, [
+            'amount' => $validated['amount'],
+            'payment_method' => $validated['payment_method'],
+        ]);
+
         return response()->json([
             'message' => 'تم تسجيل الإيداع بنجاح',
             'revenue' => $revenue,
@@ -137,6 +148,11 @@ class FinanceController extends Controller
             'description' => $desc,
             'date' => $validated['date'],
             'receipt_path' => $receiptPath,
+        ]);
+
+        \App\Services\ActivityLogger::log('سحب رصيد / مصروفات إدارية', 'Finance', $expense->id, [
+            'amount' => $validated['amount'],
+            'payment_method' => $validated['payment_method'],
         ]);
 
         return response()->json([

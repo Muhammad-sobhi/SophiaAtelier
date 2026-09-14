@@ -72,3 +72,4 @@ class FittingController extends Controller
         return response()->json(['message' => 'Fitting deleted']);
     }
 }
+

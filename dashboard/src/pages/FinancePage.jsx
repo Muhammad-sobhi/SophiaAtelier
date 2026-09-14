@@ -7,6 +7,7 @@ import {
   Sparkles, Trash2, Paperclip, Download, FileSpreadsheet, ArrowLeftRight
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
+import { FinanceStatsDetailModal } from '@/components/finance/FinanceStatsDetailModal';
 
 
 
@@ -108,6 +109,38 @@ export default function FinancePage() {
   const [vaultNotes, setVaultNotes] = useState('');
   const [vaultReceipt, setVaultReceipt] = useState(null);
   const [isSubmittingVault, setIsSubmittingVault] = useState(false);
+
+  // Stats Details Modal State
+  const [selectedStatModalType, setSelectedStatModalType] = useState(null);
+  const [dressesForStatModal, setDressesForStatModal] = useState([]);
+  const [heldInsurancesForStatModal, setHeldInsurancesForStatModal] = useState([]);
+
+  useEffect(() => {
+    apiClient.get('/dresses?per_page=1000').then((res) => {
+      const list = Array.isArray(res) ? res : res?.data || [];
+      setDressesForStatModal(list);
+    }).catch(() => {});
+
+    apiClient.get('/clients?per_page=1000').then((res) => {
+      const list = Array.isArray(res) ? res : res?.data || [];
+      const held = [];
+      list.forEach((c) => {
+        const b = c.bookings?.[0];
+        const ins = parseFloat(b?.insurance_amount || 0);
+        if (b && ins > 0 && ['confirmed', 'picked_up'].includes(b.status)) {
+          held.push({
+            brideName: c.name,
+            bridePhone: c.phone,
+            dressName: b.dress?.name || c.latest_dress_name || 'فستان',
+            insuranceAmount: ins,
+            eventDate: b.event_date || c.wedding_date,
+            stage: c.current_stage || b.status
+          });
+        }
+      });
+      setHeldInsurancesForStatModal(held);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -536,11 +569,12 @@ export default function FinancePage() {
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
   const summaryCards = [
-  { label: 'صافي الأرباح', value: `${totals.net_profit.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
-  { label: 'المبيعات / الإيرادات', value: `${totals.net_revenue.toLocaleString()} ج.م`, icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
-  { label: 'المصروفات التشغيلية', value: `${totals.net_expense.toLocaleString()} ج.م`, icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
-  { label: 'إجمالي الأصول (الفساتين)', value: `${totals.total_assets.toLocaleString()} ج.م`, icon: Building2, colorClass: 'text-sky-600', bgClass: 'bg-sky-50' },
-  { label: 'التأمينات المحتجزة (أمانات)', value: `${totals.held_insurances.toLocaleString()} ج.م`, icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' }];
+    { type: 'net_profit', label: 'صافي الأرباح', value: `${totals.net_profit.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
+    { type: 'net_revenue', label: 'المبيعات / الإيرادات', value: `${totals.net_revenue.toLocaleString()} ج.م`, icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
+    { type: 'net_expense', label: 'المصروفات التشغيلية', value: `${totals.net_expense.toLocaleString()} ج.م`, icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
+    { type: 'total_assets', label: 'إجمالي الأصول (الفساتين)', value: `${totals.total_assets.toLocaleString()} ج.م`, icon: Building2, colorClass: 'text-sky-600', bgClass: 'bg-sky-50' },
+    { type: 'held_insurances', label: 'التأمينات المحتجزة (أمانات)', value: `${totals.held_insurances.toLocaleString()} ج.م`, icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' },
+  ];
 
 
   return (
@@ -653,16 +687,26 @@ export default function FinancePage() {
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 border border-slate-50 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_12px_40px_rgba(79,70,229,0.05)] transition-all duration-300">
-              <div className="flex items-center gap-2.5 mb-2 sm:mb-3.5">
+            <div
+              key={card.label}
+              onClick={() => setSelectedStatModalType(card.type)}
+              className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 border border-slate-150 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_12px_40px_rgba(79,70,229,0.08)] hover:border-indigo-300 transition-all duration-300 cursor-pointer active:scale-98 group select-none"
+              title="انقر لعرض كافة تفاصيل هذا الإحصاء"
+            >
+              <div className="flex items-center justify-between mb-2 sm:mb-3.5">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center ${card.bgClass} ${card.colorClass}`}>
                   <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </div>
+                <span className="text-[9px] font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 hidden sm:inline">
+                  عرض التفاصيل ←
+                </span>
               </div>
               <div className={`text-sm sm:text-xl font-extrabold ${card.colorClass} truncate`}>{card.value}</div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-1 truncate">{card.label}</div>
-            </div>);
-
+              <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-1 truncate group-hover:text-slate-600 transition-colors">
+                {card.label}
+              </div>
+            </div>
+          );
         })}
       </div>
 
@@ -1739,6 +1783,17 @@ export default function FinancePage() {
           </div>
         </div>
       )}
+
+      {/* Stats Breakdown Details Modal (Requirement 7) */}
+      <FinanceStatsDetailModal
+        isOpen={Boolean(selectedStatModalType)}
+        onClose={() => setSelectedStatModalType(null)}
+        statType={selectedStatModalType}
+        totals={totals}
+        transactions={filteredTransactions}
+        dresses={dressesForStatModal}
+        heldInsurancesList={heldInsurancesForStatModal}
+      />
     </div>
   );
 }

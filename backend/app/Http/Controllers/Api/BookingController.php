@@ -245,7 +245,82 @@ class BookingController extends Controller
         unset($validated['force_override']);
         $booking->update($validated);
 
-        $loaded = $booking->load(['client', 'dress', 'dress2', 'dress3']);
+        // Sync deposit payments if provided
+        $depositPayments = $request->input('payments') ?? $request->input('deposit_payments');
+        if (is_array($depositPayments)) {
+            $booking->revenues()->where('type', 'deposit')->delete();
+            foreach ($depositPayments as $dp) {
+                $dpAmt = floatval($dp['amount'] ?? 0);
+                $dpMethod = $dp['payment_method'] ?? 'cash';
+                $rowReceipt = !empty($dp['receipt_image'])
+                    ? self::saveReceiptData($dp['receipt_image'])
+                    : (!empty($dp['receipt']) ? self::saveReceiptData($dp['receipt']) : $receiptPath);
+
+                if ($dpAmt > 0) {
+                    \App\Models\Revenue::create([
+                        'booking_id' => $booking->id,
+                        'type' => 'deposit',
+                        'amount' => $dpAmt,
+                        'payment_method' => $dpMethod,
+                        'payment_date' => $booking->booking_date ?: now()->toDateString(),
+                        'notes' => 'عربون حجز فستان للعروس: ' . ($booking->client->name ?? ''),
+                        'receipt_path' => $rowReceipt,
+                    ]);
+                }
+            }
+        }
+
+        // Sync insurance payments if provided
+        $insurancePayments = $request->input('insurance_payments');
+        if (is_array($insurancePayments)) {
+            $booking->revenues()->where('type', 'insurance')->delete();
+            foreach ($insurancePayments as $ip) {
+                $ipAmt = floatval($ip['amount'] ?? 0);
+                $ipMethod = $ip['payment_method'] ?? 'cash';
+                $rowReceipt = !empty($ip['receipt_image'])
+                    ? self::saveReceiptData($ip['receipt_image'])
+                    : (!empty($ip['receipt']) ? self::saveReceiptData($ip['receipt']) : $receiptPath);
+
+                if ($ipAmt > 0) {
+                    \App\Models\Revenue::create([
+                        'booking_id' => $booking->id,
+                        'type' => 'insurance',
+                        'amount' => $ipAmt,
+                        'payment_method' => $ipMethod,
+                        'payment_date' => now()->toDateString(),
+                        'notes' => 'تأمين الفستان للعروس: ' . ($booking->client->name ?? ''),
+                        'receipt_path' => $rowReceipt,
+                    ]);
+                }
+            }
+        }
+
+        // Sync balance payments if provided
+        $balancePayments = $request->input('balance_payments');
+        if (is_array($balancePayments)) {
+            $booking->revenues()->where('type', 'balance')->delete();
+            foreach ($balancePayments as $bp) {
+                $bpAmt = floatval($bp['amount'] ?? 0);
+                $bpMethod = $bp['payment_method'] ?? 'cash';
+                $rowReceipt = !empty($bp['receipt_image'])
+                    ? self::saveReceiptData($bp['receipt_image'])
+                    : (!empty($bp['receipt']) ? self::saveReceiptData($bp['receipt']) : $receiptPath);
+
+                if ($bpAmt > 0) {
+                    \App\Models\Revenue::create([
+                        'booking_id' => $booking->id,
+                        'type' => 'balance',
+                        'amount' => $bpAmt,
+                        'payment_method' => $bpMethod,
+                        'payment_date' => now()->toDateString(),
+                        'notes' => 'دفعة استلام الفستان للعروس: ' . ($booking->client->name ?? ''),
+                        'receipt_path' => $rowReceipt,
+                    ]);
+                }
+            }
+        }
+
+        $loaded = $booking->load(['client', 'dress', 'dress2', 'dress3', 'revenues']);
         $loaded->dress_1_conflict_date = $this->checkDressAvailability($loaded->client_id, $loaded->dress_id, $loaded->event_date, $loaded->id);
         $loaded->dress_2_conflict_date = $loaded->dress_2_id ? $this->checkDressAvailability($loaded->client_id, $loaded->dress_2_id, $loaded->event_date, $loaded->id) : null;
         $loaded->dress_3_conflict_date = $loaded->dress_3_id ? $this->checkDressAvailability($loaded->client_id, $loaded->dress_3_id, $loaded->event_date, $loaded->id) : null;

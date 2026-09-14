@@ -45,6 +45,32 @@ class ReportController extends Controller
         return response()->json($bookings);
     }
 
+    public function salesByStage(Request $request): JsonResponse
+    {
+        $month = $request->input('month', now()->format('Y-m'));
+        
+        $bookings = \App\Models\Booking::where('created_at', 'like', $month . '%')
+            ->select('sales_name', 'status', \DB::raw('count(*) as count'))
+            ->groupBy('sales_name', 'status')
+            ->get();
+
+        $fittings = \App\Models\Fitting::where('created_at', 'like', $month . '%')
+            ->select('sales_name', 'status', \DB::raw('count(*) as count'))
+            ->groupBy('sales_name', 'status')
+            ->get();
+            
+        $visits = \App\Models\Visit::where('created_at', 'like', $month . '%')
+            ->select('sales_name', 'status', \DB::raw('count(*) as count'))
+            ->groupBy('sales_name', 'status')
+            ->get();
+
+        return response()->json([
+            'bookings' => $bookings,
+            'fittings' => $fittings,
+            'visits' => $visits,
+        ]);
+    }
+
     public function conversion(): JsonResponse
     {
         $totalVisits = Visit::count();
@@ -143,3 +169,4 @@ class ReportController extends Controller
         ]);
     }
 }
+

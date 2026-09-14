@@ -12,9 +12,17 @@ class Client extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'phone', 'phone2', 'email', 'address', 'city', 'source', 'wedding_date', 'notes', 'image_path'];
+    protected $fillable = ['name', 'phone', 'phone2', 'email', 'address', 'city', 'source', 'journey_mode', 'wedding_date', 'notes', 'image_path'];
 
     protected $appends = ['visits_count', 'total_bookings', 'current_stage', 'latest_visit_date', 'latest_visit_time', 'latest_dress_name', 'latest_dress_trying_fee', 'wedding_date'];
+
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        if ($date->format('H:i:s') === '00:00:00') {
+            return $date->format('Y-m-d');
+        }
+        return $date->format('Y-m-d H:i');
+    }
 
     public function getWeddingDateAttribute(): ?string
     {
@@ -144,108 +152,7 @@ class Client extends Model
      */
     public function getCurrentStageAttribute(): string
     {
-        $bookingsList = $this->relationLoaded('bookings') ? $this->bookings : $this->bookings()->get();
-        $visitsList = $this->relationLoaded('visits') ? $this->visits : $this->visits()->get();
-        $fittingsList = $this->relationLoaded('fittings') ? $this->fittings : $this->fittings()->get();
-
-        // 1. Returned stage
-        if ($bookingsList->contains('status', 'returned')) {
-            return 'returned';
-        }
-
-        // Check latest active booking
-        $latestBooking = $bookingsList->sortByDesc('id')->first();
-        $today = \Carbon\Carbon::today()->format('Y-m-d');
-
-        if ($latestBooking) {
-            // Check status or date rules
-            if ($latestBooking->status === 'picked_up' || $latestBooking->status === 'out') {
-                return 'picked_up';
-            }
-
-            // ── Fittings table takes priority over date-based inference ──
-            // If explicit fittings exist in DB (even for Excel imports), trust them.
-            if ($fittingsList->count() > 0) {
-                $hasActiveFitting = $fittingsList->contains(fn($f) => $f->status !== 'completed');
-                if ($hasActiveFitting) {
-                    return 'fitting';
-                }
-                // All fittings completed → ready for pickup
-                return 'picked_up';
-            }
-
-            // Extract return / pickup date from notes if saved during excel import
-            $notes = $latestBooking->notes ?? '';
-            $isExcelImport = ($this->source === 'excel_import' || str_contains($notes, 'استيراد') || str_contains($notes, 'يوم الاستلام:'));
-
-            if ($isExcelImport) {
-                $returnDate = null;
-                $pickupDate = null;
-
-                if (preg_match('/(?:يوم|ميعاد)\s*التسليم:\s*(\d{4}-\d{2}-\d{2})/u', $notes, $m)) {
-                    $returnDate = $m[1];
-                }
-                if (preg_match('/(?:يوم|ميعاد)\s*الاستلام:\s*(\d{4}-\d{2}-\d{2})/u', $notes, $m)) {
-                    $pickupDate = $m[1];
-                }
-
-                // Calculate return date (1 day after wedding date if returnDate not explicitly set)
-                if (!$returnDate && !empty($latestBooking->event_date)) {
-                    $wedding = \Carbon\Carbon::parse($latestBooking->event_date);
-                    $returnDate = $wedding->addDay()->format('Y-m-d');
-                }
-
-                // Fallback pickupDate calculation from event_date if missing in notes string
-                if (!$pickupDate && !empty($latestBooking->event_date)) {
-                    $evt = \Carbon\Carbon::parse($latestBooking->event_date);
-                    $bCity = $this->city ?? 'القاهرة';
-                    $isCairoOrGiza = (! $bCity || stripos($bCity, 'cairo') !== false || stripos($bCity, 'giza') !== false || $bCity === 'القاهرة' || $bCity === 'الجيزة');
-                    $daysBefore = $isCairoOrGiza ? 1 : 2;
-                    $pickupDate = $evt->copy()->subDays($daysBefore)->format('Y-m-d');
-                }
-
-                // Apply Excel import rules ONLY when no explicit fittings exist:
-                if ($pickupDate) {
-                    if ($pickupDate < '2026-08-02') {
-                        if ($returnDate && $returnDate <= $today) {
-                            return 'returned';
-                        } else {
-                            return 'picked_up';
-                        }
-                    } elseif ($pickupDate >= '2026-08-02' && $pickupDate <= '2026-08-10') {
-                        return 'picked_up';
-                    } else {
-                        return 'fitting';
-                    }
-                }
-            }
-
-            // Normal System Bookings (Not Excel import)
-            if (!empty($latestBooking->event_date)) {
-                $calcReturn = \Carbon\Carbon::parse($latestBooking->event_date)->addDay()->format('Y-m-d');
-                if ($calcReturn <= $today && $latestBooking->status === 'returned') {
-                    return 'returned';
-                }
-            }
-
-            // Only stay in 'booking' stage if the booking is confirmed and no fitting is scheduled yet
-            if ($latestBooking->status === 'confirmed') {
-                return 'booking';
-            }
-        }
-
-        // 2. Fitting stage (if active fittings exist without booking)
-        if ($fittingsList->count() > 0) {
-            $hasActiveFitting = $fittingsList->contains(function ($f) {
-                return $f->status !== 'completed';
-            });
-            if ($hasActiveFitting) {
-                return 'fitting';
-            }
-            return 'picked_up';
-        }
-
-        // 3. Visit stage (if visits exist or default)
-        return 'visit';
+        return \App\Services\StageComputer::compute($this);
     }
 }
+

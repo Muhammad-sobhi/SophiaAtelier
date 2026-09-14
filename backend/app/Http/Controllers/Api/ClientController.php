@@ -9,7 +9,6 @@ use App\Models\Fitting;
 use App\Models\Visit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Storage;
 
 class ClientController extends Controller
@@ -18,9 +17,11 @@ class ClientController extends Controller
     {
         $query = Client::withCount(['visits', 'bookings'])->with([
             'visits' => function ($q) {
-                $q->latest(); },
+                $q->latest();
+            },
             'bookings' => function ($q) {
-                $q->latest(); },
+                $q->latest();
+            },
             'bookings.dress.accessories',
             'bookings.dress.images',
             'bookings.dress2.accessories',
@@ -31,16 +32,88 @@ class ClientController extends Controller
             'fittings'
         ]);
 
-        if ($search = $request->input('search')) {
+        if ($search = trim($request->input('search', ''))) {
             $cleanSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
             $query->where(function ($q) use ($cleanSearch) {
                 $q->where('name', 'like', "%{$cleanSearch}%")
                     ->orWhere('phone', 'like', "%{$cleanSearch}%")
-                    ->orWhere('phone2', 'like', "%{$cleanSearch}%");
+                    ->orWhere('phone2', 'like', "%{$cleanSearch}%")
+                    ->orWhere('city', 'like', "%{$cleanSearch}%")
+                    ->orWhere('address', 'like', "%{$cleanSearch}%");
             });
         }
 
-        return response()->json($query->latest()->paginate($request->input('per_page', 100)));
+        if ($city = $request->input('city')) {
+            if ($city !== 'all') {
+                $cleanCity = str_replace(['%', '_'], ['\%', '\_'], $city);
+                $query->where(function ($q) use ($cleanCity) {
+                    $q->where('city', $cleanCity)
+                        ->orWhere('address', 'like', "%{$cleanCity}%");
+                });
+            }
+        }
+
+        if ($source = $request->input('source')) {
+            if ($source !== 'all') {
+                if (in_array($source, ['instagram', 'انستجرام', 'انستقرام'])) {
+                    $query->whereIn('source', ['instagram', 'انستجرام', 'انستقرام']);
+                } else {
+                    $query->where('source', $source);
+                }
+            }
+        }
+
+        $dateFilter = $request->input('date') ?: $request->input('wedding_date');
+        if ($dateFilter) {
+            if (strlen($dateFilter) === 7) { // Month format: YYYY-MM
+                $query->where(function ($q) use ($dateFilter) {
+                    $q->where('wedding_date', 'like', "{$dateFilter}%")
+                        ->orWhereHas('bookings', function ($b) use ($dateFilter) {
+                            $b->where('event_date', 'like', "{$dateFilter}%");
+                        });
+                });
+            } else { // Date format: YYYY-MM-DD
+                $query->where(function ($q) use ($dateFilter) {
+                    $q->whereDate('wedding_date', $dateFilter)
+                        ->orWhereHas('bookings', function ($b) use ($dateFilter) {
+                            $b->whereDate('event_date', $dateFilter);
+                        });
+                });
+            }
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->where(function ($q) use ($dateFrom) {
+                $q->whereDate('wedding_date', '>=', $dateFrom)
+                    ->orWhereHas('bookings', function ($b) use ($dateFrom) {
+                        $b->whereDate('event_date', '>=', $dateFrom);
+                    });
+            });
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->where(function ($q) use ($dateTo) {
+                $q->whereDate('wedding_date', '<=', $dateTo)
+                    ->orWhereHas('bookings', function ($b) use ($dateTo) {
+                        $b->whereDate('event_date', '<=', $dateTo);
+                    });
+            });
+        }
+
+        $perPage = (int) $request->input('per_page', 20);
+        if ($perPage < 1) {
+            $perPage = 20;
+        }
+
+        $paginator = $query->latest()->paginate($perPage);
+        $result = $paginator->toArray();
+        $result['stats'] = [
+            'total_brides' => Client::count(),
+            'with_wedding_date' => Client::whereNotNull('wedding_date')->count(),
+            'with_bookings' => Client::has('bookings')->count(),
+        ];
+
+        return response()->json($result);
     }
 
     public function findClient(Request $request): JsonResponse
@@ -59,7 +132,7 @@ class ClientController extends Controller
         $rawEmail = $request->input('email');
 
         if ($clientId) {
-            $client = Client::with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images'])->find($clientId);
+            $client = Client::with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->find($clientId);
             if ($client) {
                 return response()->json($client);
             }
@@ -74,14 +147,12 @@ class ClientController extends Controller
         $cleanPhone = $rawPhone ? preg_replace('/[^\d]/', '', $rawPhone) : null;
         $cleanEmail = $rawEmail ? strtolower(trim($rawEmail)) : null;
 
-        // If phone is provided, ensure it has at least 8 digits
         if ($rawPhone && strlen($cleanPhone) < 8) {
             return response()->json([
                 'message' => 'يرجى إدخال رقم هاتف صحيح مكون من 8 أرقام على الأقل'
             ], 422);
         }
 
-        // Build exact matching variants for the phone number (Local, National, International formats)
         $phoneVariants = [];
         if ($cleanPhone) {
             $rawNoZero = ltrim($cleanPhone, '0');
@@ -99,7 +170,6 @@ class ClientController extends Controller
 
         $query = Client::query();
 
-        // Exact parameterized equality queries only — no wildcard/LIKE searches
         if ($cleanPhone && $cleanEmail) {
             $query->where(function ($q) use ($phoneVariants, $cleanEmail) {
                 $q->whereIn('phone', $phoneVariants)
@@ -115,7 +185,7 @@ class ClientController extends Controller
             $query->where('email', $cleanEmail);
         }
 
-        $client = $query->with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images'])->first();
+        $client = $query->with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->first();
 
         if (!$client) {
             return response()->json([
@@ -146,20 +216,9 @@ class ClientController extends Controller
         return response()->json($client);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(\App\Http\Requests\StoreClientRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
-            'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
-            'phone2' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
-            'email' => 'nullable|email',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
-            'source' => 'nullable|in:instagram,website,referral,walkin,whatsapp',
-            'wedding_date' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-        ]);
+        $validated = $request->validated();
 
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('clients', 'public');
@@ -175,20 +234,9 @@ class ClientController extends Controller
         return response()->json($client, 201);
     }
 
-    public function update(Request $request, Client $client): JsonResponse
+    public function update(\App\Http\Requests\UpdateClientRequest $request, Client $client): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[\pL\s\.\'\-]+$/u'],
-            'phone' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
-            'phone2' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
-            'email' => 'nullable|email',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
-            'source' => 'nullable|in:instagram,website,referral,walkin,whatsapp',
-            'wedding_date' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-        ]);
+        $validated = $request->validated();
 
         if ($request->hasFile('image')) {
             if ($client->image_path) {
@@ -250,20 +298,28 @@ class ClientController extends Controller
             'notes' => 'nullable|string|max:1000',
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
+            'insurance_refund' => 'nullable|numeric|min:0',
+            'insurance_refund_method' => 'nullable|string|max:50',
+            'insurance_refund_receipt' => 'nullable',
         ]);
 
         $action = $request->input('action');
         switch ($action) {
             case 'confirm_visit':
                 $visit = $client->visits()->latest()->first();
+                $visitSalesName = $request->input('sales_name');
                 if ($visit) {
-                    $visit->update(['status' => 'confirmed']);
+                    $visit->update([
+                        'status' => 'confirmed',
+                        'sales_name' => $visitSalesName ?: $visit->sales_name,
+                    ]);
                 } else {
                     \App\Models\Visit::create([
                         'client_id' => $client->id,
                         'visit_date' => now()->toDateString(),
                         'status' => 'confirmed',
                         'source' => $client->source ?: 'website',
+                        'sales_name' => $visitSalesName,
                         'notes' => 'تم تأكيد موعد الزيارة'
                     ]);
                 }
@@ -272,35 +328,44 @@ class ClientController extends Controller
             case 'schedule_fitting':
                 // Create a fitting record via the latest booking
                 $booking = $client->bookings()->latest()->first();
-                $dressId = $request->input('dress_id') ?: ($booking ? $booking->dress_id : 1);
+                $dressId = $request->input('dress_id') ?: ($booking ? $booking->dress_id : null);
+                if (!$dressId) {
+                    $dressId = \App\Models\Dress::value('id');
+                }
                 $fittingDate = $request->input('fitting_date', now()->addDays(3)->toDateString());
 
                 // Check if dress is booked/out on the proposed fitting date
-                $conflict = \App\Models\Booking::isDressOutOnDate($dressId, $fittingDate, $client->id);
-                if ($conflict) {
-                    return response()->json([
-                        'message' => "الفستان غير متوفر للبروفة في هذا التاريخ لأنه خارج مع عميلة أخرى من {$conflict}"
-                    ], 422);
+                if ($dressId) {
+                    $conflict = \App\Models\Booking::isDressOutOnDate($dressId, $fittingDate, $client->id);
+                    if ($conflict) {
+                        return response()->json([
+                            'message' => "الفستان غير متوفر للبروفة في هذا التاريخ لأنه خارج مع عميلة أخرى من {$conflict}"
+                        ], 422);
+                    }
                 }
 
                 if (!$booking) {
+                    $defaultDressId = $dressId ?: \App\Models\Dress::value('id');
                     // Create a default booking first if none exists
                     $booking = Booking::create([
                         'client_id' => $client->id,
-                        'dress_id' => $dressId,
+                        'dress_id' => $defaultDressId,
                         'booking_date' => now()->toDateString(),
-                        'event_date' => $request->input('event_date', now()->addMonths(2)->toDateString()),
+                        'event_date' => $request->input('event_date', $client->wedding_date ?: now()->addMonths(2)->toDateString()),
                         'status' => 'pending',
                         'total_amount' => 0,
                     ]);
-                } else {
-                    $booking->update(['dress_id' => $dressId]);
+                    $booking->update([
+                        'dress_id' => $defaultDressId,
+                        'status' => 'confirmed'
+                    ]);
                 }
 
                 Fitting::create([
                     'booking_id' => $booking->id,
                     'fitting_date' => $request->input('fitting_date', now()->addDays(3)->toDateString()),
                     'status' => 'scheduled',
+                    'sales_name' => $request->input('sales_name'),
                     'additional_notes' => 'الوقت: ' . $request->input('fitting_time', '01:00 م') . ' | ' . $request->input('notes', ''),
                 ]);
 
@@ -362,35 +427,19 @@ class ClientController extends Controller
                 $dressId = $request->input('dress_id');
                 $dress2Id = $request->input('dress_2_id');
                 $eventDate = $request->input('event_date', $client->wedding_date);
-                $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
+                $forceOverride = ($request->boolean('force_override') || $request->boolean('is_override')) && $request->user()->role === 'admin';
 
                 // Validate availability for both dresses if not force override
                 if (!$forceOverride) {
-                    $conflict1 = Booking::checkDressAvailability(
-                        $client->id,
-                        $dressId,
-                        $eventDate,
-                        $booking->id
+                    $conflicts = array_merge(
+                        \App\Services\DressAvailabilityService::getConflicts($client->id, $dressId, $eventDate, $booking->id),
+                        $dress2Id ? \App\Services\DressAvailabilityService::getConflicts($client->id, $dress2Id, $eventDate, $booking->id) : []
                     );
 
-                    $conflict2 = $dress2Id ? Booking::checkDressAvailability(
-                        $client->id,
-                        $dress2Id,
-                        $eventDate,
-                        $booking->id
-                    ) : null;
-
-                    if ($conflict1 || $conflict2) {
-                        $errorMsg = $conflict1 ? "الفستان الأول غير متوفر في هذه الفترة: {$conflict1}" : '';
-                        if ($conflict2) {
-                            $errorMsg .= ($errorMsg ? ' | ' : '') . "الفستان الثاني غير متوفر في هذه الفترة: {$conflict2}";
-                        }
-
+                    if (!empty($conflicts)) {
                         return response()->json([
-                            'message' => $errorMsg,
-                            'conflict_dress_1' => $conflict1,
-                            'conflict_dress_2' => $conflict2,
-                            'available_date' => $conflict1 ?: $conflict2
+                            'error' => 'الفستان غير متوفر في هذه الفترة',
+                            'conflicts' => $conflicts
                         ], 422);
                     }
                 }
@@ -417,6 +466,8 @@ class ClientController extends Controller
 
                 $booking->save();
                 $payments = $request->input('payments');
+                // Clean up previous deposit revenues for this booking to prevent duplicate entries when editing
+                $booking->revenues()->where('type', 'deposit')->delete();
 
                 if (is_array($payments) && count($payments) > 0) {
                     $totalDeposit = 0;
@@ -465,6 +516,7 @@ class ClientController extends Controller
 
             case 'end_fitting':
                 $fittings = $client->fittings()->get();
+                $endFittingSalesName = $request->input('sales_name');
                 if ($fittings->count() === 0) {
                     $booking = $client->bookings()->latest()->first();
                     if ($booking) {
@@ -472,12 +524,16 @@ class ClientController extends Controller
                             'booking_id' => $booking->id,
                             'fitting_date' => now()->toDateString(),
                             'status' => 'completed',
+                            'sales_name' => $endFittingSalesName,
                             'additional_notes' => 'تم إنهاء البروفات وتحويل العروس لمرحلة الاستلام',
                         ]);
                     }
                 } else {
                     foreach ($fittings as $f) {
-                        $f->update(['status' => 'completed']);
+                        $f->update([
+                            'status' => 'completed',
+                            'sales_name' => $endFittingSalesName ?: $f->sales_name,
+                        ]);
                     }
                 }
                 break;
@@ -485,11 +541,42 @@ class ClientController extends Controller
             case 'mark_picked_up':
                 $booking = $client->bookings()->latest()->first();
                 if ($booking) {
-                    $insuranceAmount = floatval($request->input('insurance_amount', 5000));
-                    $booking->update([
+                    $updateData = [
                         'status' => 'picked_up',
-                        'insurance_amount' => $insuranceAmount,
-                    ]);
+                    ];
+                    if ($request->filled('total_amount')) {
+                        $updateData['total_amount'] = floatval($request->input('total_amount'));
+                    }
+                    if ($request->has('deposit_amount')) {
+                        $updateData['deposit_amount'] = floatval($request->input('deposit_amount'));
+                    }
+                    if ($request->has('insurance_amount')) {
+                        $updateData['insurance_amount'] = floatval($request->input('insurance_amount'));
+                    }
+                    if ($request->has('sales_name')) {
+                        $updateData['pickup_sales_name'] = $request->input('sales_name');
+                    }
+                    $booking->update($updateData);
+
+                    // Sync deposit payments if provided
+                    $depositPayments = $request->input('deposit_payments');
+                    if (is_array($depositPayments)) {
+                        $booking->revenues()->where('type', 'deposit')->delete();
+                        foreach ($depositPayments as $dp) {
+                            $dpAmt = floatval($dp['amount'] ?? 0);
+                            $dpMethod = $dp['payment_method'] ?? 'cash';
+                            if ($dpAmt > 0) {
+                                \App\Models\Revenue::create([
+                                    'booking_id' => $booking->id,
+                                    'type' => 'deposit',
+                                    'amount' => $dpAmt,
+                                    'payment_method' => $dpMethod,
+                                    'payment_date' => $booking->booking_date ?: now()->toDateString(),
+                                    'notes' => 'عربون حجز فستان للعروس: ' . $client->name,
+                                ]);
+                            }
+                        }
+                    }
 
                     if ($booking->dress) {
                         $booking->dress->update(['status' => 'out']);
@@ -502,7 +589,8 @@ class ClientController extends Controller
 
                     // 1. Record balance payment(s)
                     $balancePayments = $request->input('balance_payments');
-                    if (is_array($balancePayments) && count($balancePayments) > 0) {
+                    if (is_array($balancePayments)) {
+                        $booking->revenues()->where('type', 'balance')->delete();
                         foreach ($balancePayments as $bp) {
                             $bpAmt = floatval($bp['amount'] ?? 0);
                             $bpMethod = $bp['payment_method'] ?? 'cash';
@@ -526,7 +614,8 @@ class ClientController extends Controller
 
                     // 2. Record insurance security deposit payment(s)
                     $insurancePayments = $request->input('insurance_payments');
-                    if (is_array($insurancePayments) && count($insurancePayments) > 0) {
+                    if (is_array($insurancePayments)) {
+                        $booking->revenues()->where('type', 'insurance')->delete();
                         foreach ($insurancePayments as $ip) {
                             $ipAmt = floatval($ip['amount'] ?? 0);
                             $ipMethod = $ip['payment_method'] ?? 'cash';
@@ -553,20 +642,26 @@ class ClientController extends Controller
             case 'mark_returned':
                 $booking = $client->bookings()->latest()->first();
                 if ($booking) {
-                    $booking->update(['status' => 'returned']);
-                    // Mark both dresses for dry clean
-                    if ($booking->dress) {
-                        $booking->dress->update(['status' => 'dry_clean']);
+                    $returnUpdate = ['status' => 'returned'];
+                    if ($request->has('sales_name')) {
+                        $returnUpdate['return_sales_name'] = $request->input('sales_name');
                     }
-                    if ($booking->dress2) {
-                        $booking->dress2->update(['status' => 'dry_clean']);
+                    if ($request->has('insurance_amount')) {
+                        $returnUpdate['insurance_amount'] = floatval($request->input('insurance_amount'));
                     }
+                    $booking->update($returnUpdate);
+                    // Mark all dresses for dry clean
+                    if ($booking->dress) $booking->dress->update(['status' => 'cleaning']);
+                    if ($booking->dress2) $booking->dress2->update(['status' => 'cleaning']);
+                    if ($booking->dress3) $booking->dress3->update(['status' => 'cleaning']);
 
-                    // Log negative revenue for insurance refund using the SAME payment method used when collecting insurance
-                    $insuranceAmount = floatval($booking->insurance_amount ?: 5000);
+                    // Return: write one insurance refund revenue = amount staff entered
                     $damageDeduction = floatval($request->input('damage_deduction', 0));
-                    $damageNotes = $request->input('damage_notes', '');
-                    $refundAmount = max(0, $insuranceAmount - $damageDeduction);
+                    $maxRefund = max(0, floatval($booking->insurance_amount ?? 0) - $damageDeduction);
+                    $refundAmount = min(
+                        $maxRefund,
+                        floatval($request->input('insurance_refund', $maxRefund))
+                    );
 
                     if ($refundAmount > 0) {
                         $insuranceRev = $booking->revenues()
@@ -574,23 +669,20 @@ class ClientController extends Controller
                             ->latest()
                             ->first();
 
-                        $paymentMethod = $insuranceRev ? $insuranceRev->payment_method : 'cash';
+                        $paymentMethod = $request->input('insurance_refund_method')
+                            ?: ($insuranceRev ? $insuranceRev->payment_method : 'cash');
 
-                        $dressesNames = array_filter([$booking->dress?->name, $booking->dress2?->name]);
-                        $dressesStr = !empty($dressesNames) ? implode(' و ', $dressesNames) : 'الفستان';
-
-                        $refundNote = 'مرتجع مبلغ التأمين بعد استلام (' . $dressesStr . ') للعروس: ' . $client->name;
-                        if ($damageDeduction > 0) {
-                            $refundNote .= " (تم خصم {$damageDeduction} ج.م مقابل تلفيات/صيانة: {$damageNotes})";
-                        }
+                        $receiptPath = self::saveReceipt($request, 'insurance_refund_receipt')
+                            ?? self::saveReceiptData($request->input('insurance_refund_receipt'));
 
                         \App\Models\Revenue::create([
                             'booking_id' => $booking->id,
-                            'type' => 'insurance',
+                            'type' => 'insurance_refund',
                             'amount' => -$refundAmount,
                             'payment_method' => $paymentMethod,
                             'payment_date' => now()->toDateString(),
-                            'notes' => $refundNote,
+                            'notes' => 'استرداد تأمين' . ($request->filled('notes') ? ' - ' . $request->input('notes') : ''),
+                            'receipt_path' => $receiptPath,
                         ]);
                     }
                 }
@@ -674,6 +766,30 @@ class ClientController extends Controller
                 return response()->json(['message' => 'Unknown action'], 400);
         }
 
+        // Log the activity
+        $actionLabels = [
+            'confirm_visit' => 'تأكيد زيارة عروس',
+            'schedule_fitting' => 'جدولة بروفة قياس',
+            'confirm_booking' => 'تأكيد حجز فستان',
+            'end_fitting' => 'إنهاء بروفات القياس',
+            'mark_picked_up' => 'تسليم الفستان للعروس',
+            'mark_returned' => 'استلام الفستان وتسوية التأمين',
+            'pay_remaining' => 'سداد دفعة مالية',
+        ];
+        $actionTitle = $actionLabels[$action] ?? "إجراء مرحلة: {$action}";
+        \App\Services\ActivityLogger::log(
+            $actionTitle,
+            'Client',
+            $client->id,
+            [
+                'bride_name' => $client->name,
+                'bride_phone' => $client->phone,
+                'sales_name' => $request->input('sales_name'),
+                'action_key' => $action,
+            ],
+            $request->input('sales_name')
+        );
+
         // Refresh and return updated stage
         // Must unset loaded relations so current_stage recomputes from fresh DB data
         $client->unsetRelation('fittings')->unsetRelation('bookings')->unsetRelation('visits');
@@ -682,6 +798,93 @@ class ClientController extends Controller
             'message' => 'Action completed',
             'current_stage' => $client->current_stage,
         ]);
+    }
+
+    public function revertStage(Request $request, \App\Models\Booking $booking): JsonResponse
+    {
+        $targetStage = $request->input('target_stage');
+        $client = $booking->client;
+        
+        \DB::beginTransaction();
+        try {
+            if ($targetStage === 'visit') {
+                // Delete everything related to the booking
+                $booking->revenues()->delete();
+                $booking->fittings()->delete();
+                if ($booking->dress) $booking->dress->update(['status' => 'available']);
+                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+                $booking->delete();
+                
+                $client->update(['current_stage' => 'visit']);
+            } 
+            elseif ($targetStage === 'booking') {
+                // Keep the booking (deposit remains), but remove fittings and after
+                $booking->fittings()->delete();
+                $booking->revenues()->whereIn('type', ['fitting_fee', 'balance', 'insurance', 'insurance_refund', 'late_fee', 'damage_fee'])->delete();
+                
+                if ($booking->dress) $booking->dress->update(['status' => 'available']);
+                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+                
+                $booking->update(['status' => 'confirmed']);
+                $client->update(['current_stage' => 'booking']);
+            }
+            elseif ($targetStage === 'fitting') {
+                // Keep the fitting, but remove pickup/return data
+                $booking->revenues()->whereIn('type', ['balance', 'insurance', 'insurance_refund', 'late_fee', 'damage_fee'])->delete();
+                
+                if ($booking->dress) $booking->dress->update(['status' => 'available']);
+                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+                
+                $booking->update(['status' => 'confirmed']);
+                
+                // Ensure the booking has a scheduled fitting so stage resolves to 'fitting'
+                $latestFitting = $booking->fittings()->latest()->first();
+                if ($latestFitting) {
+                    $latestFitting->update(['status' => 'scheduled']);
+                } else {
+                    \App\Models\Fitting::create([
+                        'booking_id' => $booking->id,
+                        'fitting_date' => now()->addDays(3)->toDateString(),
+                        'status' => 'scheduled',
+                        'additional_notes' => 'تمت العودة لمرحلة البروفة',
+                    ]);
+                }
+            }
+            elseif ($targetStage === 'pickup_pending' || $targetStage === 'unhandover') {
+                // Revert from Sub-stage 2 (out/delivered) back to Sub-stage 1 (ready for handover):
+                // Reset booking status to confirmed, dresses to available, and remove balance & insurance revenues recorded at pickup
+                $booking->revenues()->whereIn('type', ['balance', 'insurance', 'insurance_refund', 'late_fee', 'damage_fee'])->delete();
+                $booking->update(['status' => 'confirmed']);
+                if ($booking->dress) $booking->dress->update(['status' => 'available']);
+                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+                if ($booking->dress3) $booking->dress3->update(['status' => 'available']);
+                // Ensure fittings are marked completed so stage remains picked_up (waiting for handover)
+                $booking->fittings()->update(['status' => 'completed']);
+                $client->update(['current_stage' => 'picked_up']);
+            }
+            elseif ($targetStage === 'picked_up') {
+                // Keep pickup, remove return data
+                $booking->revenues()->whereIn('type', ['insurance_refund', 'late_fee', 'damage_fee'])->delete();
+                $booking->update(['status' => 'picked_up']);
+                if ($booking->dress) $booking->dress->update(['status' => 'out']);
+                if ($booking->dress2) $booking->dress2->update(['status' => 'out']);
+                if ($booking->dress3) $booking->dress3->update(['status' => 'out']);
+                $client->update(['current_stage' => 'picked_up']);
+            }
+            
+            \DB::commit();
+            
+            $client->unsetRelation('fittings')->unsetRelation('bookings')->unsetRelation('visits');
+            $client->refresh();
+            
+            return response()->json([
+                'message' => 'تم التراجع بنجاح',
+                'current_stage' => $client->current_stage
+            ]);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return response()->json(['message' => 'فشل التراجع: ' . $e->getMessage()], 500);
+        }
     }
 
     public function exportCsv(Request $request)
@@ -700,292 +903,27 @@ class ClientController extends Controller
             $file = fopen('php://output', 'w');
 
             // Add UTF-8 BOM for Excel Arabic compatibility
-            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($file, $columns);
 
-            Client::whereHas('bookings', function ($q) {
-                $q->where('status', 'returned');
-            })->chunk(100, function ($clients) use ($file) {
-                foreach ($clients as $client) {
-                    $latestBooking = $client->bookings()->latest()->first();
-                    $weddingDate = $latestBooking ? $latestBooking->event_date : '';
-                    fputcsv($file, [
-                        $client->id,
-                        $client->name,
-                        $client->phone,
-                        $client->email,
-                        $client->city,
-                        $client->address,
-                        $client->source,
-                        $client->notes,
-                        $weddingDate,
-                        $client->created_at ? $client->created_at->toDateTimeString() : ''
-                    ]);
-                }
-            });
-
+            $clients = Client::where('current_stage', 'returned')->orWhere('current_stage', 'archived')->get();
+            foreach ($clients as $c) {
+                fputcsv($file, [
+                    $c->id,
+                    $c->name,
+                    $c->phone,
+                    $c->email,
+                    $c->city,
+                    $c->address,
+                    $c->source,
+                    $c->notes,
+                    $c->wedding_date,
+                    $c->created_at,
+                ]);
+            }
             fclose($file);
         };
 
         return response()->stream($callback, 200, $headers);
     }
-
-    public function importExcel(Request $request): JsonResponse
-    {
-        $request->validate([
-            'rows' => 'required|array',
-            'rows.*' => 'array',
-        ]);
-
-        $rows = $request->input('rows');
-        $importedCount = 0;
-        $errors = [];
-
-        \DB::beginTransaction();
-        try {
-            foreach ($rows as $index => $row) {
-                // Key fields matching the columns
-                $brideName = trim($row['bride_name'] ?? $row['اسم العروسه'] ?? $row[0] ?? '');
-                if (empty($brideName) || $brideName === 'اسم العروسه') {
-                    continue; // Skip header or empty row
-                }
-
-                $dressName = trim($row['dress_name'] ?? $row['اسم الفستان'] ?? $row[1] ?? '');
-                $bookingDate = trim($row['booking_date'] ?? $row['تاريخ الحجز'] ?? $row['يوم الحجز'] ?? $row[2] ?? '');
-                $depositAmount = floatval($row['deposit_amount'] ?? $row['الديبوزيت'] ?? $row[3] ?? 0);
-
-                // Extract fields strictly by header title first, then fall back to numeric index
-                $city = trim($row['محافظه'] ?? $row['محافظة'] ?? $row['المحافظة'] ?? $row['city'] ?? $row[11] ?? '');
-                $salesPerson = trim($row['السيلز'] ?? $row['sales'] ?? $row[13] ?? '');
-                $insuranceAmount = floatval($row['التامين'] ?? $row['التأمين'] ?? $row['insurance_amount'] ?? $row[12] ?? 0);
-                $extraNotes = trim($row['ملاحظات'] ?? $row['notes'] ?? $row[14] ?? '');
-                $cashPayment = trim($row['كاش'] ?? $row['cash'] ?? $row[9] ?? '');
-                $transferPayment = trim($row['تحويل'] ?? $row['transfer'] ?? $row[10] ?? '');
-                $remainingAmount = floatval($row['الباقي'] ?? $row['باقي الحجز'] ?? $row['remaining_amount'] ?? $row[8] ?? 0);
-                $returnDate = trim($row['يوم التسليم'] ?? $row['ميعاد التسليم'] ?? $row['return_date'] ?? $row[7] ?? '');
-                $eventDate = trim($row['ميعاد الفرح'] ?? $row['event_date'] ?? $row[6] ?? '');
-                $pickupDate = trim($row['يوم الاستلام'] ?? $row['ميعاد الاستلام'] ?? $row['pickup_date'] ?? $row[5] ?? '');
-                $paymentMethodSymbol = trim($row['كاش/تحويل'] ?? $row['cash_transfer'] ?? $row[4] ?? '');
-
-                // Normalize Arabic city names (e.g., "الجيزه" -> "الجيزة", "القاهره" -> "القاهرة")
-                if (!empty($city)) {
-                    $city = str_replace(['ه', 'أ', 'إ', 'آ'], ['ة', 'ا', 'ا', 'ا'], $city);
-                    if (str_contains($city, 'جيز'))
-                        $city = 'الجيزة';
-                    if (str_contains($city, 'قاهر'))
-                        $city = 'القاهرة';
-                    if (str_contains($city, 'منصور'))
-                        $city = 'المنصورة';
-                    if (str_contains($city, 'اسكندر') || str_contains($city, 'إسكندر'))
-                        $city = 'الإسكندرية';
-                    if (str_contains($city, 'منوف'))
-                        $city = 'المنوفية';
-                    if (str_contains($city, 'اسماعيل') || str_contains($city, 'إسماعيل'))
-                        $city = 'الإسماعيلية';
-                    if (str_contains($city, 'سويف'))
-                        $city = 'بني سويف';
-                    if (str_contains($city, 'شرق'))
-                        $city = 'الشرقية';
-                    if (str_contains($city, 'غري'))
-                        $city = 'الغربية';
-                    if (str_contains($city, 'سويس'))
-                        $city = 'السويس';
-                }
-
-                // Helper to clean and format dates (handles 29\4, 29/4, 2\8, 2026-04-29, extra spaces and arabic digits)
-                $parseDate = function ($dateVal) {
-                    if (empty($dateVal))
-                        return null;
-                    try {
-                        // Convert Eastern Arabic numerals to Western Arabic
-                        $westernDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                        $easternDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-                        $str = str_replace($easternDigits, $westernDigits, trim($dateVal));
-
-                        // Match day and month pattern e.g., 2\8, 2/8, 02-08, 2.8
-                        if (preg_match('/^(\d{1,2})[\/\\\\.\-–]\s*(\d{1,2})/u', $str, $matches)) {
-                            $day = intval($matches[1]);
-                            $month = intval($matches[2]);
-                            $year = intval(date('Y'));
-                            return sprintf('%04d-%02d-%02d', $year, $month, $day);
-                        }
-
-                        // Replace any slashes/backslashes for Carbon fallback
-                        $normalized = preg_replace('/[\/\\\\.]/', '-', $str);
-                        return \Carbon\Carbon::parse($normalized)->format('Y-m-d');
-                    } catch (\Exception $e) {
-                        return null;
-                    }
-                };
-
-                $formattedBookingDate = $parseDate($bookingDate) ?? date('Y-m-d');
-                $formattedEventDate = $parseDate($eventDate) ?? $formattedBookingDate;
-                $formattedPickupDate = $parseDate($pickupDate);
-                $formattedReturnDate = $parseDate($returnDate);
-
-                // 1. Create a distinct Client for every Excel row (supports brides with identical names)
-                $client = Client::create([
-                    'name' => $brideName,
-                    'phone' => '0100000' . rand(1000, 9999),
-                    'city' => $city ?: null,
-                    'wedding_date' => $formattedEventDate,
-                    'source' => 'excel_import',
-                    'notes' => $salesPerson ? "السيلز: {$salesPerson}" : null,
-                ]);
-
-                // 2. Find or Create Dress
-                $dressId = null;
-                if (!empty($dressName)) {
-                    $dress = \App\Models\Dress::where('name', 'like', "%{$dressName}%")
-                        ->orWhere('name_ar', 'like', "%{$dressName}%")
-                        ->orWhere('code', 'like', "%{$dressName}%")
-                        ->first();
-
-                    if (!$dress) {
-                        $firstCat = \App\Models\Category::first();
-                        $firstDes = \App\Models\Designer::first();
-                        $catId = $firstCat ? $firstCat->id : 1;
-                        $desId = $firstDes ? $firstDes->id : 1;
-
-                        $dress = \App\Models\Dress::create([
-                            'name' => $dressName,
-                            'name_ar' => $dressName,
-                            'category_id' => $catId,
-                            'designer_id' => $desId,
-                            'code' => 'IMP-' . strtoupper(substr(md5($dressName), 0, 5)),
-                            'rental_price' => $depositAmount + $remainingAmount,
-                            'status' => 'available',
-                        ]);
-                    }
-                    $dressId = $dress->id;
-                }
-
-                if (!$dressId) {
-                    $firstDress = \App\Models\Dress::first();
-                    $dressId = $firstDress ? $firstDress->id : 1;
-                }
-
-                // 3. Determine Payment Method (ت = instapay/bank_transfer, ك = cash)
-                $paymentMethod = 'cash';
-                if ($paymentMethodSymbol === 'ت' || !empty($transferPayment) && $transferPayment !== '0' && $transferPayment !== '-') {
-                    $paymentMethod = 'instapay';
-                } elseif ($paymentMethodSymbol === 'ك' || (!empty($cashPayment) && $cashPayment !== '0')) {
-                    $paymentMethod = 'cash';
-                }
-
-                $totalAmount = $depositAmount + $remainingAmount;
-
-                // Build notes from extra dates, sales, notes
-                $notesArr = [];
-                if ($formattedPickupDate)
-                    $notesArr[] = "يوم الاستلام: " . $formattedPickupDate;
-                if ($formattedReturnDate)
-                    $notesArr[] = "يوم التسليم: " . $formattedReturnDate;
-                if ($salesPerson)
-                    $notesArr[] = "السيلز: " . $salesPerson;
-                if ($extraNotes)
-                    $notesArr[] = "ملاحظات: " . $extraNotes;
-                $notesStr = implode(' | ', $notesArr);
-
-                // Determine status automatically based on pickup & return date rules:
-                // A bride ONLY moves to 'returned' IF her return date (1 day after wedding) has passed!
-                $todayStr = date('Y-m-d');
-                $calculatedReturnDate = $formattedReturnDate;
-                if (!$calculatedReturnDate && $formattedEventDate) {
-                    $calculatedReturnDate = \Carbon\Carbon::parse($formattedEventDate)->addDay()->format('Y-m-d');
-                }
-
-                $bookingStatus = 'confirmed';
-                if ($formattedPickupDate && $formattedPickupDate < '2026-08-02') {
-                    if ($calculatedReturnDate && $calculatedReturnDate <= $todayStr) {
-                        $bookingStatus = 'returned';
-                    } else {
-                        $bookingStatus = 'picked_up';
-                    }
-                } elseif ($formattedPickupDate && $formattedPickupDate === '2026-08-02') {
-                    if ($calculatedReturnDate && $calculatedReturnDate <= $todayStr) {
-                        $bookingStatus = 'returned';
-                    } else {
-                        $bookingStatus = 'picked_up';
-                    }
-                } else {
-                    $bookingStatus = 'confirmed';
-                }
-
-                // 4. Create Booking
-                $booking = Booking::create([
-                    'client_id' => $client->id,
-                    'dress_id' => $dressId,
-                    'booking_date' => $formattedBookingDate,
-                    'event_date' => $formattedEventDate,
-                    'status' => $bookingStatus,
-                    'total_amount' => $totalAmount,
-                    'deposit_amount' => $depositAmount,
-                    'insurance_amount' => $insuranceAmount,
-                    'payment_method' => $paymentMethod,
-                    'notes' => $notesStr ?: 'استيراد تلقائي من شيت إكسيل',
-                ]);
-
-                // Create revenue record for financial tracking if deposit paid
-                if ($depositAmount > 0) {
-                    \App\Models\Revenue::create([
-                        'booking_id' => $booking->id,
-                        'type' => 'deposit',
-                        'amount' => $depositAmount,
-                        'payment_method' => $paymentMethod,
-                        'payment_date' => $formattedBookingDate,
-                        'notes' => 'دفعة عربون من شيت الإكسيل - ' . $client->name,
-                    ]);
-                }
-
-                $importedCount++;
-            }
-
-            \DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => "تم استيراد {$importedCount} عروسة وحجز بنجاح!",
-                'count' => $importedCount
-            ]);
-        } catch (\Exception $e) {
-            \DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'حدث خطأ أثناء استيراد البيانات: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-    public function revertStage(Request $request, \App\Models\Booking $booking)
-    {
-        $newStatus = $request->input('status'); // The status to revert back to
-        $validStatuses = ['pending', 'confirmed', 'picked_up', 'returned', 'cancelled'];
-        
-        if (!in_array($newStatus, $validStatuses)) {
-            return response()->json(['success' => false, 'message' => 'حالة غير صالحة'], 400);
-        }
-
-        $oldStatus = $booking->status;
-
-        // Revert dress statuses if transitioning backward
-        if ($oldStatus === 'returned' && $newStatus === 'picked_up') {
-            // Revert from dry_clean to out
-            if ($booking->dress) $booking->dress->update(['status' => 'out']);
-            if ($booking->dress2) $booking->dress2->update(['status' => 'out']);
-        } elseif ($oldStatus === 'picked_up' && $newStatus === 'confirmed') {
-            // Revert from out to booked/available (assuming available for simplicity or booked)
-            // It's safer to just set it back to available or booked
-            if ($booking->dress) $booking->dress->update(['status' => 'available']);
-            if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
-        }
-
-        $booking->update(['status' => $newStatus]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'تم استرجاع الحالة بنجاح',
-            'booking' => $booking->fresh(['dress', 'dress2', 'revenues'])
-        ]);
-    }
 }
-
