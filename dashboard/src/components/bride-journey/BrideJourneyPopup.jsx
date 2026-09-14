@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
+import { calculateScheduledDates } from '@/lib/utils';
 import { StageBadge } from './StageBadge';
 import { UnifiedStageModal } from './UnifiedStageModal';
 import { ReturnDressModal } from './ReturnDressModal';
@@ -83,6 +84,11 @@ export function BrideJourneyPopup({
   const dress = booking?.dress;
   const dress2 = booking?.dress2;
   const dresses = [dress, dress2, booking?.dress3].filter(Boolean);
+
+  const weddingDate = booking?.event_date || bride.wedding_date || bride.relevant_date;
+  const scheduled = calculateScheduledDates(weddingDate, bride.city);
+  const pickupDate = booking?.pickup_scheduled_on || bride.pickup_scheduled_on || scheduled.pickupDate;
+  const returnDate = booking?.return_scheduled_on || bride.return_scheduled_on || scheduled.returnDate;
 
   const rentRevenues = (booking?.revenues || []).filter((r) => r.type === 'deposit' || r.type === 'balance');
   const paidRent = rentRevenues.length > 0
@@ -421,17 +427,25 @@ export function BrideJourneyPopup({
               </div>
             )}
 
-            {/* Event dates */}
+            {/* Event & Scheduled Dates */}
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-2.5">
                 <div className="text-[10px] font-bold text-indigo-700 flex items-center gap-1"><Calendar size={11} /> تاريخ المناسبة</div>
-                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(booking?.event_date || bride.wedding_date)}</div>
+                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(weddingDate)}</div>
               </div>
               <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5">
                 <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> {stage === 'visit' ? 'موعد الزيارة' : 'تاريخ الحجز'}</div>
                 <div className="text-xs font-black text-slate-800 mt-0.5">
                   {stage === 'visit' ? (bride.latest_visit_date || formatDate(booking?.booking_date)) : formatDate(booking?.booking_date)}
                 </div>
+              </div>
+              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5">
+                <div className="text-[10px] font-bold text-blue-700 flex items-center gap-1"><Package size={11} /> تاريخ الاستلام</div>
+                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(pickupDate)}</div>
+              </div>
+              <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-2.5">
+                <div className="text-[10px] font-bold text-purple-700 flex items-center gap-1"><RotateCcw size={11} /> تاريخ الإرجاع</div>
+                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(returnDate)}</div>
               </div>
             </div>
 

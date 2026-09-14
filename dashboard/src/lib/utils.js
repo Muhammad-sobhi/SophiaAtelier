@@ -28,11 +28,14 @@ export function formatDate(raw) {
 export function calculateScheduledDates(weddingDate, city) {
   if (!weddingDate) return { pickupDate: '', returnDate: '' };
   try {
+    const c = (city || '').trim().toLowerCase();
     const isCairo = !city ||
-      city.includes('القاهرة') ||
-      city.includes('الجيزة') ||
-      city.toLowerCase().includes('cairo') ||
-      city.toLowerCase().includes('giza');
+      c.includes('قاهر') ||
+      c.includes('جيز') ||
+      c.includes('cairo') ||
+      c.includes('giza') ||
+      c.includes('gize') ||
+      ['أكتوبر', 'اكتوبر', 'زايد', 'حلوان', 'المعادي', 'معادي', 'مدينة نصر', 'مدينه نصر', 'التجمع', 'الشروق', 'مدينتي', 'بدر'].some((sub) => c.includes(sub));
     
     // 1 day before wedding for Cairo & Giza, 2 days before for other cities
     const daysBefore = isCairo ? 1 : 2;

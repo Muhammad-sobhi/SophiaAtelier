@@ -76,6 +76,8 @@ export default function DashboardPage() {
         wedding_date: (c.wedding_date || c.bookings?.[0]?.event_date) ? String(c.wedding_date || c.bookings?.[0]?.event_date).substring(0, 10) : '',
         latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
         latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
+        pickup_scheduled_on: c.pickup_scheduled_on || c.bookings?.[0]?.pickup_scheduled_on || '',
+        return_scheduled_on: c.return_scheduled_on || c.bookings?.[0]?.return_scheduled_on || '',
       }));
       setBrides(mapped);
 

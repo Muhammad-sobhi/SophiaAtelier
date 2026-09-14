@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Sparkles, Clock, AlertTriangle, CheckCircle2, LayoutGrid } from 'lucide-react';
 import { getStorageUrl } from '@/lib/api-client';
-import { cleanDate } from '@/lib/utils';
+import { cleanDate, calculateScheduledDates } from '@/lib/utils';
 import BookedDressesModal from './BookedDressesModal';
 
 const getDressImageUrl = (dress) => {
@@ -52,7 +52,7 @@ export default function DressesTab({
     return dresses.find((d) => d.id === selectedDressId) || dresses[0];
   }, [dresses, selectedDressId]);
 
-  // Bookings for selected dress with computed return date (next day of event date)
+  // Bookings for selected dress with computed pickup and return dates
   const selectedDressBookings = useMemo(() => {
     if (!selectedDress) return [];
     const results = [];
@@ -67,12 +67,20 @@ export default function DressesTab({
         if (matchDress) {
           const rawDate = bk.event_date || b.wedding_date || b.relevant_date || '';
           const eventDate = cleanDate(rawDate) || '-';
-          // Filter by date range
-          if (dressFromDate && eventDate < dressFromDate) return;
-          if (dressToDate && eventDate > dressToDate) return;
 
-          // Compute return date: explicit return_scheduled_on or next day of wedding/event date
+          // Compute scheduled pickup & return dates
+          const scheduled = calculateScheduledDates(eventDate !== '-' ? eventDate : '', b.city);
+          const pickupDate = bk.pickup_scheduled_on
+            ? cleanDate(bk.pickup_scheduled_on)
+            : (b.pickup_scheduled_on ? cleanDate(b.pickup_scheduled_on) : scheduled.pickupDate);
+
           let returnDate = bk.return_scheduled_on ? cleanDate(bk.return_scheduled_on) : '';
+          if (!returnDate && b.return_scheduled_on) {
+            returnDate = cleanDate(b.return_scheduled_on);
+          }
+          if (!returnDate && scheduled.returnDate) {
+            returnDate = scheduled.returnDate;
+          }
           if (!returnDate && eventDate && eventDate !== '-') {
             try {
               const d = new Date(eventDate);
@@ -83,11 +91,17 @@ export default function DressesTab({
             } catch {}
           }
 
+          // Filter by date range (matches pickupDate or eventDate)
+          const filterDate = pickupDate || eventDate;
+          if (dressFromDate && filterDate < dressFromDate) return;
+          if (dressToDate && filterDate > dressToDate) return;
+
           results.push({
             brideId: b.id,
             brideName: b.name,
             bridePhone: b.phone,
             eventDate,
+            pickupDate,
             returnDate,
             stage: b.current_stage || bk.status || 'booking',
             bookingId: bk.id,
@@ -96,7 +110,7 @@ export default function DressesTab({
         }
       });
     });
-    return results.sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
+    return results.sort((a, b) => (a.pickupDate || a.eventDate || '').localeCompare(b.pickupDate || b.eventDate || ''));
   }, [brides, selectedDress, dressFromDate, dressToDate]);
 
   // Check if the selected dress is currently out with any bride
@@ -310,7 +324,7 @@ export default function DressesTab({
                   <tr className="border-b border-slate-100 text-slate-400 font-bold text-[11px]">
                     <th className="pb-2 px-2.5">العروس</th>
                     <th className="pb-2 px-2.5">الهاتف</th>
-                    <th className="pb-2 px-2.5">تاريخ الحفلة</th>
+                    <th className="pb-2 px-2.5">تاريخ الاستلام</th>
                     <th className="pb-2 px-2.5">تاريخ الإرجاع</th>
                     <th className="pb-2 px-2.5">المرحلة الحالية</th>
                     <th className="pb-2 px-2.5 text-left">إجراء</th>
@@ -343,7 +357,7 @@ export default function DressesTab({
                             </div>
                           </td>
                           <td className="py-2.5 px-2.5 font-mono text-slate-500">{b.bridePhone}</td>
-                          <td className="py-2.5 px-2.5 font-mono text-indigo-700 font-black">{b.eventDate}</td>
+                          <td className="py-2.5 px-2.5 font-mono text-indigo-700 font-black">{b.pickupDate || b.eventDate || '—'}</td>
                           
                           {/* Return Date + Pending status badge */}
                           <td className="py-2.5 px-2.5">
@@ -431,8 +445,8 @@ export default function DressesTab({
                           <span className="font-mono font-bold text-slate-700">{b.bridePhone || '—'}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 block mb-0.5">تاريخ الحفلة:</span>
-                          <span className="font-mono font-black text-indigo-700">{b.eventDate || '—'}</span>
+                          <span className="text-[10px] font-bold text-slate-400 block mb-0.5">تاريخ الاستلام:</span>
+                          <span className="font-mono font-black text-indigo-700">{b.pickupDate || b.eventDate || '—'}</span>
                         </div>
                         <div className="col-span-2 pt-1 border-t border-slate-200/60 flex items-center justify-between">
                           <div>

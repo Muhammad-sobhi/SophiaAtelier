@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Search, Filter, MessageCircle } from 'lucide-react';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
-import { cleanDate } from '@/lib/utils';
+import { cleanDate, calculateScheduledDates } from '@/lib/utils';
 
 export default function BridesTab({
   brides,
@@ -197,6 +197,11 @@ export default function BridesTab({
               const stageCfg = STAGE_MAP[stage] || STAGE_MAP.visit;
               const displayDate = bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
+              const wDate = bride.wedding_date || bride.bookings?.[0]?.event_date || bride.relevant_date;
+              const scheduled = calculateScheduledDates(wDate, bride.city);
+              const pickupDate = bride.pickup_scheduled_on || bride.bookings?.[0]?.pickup_scheduled_on || scheduled.pickupDate;
+              const returnDate = bride.return_scheduled_on || bride.bookings?.[0]?.return_scheduled_on || scheduled.returnDate;
+
               return (
                 <div
                   key={bride.id}
@@ -237,11 +242,19 @@ export default function BridesTab({
                     </span>
 
                     {cleanDate(displayDate) && (
-                      <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 font-semibold truncate">
+                      <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 font-semibold truncate" title="تاريخ المناسبة / الزفاف">
                         {cleanDate(displayDate)}
                       </span>
                     )}
                   </div>
+
+                  {/* Scheduled Pickup & Return Dates */}
+                  {pickupDate && returnDate && (
+                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-100 flex items-center justify-between text-[9px] font-mono font-bold">
+                      <span className="text-blue-600 truncate" title="تاريخ الاستلام">استلام: {cleanDate(pickupDate)}</span>
+                      <span className="text-purple-600 truncate" title="تاريخ الإرجاع">إرجاع: {cleanDate(returnDate)}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
