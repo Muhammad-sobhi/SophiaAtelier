@@ -67,36 +67,60 @@ class ClientController extends Controller
         if ($dateFilter) {
             if (strlen($dateFilter) === 7) { // Month format: YYYY-MM
                 $query->where(function ($q) use ($dateFilter) {
-                    $q->where('wedding_date', 'like', "{$dateFilter}%")
-                        ->orWhereHas('bookings', function ($b) use ($dateFilter) {
-                            $b->where('event_date', 'like', "{$dateFilter}%");
-                        });
+                    $q->whereHas('bookings', function ($b) use ($dateFilter) {
+                        $b->where('pickup_scheduled_on', 'like', "{$dateFilter}%")
+                          ->orWhere(function ($sub) use ($dateFilter) {
+                              $sub->whereNull('pickup_scheduled_on')
+                                  ->where('event_date', 'like', "{$dateFilter}%");
+                          });
+                    })->orWhere(function ($c) use ($dateFilter) {
+                        $c->doesntHave('bookings')
+                          ->where('wedding_date', 'like', "{$dateFilter}%");
+                    });
                 });
             } else { // Date format: YYYY-MM-DD
                 $query->where(function ($q) use ($dateFilter) {
-                    $q->whereDate('wedding_date', $dateFilter)
-                        ->orWhereHas('bookings', function ($b) use ($dateFilter) {
-                            $b->whereDate('event_date', $dateFilter);
-                        });
+                    $q->whereHas('bookings', function ($b) use ($dateFilter) {
+                        $b->whereDate('pickup_scheduled_on', $dateFilter)
+                          ->orWhere(function ($sub) use ($dateFilter) {
+                              $sub->whereNull('pickup_scheduled_on')
+                                  ->whereDate('event_date', $dateFilter);
+                          });
+                    })->orWhere(function ($c) use ($dateFilter) {
+                        $c->doesntHave('bookings')
+                          ->whereDate('wedding_date', $dateFilter);
+                    });
                 });
             }
         }
 
         if ($dateFrom = $request->input('date_from')) {
             $query->where(function ($q) use ($dateFrom) {
-                $q->whereDate('wedding_date', '>=', $dateFrom)
-                    ->orWhereHas('bookings', function ($b) use ($dateFrom) {
-                        $b->whereDate('event_date', '>=', $dateFrom);
-                    });
+                $q->whereHas('bookings', function ($b) use ($dateFrom) {
+                    $b->whereDate('pickup_scheduled_on', '>=', $dateFrom)
+                      ->orWhere(function ($sub) use ($dateFrom) {
+                          $sub->whereNull('pickup_scheduled_on')
+                              ->whereDate('event_date', '>=', $dateFrom);
+                      });
+                })->orWhere(function ($c) use ($dateFrom) {
+                    $c->doesntHave('bookings')
+                      ->whereDate('wedding_date', '>=', $dateFrom);
+                });
             });
         }
 
         if ($dateTo = $request->input('date_to')) {
             $query->where(function ($q) use ($dateTo) {
-                $q->whereDate('wedding_date', '<=', $dateTo)
-                    ->orWhereHas('bookings', function ($b) use ($dateTo) {
-                        $b->whereDate('event_date', '<=', $dateTo);
-                    });
+                $q->whereHas('bookings', function ($b) use ($dateTo) {
+                    $b->whereDate('pickup_scheduled_on', '<=', $dateTo)
+                      ->orWhere(function ($sub) use ($dateTo) {
+                          $sub->whereNull('pickup_scheduled_on')
+                              ->whereDate('event_date', '<=', $dateTo);
+                      });
+                })->orWhere(function ($c) use ($dateTo) {
+                    $c->doesntHave('bookings')
+                      ->whereDate('wedding_date', '<=', $dateTo);
+                });
             });
         }
 
@@ -231,6 +255,42 @@ class ClientController extends Controller
 
         $client = Client::create($validated);
 
+        // Auto-calculate scheduled dates if wedding_date is present and dates were not passed
+        if (!empty($validated['wedding_date'])) {
+            $scheduled = \App\Models\Booking::calculateScheduledDates($validated['wedding_date'], $client->city);
+            if (empty($validated['pickup_scheduled_on'])) {
+                $validated['pickup_scheduled_on'] = $scheduled['pickup_date'];
+            }
+            if (empty($validated['return_scheduled_on'])) {
+                $validated['return_scheduled_on'] = $scheduled['return_date'];
+            }
+        }
+
+        if (!empty($validated['dress_id']) || !empty($validated['dress_2_id']) || !empty($validated['dress_3_id']) || !empty($validated['pickup_scheduled_on']) || !empty($validated['return_scheduled_on']) || !empty($validated['wedding_date'])) {
+            $client->bookings()->create([
+                'dress_id' => $validated['dress_id'] ?? null,
+                'dress_2_id' => $validated['dress_2_id'] ?? null,
+                'dress_3_id' => $validated['dress_3_id'] ?? null,
+                'booking_date' => $validated['visit_date'] ?? now()->toDateString(),
+                'event_date' => $validated['wedding_date'] ?? null,
+                'pickup_scheduled_on' => $validated['pickup_scheduled_on'] ?? null,
+                'return_scheduled_on' => $validated['return_scheduled_on'] ?? null,
+                'status' => 'pending',
+                'total_amount' => 0,
+                'notes' => 'تم تحديد الفساتين ومواعيد الاستلام والإرجاع عند إنشاء العروس',
+            ]);
+        }
+
+        if (!empty($validated['visit_date'])) {
+            $client->visits()->create([
+                'visit_date' => $validated['visit_date'],
+                'time_slot' => $validated['visit_time'] ?? null,
+                'status' => 'pending',
+                'source' => $client->source ?: 'website',
+                'notes' => 'موعد زيارة مبدئي',
+            ]);
+        }
+
         return response()->json($client, 201);
     }
 
@@ -252,21 +312,118 @@ class ClientController extends Controller
 
         $client->update($validated);
 
+        if (array_key_exists('wedding_date', $validated) && !empty($validated['wedding_date']) && empty($validated['pickup_scheduled_on'])) {
+            $scheduled = \App\Models\Booking::calculateScheduledDates($validated['wedding_date'], $client->city);
+            $validated['pickup_scheduled_on'] = $scheduled['pickup_date'];
+            $validated['return_scheduled_on'] = $scheduled['return_date'];
+        }
+
+        if (array_key_exists('dress_id', $validated) || array_key_exists('dress_2_id', $validated) || array_key_exists('dress_3_id', $validated) || array_key_exists('pickup_scheduled_on', $validated) || array_key_exists('return_scheduled_on', $validated) || array_key_exists('wedding_date', $validated)) {
+            $booking = $client->bookings()->latest()->first();
+            if ($booking) {
+                $bookingUpdates = [];
+                if (array_key_exists('wedding_date', $validated)) $bookingUpdates['event_date'] = $validated['wedding_date'];
+                if (array_key_exists('dress_id', $validated)) $bookingUpdates['dress_id'] = $validated['dress_id'];
+                if (array_key_exists('dress_2_id', $validated)) $bookingUpdates['dress_2_id'] = $validated['dress_2_id'];
+                if (array_key_exists('dress_3_id', $validated)) $bookingUpdates['dress_3_id'] = $validated['dress_3_id'];
+                if (array_key_exists('pickup_scheduled_on', $validated)) $bookingUpdates['pickup_scheduled_on'] = $validated['pickup_scheduled_on'];
+                if (array_key_exists('return_scheduled_on', $validated)) $bookingUpdates['return_scheduled_on'] = $validated['return_scheduled_on'];
+                if (!empty($bookingUpdates)) {
+                    $booking->update($bookingUpdates);
+                }
+            } elseif (!empty($validated['dress_id']) || !empty($validated['dress_2_id']) || !empty($validated['dress_3_id']) || !empty($validated['pickup_scheduled_on']) || !empty($validated['return_scheduled_on']) || !empty($validated['wedding_date'])) {
+                $client->bookings()->create([
+                    'dress_id' => $validated['dress_id'] ?? null,
+                    'dress_2_id' => $validated['dress_2_id'] ?? null,
+                    'dress_3_id' => $validated['dress_3_id'] ?? null,
+                    'booking_date' => $validated['visit_date'] ?? now()->toDateString(),
+                    'event_date' => $validated['wedding_date'] ?? null,
+                    'pickup_scheduled_on' => $validated['pickup_scheduled_on'] ?? null,
+                    'return_scheduled_on' => $validated['return_scheduled_on'] ?? null,
+                    'status' => 'pending',
+                    'total_amount' => 0,
+                    'notes' => 'تم تحديد الفساتين ومواعيد الاستلام والإرجاع عند تعديل بيانات العروس',
+                ]);
+            }
+        }
+
         return response()->json($client);
     }
 
     public function destroy(Client $client): JsonResponse
     {
-        // Delete related visits, bookings, and fittings associated with this bride
-        $client->visits()->delete();
-        $client->bookings()->each(function ($booking) {
-            $booking->fittings()->delete();
-            $booking->delete();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($client) {
+            // Delete client image from storage
+            if ($client->image_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($client->image_path);
+            }
+
+            // Get all booking IDs for this client
+            $bookingIds = $client->bookings()->pluck('id')->toArray();
+
+            if (!empty($bookingIds)) {
+                // Delete booking receipt images from storage
+                $receipts = \App\Models\Booking::whereIn('id', $bookingIds)
+                    ->pluck('receipt_path')
+                    ->filter();
+                foreach ($receipts as $receipt) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($receipt);
+                }
+
+                // Hard delete revenues related to these bookings
+                \App\Models\Revenue::whereIn('booking_id', $bookingIds)->delete();
+
+                // Hard delete tasks related to these bookings
+                \App\Models\Task::whereIn('booking_id', $bookingIds)->delete();
+
+                // Hard delete fittings related to these bookings
+                \App\Models\Fitting::whereIn('booking_id', $bookingIds)->delete();
+
+                // Delete notifications related to bookings
+                \App\Models\Notification::where('related_type', 'booking')
+                    ->whereIn('related_id', $bookingIds)
+                    ->forceDelete();
+
+                // Delete finance transactions related to bookings
+                \App\Models\FinanceTransaction::where('reference_type', 'booking')
+                    ->whereIn('reference_id', $bookingIds)
+                    ->delete();
+
+                // Permanently delete bookings
+                \App\Models\Booking::whereIn('id', $bookingIds)->delete();
+            }
+
+            // Hard delete all visits
+            $client->visits()->delete();
+
+            // Delete notifications related to this client
+            \App\Models\Notification::where('related_type', 'client')
+                ->where('related_id', $client->id)
+                ->forceDelete();
+
+            // Delete finance transactions related to client
+            \App\Models\FinanceTransaction::where('reference_type', 'client')
+                ->where('reference_id', $client->id)
+                ->delete();
+
+            // Delete activity logs related to client or bookings
+            \App\Models\ActivityLog::where(function ($q) use ($client, $bookingIds) {
+                $q->whereIn('entity_type', ['client', 'Client'])->where('entity_id', $client->id);
+                if (!empty($bookingIds)) {
+                    $q->orWhere(function ($sub) use ($bookingIds) {
+                        $sub->whereIn('entity_type', ['booking', 'Booking'])->whereIn('entity_id', $bookingIds);
+                    });
+                }
+            })->delete();
+
+            // Permanently force delete the client record
+            $client->forceDelete();
         });
 
-        $client->delete();
-
-        return response()->json(['message' => 'Client deleted']);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم مسح العروس وكافة بياناتها وسجلاتها نهائياً من النظام'
+        ]);
     }
 
     /**
@@ -281,8 +438,11 @@ class ClientController extends Controller
             'phone2' => 'nullable|string|max:50',
             'dress_id' => 'nullable|integer|exists:dresses,id',
             'dress_2_id' => 'nullable|integer|exists:dresses,id',
+            'dress_3_id' => 'nullable|integer|exists:dresses,id',
             'fitting_date' => 'nullable|date',
             'fitting_time' => 'nullable|string|max:20',
+            'visit_date' => 'nullable|date',
+            'visit_time' => 'nullable|string|max:50',
             'event_date' => 'nullable|date',
             'total_amount' => 'nullable|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
@@ -308,20 +468,53 @@ class ClientController extends Controller
             case 'confirm_visit':
                 $visit = $client->visits()->latest()->first();
                 $visitSalesName = $request->input('sales_name');
+                $visitDate = $request->input('visit_date', now()->toDateString());
+                $visitTime = $request->input('visit_time');
+
                 if ($visit) {
                     $visit->update([
                         'status' => 'confirmed',
                         'sales_name' => $visitSalesName ?: $visit->sales_name,
+                        'visit_date' => $visitDate ?: $visit->visit_date,
+                        'time_slot' => $visitTime ?: $visit->time_slot,
                     ]);
                 } else {
                     \App\Models\Visit::create([
                         'client_id' => $client->id,
-                        'visit_date' => now()->toDateString(),
+                        'visit_date' => $visitDate,
+                        'time_slot' => $visitTime,
                         'status' => 'confirmed',
                         'source' => $client->source ?: 'website',
                         'sales_name' => $visitSalesName,
                         'notes' => 'تم تأكيد موعد الزيارة'
                     ]);
+                }
+
+                // Associate or update up to 3 interested dresses in a pending booking
+                $dressId = $request->input('dress_id');
+                $dress2Id = $request->input('dress_2_id');
+                $dress3Id = $request->input('dress_3_id');
+                if ($dressId || $dress2Id || $dress3Id) {
+                    $booking = $client->bookings()->latest()->first();
+                    if ($booking) {
+                        $booking->update([
+                            'dress_id' => $dressId ?: $booking->dress_id,
+                            'dress_2_id' => $dress2Id,
+                            'dress_3_id' => $dress3Id,
+                            'event_date' => $request->input('event_date') ?: ($client->wedding_date ?: $booking->event_date),
+                        ]);
+                    } else {
+                        $client->bookings()->create([
+                            'dress_id' => $dressId,
+                            'dress_2_id' => $dress2Id,
+                            'dress_3_id' => $dress3Id,
+                            'booking_date' => $visitDate,
+                            'event_date' => $request->input('event_date', $client->wedding_date),
+                            'status' => 'pending',
+                            'total_amount' => 0,
+                            'notes' => 'تم تسجيل الفساتين المراد تجربتها',
+                        ]);
+                    }
                 }
                 break;
 

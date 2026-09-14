@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Search, Calendar as CalendarIcon, Filter, X, LayoutGrid } from 'lucide-react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { cleanDate } from '@/lib/utils';
+import { calculateScheduledDates } from '@/pages/BridesPage';
 
 const normalizeArabic = (text) => {
   if (!text) return '';
@@ -34,22 +35,35 @@ export default function CalendarTab({
       .then((res) => {
         if (!isMounted) return;
         const data = res.data || res || [];
-        const mapped = data.map((c) => ({
-          id: c.id,
-          name: c.name,
-          phone: c.phone || '',
-          phone2: c.phone2 || '',
-          email: c.email || '',
-          city: c.city || c.address || '',
-          notes: c.notes || '',
-          current_stage: c.current_stage || 'visit',
-          image_path: c.image_path,
-          wedding_date: (c.wedding_date || c.bookings?.[0]?.event_date) ? String(c.wedding_date || c.bookings?.[0]?.event_date).substring(0, 10) : '',
-          bookings: c.bookings || [],
-          visits: c.visits || [],
-          latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
-          latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
-        }));
+        const mapped = data.map((c) => {
+          const wDate = (c.wedding_date || c.bookings?.[0]?.event_date) ? String(c.wedding_date || c.bookings?.[0]?.event_date).substring(0, 10) : '';
+          const clientCity = c.city || c.address || 'القاهرة';
+          const pDate = (c.pickup_scheduled_on || c.bookings?.[0]?.pickup_scheduled_on)
+            ? String(c.pickup_scheduled_on || c.bookings?.[0]?.pickup_scheduled_on).substring(0, 10)
+            : (wDate ? calculateScheduledDates(wDate, clientCity).pickupDate : '');
+          const rDate = (c.return_scheduled_on || c.bookings?.[0]?.return_scheduled_on)
+            ? String(c.return_scheduled_on || c.bookings?.[0]?.return_scheduled_on).substring(0, 10)
+            : (wDate ? calculateScheduledDates(wDate, clientCity).returnDate : '');
+
+          return {
+            id: c.id,
+            name: c.name,
+            phone: c.phone || '',
+            phone2: c.phone2 || '',
+            email: c.email || '',
+            city: clientCity,
+            notes: c.notes || '',
+            current_stage: c.current_stage || 'visit',
+            image_path: c.image_path,
+            wedding_date: wDate,
+            pickup_scheduled_on: pDate,
+            return_scheduled_on: rDate,
+            bookings: c.bookings || [],
+            visits: c.visits || [],
+            latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
+            latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
+          };
+        });
         setInternalBrides(mapped);
       })
       .catch((err) => {
@@ -88,9 +102,9 @@ export default function CalendarTab({
   const availableMonths = useMemo(() => {
     const map = {};
     activeBridesList.forEach((b) => {
+      const pDate = b.pickup_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '');
       const dates = [
-        b.wedding_date,
-        b.bookings?.[0]?.event_date,
+        pDate,
         b.latest_visit_date,
         b.visits?.[0]?.visit_date,
       ].filter(Boolean);
@@ -221,23 +235,34 @@ export default function CalendarTab({
         }
       }
 
-      // 3. Date matching: Does this bride have an event on this date?
-      const isMatchDay =
-        cleanDate(b.wedding_date)?.startsWith(dateStr) ||
-        cleanDate(b.latest_visit_date)?.startsWith(dateStr) ||
-        b.bookings?.some((bk) => cleanDate(bk.event_date)?.startsWith(dateStr)) ||
-        b.bookings?.some((bk) => cleanDate(bk.pickup_scheduled_on)?.startsWith(dateStr)) ||
-        b.bookings?.some((bk) => cleanDate(bk.return_scheduled_on)?.startsWith(dateStr)) ||
-        b.visits?.some((v) => cleanDate(v.visit_date)?.startsWith(dateStr)) ||
-        b.fittings?.some((f) => cleanDate(f.fitting_date)?.startsWith(dateStr)) ||
-        b.bookings?.some((bk) => bk.fittings?.some((f) => cleanDate(f.fitting_date)?.startsWith(dateStr))) ||
-        calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
+      // 3. Date matching: Base day appearance on Pickup Date (or Visit Date for visits)
+      const effectivePickupDate = cleanDate(
+        b.pickup_scheduled_on ||
+        b.bookings?.[0]?.pickup_scheduled_on ||
+        (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '')
+      );
+
+      let isMatchDay = false;
+
+      if (brideStage === 'visit') {
+        isMatchDay =
+          cleanDate(b.latest_visit_date)?.startsWith(dateStr) ||
+          b.visits?.some((v) => cleanDate(v.visit_date)?.startsWith(dateStr)) ||
+          calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
+      } else {
+        // Bookings / fittings / pickup / receive / returned are positioned strictly on pickup date
+        isMatchDay =
+          effectivePickupDate === dateStr ||
+          b.bookings?.some((bk) => cleanDate(bk.pickup_scheduled_on) === dateStr) ||
+          calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
+      }
 
       if (!isMatchDay) continue;
 
       results.push({
         bride: b,
         dayStage: brideStage,
+        effectivePickupDate,
       });
     }
 
@@ -252,16 +277,22 @@ export default function CalendarTab({
     activeBridesList.forEach((b) => {
       const bookings = Array.isArray(b.bookings) ? b.bookings : [];
       bookings.forEach((booking) => {
-        const evDate = cleanDate(booking.event_date || b.wedding_date || '');
-        if (evDate && evDate.startsWith(monthKey)) {
+        const pDate = cleanDate(
+          booking.pickup_scheduled_on ||
+          b.pickup_scheduled_on ||
+          (booking.event_date ? calculateScheduledDates(booking.event_date, b.city).pickupDate : '') ||
+          (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '')
+        );
+
+        if (pDate && pDate.startsWith(monthKey)) {
           const dressName = booking.dress?.name || b.latest_dress_name || 'فستان زفاف';
           const dressCode = booking.dress?.code || '';
           let returnDate = booking.return_scheduled_on ? cleanDate(booking.return_scheduled_on) : '';
-          if (!returnDate && evDate) {
+          if (!returnDate && pDate) {
             try {
-              const d = new Date(evDate);
+              const d = new Date(pDate);
               if (!isNaN(d.getTime())) {
-                d.setDate(d.getDate() + 1);
+                d.setDate(d.getDate() + 2);
                 returnDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
               }
             } catch {}
@@ -272,7 +303,8 @@ export default function CalendarTab({
             bridePhone: b.phone,
             dressName,
             dressCode,
-            eventDate: cleanDate(evDate),
+            eventDate: cleanDate(booking.event_date || b.wedding_date || ''),
+            pickupDate: pDate,
             returnDate: cleanDate(returnDate),
             stage: getBrideStage(b)
           });

@@ -64,11 +64,14 @@ class CalendarController extends Controller
                 ];
             });
 
-        // Fetch bookings in date range (by booking_date or event_date)
+        // Fetch bookings in date range (based on pickup_scheduled_on, or fallback to event_date)
         $bookings = Booking::whereHas('client')->with(['client.visits', 'dress', 'dress2', 'dress3'])
             ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('booking_date', [$startDate, $endDate])
-                  ->orWhereBetween('event_date', [$startDate, $endDate]);
+                $q->whereBetween('pickup_scheduled_on', [$startDate, $endDate])
+                  ->orWhere(function ($sub) use ($startDate, $endDate) {
+                      $sub->whereNull('pickup_scheduled_on')
+                          ->whereBetween('event_date', [$startDate, $endDate]);
+                  });
             })
             ->get()
             ->map(function ($booking) {
@@ -80,17 +83,25 @@ class CalendarController extends Controller
                 $fittingsCompleted = $hasFittings && !$booking->fittings()->where('fittings.status', '!=', 'completed')->exists();
 
                 $type = 'booking';
-                $eventDateStr = explode(' ', $booking->getRawOriginal('event_date'))[0];
-                $date = $eventDateStr;
+                $eventDateStr = $booking->getRawOriginal('event_date') ? explode(' ', $booking->getRawOriginal('event_date'))[0] : '';
+                
+                // Base calendar event date on pickup date
+                $pickupDateStr = $booking->pickup_scheduled_on
+                    ? explode(' ', $booking->getRawOriginal('pickup_scheduled_on'))[0]
+                    : null;
 
-                if ($fittingsCompleted) {
-                    $type = 'pickup';
-                    $weddingDate = \Carbon\Carbon::parse($eventDateStr);
-                    $pickupDaysBefore = $isCairo ? 1 : 2;
-                    $date = $weddingDate->subDays($pickupDaysBefore)->toDateString();
+                if (!$pickupDateStr && !empty($eventDateStr)) {
+                    $scheduled = Booking::calculateScheduledDates($eventDateStr, $clientCity);
+                    $pickupDateStr = $scheduled['pickup_date'];
                 }
 
-                $bookingDateOnly = explode(' ', $booking->getRawOriginal('booking_date'))[0];
+                $date = $pickupDateStr ?: $eventDateStr;
+
+                if ($fittingsCompleted || $booking->status === 'picked_up') {
+                    $type = 'pickup';
+                }
+
+                $bookingDateOnly = $booking->getRawOriginal('booking_date') ? explode(' ', $booking->getRawOriginal('booking_date'))[0] : '';
                 $timeSlot = null;
                 if ($booking->client) {
                     $visit = $booking->client->visits->first(function ($v) use ($bookingDateOnly) {
@@ -105,6 +116,8 @@ class CalendarController extends Controller
                     'id' => 'booking-' . $booking->id,
                     'type' => $type,
                     'date' => $date,
+                    'pickup_scheduled_on' => $pickupDateStr,
+                    'return_scheduled_on' => $booking->return_scheduled_on ? explode(' ', $booking->getRawOriginal('return_scheduled_on'))[0] : null,
                     'event_date' => $eventDateStr,
                     'booking_date' => $bookingDateOnly,
                     'time_slot' => $timeSlot,

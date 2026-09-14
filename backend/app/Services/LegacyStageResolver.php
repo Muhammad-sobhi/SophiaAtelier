@@ -9,9 +9,9 @@ class LegacyStageResolver
 {
     public static function resolve(Client $client, $latestBooking): string
     {
-        if (!$latestBooking) {
+        if (!$latestBooking || in_array($latestBooking->status, ['pending', 'cancelled'])) {
             $visitsCount = $client->relationLoaded('visits') ? $client->visits->count() : $client->visits()->count();
-            return $visitsCount > 0 ? 'visit' : 'visit';
+            return 'visit';
         }
 
         if ($latestBooking->status === 'returned') return 'returned';

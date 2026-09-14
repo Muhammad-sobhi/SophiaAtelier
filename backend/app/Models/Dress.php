@@ -73,4 +73,9 @@ class Dress extends Model
     {
         return $this->hasMany(Booking::class, 'dress_2_id');
     }
+
+    public function thirdBookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'dress_3_id');
+    }
 }

@@ -6,7 +6,7 @@ import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 import { cleanDate } from '@/lib/utils';
 import {
   X, Heart, Calendar, Ruler, Package, RotateCcw,
-  Search, CheckCircle2, AlertTriangle, User, CreditCard
+  Search, CheckCircle2, AlertTriangle, User, CreditCard, Trash2, Loader2
 } from 'lucide-react';
 
 export const getDressConflict = (dress, targetDate, currentClientId = null, targetCity = 'القاهرة') => {
@@ -14,6 +14,7 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
   const bookings = [
     ...(Array.isArray(dress.bookings) ? dress.bookings : []),
     ...(Array.isArray(dress.secondBookings) ? dress.secondBookings : []),
+    ...(Array.isArray(dress.thirdBookings) ? dress.thirdBookings : []),
   ];
   if (bookings.length === 0) return null;
 
@@ -27,7 +28,8 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
     targetCity.toLowerCase().includes('cairo') ||
     targetCity.toLowerCase().includes('giza');
 
-  const targetDaysBefore = isTargetCairo ? 2 : 3;
+  // 1 day before wedding for Cairo & Giza, 2 days before for other cities
+  const targetDaysBefore = isTargetCairo ? 1 : 2;
   const targetDaysAfter = 1;
 
   const targetStart = targetTime - (targetDaysBefore * 24 * 60 * 60 * 1000);
@@ -57,7 +59,7 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
     } else {
       const bDateStr = String(b.event_date).split('T')[0].split(' ')[0];
       const bTime = new Date(`${bDateStr}T00:00:00`).getTime();
-      const bDaysBefore = isBCairo ? 2 : 3;
+      const bDaysBefore = isBCairo ? 1 : 2;
       const bDaysAfter = 1;
       bStart = bTime - (bDaysBefore * 24 * 60 * 60 * 1000);
       bEnd = bTime + (bDaysAfter * 24 * 60 * 60 * 1000);
@@ -118,6 +120,24 @@ export function UnifiedStageModal({
   const [dressesList, setDressesList] = useState(propDressesList || []);
   const [employeesList, setEmployeesList] = useState(propEmployeesList || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteBride = async () => {
+    setIsDeleting(true);
+    try {
+      await apiClient.delete(`/clients/${bride.id}`);
+      toast.success(`تم مسح بيانات العروس (${bride.name}) بالكامل نهائياً وكأنها لم تُسجل ✨`);
+      setIsDeleteConfirmOpen(false);
+      onClose();
+      onSuccess?.();
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.message || 'حدث خطأ أثناء مسح بيانات العروس');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Common Client Fields
   const [name, setName] = useState(bride.name || '');
@@ -153,6 +173,16 @@ export function UnifiedStageModal({
   const [visitSalesName, setVisitSalesName] = useState(bride.visits?.[0]?.sales_name || bride.sales_name || salesName || '');
   const [tryingFee, setTryingFee] = useState(bride.latest_dress_trying_fee ? String(bride.latest_dress_trying_fee) : '0');
   const [visitPaymentMethod, setVisitPaymentMethod] = useState('cash');
+
+  // Visit Stage Dresses (up to 3 dresses)
+  const [visitDress1Id, setVisitDress1Id] = useState(booking?.dress_id ? String(booking.dress_id) : '');
+  const [visitDress1Search, setVisitDress1Search] = useState('');
+  const [visitHasDress2, setVisitHasDress2] = useState(Boolean(booking?.dress_2_id));
+  const [visitDress2Id, setVisitDress2Id] = useState(booking?.dress_2_id ? String(booking.dress_2_id) : '');
+  const [visitDress2Search, setVisitDress2Search] = useState('');
+  const [visitHasDress3, setVisitHasDress3] = useState(Boolean(booking?.dress_3_id));
+  const [visitDress3Id, setVisitDress3Id] = useState(booking?.dress_3_id ? String(booking.dress_3_id) : '');
+  const [visitDress3Search, setVisitDress3Search] = useState('');
 
   // Fitting Stage Fields
   const latestFitting = bride.fittings?.[0];
@@ -285,6 +315,77 @@ export function UnifiedStageModal({
     setBookingTotalAmount(String(p1 + p2));
   };
 
+  // Selected dress objects in Visit
+  const visitDress1Obj = dressesList.find(d => String(d.id) === String(visitDress1Id));
+  const visitDress2Obj = (visitHasDress2 && visitDress2Id) ? dressesList.find(d => String(d.id) === String(visitDress2Id)) : null;
+  const visitDress3Obj = (visitHasDress3 && visitDress3Id) ? dressesList.find(d => String(d.id) === String(visitDress3Id)) : null;
+
+  // Conflicts in Visit (evaluated against weddingDate & city)
+  const visitDress1Conflict = useMemo(() => {
+    return getDressConflict(visitDress1Obj, weddingDate, bride?.id, city);
+  }, [visitDress1Obj, weddingDate, bride?.id, city]);
+
+  const visitDress2Conflict = useMemo(() => {
+    return getDressConflict(visitDress2Obj, weddingDate, bride?.id, city);
+  }, [visitDress2Obj, weddingDate, bride?.id, city]);
+
+  const visitDress3Conflict = useMemo(() => {
+    return getDressConflict(visitDress3Obj, weddingDate, bride?.id, city);
+  }, [visitDress3Obj, weddingDate, bride?.id, city]);
+
+  const calculateVisitTryingFee = (d1Id, d2Id, d3Id, hasD2, hasD3) => {
+    let total = 0;
+    const d1 = dressesList.find(d => String(d.id) === String(d1Id));
+    if (d1 && d1.trying_fee) total += parseFloat(d1.trying_fee);
+
+    if (hasD2 && d2Id) {
+      const d2 = dressesList.find(d => String(d.id) === String(d2Id));
+      if (d2 && d2.trying_fee) total += parseFloat(d2.trying_fee);
+    }
+
+    if (hasD3 && d3Id) {
+      const d3 = dressesList.find(d => String(d.id) === String(d3Id));
+      if (d3 && d3.trying_fee) total += parseFloat(d3.trying_fee);
+    }
+
+    return total;
+  };
+
+  const handleSelectVisitDress1 = (dress) => {
+    const dId = String(dress.id);
+    setVisitDress1Id(dId);
+    const fee = calculateVisitTryingFee(dId, visitDress2Id, visitDress3Id, visitHasDress2, visitHasDress3);
+    setTryingFee(String(fee));
+  };
+
+  const handleSelectVisitDress2 = (dress) => {
+    const dId = String(dress.id);
+    setVisitDress2Id(dId);
+    const fee = calculateVisitTryingFee(visitDress1Id, dId, visitDress3Id, true, visitHasDress3);
+    setTryingFee(String(fee));
+  };
+
+  const handleSelectVisitDress3 = (dress) => {
+    const dId = String(dress.id);
+    setVisitDress3Id(dId);
+    const fee = calculateVisitTryingFee(visitDress1Id, visitDress2Id, dId, visitHasDress2, true);
+    setTryingFee(String(fee));
+  };
+
+  const handleRemoveVisitDress2 = () => {
+    setVisitHasDress2(false);
+    setVisitDress2Id('');
+    const fee = calculateVisitTryingFee(visitDress1Id, '', visitDress3Id, false, visitHasDress3);
+    setTryingFee(String(fee));
+  };
+
+  const handleRemoveVisitDress3 = () => {
+    setVisitHasDress3(false);
+    setVisitDress3Id('');
+    const fee = calculateVisitTryingFee(visitDress1Id, visitDress2Id, '', visitHasDress2, false);
+    setTryingFee(String(fee));
+  };
+
   // Revert stage handler
   const handleRevertStage = async () => {
     const stageFlow = ['visit', 'booking', 'fitting', 'picked_up', 'returned'];
@@ -324,6 +425,11 @@ export function UnifiedStageModal({
 
     try {
       if (stage === 'visit') {
+        const d1 = visitDress1Id ? parseInt(visitDress1Id) : null;
+        const d2 = (visitHasDress2 && visitDress2Id) ? parseInt(visitDress2Id) : null;
+        const d3 = (visitHasDress3 && visitDress3Id) ? parseInt(visitDress3Id) : null;
+        const parsedFee = parseFloat(tryingFee || 0);
+
         await apiClient.put(`/clients/${bride.id}`, {
           name: name.trim(),
           phone: phone.trim(),
@@ -332,6 +438,10 @@ export function UnifiedStageModal({
           source: source,
           wedding_date: weddingDate || null,
           notes: notes.trim() || null,
+          dress_id: d1,
+          dress_2_id: d2,
+          dress_3_id: d3,
+          trying_fee: parsedFee,
         });
 
         if (visitDate) {
@@ -340,8 +450,12 @@ export function UnifiedStageModal({
             visit_date: visitDate,
             visit_time: visitTime,
             sales_name: visitSalesName.trim() || null,
-            trying_fee: parseFloat(tryingFee || 0),
+            trying_fee: parsedFee,
             payment_method: visitPaymentMethod,
+            dress_id: d1,
+            dress_2_id: d2,
+            dress_3_id: d3,
+            event_date: weddingDate || null,
           });
         }
       } else if (stage === 'booking') {
@@ -498,13 +612,24 @@ export function UnifiedStageModal({
             {headerInfo.icon}
             <span>{headerInfo.title}</span>
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-          >
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              className="p-1 hover:bg-rose-100 rounded-lg text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+              title="مسح العروس وكافة بياناتها نهائياً"
+            >
+              <Trash2 size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              title="إغلاق"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Form Body */}
@@ -1055,6 +1180,324 @@ export function UnifiedStageModal({
                     />
                   </div>
                 </div>
+
+                {/* Visit Stage: Interested Dresses Selection (Up to 3 Dresses) */}
+                <div className="bg-rose-50/30 p-3 rounded-2xl border border-rose-100 space-y-3">
+                  <div className="flex items-center justify-between border-b border-rose-100/60 pb-2">
+                    <span className="text-xs font-black text-rose-900 flex items-center gap-1.5">
+                      <span>👗 الفساتين المطلوب قياسها / تجربتها (حتى 3 فساتين)</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-rose-600 bg-rose-100/60 px-2 py-0.5 rounded-full">
+                      {(visitDress1Id ? 1 : 0) + (visitHasDress2 && visitDress2Id ? 1 : 0) + (visitHasDress3 && visitDress3Id ? 1 : 0)} / 3 فساتين
+                    </span>
+                  </div>
+
+                  {/* Dress 1 Selection */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10.5px] font-extrabold text-slate-700 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                        <span>فستان التجربة 1</span>
+                        <span className="text-[9px] text-slate-400 font-normal">(اختياري)</span>
+                      </label>
+                      {visitDress1Id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVisitDress1Id('');
+                            const fee = calculateVisitTryingFee('', visitDress2Id, visitDress3Id, visitHasDress2, visitHasDress3);
+                            setTryingFee(String(fee));
+                          }}
+                          className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <X size={10} /> إلغاء الاختيار
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 بحث سريع عن الفستان بالاسم أو الكود..."
+                        value={visitDress1Search}
+                        onChange={(e) => setVisitDress1Search(e.target.value)}
+                        className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
+                      />
+                      <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                      {visitDress1Search && (
+                        <button
+                          type="button"
+                          onClick={() => setVisitDress1Search('')}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={11} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 overflow-y-auto scrollbar-thin">
+                      {dressesList
+                        .filter((d) => {
+                          if (!visitDress1Search.trim()) return true;
+                          const q = visitDress1Search.toLowerCase().trim();
+                          return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                        })
+                        .map((d) => {
+                          const isSelected = visitDress1Id === String(d.id);
+                          const conflict = weddingDate ? getDressConflict(d, weddingDate, bride?.id, city) : null;
+                          const isBlocked = Boolean(conflict);
+
+                          return (
+                            <button
+                              type="button"
+                              key={d.id}
+                              onClick={() => handleSelectVisitDress1(d)}
+                              title={isBlocked ? `⚠️ محجوز للعروس: ${conflict.clientName} (من ${conflict.startDate} إلى ${conflict.endDate})` : '🟢 متاح في تاريخ الفرح'}
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-rose-600 border-rose-600 text-white shadow-xs font-black'
+                                  : isBlocked
+                                    ? 'bg-rose-50/70 border-rose-200 text-rose-800 hover:bg-rose-100/80'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50'
+                              }`}
+                            >
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  isBlocked
+                                    ? isSelected ? 'bg-white ring-2 ring-rose-300 animate-pulse' : 'bg-rose-500 ring-2 ring-rose-200 animate-pulse'
+                                    : isSelected ? 'bg-white' : 'bg-emerald-500'
+                                }`}
+                              />
+                              <span>{d.name} {d.code ? `(${d.code})` : ''}</span>
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    {visitDress1Obj && (
+                      <div className="text-[10px] font-extrabold text-rose-700 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                        <span>الفستان 1 المختار: <strong className="font-black">{visitDress1Obj.name}</strong></span>
+                        <span className="font-mono text-[9.5px] text-rose-800">
+                          رسوم التجربة: {parseFloat(visitDress1Obj.trying_fee || 0) > 0 ? `${parseFloat(visitDress1Obj.trying_fee).toLocaleString()} ج.م` : 'مجانية'}
+                        </span>
+                      </div>
+                    )}
+
+                    {visitDress1Conflict && (
+                      <div className="p-2.5 bg-rose-50/90 border-2 border-rose-300 rounded-xl space-y-1 text-right text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black text-rose-800 flex items-center gap-1">
+                            <AlertTriangle size={13} className="text-rose-600 animate-bounce" />
+                            تعارض في الفستان 1 مع حجز آخر!
+                          </span>
+                          <span className="text-[9.5px] bg-rose-200 text-rose-900 font-bold px-1.5 py-0.5 rounded">
+                            حجز #{visitDress1Conflict.bookingId}
+                          </span>
+                        </div>
+                        <div className="text-[10.5px] text-slate-700 space-y-0.5">
+                          <div>👰 العروس: <strong className="text-rose-700">{visitDress1Conflict.clientName}</strong> ({visitDress1Conflict.clientCity})</div>
+                          <div>⏳ فترة الحظر: من <strong className="font-mono">{visitDress1Conflict.startDate}</strong> إلى <strong className="font-mono">{visitDress1Conflict.endDate}</strong></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dress 2 Toggle / Selector */}
+                  {!visitHasDress2 ? (
+                    <button
+                      type="button"
+                      onClick={() => setVisitHasDress2(true)}
+                      className="w-full py-1.5 border border-dashed border-purple-300 text-purple-700 hover:bg-purple-50/50 rounded-xl text-[10.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <span>+ إضافة فستان ثانٍ للتجربة</span>
+                    </button>
+                  ) : (
+                    <div className="bg-purple-50/30 p-2.5 rounded-xl border border-purple-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10.5px] font-extrabold text-purple-900 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                          <span>فستان التجربة 2</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRemoveVisitDress2}
+                          className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <X size={10} /> حذف الفستان 2
+                        </button>
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="🔍 بحث عن الفستان الثاني..."
+                          value={visitDress2Search}
+                          onChange={(e) => setVisitDress2Search(e.target.value)}
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-right"
+                        />
+                        <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 overflow-y-auto scrollbar-thin">
+                        {dressesList
+                          .filter((d) => {
+                            if (!visitDress2Search.trim()) return true;
+                            const q = visitDress2Search.toLowerCase().trim();
+                            return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                          })
+                          .map((d) => {
+                            const isSelected = visitDress2Id === String(d.id);
+                            const conflict = weddingDate ? getDressConflict(d, weddingDate, bride?.id, city) : null;
+                            const isBlocked = Boolean(conflict);
+
+                            return (
+                              <button
+                                type="button"
+                                key={d.id}
+                                onClick={() => handleSelectVisitDress2(d)}
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                  isSelected
+                                    ? 'bg-purple-600 border-purple-600 text-white shadow-xs font-black'
+                                    : isBlocked
+                                      ? 'bg-purple-50/70 border-purple-200 text-purple-800 hover:bg-purple-100/80'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:bg-purple-50'
+                                }`}
+                              >
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${isBlocked ? (isSelected ? 'bg-white' : 'bg-rose-500 animate-pulse') : (isSelected ? 'bg-white' : 'bg-emerald-500')}`} />
+                                <span>{d.name} {d.code ? `(${d.code})` : ''}</span>
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      {visitDress2Obj && (
+                        <div className="text-[10px] font-extrabold text-purple-700 bg-purple-50/70 border border-purple-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                          <span>الفستان 2 المختار: <strong className="font-black">{visitDress2Obj.name}</strong></span>
+                          <span className="font-mono text-[9.5px] text-purple-800">
+                            رسوم التجربة: {parseFloat(visitDress2Obj.trying_fee || 0) > 0 ? `${parseFloat(visitDress2Obj.trying_fee).toLocaleString()} ج.م` : 'مجانية'}
+                          </span>
+                        </div>
+                      )}
+
+                      {visitDress2Conflict && (
+                        <div className="p-2.5 bg-rose-50/90 border-2 border-rose-300 rounded-xl space-y-1 text-right text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-black text-rose-800 flex items-center gap-1">
+                              <AlertTriangle size={13} className="text-rose-600 animate-bounce" />
+                              تعارض في الفستان 2 مع حجز آخر!
+                            </span>
+                            <span className="text-[9.5px] bg-rose-200 text-rose-900 font-bold px-1.5 py-0.5 rounded">
+                              حجز #{visitDress2Conflict.bookingId}
+                            </span>
+                          </div>
+                          <div className="text-[10.5px] text-slate-700 space-y-0.5">
+                            <div>👰 العروس: <strong className="text-rose-700">{visitDress2Conflict.clientName}</strong> ({visitDress2Conflict.clientCity})</div>
+                            <div>⏳ فترة الحظر: من <strong className="font-mono">{visitDress2Conflict.startDate}</strong> إلى <strong className="font-mono">{visitDress2Conflict.endDate}</strong></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Dress 3 Toggle / Selector */}
+                  {visitHasDress2 && (
+                    !visitHasDress3 ? (
+                      <button
+                        type="button"
+                        onClick={() => setVisitHasDress3(true)}
+                        className="w-full py-1.5 border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50/50 rounded-xl text-[10.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <span>+ إضافة فستان ثالث للتجربة (الحد الأقصى 3)</span>
+                      </button>
+                    ) : (
+                      <div className="bg-indigo-50/30 p-2.5 rounded-xl border border-indigo-100 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10.5px] font-extrabold text-indigo-900 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            <span>فستان التجربة 3</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleRemoveVisitDress3}
+                            className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <X size={10} /> حذف الفستان 3
+                          </button>
+                        </div>
+
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="🔍 بحث عن الفستان الثالث..."
+                            value={visitDress3Search}
+                            onChange={(e) => setVisitDress3Search(e.target.value)}
+                            className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-right"
+                          />
+                          <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 overflow-y-auto scrollbar-thin">
+                          {dressesList
+                            .filter((d) => {
+                              if (!visitDress3Search.trim()) return true;
+                              const q = visitDress3Search.toLowerCase().trim();
+                              return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                            })
+                            .map((d) => {
+                              const isSelected = visitDress3Id === String(d.id);
+                              const conflict = weddingDate ? getDressConflict(d, weddingDate, bride?.id, city) : null;
+                              const isBlocked = Boolean(conflict);
+
+                              return (
+                                <button
+                                  type="button"
+                                  key={d.id}
+                                  onClick={() => handleSelectVisitDress3(d)}
+                                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                    isSelected
+                                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs font-black'
+                                      : isBlocked
+                                        ? 'bg-indigo-50/70 border-indigo-200 text-indigo-800 hover:bg-indigo-100/80'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50'
+                                  }`}
+                                >
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${isBlocked ? (isSelected ? 'bg-white' : 'bg-rose-500 animate-pulse') : (isSelected ? 'bg-white' : 'bg-emerald-500')}`} />
+                                  <span>{d.name} {d.code ? `(${d.code})` : ''}</span>
+                                </button>
+                              );
+                            })}
+                        </div>
+
+                        {visitDress3Obj && (
+                          <div className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50/70 border border-indigo-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                            <span>الفستان 3 المختار: <strong className="font-black">{visitDress3Obj.name}</strong></span>
+                            <span className="font-mono text-[9.5px] text-indigo-800">
+                              رسوم التجربة: {parseFloat(visitDress3Obj.trying_fee || 0) > 0 ? `${parseFloat(visitDress3Obj.trying_fee).toLocaleString()} ج.م` : 'مجانية'}
+                            </span>
+                          </div>
+                        )}
+
+                        {visitDress3Conflict && (
+                          <div className="p-2.5 bg-rose-50/90 border-2 border-rose-300 rounded-xl space-y-1 text-right text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-black text-rose-800 flex items-center gap-1">
+                                <AlertTriangle size={13} className="text-rose-600 animate-bounce" />
+                                تعارض في الفستان 3 مع حجز آخر!
+                              </span>
+                              <span className="text-[9.5px] bg-rose-200 text-rose-900 font-bold px-1.5 py-0.5 rounded">
+                                حجز #{visitDress3Conflict.bookingId}
+                              </span>
+                            </div>
+                            <div className="text-[10.5px] text-slate-700 space-y-0.5">
+                              <div>👰 العروس: <strong className="text-rose-700">{visitDress3Conflict.clientName}</strong> ({visitDress3Conflict.clientCity})</div>
+                              <div>⏳ فترة الحظر: من <strong className="font-mono">{visitDress3Conflict.startDate}</strong> إلى <strong className="font-mono">{visitDress3Conflict.endDate}</strong></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
               </>
             )}
 
@@ -1489,6 +1932,53 @@ export function UnifiedStageModal({
             </button>
           </div>
         </form>
+      {/* Permanent Delete Confirmation Dialog */}
+      {isDeleteConfirmOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[99999] flex items-center justify-center p-4 text-right"
+          dir="rtl"
+          onClick={() => !isDeleting && setIsDeleteConfirmOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-sm p-5 border border-rose-100 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto">
+              <Trash2 size={24} />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-black text-slate-900">مسح بيانات العروس نهائياً؟</h3>
+              <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                سيتم مسح العروس <strong className="text-rose-600">({bride.name})</strong> وكافة الحجوزات، المواعيد، القياسات، والمدفوعات المرتبطة بها تماماً وكأنها لم تكن مسجلة مسبقاً.
+              </p>
+              <p className="text-[10px] text-rose-500 font-extrabold bg-rose-50 py-1 px-2.5 rounded-lg mt-2 inline-block">
+                ⚠️ هذا الإجراء نهائي ولا يمكن التراجع عنه
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteBride}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-rose-200"
+              >
+                {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                <span>{isDeleting ? 'جاري المسح...' : 'تأكيد المسح'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

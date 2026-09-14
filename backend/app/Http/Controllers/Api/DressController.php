@@ -23,6 +23,9 @@ class DressController extends Controller
                 },
                 'secondBookings' => function($q) {
                     $q->where('status', '!=', 'cancelled')->with('client');
+                },
+                'thirdBookings' => function($q) {
+                    $q->where('status', '!=', 'cancelled')->with('client');
                 }
             ]);
         }
@@ -152,6 +155,9 @@ class DressController extends Controller
                 $q->where('status', '!=', 'cancelled')->with('client');
             },
             'secondBookings' => function($q) {
+                $q->where('status', '!=', 'cancelled')->with('client');
+            },
+            'thirdBookings' => function($q) {
                 $q->where('status', '!=', 'cancelled')->with('client');
             }
         ]);

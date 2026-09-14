@@ -3,12 +3,43 @@ import { createPortal } from 'react-dom';
 import { 
   Users, UserPlus, Search, Phone, MapPin, Calendar, 
   Eye, Edit3, Trash2, X, Check, MessageCircle, 
-  Sparkles, Filter, RefreshCw, AlertTriangle, ChevronLeft, ChevronRight, RotateCcw
+  Sparkles, Filter, RefreshCw, AlertTriangle, ChevronLeft, ChevronRight, RotateCcw,
+  Package, Clock
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate } from '@/lib/utils';
+import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
+
+export function calculateScheduledDates(weddingDate, city) {
+  if (!weddingDate) return { pickupDate: '', returnDate: '' };
+  try {
+    const isCairo = !city ||
+      city.includes('القاهرة') ||
+      city.includes('الجيزة') ||
+      city.toLowerCase().includes('cairo') ||
+      city.toLowerCase().includes('giza');
+    
+    // 1 day before wedding for Cairo & Giza, 2 days before for other cities
+    const daysBefore = isCairo ? 1 : 2;
+    const daysAfter = 1;
+
+    const [year, month, day] = String(weddingDate).split('T')[0].split(' ')[0].split('-').map(Number);
+    if (!year || !month || !day) return { pickupDate: '', returnDate: '' };
+
+    const wDate = new Date(Date.UTC(year, month - 1, day));
+    const pDate = new Date(wDate.getTime() - daysBefore * 24 * 60 * 60 * 1000);
+    const rDate = new Date(wDate.getTime() + daysAfter * 24 * 60 * 60 * 1000);
+
+    return {
+      pickupDate: pDate.toISOString().split('T')[0],
+      returnDate: rDate.toISOString().split('T')[0],
+    };
+  } catch (e) {
+    return { pickupDate: '', returnDate: '' };
+  }
+}
 
 const CITIES = [
   'القاهرة', 'الجيزة', 'الإسكندرية', 'القليوبية', 'الشرقية',
@@ -88,6 +119,7 @@ export default function BridesPage() {
   const [viewingBride, setViewingBride] = useState(null);
   const [deletingBride, setDeletingBride] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dressesList, setDressesList] = useState([]);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -98,8 +130,28 @@ export default function BridesPage() {
     address: '',
     source: 'instagram',
     wedding_date: '',
+    pickup_scheduled_on: '',
+    return_scheduled_on: '',
     notes: '',
+    dress_id: '',
+    dress_2_id: '',
+    dress_3_id: '',
+    has_dress_2: false,
+    has_dress_3: false,
+    trying_fee: '',
+    dress_1_search: '',
+    dress_2_search: '',
+    dress_3_search: '',
   });
+
+  useEffect(() => {
+    apiClient.get('/dresses?per_page=1000&with_bookings=1')
+      .then((res) => {
+        const list = res.data || res || [];
+        setDressesList(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchBrides = async (
     page = currentPage,
@@ -126,6 +178,8 @@ export default function BridesPage() {
         ...c,
         current_stage: c.current_stage || c.stage || 'visit',
         wedding_date: c.wedding_date || c.bookings?.[0]?.event_date || '',
+        pickup_scheduled_on: c.pickup_scheduled_on || c.bookings?.[0]?.pickup_scheduled_on || '',
+        return_scheduled_on: c.return_scheduled_on || c.bookings?.[0]?.return_scheduled_on || '',
         latest_visit_date: c.latest_visit_date || c.visits?.[0]?.visit_date || '',
       }));
       setBrides(mapped);
@@ -188,7 +242,18 @@ export default function BridesPage() {
       address: '',
       source: 'instagram',
       wedding_date: '',
+      pickup_scheduled_on: '',
+      return_scheduled_on: '',
       notes: '',
+      dress_id: '',
+      dress_2_id: '',
+      dress_3_id: '',
+      has_dress_2: false,
+      has_dress_3: false,
+      trying_fee: '',
+      dress_1_search: '',
+      dress_2_search: '',
+      dress_3_search: '',
     });
   };
 
@@ -199,17 +264,145 @@ export default function BridesPage() {
 
   const handleOpenEdit = (bride) => {
     setEditingBride(bride);
+    const b = bride.bookings?.[0];
+    const d1 = b?.dress_id ? String(b.dress_id) : '';
+    const d2 = b?.dress_2_id ? String(b.dress_2_id) : '';
+    const d3 = b?.dress_3_id ? String(b.dress_3_id) : '';
+    const tf = (bride.latest_dress_trying_fee !== undefined && bride.latest_dress_trying_fee > 0)
+      ? String(bride.latest_dress_trying_fee)
+      : (b?.dress?.trying_fee ? String(b.dress.trying_fee) : '');
+
+    const wDate = bride.wedding_date ? String(bride.wedding_date).substring(0, 10) : '';
+    const clientCity = bride.city || bride.address || 'القاهرة';
+
+    let initialPickup = (bride.pickup_scheduled_on || b?.pickup_scheduled_on)
+      ? String(bride.pickup_scheduled_on || b?.pickup_scheduled_on).substring(0, 10)
+      : '';
+    let initialReturn = (bride.return_scheduled_on || b?.return_scheduled_on)
+      ? String(bride.return_scheduled_on || b?.return_scheduled_on).substring(0, 10)
+      : '';
+
+    if (wDate && (!initialPickup || !initialReturn)) {
+      const { pickupDate, returnDate } = calculateScheduledDates(wDate, clientCity);
+      if (!initialPickup) initialPickup = pickupDate;
+      if (!initialReturn) initialReturn = returnDate;
+    }
+
     setFormData({
       name: bride.name || '',
       phone: bride.phone || '',
       phone2: bride.phone2 || '',
-      city: bride.city || bride.address || 'القاهرة',
+      city: clientCity,
       address: bride.address || '',
       source: bride.source || 'instagram',
-      wedding_date: bride.wedding_date ? String(bride.wedding_date).substring(0, 10) : '',
+      wedding_date: wDate,
+      pickup_scheduled_on: initialPickup,
+      return_scheduled_on: initialReturn,
       notes: bride.notes || '',
+      dress_id: d1,
+      dress_2_id: d2,
+      dress_3_id: d3,
+      has_dress_2: Boolean(d2),
+      has_dress_3: Boolean(d3),
+      trying_fee: tf,
+      dress_1_search: '',
+      dress_2_search: '',
+      dress_3_search: '',
     });
   };
+
+  const handleWeddingDateChange = (newDate) => {
+    const { pickupDate, returnDate } = calculateScheduledDates(newDate, formData.city);
+    setFormData(prev => ({
+      ...prev,
+      wedding_date: newDate,
+      pickup_scheduled_on: pickupDate || '',
+      return_scheduled_on: returnDate || '',
+    }));
+  };
+
+  const handleCityChange = (newCity) => {
+    setFormData(prev => {
+      let nextPickup = prev.pickup_scheduled_on;
+      let nextReturn = prev.return_scheduled_on;
+      if (prev.wedding_date) {
+        const { pickupDate, returnDate } = calculateScheduledDates(prev.wedding_date, newCity);
+        nextPickup = pickupDate || '';
+        nextReturn = returnDate || '';
+      }
+      return {
+        ...prev,
+        city: newCity,
+        pickup_scheduled_on: nextPickup,
+        return_scheduled_on: nextReturn,
+      };
+    });
+  };
+
+  const calculateBrideTryingFee = (d1Id, d2Id, d3Id, hasD2, hasD3) => {
+    let total = 0;
+    const d1 = dressesList.find(d => String(d.id) === String(d1Id));
+    if (d1 && d1.trying_fee) total += parseFloat(d1.trying_fee);
+
+    if (hasD2 && d2Id) {
+      const d2 = dressesList.find(d => String(d.id) === String(d2Id));
+      if (d2 && d2.trying_fee) total += parseFloat(d2.trying_fee);
+    }
+
+    if (hasD3 && d3Id) {
+      const d3 = dressesList.find(d => String(d.id) === String(d3Id));
+      if (d3 && d3.trying_fee) total += parseFloat(d3.trying_fee);
+    }
+
+    return total;
+  };
+
+  const handleSelectBrideDress1 = (dress) => {
+    const dId = String(dress.id);
+    const fee = calculateBrideTryingFee(dId, formData.dress_2_id, formData.dress_3_id, formData.has_dress_2, formData.has_dress_3);
+    setFormData(prev => ({
+      ...prev,
+      dress_id: dId,
+      trying_fee: fee > 0 ? String(fee) : prev.trying_fee,
+    }));
+  };
+
+  const handleSelectBrideDress2 = (dress) => {
+    const dId = String(dress.id);
+    const fee = calculateBrideTryingFee(formData.dress_id, dId, formData.dress_3_id, true, formData.has_dress_3);
+    setFormData(prev => ({
+      ...prev,
+      dress_2_id: dId,
+      trying_fee: fee > 0 ? String(fee) : prev.trying_fee,
+    }));
+  };
+
+  const handleSelectBrideDress3 = (dress) => {
+    const dId = String(dress.id);
+    const fee = calculateBrideTryingFee(formData.dress_id, formData.dress_2_id, dId, formData.has_dress_2, true);
+    setFormData(prev => ({
+      ...prev,
+      dress_3_id: dId,
+      trying_fee: fee > 0 ? String(fee) : prev.trying_fee,
+    }));
+  };
+
+  // Conflict helpers in BridesPage
+  const brideDress1Obj = dressesList.find(d => String(d.id) === String(formData.dress_id));
+  const brideDress2Obj = (formData.has_dress_2 && formData.dress_2_id) ? dressesList.find(d => String(d.id) === String(formData.dress_2_id)) : null;
+  const brideDress3Obj = (formData.has_dress_3 && formData.dress_3_id) ? dressesList.find(d => String(d.id) === String(formData.dress_3_id)) : null;
+
+  const brideDress1Conflict = React.useMemo(() => {
+    return getDressConflict(brideDress1Obj, formData.wedding_date, editingBride?.id, formData.city);
+  }, [brideDress1Obj, formData.wedding_date, editingBride?.id, formData.city]);
+
+  const brideDress2Conflict = React.useMemo(() => {
+    return getDressConflict(brideDress2Obj, formData.wedding_date, editingBride?.id, formData.city);
+  }, [brideDress2Obj, formData.wedding_date, editingBride?.id, formData.city]);
+
+  const brideDress3Conflict = React.useMemo(() => {
+    return getDressConflict(brideDress3Obj, formData.wedding_date, editingBride?.id, formData.city);
+  }, [brideDress3Obj, formData.wedding_date, editingBride?.id, formData.city]);
 
   const handleSaveBride = async (e) => {
     e.preventDefault();
@@ -220,32 +413,31 @@ export default function BridesPage() {
 
     setIsSubmitting(true);
     try {
+      const payload = {
+        name: formData.name.trim(),
+        phone: formData.phone.trim() || null,
+        phone2: formData.phone2.trim() || null,
+        city: formData.city,
+        address: formData.address.trim() || null,
+        source: formData.source,
+        wedding_date: formData.wedding_date || null,
+        pickup_scheduled_on: formData.pickup_scheduled_on || null,
+        return_scheduled_on: formData.return_scheduled_on || null,
+        notes: formData.notes.trim() || null,
+        dress_id: formData.dress_id ? parseInt(formData.dress_id) : null,
+        dress_2_id: (formData.has_dress_2 && formData.dress_2_id) ? parseInt(formData.dress_2_id) : null,
+        dress_3_id: (formData.has_dress_3 && formData.dress_3_id) ? parseInt(formData.dress_3_id) : null,
+        trying_fee: formData.trying_fee ? parseFloat(formData.trying_fee) : 0,
+      };
+
       if (editingBride) {
         // Update existing bride
-        await apiClient.put(`/clients/${editingBride.id}`, {
-          name: formData.name.trim(),
-          phone: formData.phone.trim() || null,
-          phone2: formData.phone2.trim() || null,
-          city: formData.city,
-          address: formData.address.trim() || null,
-          source: formData.source,
-          wedding_date: formData.wedding_date || null,
-          notes: formData.notes.trim() || null,
-        });
+        await apiClient.put(`/clients/${editingBride.id}`, payload);
         toast.success(`تم تحديث بيانات العروس (${formData.name}) بنجاح ✨`);
         setEditingBride(null);
       } else {
         // Add new bride
-        await apiClient.post('/clients', {
-          name: formData.name.trim(),
-          phone: formData.phone.trim() || null,
-          phone2: formData.phone2.trim() || null,
-          city: formData.city,
-          address: formData.address.trim() || null,
-          source: formData.source,
-          wedding_date: formData.wedding_date || null,
-          notes: formData.notes.trim() || null,
-        });
+        await apiClient.post('/clients', payload);
         toast.success(`تمت إضافة العروس (${formData.name}) بنجاح ✨`);
         setIsAddModalOpen(false);
       }
@@ -375,13 +567,13 @@ export default function BridesPage() {
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
             <Calendar size={14} className="text-slate-400 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-[9px] font-black text-slate-400 leading-none">موعد المناسبة</span>
+              <span className="text-[9px] font-black text-slate-400 leading-none">تاريخ الاستلام</span>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer pt-0.5"
-                title="تصفية بحسب موعد المناسبة في قاعدة البيانات"
+                title="تصفية بحسب تاريخ استلام الفستان"
               />
             </div>
             {selectedDate && (
@@ -822,7 +1014,7 @@ export default function BridesPage() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveBride} className="p-4 sm:p-5 space-y-3.5">
+            <form onSubmit={handleSaveBride} className="p-4 sm:p-5 space-y-3.5 max-h-[82vh] overflow-y-auto scrollbar-thin">
               {/* Name */}
               <div>
                 <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
@@ -876,7 +1068,7 @@ export default function BridesPage() {
                   </label>
                   <select
                     value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    onChange={(e) => handleCityChange(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
                   >
                     {CITIES.map((c) => (
@@ -900,17 +1092,365 @@ export default function BridesPage() {
                 </div>
               </div>
 
-              {/* Wedding Date */}
-              <div>
-                <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                  تاريخ المناسبة / الزفاف
-                </label>
-                <input
-                  type="date"
-                  value={formData.wedding_date}
-                  onChange={(e) => setFormData({ ...formData, wedding_date: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-                />
+              {/* Wedding Date & Trying Fee */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
+                    تاريخ المناسبة / الزفاف
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.wedding_date}
+                    onChange={(e) => handleWeddingDateChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
+                    رسوم قياس الفساتين (إن وجدت)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.trying_fee}
+                    onChange={(e) => setFormData({ ...formData, trying_fee: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Scheduled Pickup and Return Dates (Auto calculated from Wedding Date, but Editable) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-indigo-50/40 border border-indigo-100 rounded-2xl">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-extrabold text-indigo-950 flex items-center gap-1.5">
+                      <Package size={13} className="text-indigo-600" />
+                      <span>تاريخ استلام الفستان (Pickup)</span>
+                    </label>
+                    <span className="text-[9.5px] font-bold text-indigo-600 bg-indigo-100/70 px-1.5 py-0.5 rounded">
+                      {formData.wedding_date ? (['القاهرة', 'الجيزة', 'مدينة نصر', 'مصر الجديدة', 'المعادي', 'التجمع الأول', 'التجمع الخامس', 'الشيخ زايد', '6 أكتوبر', 'الشروق', 'مدينتي'].some(c => (formData.city || '').includes(c)) ? 'قبل الفرح بيوم' : 'قبل الفرح بيومين') : 'تلقائي'}
+                    </span>
+                  </div>
+                  <input
+                    type="date"
+                    value={formData.pickup_scheduled_on}
+                    onChange={(e) => setFormData({ ...formData, pickup_scheduled_on: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-sm"
+                  />
+                  <p className="text-[9px] text-indigo-700/70 mt-1 font-medium">
+                    محسوب تلقائياً حسب المحافظة وموعد الفرح (قابل للتعديل)
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-extrabold text-indigo-950 flex items-center gap-1.5">
+                      <Clock size={13} className="text-indigo-600" />
+                      <span>تاريخ إرجاع الفستان (Return)</span>
+                    </label>
+                    <span className="text-[9.5px] font-bold text-indigo-600 bg-indigo-100/70 px-1.5 py-0.5 rounded">
+                      {formData.wedding_date ? 'بعد الفرح بيوم' : 'تلقائي'}
+                    </span>
+                  </div>
+                  <input
+                    type="date"
+                    value={formData.return_scheduled_on}
+                    onChange={(e) => setFormData({ ...formData, return_scheduled_on: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-sm"
+                  />
+                  <p className="text-[9px] text-indigo-700/70 mt-1 font-medium">
+                    محسوب تلقائياً بعد الفرح بيوم واحد (قابل للتعديل)
+                  </p>
+                </div>
+              </div>
+
+              {/* Interested Dresses Section (Up to 3 Dresses) */}
+              <div className="bg-rose-50/30 p-3 rounded-2xl border border-rose-100 space-y-3">
+                <div className="flex items-center justify-between border-b border-rose-100/60 pb-2">
+                  <span className="text-xs font-black text-rose-900 flex items-center gap-1.5">
+                    <span>👗 الفساتين المطلوب قياسها / تجربتها (حتى 3 فساتين)</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-rose-600 bg-rose-100/60 px-2 py-0.5 rounded-full">
+                    {(formData.dress_id ? 1 : 0) + (formData.has_dress_2 && formData.dress_2_id ? 1 : 0) + (formData.has_dress_3 && formData.dress_3_id ? 1 : 0)} / 3 فساتين
+                  </span>
+                </div>
+
+                {/* Dress 1 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10.5px] font-extrabold text-slate-700 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                      <span>فستان التجربة 1</span>
+                      <span className="text-[9px] text-slate-400 font-normal">(اختياري)</span>
+                    </label>
+                    {formData.dress_id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fee = calculateBrideTryingFee('', formData.dress_2_id, formData.dress_3_id, formData.has_dress_2, formData.has_dress_3);
+                          setFormData(prev => ({ ...prev, dress_id: '', trying_fee: fee > 0 ? String(fee) : prev.trying_fee }));
+                        }}
+                        className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <X size={10} /> إلغاء الاختيار
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="🔍 بحث عن الفستان بالاسم أو الكود..."
+                      value={formData.dress_1_search}
+                      onChange={(e) => setFormData({ ...formData, dress_1_search: e.target.value })}
+                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-right"
+                    />
+                    <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 overflow-y-auto scrollbar-thin">
+                    {dressesList
+                      .filter((d) => {
+                        if (!formData.dress_1_search.trim()) return true;
+                        const q = formData.dress_1_search.toLowerCase().trim();
+                        return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                      })
+                      .map((d) => {
+                        const isSelected = formData.dress_id === String(d.id);
+                        const conflict = formData.wedding_date ? getDressConflict(d, formData.wedding_date, editingBride?.id, formData.city) : null;
+                        const isBlocked = Boolean(conflict);
+
+                        return (
+                          <button
+                            type="button"
+                            key={d.id}
+                            onClick={() => handleSelectBrideDress1(d)}
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-rose-600 border-rose-600 text-white shadow-xs font-black'
+                                : isBlocked
+                                  ? 'bg-rose-50/70 border-rose-200 text-rose-800 hover:bg-rose-100/80'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${isBlocked ? (isSelected ? 'bg-white' : 'bg-rose-500 animate-pulse') : (isSelected ? 'bg-white' : 'bg-emerald-500')}`} />
+                            <span>{d.name} {d.code ? `(${d.code})` : ''}</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  {brideDress1Obj && (
+                    <div className="text-[10px] font-extrabold text-rose-700 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                      <span>الفستان 1: <strong className="font-black">{brideDress1Obj.name}</strong></span>
+                      <span className="font-mono text-[9.5px] text-rose-800">
+                        رسوم التجربة: {parseFloat(brideDress1Obj.trying_fee || 0) > 0 ? `${parseFloat(brideDress1Obj.trying_fee).toLocaleString()} ج.م` : 'مجانية'}
+                      </span>
+                    </div>
+                  )}
+
+                  {brideDress1Conflict && (
+                    <div className="p-2 bg-rose-50/90 border border-rose-300 rounded-xl text-right text-xs space-y-0.5">
+                      <div className="text-[10.5px] font-black text-rose-800 flex items-center gap-1">
+                        <AlertTriangle size={12} className="text-rose-600 animate-bounce" />
+                        تعارض في الفستان 1: محجوز للعروس {brideDress1Conflict.clientName}
+                      </div>
+                      <div className="text-[10px] text-slate-600">
+                        فترة الحظر: من {brideDress1Conflict.startDate} إلى {brideDress1Conflict.endDate}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dress 2 */}
+                {!formData.has_dress_2 ? (
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, has_dress_2: true }))}
+                    className="w-full py-1.5 border border-dashed border-purple-300 text-purple-700 hover:bg-purple-50/50 rounded-xl text-[10.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span>+ إضافة فستان ثانٍ للتجربة</span>
+                  </button>
+                ) : (
+                  <div className="bg-purple-50/30 p-2.5 rounded-xl border border-purple-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10.5px] font-extrabold text-purple-900 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span>فستان التجربة 2</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fee = calculateBrideTryingFee(formData.dress_id, '', formData.dress_3_id, false, formData.has_dress_3);
+                          setFormData(prev => ({ ...prev, has_dress_2: false, dress_2_id: '', trying_fee: fee > 0 ? String(fee) : prev.trying_fee }));
+                        }}
+                        className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <X size={10} /> حذف الفستان 2
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 بحث عن الفستان الثاني..."
+                        value={formData.dress_2_search}
+                        onChange={(e) => setFormData({ ...formData, dress_2_search: e.target.value })}
+                        className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-right"
+                      />
+                      <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 overflow-y-auto scrollbar-thin">
+                      {dressesList
+                        .filter((d) => {
+                          if (!formData.dress_2_search.trim()) return true;
+                          const q = formData.dress_2_search.toLowerCase().trim();
+                          return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                        })
+                        .map((d) => {
+                          const isSelected = formData.dress_2_id === String(d.id);
+                          const conflict = formData.wedding_date ? getDressConflict(d, formData.wedding_date, editingBride?.id, formData.city) : null;
+                          const isBlocked = Boolean(conflict);
+
+                          return (
+                            <button
+                              type="button"
+                              key={d.id}
+                              onClick={() => handleSelectBrideDress2(d)}
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-purple-600 border-purple-600 text-white shadow-xs font-black'
+                                  : isBlocked
+                                    ? 'bg-purple-50/70 border-purple-200 text-purple-800 hover:bg-purple-100/80'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-purple-50'
+                              }`}
+                            >
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${isBlocked ? (isSelected ? 'bg-white' : 'bg-rose-500 animate-pulse') : (isSelected ? 'bg-white' : 'bg-emerald-500')}`} />
+                              <span>{d.name} {d.code ? `(${d.code})` : ''}</span>
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    {brideDress2Obj && (
+                      <div className="text-[10px] font-extrabold text-purple-700 bg-purple-50/70 border border-purple-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                        <span>الفستان 2: <strong className="font-black">{brideDress2Obj.name}</strong></span>
+                        <span className="font-mono text-[9.5px] text-purple-800">
+                          رسوم التجربة: {parseFloat(brideDress2Obj.trying_fee || 0) > 0 ? `${parseFloat(brideDress2Obj.trying_fee).toLocaleString()} ج.م` : 'مجانية'}
+                        </span>
+                      </div>
+                    )}
+
+                    {brideDress2Conflict && (
+                      <div className="p-2 bg-rose-50/90 border border-rose-300 rounded-xl text-right text-xs space-y-0.5">
+                        <div className="text-[10.5px] font-black text-rose-800 flex items-center gap-1">
+                          <AlertTriangle size={12} className="text-rose-600 animate-bounce" />
+                          تعارض في الفستان 2: محجوز للعروس {brideDress2Conflict.clientName}
+                        </div>
+                        <div className="text-[10px] text-slate-600">
+                          فترة الحظر: من {brideDress2Conflict.startDate} إلى {brideDress2Conflict.endDate}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dress 3 */}
+                {formData.has_dress_2 && (
+                  !formData.has_dress_3 ? (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, has_dress_3: true }))}
+                      className="w-full py-1.5 border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50/50 rounded-xl text-[10.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <span>+ إضافة فستان ثالث للتجربة (الحد الأقصى 3)</span>
+                    </button>
+                  ) : (
+                    <div className="bg-indigo-50/30 p-2.5 rounded-xl border border-indigo-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10.5px] font-extrabold text-indigo-900 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          <span>فستان التجربة 3</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fee = calculateBrideTryingFee(formData.dress_id, formData.dress_2_id, '', formData.has_dress_2, false);
+                            setFormData(prev => ({ ...prev, has_dress_3: false, dress_3_id: '', trying_fee: fee > 0 ? String(fee) : prev.trying_fee }));
+                          }}
+                          className="text-[10px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <X size={10} /> حذف الفستان 3
+                        </button>
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="🔍 بحث عن الفستان الثالث..."
+                          value={formData.dress_3_search}
+                          onChange={(e) => setFormData({ ...formData, dress_3_search: e.target.value })}
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-right"
+                        />
+                        <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-slate-100 max-h-24 overflow-y-auto scrollbar-thin">
+                        {dressesList
+                          .filter((d) => {
+                            if (!formData.dress_3_search.trim()) return true;
+                            const q = formData.dress_3_search.toLowerCase().trim();
+                            return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                          })
+                          .map((d) => {
+                            const isSelected = formData.dress_3_id === String(d.id);
+                            const conflict = formData.wedding_date ? getDressConflict(d, formData.wedding_date, editingBride?.id, formData.city) : null;
+                            const isBlocked = Boolean(conflict);
+
+                            return (
+                              <button
+                                type="button"
+                                key={d.id}
+                                onClick={() => handleSelectBrideDress3(d)}
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                  isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs font-black'
+                                    : isBlocked
+                                      ? 'bg-indigo-50/70 border-indigo-200 text-indigo-800 hover:bg-indigo-100/80'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50'
+                                }`}
+                              >
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${isBlocked ? (isSelected ? 'bg-white' : 'bg-rose-500 animate-pulse') : (isSelected ? 'bg-white' : 'bg-emerald-500')}`} />
+                                <span>{d.name} {d.code ? `(${d.code})` : ''}</span>
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      {brideDress3Obj && (
+                        <div className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50/70 border border-indigo-100 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                          <span>الفستان 3: <strong className="font-black">{brideDress3Obj.name}</strong></span>
+                          <span className="font-mono text-[9.5px] text-indigo-800">
+                            رسوم التجربة: {parseFloat(brideDress3Obj.trying_fee || 0) > 0 ? `${parseFloat(brideDress3Obj.trying_fee).toLocaleString()} ج.م` : 'مجانية'}
+                          </span>
+                        </div>
+                      )}
+
+                      {brideDress3Conflict && (
+                        <div className="p-2 bg-rose-50/90 border border-rose-300 rounded-xl text-right text-xs space-y-0.5">
+                          <div className="text-[10.5px] font-black text-rose-800 flex items-center gap-1">
+                            <AlertTriangle size={12} className="text-rose-600 animate-bounce" />
+                            تعارض في الفستان 3: محجوز للعروس {brideDress3Conflict.clientName}
+                          </div>
+                          <div className="text-[10px] text-slate-600">
+                            فترة الحظر: من {brideDress3Conflict.startDate} إلى {brideDress3Conflict.endDate}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
 
               {/* Notes */}
@@ -1029,6 +1569,30 @@ export default function BridesPage() {
                     {cleanDate(viewingBride.wedding_date) || 'غير محدد'}
                   </span>
                 </div>
+
+                {(viewingBride.pickup_scheduled_on || viewingBride.bookings?.[0]?.pickup_scheduled_on) && (
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400 font-bold flex items-center gap-1">
+                      <Package size={12} className="text-indigo-600" />
+                      <span>تاريخ الاستلام المجدول:</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-700">
+                      {cleanDate(viewingBride.pickup_scheduled_on || viewingBride.bookings?.[0]?.pickup_scheduled_on)}
+                    </span>
+                  </div>
+                )}
+
+                {(viewingBride.return_scheduled_on || viewingBride.bookings?.[0]?.return_scheduled_on) && (
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400 font-bold flex items-center gap-1">
+                      <Clock size={12} className="text-indigo-600" />
+                      <span>تاريخ الإرجاع المجدول:</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-700">
+                      {cleanDate(viewingBride.return_scheduled_on || viewingBride.bookings?.[0]?.return_scheduled_on)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center py-1 border-b border-slate-100">
                   <span className="text-slate-400 font-bold">المصدر:</span>

@@ -101,7 +101,14 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.message || `Request failed with status ${response.status}`);
+      let msg = errorData.message || `Request failed with status ${response.status}`;
+      if (errorData.errors && typeof errorData.errors === 'object') {
+        const errorDetails = Object.values(errorData.errors).flat().join(' | ');
+        if (errorDetails) {
+          msg = `${msg}: ${errorDetails}`;
+        }
+      }
+      const error = new Error(msg);
       error.data = errorData;
       throw error;
     }
@@ -156,7 +163,14 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.message || `Upload failed with status ${response.status}`);
+      let msg = errorData.message || `Upload failed with status ${response.status}`;
+      if (errorData.errors && typeof errorData.errors === 'object') {
+        const errorDetails = Object.values(errorData.errors).flat().join(' | ');
+        if (errorDetails) {
+          msg = `${msg}: ${errorDetails}`;
+        }
+      }
+      const error = new Error(msg);
       error.data = errorData;
       throw error;
     }

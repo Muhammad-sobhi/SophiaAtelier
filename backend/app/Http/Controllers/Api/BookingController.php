@@ -21,12 +21,34 @@ class BookingController extends Controller
             $query->where('client_id', $clientId);
         }
 
-        if ($startDate = $request->input('start_date')) {
-            $query->where('booking_date', '>=', $startDate);
+        if ($date = $request->input('date')) {
+            $query->where(function ($q) use ($date) {
+                $q->whereDate('pickup_scheduled_on', $date)
+                  ->orWhere(function ($sub) use ($date) {
+                      $sub->whereNull('pickup_scheduled_on')
+                          ->whereDate('event_date', $date);
+                  });
+            });
         }
 
-        if ($endDate = $request->input('end_date')) {
-            $query->where('booking_date', '<=', $endDate);
+        if ($startDate = ($request->input('start_date') ?: $request->input('date_from'))) {
+            $query->where(function ($q) use ($startDate) {
+                $q->where('pickup_scheduled_on', '>=', $startDate)
+                  ->orWhere(function ($sub) use ($startDate) {
+                      $sub->whereNull('pickup_scheduled_on')
+                          ->where('event_date', '>=', $startDate);
+                  });
+            });
+        }
+
+        if ($endDate = ($request->input('end_date') ?: $request->input('date_to'))) {
+            $query->where(function ($q) use ($endDate) {
+                $q->where('pickup_scheduled_on', '<=', $endDate)
+                  ->orWhere(function ($sub) use ($endDate) {
+                      $sub->whereNull('pickup_scheduled_on')
+                          ->where('event_date', '<=', $endDate);
+                  });
+            });
         }
 
         $bookings = $query->latest()->paginate($request->input('per_page', 25));
@@ -51,6 +73,8 @@ class BookingController extends Controller
             'dress_3_id' => 'nullable|exists:dresses,id',
             'booking_date' => 'required|date',
             'event_date' => 'required|date',
+            'pickup_scheduled_on' => 'nullable|date',
+            'return_scheduled_on' => 'nullable|date',
             'status' => 'nullable|in:pending,confirmed,picked_up,returned,cancelled',
             'total_amount' => 'required|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
@@ -108,6 +132,18 @@ class BookingController extends Controller
         }
 
         unset($validated['force_override']);
+
+        if (empty($validated['pickup_scheduled_on']) || empty($validated['return_scheduled_on'])) {
+            $clientModel = \App\Models\Client::find($validated['client_id']);
+            $scheduled = Booking::calculateScheduledDates($validated['event_date'] ?? null, $clientModel->city ?? null);
+            if (empty($validated['pickup_scheduled_on'])) {
+                $validated['pickup_scheduled_on'] = $scheduled['pickup_date'];
+            }
+            if (empty($validated['return_scheduled_on'])) {
+                $validated['return_scheduled_on'] = $scheduled['return_date'];
+            }
+        }
+
         $booking = Booking::create($validated);
 
         // Record revenue deposit if provided
@@ -180,6 +216,8 @@ class BookingController extends Controller
             'dress_3_id' => 'nullable|exists:dresses,id',
             'booking_date' => 'sometimes|required|date',
             'event_date' => 'sometimes|required|date',
+            'pickup_scheduled_on' => 'nullable|date',
+            'return_scheduled_on' => 'nullable|date',
             'status' => 'nullable|in:pending,confirmed,picked_up,returned,cancelled',
             'total_amount' => 'sometimes|required|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
@@ -450,6 +488,9 @@ class BookingController extends Controller
 
             $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
 
+            // Calculate pickup and return dates automatically for website brides
+            $scheduledDates = Booking::calculateScheduledDates($eventDate, $client->city ?? $validated['client_city'] ?? null);
+
             // Also create a pending booking record so it can be confirmed later in stage 2
             $booking = Booking::create([
                 'client_id' => $client->id,
@@ -458,6 +499,8 @@ class BookingController extends Controller
                 'dress_3_id' => $dress3Id,
                 'booking_date' => $bookingDate,
                 'event_date' => $eventDate,
+                'pickup_scheduled_on' => $scheduledDates['pickup_date'],
+                'return_scheduled_on' => $scheduledDates['return_date'],
                 'status' => 'pending',
                 'total_amount' => $validated['total_amount'] ?? 0,
                 'notes' => $validated['notes'],

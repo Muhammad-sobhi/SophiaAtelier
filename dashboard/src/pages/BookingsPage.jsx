@@ -16,29 +16,17 @@ import {
   Trash2,
   Edit3 } from
 'lucide-react';
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { calculateScheduledDates } from './BridesPage';
 
 export function getOccupiedDatesForBooking(weddingDateStr, city) {
   if (!weddingDateStr) return [];
   const weddingDate = new Date(weddingDateStr);
   const dates = [];
 
-  // Cairo / Giza: 2 days before (pending start), pickup 1 day before, wedding day, 1 day after return
-  // Other cities: 3 days before (pending start), pickup 2 days before, wedding day, 1 day after return
+  // Cairo / Giza: 1 day before pickup, wedding day, 1 day after return
+  // Other cities: 2 days before pickup, wedding day, 1 day after return
   const isCairoOrGiza = !city || city === 'القاهرة' || city === 'الجيزة' || city === 'cairo' || city === 'giza';
-  const daysBefore = isCairoOrGiza ? 2 : 3;
+  const daysBefore = isCairoOrGiza ? 1 : 2;
   const daysAfter = 1;
 
   for (let i = -daysBefore; i <= daysAfter; i++) {
@@ -156,7 +144,7 @@ export default function BookingsPage() {
     if (isNaN(proposedWedding.getTime())) return null;
 
     const isCairo = cityStr === 'القاهرة' || cityStr === 'cairo' || !cityStr;
-    const daysBefore = isCairo ? 2 : 3;
+    const daysBefore = isCairo ? 1 : 2;
     const daysAfter = 1;
 
     const proposedStart = new Date(proposedWedding);
@@ -180,7 +168,7 @@ export default function BookingsPage() {
 
       const exCity = eb.city || 'القاهرة';
       const exIsCairo = exCity === 'القاهرة' || exCity === 'cairo';
-      const exDaysBefore = exIsCairo ? 2 : 3;
+      const exDaysBefore = exIsCairo ? 1 : 2;
       const exDaysAfter = 1;
 
       const exStart = new Date(exWedding);
@@ -209,17 +197,23 @@ export default function BookingsPage() {
     try {
       const res = await apiClient.get('/bookings');
       const data = res.data || [];
-      const mapped = data.map((b) => ({
-        id: b.id,
-        client: b.client?.name || '-',
-        dress: b.dress?.name || '-',
-        weddingDate: b.event_date || '',
-        amount: `${parseFloat(b.total_amount || 0).toLocaleString()} ج.م`,
-        status: b.status === 'confirmed' ? 'مؤكد' : b.status === 'cancelled' ? 'ملغي' : 'في الانتظار',
-        city: 'القاهرة',
-        paymentMethod: 'cash',
-        receiptImage: null
-      }));
+      const mapped = data.map((b) => {
+        const pDate = b.pickup_scheduled_on || (b.event_date ? calculateScheduledDates(b.event_date, b.client?.city).pickupDate : '');
+        const rDate = b.return_scheduled_on || (b.event_date ? calculateScheduledDates(b.event_date, b.client?.city).returnDate : '');
+        return {
+          id: b.id,
+          client: b.client?.name || '-',
+          dress: b.dress?.name || '-',
+          weddingDate: b.event_date || '',
+          pickupDate: pDate,
+          returnDate: rDate,
+          amount: `${parseFloat(b.total_amount || 0).toLocaleString()} ج.م`,
+          status: b.status === 'confirmed' ? 'مؤكد' : b.status === 'cancelled' ? 'ملغي' : 'في الانتظار',
+          city: b.client?.city || 'القاهرة',
+          paymentMethod: 'cash',
+          receiptImage: null
+        };
+      });
       setManualBookings(mapped);
       setMergedBookings(mapped);
     } catch (e) {
@@ -516,8 +510,8 @@ export default function BookingsPage() {
     b.dress.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 
-    if (isFilterActive) {
-      return b.weddingDate === selectedDateStr;
+    if (isFilterActive && selectedDateStr) {
+      return (b.pickupDate && b.pickupDate === selectedDateStr) || (!b.pickupDate && b.weddingDate === selectedDateStr);
     }
     return true;
   });
@@ -582,10 +576,9 @@ export default function BookingsPage() {
             }
 
             const currentDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const dayBlockouts = mergedBookings.filter((b) => {
+            const dayPickups = mergedBookings.filter((b) => {
               if (b.status === 'ملغي') return false;
-              const occupied = getOccupiedDatesForBooking(b.weddingDate, b.city || 'القاهرة');
-              return occupied.includes(currentDayStr);
+              return (b.pickupDate && b.pickupDate === currentDayStr) || (!b.pickupDate && b.weddingDate === currentDayStr);
             });
             const isSelected = selectedDateStr === currentDayStr;
 
@@ -606,36 +599,28 @@ export default function BookingsPage() {
                   <span className={`text-xs font-bold ${isSelected ? 'text-indigo-600' : 'text-slate-600'}`}>
                     {day}
                   </span>
-                  {dayBlockouts.length > 0 &&
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                  dayBlockouts.some((b) => b.weddingDate === currentDayStr) ? 'bg-indigo-500' : 'bg-amber-500'}`
-                  } />
+                  {dayPickups.length > 0 &&
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                   }
                 </div>
 
-                {/* Day Bookings & Blockouts Mini Cards */}
+                {/* Day Bookings Mini Cards */}
                 <div className="space-y-1 mt-1 flex-grow overflow-y-auto max-h-[55px] scrollbar-none">
-                  {dayBlockouts.slice(0, 2).map((b) => {
-                    const isWeddingDay = b.weddingDate === currentDayStr;
-                    const style = isWeddingDay ?
-                    statusStyles[b.status] || statusStyles['مؤكد'] :
-                    { bg: 'bg-amber-50/60', text: 'text-amber-700', dot: 'bg-amber-500' };
-
+                  {dayPickups.slice(0, 2).map((b) => {
+                    const style = statusStyles[b.status] || statusStyles['مؤكد'];
                     return (
                       <div
                         key={b.id}
                         className={`px-1 py-0.5 rounded text-[8px] font-bold flex items-center justify-between gap-0.5 border border-slate-100/60 ${style.bg} ${style.text} truncate`}>
-                        
-                        <span className="truncate max-w-[50px]">
-                          {isWeddingDay ? `فرح ${b.client}` : `تجهيز لـ ${b.client}`}
+                        <span className="truncate max-w-[55px]">
+                          استلام {b.client}
                         </span>
                         <span className={`w-1 h-1 rounded-full ${style.dot} flex-shrink-0`} />
                       </div>);
-
                   })}
-                  {dayBlockouts.length > 2 &&
+                  {dayPickups.length > 2 &&
                   <div className="text-[7px] font-extrabold text-slate-400 text-center">
-                      +{dayBlockouts.length - 2} أخرى
+                      +{dayPickups.length - 2} أخرى
                     </div>
                   }
                 </div>
@@ -651,7 +636,7 @@ export default function BookingsPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-extrabold text-slate-800">
-                {isFilterActive ? 'حجوزات تاريخ فرح يوم:' : 'جميع الحجوزات المسجلة'}
+                {isFilterActive ? 'حجوزات تاريخ استلام يوم:' : 'جميع الحجوزات المسجلة'}
               </h3>
               {isFilterActive ?
               <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-xl text-xs font-extrabold">{selectedDateStr}</span> :
@@ -694,6 +679,7 @@ export default function BookingsPage() {
                 <tr className="bg-slate-50/50 border-b border-slate-100/70">
                   <th className="px-6 py-4 text-xs font-extrabold text-slate-400">العميلة</th>
                   <th className="px-6 py-4 text-xs font-extrabold text-slate-400">الفستان المطلوب</th>
+                  <th className="px-6 py-4 text-xs font-extrabold text-slate-400">تاريخ الاستلام</th>
                   <th className="px-6 py-4 text-xs font-extrabold text-slate-400">تاريخ الفرح</th>
                   <th className="px-6 py-4 text-xs font-extrabold text-slate-400">القيمة الإجمالية</th>
                   <th className="px-6 py-4 text-xs font-extrabold text-slate-400">طريقة الدفع</th>
@@ -715,6 +701,7 @@ export default function BookingsPage() {
                     
                       <td className="px-6 py-4 text-xs font-bold text-slate-800">{b.client}</td>
                       <td className="px-6 py-4 text-xs text-slate-500 font-semibold">{b.dress}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-indigo-600">{b.pickupDate || '-'}</td>
                       <td className="px-6 py-4 text-xs text-slate-500 font-semibold">{b.weddingDate}</td>
                       <td className="px-6 py-4 text-xs font-bold text-indigo-600">{b.amount}</td>
                       <td className="px-6 py-4 text-xs font-extrabold text-slate-600">

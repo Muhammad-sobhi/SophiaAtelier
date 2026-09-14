@@ -8,7 +8,7 @@ import { ReturnDressModal } from './ReturnDressModal';
 import { BookingPaymentsModal } from './BookingPaymentsModal';
 import {
   X, Phone, MapPin, Calendar, Heart, Ruler, Package, RotateCcw,
-  Clock, CreditCard, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2
+  Clock, CreditCard, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle
 } from 'lucide-react';
 
 const STAGES = [
@@ -44,6 +44,8 @@ export function BrideJourneyPopup({
   const [stageModal, setStageModal] = useState({ isOpen: false, stage: null });
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Keep local state synced if parent passes a newer bride object
   useEffect(() => {
@@ -124,6 +126,22 @@ export function BrideJourneyPopup({
       toast.error(e?.message || 'حدث خطأ أثناء الرجوع للمرحلة السابقة');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteBride = async () => {
+    setIsDeleting(true);
+    try {
+      await apiClient.delete(`/clients/${bride.id}`);
+      toast.success(`تم مسح بيانات العروس (${bride.name}) بالكامل نهائياً وكأنها لم تُسجل ✨`);
+      setIsDeleteConfirmOpen(false);
+      if (onUpdate) await onUpdate(null);
+      if (onClose) onClose();
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.message || 'حدث خطأ أثناء مسح بيانات العروس');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -269,13 +287,27 @@ export function BrideJourneyPopup({
           <div className="relative bg-gradient-to-br from-slate-50 to-white p-4 border-b border-slate-100 flex-shrink-0">
             <div className="absolute top-3 left-3 flex items-center gap-1">
               <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+                className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                title="مسح العروس وكافة بياناتها نهائياً"
+              >
+                <Trash2 size={16} />
+              </button>
+              <button
+                type="button"
                 onClick={() => openFormForStage(stage)}
                 className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
                 title="تعديل بيانات المرحلة الحالية"
               >
                 <Edit3 size={16} />
               </button>
-              <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-rose-600 transition-colors cursor-pointer" title="إغلاق">
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                title="إغلاق"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -367,7 +399,7 @@ export function BrideJourneyPopup({
             {dresses.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-amber-500" /> الفساتين المحجوزة
+                  <Sparkles size={13} className="text-amber-500" /> {stage === 'visit' ? 'فساتين مطلوب تجربتها بالزيارة' : 'الفساتين المحجوزة'}
                 </h4>
                 <div className="space-y-1.5">
                   {dresses.map((d, idx) => (
@@ -396,13 +428,15 @@ export function BrideJourneyPopup({
                 <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(booking?.event_date || bride.wedding_date)}</div>
               </div>
               <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5">
-                <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> تاريخ الحجز</div>
-                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(booking?.booking_date)}</div>
+                <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> {stage === 'visit' ? 'موعد الزيارة' : 'تاريخ الحجز'}</div>
+                <div className="text-xs font-black text-slate-800 mt-0.5">
+                  {stage === 'visit' ? (bride.latest_visit_date || formatDate(booking?.booking_date)) : formatDate(booking?.booking_date)}
+                </div>
               </div>
             </div>
 
-            {/* Finances */}
-            {booking && (
+            {/* Finances - Only for booking, fitting, pickup stages or confirmed bookings */}
+            {booking && stage !== 'visit' && booking.status !== 'pending' && (
               <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[11px] font-black text-emerald-800 flex items-center gap-1.5">
@@ -452,6 +486,18 @@ export function BrideJourneyPopup({
               </div>
             )}
 
+            {/* Trying fee card if in visit stage */}
+            {stage === 'visit' && parseFloat(bride.latest_dress_trying_fee || 0) > 0 && (
+              <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-2.5 flex items-center justify-between text-xs">
+                <span className="font-bold text-purple-900 flex items-center gap-1.5">
+                  <Banknote size={14} className="text-purple-600" /> رسوم تجربة الفساتين المقترحة:
+                </span>
+                <span className="font-black text-purple-700 font-mono">
+                  {parseFloat(bride.latest_dress_trying_fee).toLocaleString()} ج.م
+                </span>
+              </div>
+            )}
+
             {/* Actions */}
             <div>
               <h4 className="text-[11px] font-black text-slate-700 mb-2">إجراءات المرحلة</h4>
@@ -460,6 +506,54 @@ export function BrideJourneyPopup({
           </div>
         </div>
       </div>
+      )}
+
+      {/* Permanent Delete Confirmation Dialog */}
+      {isDeleteConfirmOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[99999] flex items-center justify-center p-4 text-right"
+          dir="rtl"
+          onClick={() => !isDeleting && setIsDeleteConfirmOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-sm p-5 border border-rose-100 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto">
+              <Trash2 size={24} />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-black text-slate-900">مسح بيانات العروس نهائياً؟</h3>
+              <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                سيتم مسح العروس <strong className="text-rose-600">({bride.name})</strong> وكافة الحجوزات، المواعيد، القياسات، والمدفوعات المرتبطة بها تماماً وكأنها لم تكن مسجلة مسبقاً.
+              </p>
+              <p className="text-[10px] text-rose-500 font-extrabold bg-rose-50 py-1 px-2.5 rounded-lg mt-2 inline-block">
+                ⚠️ هذا الإجراء نهائي ولا يمكن التراجع عنه
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteBride}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-rose-200"
+              >
+                {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                <span>{isDeleting ? 'جاري المسح...' : 'تأكيد المسح'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Unified Stage Form Modal */}

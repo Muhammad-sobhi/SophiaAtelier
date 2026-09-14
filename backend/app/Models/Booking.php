@@ -13,6 +13,7 @@ class Booking extends Model
 
     protected $fillable = [
         'client_id', 'dress_id', 'dress_2_id', 'dress_3_id', 'booking_date', 'event_date',
+        'pickup_scheduled_on', 'return_scheduled_on',
         'status', 'total_amount', 'deposit_amount', 'insurance_amount', 'notes',
         'receipt_path', 'payment_method', 'sales_name', 'is_override',
     ];
@@ -52,6 +53,43 @@ class Booking extends Model
             return $date->format('Y-m-d');
         }
         return $date->format('Y-m-d H:i');
+    }
+
+    public static function calculateScheduledDates(?string $weddingDate, ?string $city = null): array
+    {
+        if (empty($weddingDate)) {
+            return ['pickup_date' => null, 'return_date' => null];
+        }
+
+        try {
+            $wDate = \Carbon\Carbon::parse($weddingDate);
+            $cityLower = mb_strtolower($city ?? '');
+            $isCairo = empty($city) ||
+                str_contains($cityLower, 'قاهرة') ||
+                str_contains($cityLower, 'جيزة') ||
+                str_contains($cityLower, 'cairo') ||
+                str_contains($cityLower, 'giza') ||
+                str_contains($cityLower, 'نصر') ||
+                str_contains($cityLower, 'جديدة') ||
+                str_contains($cityLower, 'معادي') ||
+                str_contains($cityLower, 'تجمع') ||
+                str_contains($cityLower, 'زايد') ||
+                str_contains($cityLower, 'أكتوبر') ||
+                str_contains($cityLower, 'اكتوبر') ||
+                str_contains($cityLower, 'شروق') ||
+                str_contains($cityLower, 'مدينتي');
+
+            // 1 day before wedding for Cairo & Giza, 2 days before wedding for other cities
+            $daysBefore = $isCairo ? 1 : 2;
+            $daysAfter = 1;
+
+            return [
+                'pickup_date' => $wDate->copy()->subDays($daysBefore)->toDateString(),
+                'return_date' => $wDate->copy()->addDays($daysAfter)->toDateString(),
+            ];
+        } catch (\Throwable $e) {
+            return ['pickup_date' => null, 'return_date' => null];
+        }
     }
 
     public function client(): BelongsTo
@@ -130,7 +168,8 @@ class Booking extends Model
 
         $city = $client->city ?? 'القاهرة';
         $isCairoOrGiza = (! $city || stripos($city, 'cairo') !== false || stripos($city, 'giza') !== false || $city === 'القاهرة' || $city === 'الجيزة');
-        $daysBefore = $isCairoOrGiza ? 2 : 3;
+        // 1 day before for Cairo/Giza, 2 days before for other cities
+        $daysBefore = $isCairoOrGiza ? 1 : 2;
         $daysAfter = 1;
 
         $proposedWedding = \Carbon\Carbon::parse($eventDate);
@@ -140,7 +179,8 @@ class Booking extends Model
         $query = self::with('client')
             ->where(function ($q) use ($dressId) {
                 $q->where('dress_id', $dressId)
-                  ->orWhere('dress_2_id', $dressId);
+                  ->orWhere('dress_2_id', $dressId)
+                  ->orWhere('dress_3_id', $dressId);
             })
             ->whereIn('status', ['confirmed', 'picked_up', 'out', 'returned']);
 
@@ -151,15 +191,20 @@ class Booking extends Model
         $existingBookings = $query->get();
 
         foreach ($existingBookings as $eb) {
-            $exClient = $eb->client;
-            $exCity = $exClient ? ($exClient->city ?? 'القاهرة') : 'القاهرة';
-            $exIsCairoOrGiza = (! $exCity || stripos($exCity, 'cairo') !== false || stripos($exCity, 'giza') !== false || $exCity === 'القاهرة' || $exCity === 'الجيزة');
-            $exDaysBefore = $exIsCairoOrGiza ? 2 : 3;
-            $exDaysAfter = 1;
+            if (!empty($eb->pickup_scheduled_on) && !empty($eb->return_scheduled_on)) {
+                $exStart = \Carbon\Carbon::parse($eb->pickup_scheduled_on)->startOfDay();
+                $exEnd = \Carbon\Carbon::parse($eb->return_scheduled_on)->endOfDay();
+            } else {
+                $exClient = $eb->client;
+                $exCity = $exClient ? ($exClient->city ?? 'القاهرة') : 'القاهرة';
+                $exIsCairoOrGiza = (! $exCity || stripos($exCity, 'cairo') !== false || stripos($exCity, 'giza') !== false || $exCity === 'القاهرة' || $exCity === 'الجيزة');
+                $exDaysBefore = $exIsCairoOrGiza ? 1 : 2;
+                $exDaysAfter = 1;
 
-            $exWedding = \Carbon\Carbon::parse($eb->event_date);
-            $exStart = $exWedding->copy()->subDays($exDaysBefore)->startOfDay();
-            $exEnd = $exWedding->copy()->addDays($exDaysAfter)->endOfDay();
+                $exWedding = \Carbon\Carbon::parse($eb->event_date);
+                $exStart = $exWedding->copy()->subDays($exDaysBefore)->startOfDay();
+                $exEnd = $exWedding->copy()->addDays($exDaysAfter)->endOfDay();
+            }
 
             if ($proposedStart->lte($exEnd) && $proposedEnd->gte($exStart)) {
                 $availableDate = $exEnd->copy()->addDay()->format('Y-m-d');
@@ -180,7 +225,8 @@ class Booking extends Model
         $bookings = self::with('client')
             ->where(function ($q) use ($dressId) {
                 $q->where('dress_id', $dressId)
-                  ->orWhere('dress_2_id', $dressId);
+                  ->orWhere('dress_2_id', $dressId)
+                  ->orWhere('dress_3_id', $dressId);
             })
             ->whereIn('status', ['confirmed', 'picked_up', 'out', 'returned']);
             
@@ -189,15 +235,21 @@ class Booking extends Model
         }
         
         foreach ($bookings->get() as $b) {
-            $bClient = $b->client;
-            $bCity = $bClient ? ($bClient->city ?? 'القاهرة') : 'القاهرة';
-            $isCairoOrGiza = (! $bCity || stripos($bCity, 'cairo') !== false || stripos($bCity, 'giza') !== false || $bCity === 'القاهرة' || $bCity === 'الجيزة');
-            $daysBefore = $isCairoOrGiza ? 2 : 3;
-            $daysAfter = 1;
-            
-            $wedding = \Carbon\Carbon::parse($b->event_date);
-            $start = $wedding->copy()->subDays($daysBefore)->startOfDay();
-            $end = $wedding->copy()->addDays($daysAfter)->endOfDay();
+            if (!empty($b->pickup_scheduled_on) && !empty($b->return_scheduled_on)) {
+                $start = \Carbon\Carbon::parse($b->pickup_scheduled_on)->startOfDay();
+                $end = \Carbon\Carbon::parse($b->return_scheduled_on)->endOfDay();
+            } else {
+                $bClient = $b->client;
+                $bCity = $bClient ? ($bClient->city ?? 'القاهرة') : 'القاهرة';
+                $isCairoOrGiza = (! $bCity || stripos($bCity, 'cairo') !== false || stripos($bCity, 'giza') !== false || $bCity === 'القاهرة' || $bCity === 'الجيزة');
+                // 1 day before for Cairo/Giza, 2 days before for other cities
+                $daysBefore = $isCairoOrGiza ? 1 : 2;
+                $daysAfter = 1;
+                
+                $wedding = \Carbon\Carbon::parse($b->event_date);
+                $start = $wedding->copy()->subDays($daysBefore)->startOfDay();
+                $end = $wedding->copy()->addDays($daysAfter)->endOfDay();
+            }
             
             if ($checkDate->gte($start) && $checkDate->lte($end)) {
                 return "من {$start->format('Y-m-d')} إلى {$end->format('Y-m-d')}";
