@@ -19,8 +19,8 @@ import {
   HelpCircle,
   Layers,
   ShieldCheck,
-  Image as ImageIcon } from
-'lucide-react';
+  Image as ImageIcon } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 const menuItems = [
 { icon: LayoutDashboard, label: 'لوحة التحكم', path: '/dashboard' },
@@ -71,12 +71,11 @@ export function Sidebar({ onClose }) {
 
   const handleLogout = async () => {
     try {
-      const { apiClient } = await import('@/lib/api-client');
       await apiClient.post('/auth/logout', {});
     } catch (e) {
-
       // If backend is unreachable, still clear local auth
-    }localStorage.removeItem('atelier_current_employee');
+    }
+    localStorage.removeItem('atelier_current_employee');
     localStorage.removeItem('atelier_auth_token');
     window.dispatchEvent(new Event('auth-change'));
     navigate('/dashboard');

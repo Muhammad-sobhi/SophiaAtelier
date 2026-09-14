@@ -16,7 +16,7 @@ import {
   Trash2,
   Edit3 } from
 'lucide-react';
-import { calculateScheduledDates } from './BridesPage';
+import { calculateScheduledDates } from '@/lib/utils';
 
 export function getOccupiedDatesForBooking(weddingDateStr, city) {
   if (!weddingDateStr) return [];

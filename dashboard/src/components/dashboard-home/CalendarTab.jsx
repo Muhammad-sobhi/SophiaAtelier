@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Search, Calendar as CalendarIcon, Filter, X, LayoutGrid } from 'lucide-react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
-import { cleanDate } from '@/lib/utils';
-import { calculateScheduledDates } from '@/pages/BridesPage';
+import { cleanDate, calculateScheduledDates } from '@/lib/utils';
 
 const normalizeArabic = (text) => {
   if (!text) return '';
