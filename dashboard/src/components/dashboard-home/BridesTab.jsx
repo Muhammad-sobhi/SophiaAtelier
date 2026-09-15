@@ -27,6 +27,13 @@ export default function BridesTab({
         b.wedding_date,
         b.relevant_date,
         b.latest_visit_date,
+        b.visits?.[0]?.visit_date,
+        b.fittings?.[0]?.fitting_date,
+        b.latest_fitting_date,
+        b.pickup_scheduled_on,
+        b.bookings?.[0]?.pickup_scheduled_on,
+        b.return_scheduled_on,
+        b.bookings?.[0]?.return_scheduled_on,
         b.bookings?.[0]?.booking_date,
         b.bookings?.[0]?.event_date,
       ].filter(Boolean);
@@ -39,11 +46,39 @@ export default function BridesTab({
     return Array.from(monthsSet).sort().reverse();
   }, [brides]);
 
+  // Returns the stage-relevant date used for month filtering & sorting
+  const getStageDate = (b, targetStage) => {
+    switch (targetStage) {
+      case 'visit':
+      case 'booking':
+        return b.latest_visit_date || b.visits?.[0]?.visit_date || b.bookings?.[0]?.booking_date;
+      case 'fitting':
+        return b.fittings?.[0]?.fitting_date || b.latest_fitting_date;
+      case 'pickup':
+      case 'picked_up':
+        return b.pickup_scheduled_on || b.bookings?.[0]?.pickup_scheduled_on;
+      case 'receive':
+      case 'returned':
+        return b.return_scheduled_on || b.bookings?.[0]?.return_scheduled_on || b.expected_return_date;
+      default:
+        return null;
+    }
+  };
+
+  // Effective stage: dress delivered to bride => return stage (receive from bride)
+  const getEffectiveStage = (b) => {
+    const raw = b.current_stage || b.stage || 'visit';
+    const isDelivered =
+      (b.bookings?.[0]?.status === 'picked_up' || b.bookings?.[0]?.status === 'out') ||
+      b.bookings?.some((bk) => bk.status === 'picked_up' || bk.status === 'out');
+    return raw === 'picked_up' && isDelivered ? 'returned' : raw;
+  };
+
   // Filtered Brides
   const filteredBrides = useMemo(() => {
-    return brides.filter((b) => {
+    const list = brides.filter((b) => {
       // 1. Stage filter
-      const stage = b.current_stage || b.stage || 'visit';
+      const stage = getEffectiveStage(b);
       if (stageFilter !== 'all' && stage !== stageFilter) {
         return false;
       }
@@ -56,25 +91,25 @@ export default function BridesTab({
         if (!nameMatch && !phoneMatch) return false;
       }
 
-      // 3. Monthly Filter
+      // 3. Monthly Filter — matched against the active stage's own date
       if (monthFilter !== 'all') {
         let matchesMonth = false;
-        const weddingMonth = b.wedding_date?.slice(0, 7) || b.bookings?.[0]?.event_date?.slice(0, 7);
-        const visitMonth = b.latest_visit_date?.slice(0, 7);
-        const bookingMonth = b.bookings?.[0]?.booking_date?.slice(0, 7);
-
-        if (dateBasis === 'wedding_date') {
-          matchesMonth = weddingMonth === monthFilter;
+        if (stageFilter !== 'all') {
+          const stageDate = getStageDate(b, stageFilter);
+          matchesMonth = !!stageDate && stageDate.slice(0, 7) === monthFilter;
+        } else if (dateBasis === 'wedding_date') {
+          matchesMonth = (b.wedding_date?.slice(0, 7) || b.bookings?.[0]?.event_date?.slice(0, 7)) === monthFilter;
         } else if (dateBasis === 'visit_date') {
-          matchesMonth = visitMonth === monthFilter;
+          matchesMonth = b.latest_visit_date?.slice(0, 7) === monthFilter;
         } else if (dateBasis === 'booking_date') {
-          matchesMonth = bookingMonth === monthFilter;
+          matchesMonth = b.bookings?.[0]?.booking_date?.slice(0, 7) === monthFilter;
         } else {
           // 'all' dates basis: any date matches the month
+          const weddingMonth = b.wedding_date?.slice(0, 7) || b.bookings?.[0]?.event_date?.slice(0, 7);
           matchesMonth =
             weddingMonth === monthFilter ||
-            visitMonth === monthFilter ||
-            bookingMonth === monthFilter ||
+            b.latest_visit_date?.slice(0, 7) === monthFilter ||
+            b.bookings?.[0]?.booking_date?.slice(0, 7) === monthFilter ||
             b.relevant_date?.slice(0, 7) === monthFilter;
         }
 
@@ -83,6 +118,15 @@ export default function BridesTab({
 
       return true;
     });
+
+    // Sort by the active stage's own date (then relevant date as tiebreak)
+    list.sort((a, b) => {
+      const dateA = (stageFilter !== 'all' ? getStageDate(a, stageFilter) : null) || a.relevant_date || a.wedding_date || '';
+      const dateB = (stageFilter !== 'all' ? getStageDate(b, stageFilter) : null) || b.relevant_date || b.wedding_date || '';
+      return String(dateA).localeCompare(String(dateB));
+    });
+
+    return list;
   }, [brides, stageFilter, brideSearch, monthFilter, dateBasis]);
 
   return (
@@ -92,7 +136,7 @@ export default function BridesTab({
         {STAGES.map((s) => {
           const count = s.id === 'all'
             ? brides.length
-            : brides.filter((b) => (b.current_stage || b.stage || 'visit') === s.id).length;
+            : brides.filter((b) => getEffectiveStage(b) === s.id).length;
           const isActive = stageFilter === s.id;
 
           return (
@@ -193,14 +237,13 @@ export default function BridesTab({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3 select-none pb-4">
             {filteredBrides.map((bride) => {
-              const stage = bride.current_stage || bride.stage || 'visit';
+              const stage = getEffectiveStage(bride);
               const stageCfg = STAGE_MAP[stage] || STAGE_MAP.visit;
               const displayDate = bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
               const wDate = bride.wedding_date || bride.bookings?.[0]?.event_date || bride.relevant_date;
               const scheduled = calculateScheduledDates(wDate, bride.city);
               const pickupDate = bride.pickup_scheduled_on || bride.bookings?.[0]?.pickup_scheduled_on || scheduled.pickupDate;
-              const returnDate = bride.return_scheduled_on || bride.bookings?.[0]?.return_scheduled_on || scheduled.returnDate;
 
               return (
                 <div
@@ -234,25 +277,49 @@ export default function BridesTab({
                     </div>
                   </div>
 
-                  {/* Bottom row: Stage Badge & Date */}
+                  {/* Bottom row: Stage Badge & Date (return date for return stage, else wedding date) */}
                   <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-extrabold border ${stageCfg.badgeClass}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${stageCfg.dotColor}`} />
                       <span>{stageCfg.label}</span>
                     </span>
 
-                    {cleanDate(displayDate) && (
-                      <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 font-semibold truncate" title="تاريخ المناسبة / الزفاف">
-                        {cleanDate(displayDate)}
-                      </span>
-                    )}
+                    {(() => {
+                      const cardReturnDate = bride.return_scheduled_on || bride.bookings?.[0]?.return_scheduled_on || scheduled.returnDate;
+                      if (stage === 'returned' && cardReturnDate) {
+                        return (
+                          <span className="text-[9.5px] sm:text-[10px] font-mono text-rose-600 font-bold truncate" title="تاريخ الإرجاع">
+                            {cleanDate(cardReturnDate)}
+                          </span>
+                        );
+                      }
+                      return cleanDate(displayDate) ? (
+                        <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 font-semibold truncate" title="تاريخ المناسبة / الزفاف">
+                          {cleanDate(displayDate)}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
 
-                  {/* Scheduled Pickup & Return Dates */}
-                  {pickupDate && returnDate && (
+                  {/* Visit Date — always visible on card face (fitting date during fitting stage) */}
+                  {(() => {
+                    const faceVisitDate = bride.latest_visit_date || bride.visits?.[0]?.visit_date || bride.bookings?.[0]?.booking_date;
+                    const faceFittingDate = bride.fittings?.[0]?.fitting_date || bride.latest_fitting_date;
+                    const faceDate = stage === 'fitting' && faceFittingDate ? faceFittingDate : faceVisitDate;
+                    if (!faceDate) return null;
+                    return (
+                      <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-100 flex items-center justify-between text-[9px] font-mono font-bold">
+                        <span className={`${stage === 'fitting' ? 'text-purple-700' : 'text-amber-700'} truncate`} title={stage === 'fitting' ? 'تاريخ البروفة' : 'تاريخ الزيارة'}>
+                          {stage === 'fitting' ? 'بروفة: ' : 'زيارة: '}{cleanDate(faceDate)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Scheduled Pickup Date — only from booking stage onward (return date removed from card face) */}
+                  {stage !== 'visit' && pickupDate && (
                     <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-100 flex items-center justify-between text-[9px] font-mono font-bold">
                       <span className="text-blue-600 truncate" title="تاريخ الاستلام">استلام: {cleanDate(pickupDate)}</span>
-                      <span className="text-purple-600 truncate" title="تاريخ الإرجاع">إرجاع: {cleanDate(returnDate)}</span>
                     </div>
                   )}
                 </div>

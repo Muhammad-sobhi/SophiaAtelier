@@ -325,6 +325,7 @@ export default function DressesTab({
                     <th className="pb-2 px-2.5">العروس</th>
                     <th className="pb-2 px-2.5">الهاتف</th>
                     <th className="pb-2 px-2.5">تاريخ الاستلام</th>
+                    <th className="pb-2 px-2.5">تاريخ الفرح</th>
                     <th className="pb-2 px-2.5">تاريخ الإرجاع</th>
                     <th className="pb-2 px-2.5">المرحلة الحالية</th>
                     <th className="pb-2 px-2.5 text-left">إجراء</th>
@@ -333,7 +334,7 @@ export default function DressesTab({
                 <tbody className="divide-y divide-slate-100">
                   {selectedDressBookings.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400 font-bold">
+                      <td colSpan={7} className="text-center py-8 text-slate-400 font-bold">
                         لا توجد حجوزات مسجلة لهذا الفستان ضمن الفترة المحددة
                       </td>
                     </tr>
@@ -358,7 +359,10 @@ export default function DressesTab({
                           </td>
                           <td className="py-2.5 px-2.5 font-mono text-slate-500">{b.bridePhone}</td>
                           <td className="py-2.5 px-2.5 font-mono text-indigo-700 font-black">{b.pickupDate || b.eventDate || '—'}</td>
-                          
+
+                          {/* Wedding Date */}
+                          <td className="py-2.5 px-2.5 font-mono text-slate-700 font-bold">{b.eventDate || '—'}</td>
+
                           {/* Return Date + Pending status badge */}
                           <td className="py-2.5 px-2.5">
                             {b.returnDate ? (
@@ -447,6 +451,10 @@ export default function DressesTab({
                         <div>
                           <span className="text-[10px] font-bold text-slate-400 block mb-0.5">تاريخ الاستلام:</span>
                           <span className="font-mono font-black text-indigo-700">{b.pickupDate || b.eventDate || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 block mb-0.5">تاريخ الفرح:</span>
+                          <span className="font-mono font-bold text-slate-800">{b.eventDate || '—'}</span>
                         </div>
                         <div className="col-span-2 pt-1 border-t border-slate-200/60 flex items-center justify-between">
                           <div>

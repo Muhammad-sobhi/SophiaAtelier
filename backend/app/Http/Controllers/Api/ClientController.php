@@ -856,14 +856,28 @@ class ClientController extends Controller
                         floatval($request->input('insurance_refund', $maxRefund))
                     );
 
-                    if ($refundAmount > 0) {
-                        $insuranceRev = $booking->revenues()
-                            ->where('notes', 'like', '%تأمين%')
-                            ->latest()
-                            ->first();
+                    $insuranceRev = $booking->revenues()
+                        ->where('notes', 'like', '%تأمين%')
+                        ->latest()
+                        ->first();
 
+                    $insuranceMethod = $insuranceRev ? $insuranceRev->payment_method : 'cash';
+
+                    // Damage deduction kept from the insurance -> recorded as its own damage_fee income
+                    if ($damageDeduction > 0) {
+                        \App\Models\Revenue::create([
+                            'booking_id' => $booking->id,
+                            'type' => 'damage_fee',
+                            'amount' => $damageDeduction,
+                            'payment_method' => $insuranceMethod,
+                            'payment_date' => now()->toDateString(),
+                            'notes' => 'خصم تلفيات من التأمين' . ($request->filled('damage_notes') ? ' - ' . $request->input('damage_notes') : ''),
+                        ]);
+                    }
+
+                    if ($refundAmount > 0) {
                         $paymentMethod = $request->input('insurance_refund_method')
-                            ?: ($insuranceRev ? $insuranceRev->payment_method : 'cash');
+                            ?: $insuranceMethod;
 
                         $receiptPath = self::saveReceipt($request, 'insurance_refund_receipt')
                             ?? self::saveReceiptData($request->input('insurance_refund_receipt'));

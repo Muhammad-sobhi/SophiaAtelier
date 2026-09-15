@@ -59,7 +59,9 @@ export default function CalendarTab({
             return_scheduled_on: rDate,
             bookings: c.bookings || [],
             visits: c.visits || [],
+            fittings: c.fittings || [],
             latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
+            latest_fitting_date: c.fittings?.[0]?.fitting_date ? String(c.fittings[0].fitting_date).substring(0, 10) : '',
             latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
           };
         });
@@ -102,10 +104,15 @@ export default function CalendarTab({
     const map = {};
     activeBridesList.forEach((b) => {
       const pDate = b.pickup_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '');
+      const rDate = b.return_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).returnDate : '');
       const dates = [
         pDate,
+        rDate,
         b.latest_visit_date,
         b.visits?.[0]?.visit_date,
+        b.fittings?.[0]?.fitting_date,
+        b.latest_fitting_date,
+        b.bookings?.[0]?.booking_date,
       ].filter(Boolean);
 
       dates.forEach((dStr) => {
@@ -146,12 +153,12 @@ export default function CalendarTab({
       latestBk?.status === 'out' ||
       b.bookings?.some((bk) => bk.status === 'picked_up' || bk.status === 'out');
 
-    if (raw === 'picked_up' || raw === 'pickup' || raw === 'receive' || raw === 'receiving' || isDelivered) {
-      // Sub-stage 2: الفستان خارج الأتيليه مع العروس -> استلام (من العروس)
-      if (isDelivered || raw === 'receive' || raw === 'receiving') {
-        return 'receive';
+    if (raw === 'picked_up' || raw === 'pickup' || raw === 'receive' || raw === 'receiving' || raw === 'returned' || isDelivered) {
+      // Dress is out with the bride -> الإرجاع (استلام من العروس)
+      if (isDelivered || raw === 'receive' || raw === 'receiving' || raw === 'returned') {
+        return 'returned';
       }
-      // Sub-stage 1: بانتظار التسليم للعروس -> تسليم (للعروس)
+      // بانتظار التسليم للعروس -> تسليم (للعروس)
       return 'pickup';
     }
 
@@ -185,8 +192,6 @@ export default function CalendarTab({
         return 'text-blue-600 bg-blue-50 border-blue-300 hover:bg-blue-100';
       case 'receive':
       case 'receiving':
-        // Dark Blue (receive from bride)
-        return 'text-white bg-[#1e3a8a] border-[#172554] font-black hover:bg-[#1e40af] shadow-2xs';
       case 'returned':
         // Red
         return 'text-red-600 bg-red-50 border-red-300 hover:bg-red-100';
@@ -203,8 +208,8 @@ export default function CalendarTab({
       case 'pickup':
       case 'picked_up': return 'تسليم (للعروس)';
       case 'receive':
-      case 'receiving': return 'استلام (من العروس)';
-      case 'returned': return 'مرتجع';
+      case 'receiving':
+      case 'returned': return 'استلام من العروس (مرتجع)';
       default: return stage || 'حجز';
     }
   };
@@ -227,19 +232,26 @@ export default function CalendarTab({
       if (selectedStageFilter !== 'all') {
         if (selectedStageFilter === 'pickup') {
           if (brideStage !== 'pickup' && brideStage !== 'picked_up') continue;
-        } else if (selectedStageFilter === 'receive') {
-          if (brideStage !== 'receive' && brideStage !== 'receiving') continue;
+        } else if (selectedStageFilter === 'returned') {
+          if (brideStage !== 'returned' && brideStage !== 'receive' && brideStage !== 'receiving') continue;
         } else {
           if (brideStage !== selectedStageFilter) continue;
         }
       }
 
-      // 3. Date matching: Base day appearance on Pickup Date (or Visit Date for visits)
+      // 3. Date matching: base the bride's day on her CURRENT STAGE's own date
+      const latestBooking = b.bookings?.[0];
       const effectivePickupDate = cleanDate(
         b.pickup_scheduled_on ||
-        b.bookings?.[0]?.pickup_scheduled_on ||
+        latestBooking?.pickup_scheduled_on ||
         (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '')
       );
+      const effectiveReturnDate = cleanDate(
+        b.return_scheduled_on ||
+        latestBooking?.return_scheduled_on ||
+        (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).returnDate : '')
+      );
+      const effectiveFittingDate = cleanDate(b.fittings?.[0]?.fitting_date || b.latest_fitting_date || '');
 
       let isMatchDay = false;
 
@@ -248,8 +260,26 @@ export default function CalendarTab({
           cleanDate(b.latest_visit_date)?.startsWith(dateStr) ||
           b.visits?.some((v) => cleanDate(v.visit_date)?.startsWith(dateStr)) ||
           calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
+      } else if (brideStage === 'booking') {
+        // Booking date = visit date
+        isMatchDay =
+          cleanDate(b.latest_visit_date)?.startsWith(dateStr) ||
+          b.visits?.some((v) => cleanDate(v.visit_date)?.startsWith(dateStr)) ||
+          cleanDate(latestBooking?.booking_date)?.startsWith(dateStr) ||
+          calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
+      } else if (brideStage === 'fitting') {
+        isMatchDay =
+          effectiveFittingDate === dateStr ||
+          b.fittings?.some((f) => cleanDate(f.fitting_date) === dateStr) ||
+          calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
+      } else if (brideStage === 'returned') {
+        // Receive from bride / returned are positioned on the return date
+        isMatchDay =
+          effectiveReturnDate === dateStr ||
+          b.bookings?.some((bk) => cleanDate(bk.return_scheduled_on) === dateStr) ||
+          calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
       } else {
-        // Bookings / fittings / pickup / receive / returned are positioned strictly on pickup date
+        // Pickup: positioned strictly on pickup date
         isMatchDay =
           effectivePickupDate === dateStr ||
           b.bookings?.some((bk) => cleanDate(bk.pickup_scheduled_on) === dateStr) ||
@@ -452,8 +482,7 @@ export default function CalendarTab({
             { id: 'booking', label: 'حجز', dot: 'bg-emerald-500' },
             { id: 'fitting', label: 'بروفة', dot: 'bg-purple-500' },
             { id: 'pickup', label: 'تسليم (للعروس)', dot: 'bg-blue-500' },
-            { id: 'receive', label: 'استلام (من العروس)', dot: 'bg-blue-950' },
-            { id: 'returned', label: 'مرتجع', dot: 'bg-red-500' },
+            { id: 'returned', label: 'استلام من العروس (مرتجع)', dot: 'bg-red-500' },
           ].map((stage) => {
             const active = selectedStageFilter === stage.id;
             return (

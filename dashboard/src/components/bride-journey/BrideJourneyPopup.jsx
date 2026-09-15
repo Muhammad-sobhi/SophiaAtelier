@@ -9,7 +9,7 @@ import { ReturnDressModal } from './ReturnDressModal';
 import { BookingPaymentsModal } from './BookingPaymentsModal';
 import {
   X, Phone, MapPin, Calendar, Heart, Ruler, Package, RotateCcw,
-  Clock, CreditCard, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle
+  Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle
 } from 'lucide-react';
 
 const STAGES = [
@@ -79,8 +79,11 @@ export function BrideJourneyPopup({
     return null;
   };
 
-  const stage = bride.current_stage || bride.stage || 'visit';
+  const rawStage = bride.current_stage || bride.stage || 'visit';
   const booking = bride.bookings?.[0];
+  const isDelivered = booking?.status === 'picked_up' || booking?.status === 'out';
+  // Dress delivered to the bride => journey moves to the RETURN stage (receive from bride)
+  const stage = rawStage === 'picked_up' && isDelivered ? 'returned' : rawStage;
   const dress = booking?.dress;
   const dress2 = booking?.dress2;
   const dresses = [dress, dress2, booking?.dress3].filter(Boolean);
@@ -172,9 +175,6 @@ export function BrideJourneyPopup({
             <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
               <Heart size={13} /> حجز فستان
             </button>
-            <button onClick={() => openFormForStage('fitting')} className={`${common} bg-indigo-600 hover:bg-indigo-700 text-white col-span-2`}>
-              <Ruler size={13} /> تحديد موعد بروفة
-            </button>
           </div>
         );
       case 'booking':
@@ -205,62 +205,61 @@ export function BrideJourneyPopup({
           </div>
         );
       case 'picked_up': {
-        const isDelivered = booking?.status === 'picked_up' || booking?.status === 'out';
+        // Dress not yet delivered to the bride -> single step: hand over the dress
+        const weddingDate = bride.wedding_date || booking?.event_date;
+        let isPickupOverdue = false;
+        if (weddingDate) {
+          const isCairo = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة';
+          const pickupDate = new Date(new Date(weddingDate).getTime() - (isCairo ? 1 : 2) * 24 * 60 * 60 * 1000);
+          if (new Date() > pickupDate) {
+            isPickupOverdue = true;
+          }
+        }
+
         return (
-          <div className="space-y-2">
-            {!isDelivered ? (
-              <div className="space-y-1.5">
-                <div className="text-[10.5px] font-black text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between">
-                  <span>الخطوة 1: تسليم الفستان والملحقات للعروس</span>
-                  <span className="text-[9px] bg-amber-200/70 text-amber-900 px-1.5 py-0.5 rounded-md font-bold">بانتظار التسليم</span>
-                </div>
-                <button
-                  onClick={() => openFormForStage('picked_up')}
-                  disabled={loading}
-                  className={`${common} w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs`}
-                >
-                  <Package size={14} /> تسليم الفستان للعروس (فحص الإكسسوارات + التأمين والمتبقي) 📦
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <div className="text-[10.5px] font-black text-blue-800 bg-blue-50 border border-blue-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between">
-                  <span>الخطوة 2: الفستان خارج الأتيليه مع العروس</span>
-                  <span className="text-[9px] bg-blue-200/70 text-blue-900 px-1.5 py-0.5 rounded-md font-bold">تم التسليم للعروس</span>
-                </div>
-                <button
-                  onClick={() => setIsReturnModalOpen(true)}
-                  className={`${common} w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs`}
-                >
-                  <RotateCcw size={14} /> تسجيل إرجاع الفستان وتسوية التأمين 🔄
-                </button>
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                  <button
-                    onClick={() => openFormForStage('picked_up')}
-                    className="text-[10px] font-bold text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
-                  >
-                    مراجعة / تعديل الاستلام ✏️
-                  </button>
-                  <button
-                    onClick={() => handleRevertTo('pickup_pending', 'ما قبل التسليم (إلغاء تسليم الفستان)')}
-                    disabled={loading}
-                    className="text-[10px] font-extrabold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer flex items-center gap-1"
-                    title="الرجوع للخطوة 1: إلغاء خروج الفستان وإعادته للأتيليه لتسليمه مجدداً"
-                  >
-                    <RotateCcw size={11} /> التراجع للخطوة 1 (إلغاء التسليم)
-                  </button>
-                </div>
+          <div className="space-y-1.5">
+          {isPickupOverdue && (
+              <div className="text-[10.5px] font-black text-rose-800 bg-rose-50/90 border border-rose-200 rounded-xl px-2.5 py-1.5 text-center leading-tight flex items-center justify-center gap-1">
+                <AlertTriangle size={12} className="text-rose-600" />
+                <span>تنبيه: حان موعد تسليم الفستان للعروس</span>
               </div>
             )}
+            <button
+              onClick={() => openFormForStage('picked_up')}
+              disabled={loading}
+              className={`${common} w-full py-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white shadow-xs`}
+            >
+              <Package size={14} /> تسليم الفستان للعروس (فحص الإكسسوارات + التأمين والمتبقي) 📦
+            </button>
           </div>
         );
       }
-      case 'returned':
+      case 'returned': {
+        // Dress is out with the bride -> RETURN stage: receive dress + inspect + settle insurance
+        if (isDelivered) {
+          return (
+            <div className="space-y-1.5">
+              <div className="text-[10.5px] font-black text-blue-800 bg-blue-50 border border-blue-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between">
+                <span>الفستان مع العروس — بانتظار الاستلام والفحص</span>
+                <span className="text-[9px] bg-blue-200/70 text-blue-900 px-1.5 py-0.5 rounded-md font-bold">قيد الإرجاع</span>
+              </div>
+              <button
+                onClick={() => setIsReturnModalOpen(true)}
+                disabled={loading}
+                className={`${common} w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs`}
+              >
+                <RotateCcw size={14} /> استلام الفستان من العروس (جرد الملحقات + تسوية التأمين) 🔄
+              </button>
+            </div>
+          );
+        }
+
         return (
-          <div className="text-center text-xs text-slate-500 font-bold py-2 bg-slate-50 rounded-xl border border-slate-150">
-            اكتملت رحلة العروس بنجاح ✨
+          <div className="text-[10.5px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-center">
+            ✓ تم استلام الفستان من العروس واكتملت الرحلة بنجاح
           </div>
         );
+      }
       default:
         return null;
     }
@@ -379,7 +378,10 @@ export function BrideJourneyPopup({
                         if (isCurrent || isFuture) {
                           openFormForStage(s.id);
                         } else if (isPast && booking?.id) {
-                          handleRevertTo(s.id, s.label);
+                          // Reverting from return stage to pickup stage => dress goes back to "awaiting delivery"
+                          const targetStageId = s.id === 'picked_up' ? 'pickup_pending' : s.id;
+                          const targetLabel = s.id === 'picked_up' ? 'مرحلة التسليم (بانتظار التسليم للعروس)' : s.label;
+                          handleRevertTo(targetStageId, targetLabel);
                         }
                       }}
                       className="relative z-10 flex flex-col items-center gap-1.5 flex-1 cursor-pointer group transition-transform active:scale-95"
@@ -434,19 +436,23 @@ export function BrideJourneyPopup({
                 <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(weddingDate)}</div>
               </div>
               <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5">
-                <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> {stage === 'visit' ? 'موعد الزيارة' : 'تاريخ الحجز'}</div>
+                <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> تاريخ الزيارة</div>
                 <div className="text-xs font-black text-slate-800 mt-0.5">
-                  {stage === 'visit' ? (bride.latest_visit_date || formatDate(booking?.booking_date)) : formatDate(booking?.booking_date)}
+                  {bride.latest_visit_date || bride.visits?.[0]?.visit_date || formatDate(booking?.booking_date)}
                 </div>
               </div>
-              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5">
-                <div className="text-[10px] font-bold text-blue-700 flex items-center gap-1"><Package size={11} /> تاريخ الاستلام</div>
-                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(pickupDate)}</div>
-              </div>
-              <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-2.5">
-                <div className="text-[10px] font-bold text-purple-700 flex items-center gap-1"><RotateCcw size={11} /> تاريخ الإرجاع</div>
-                <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(returnDate)}</div>
-              </div>
+              {stage !== 'visit' && (
+                <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5">
+                  <div className="text-[10px] font-bold text-blue-700 flex items-center gap-1"><Package size={11} /> تاريخ الاستلام</div>
+                  <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(pickupDate)}</div>
+                </div>
+              )}
+              {stage !== 'visit' && (
+                <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-2.5">
+                  <div className="text-[10px] font-bold text-purple-700 flex items-center gap-1"><RotateCcw size={11} /> تاريخ الإرجاع</div>
+                  <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(returnDate)}</div>
+                </div>
+              )}
             </div>
 
             {/* Finances - Only for booking, fitting, pickup stages or confirmed bookings */}
@@ -489,14 +495,6 @@ export function BrideJourneyPopup({
                     )}
                   </div>
                 </div>
-                {remaining > 0 && (
-                  <button
-                    onClick={() => openFormForStage('picked_up')}
-                    className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
-                  >
-                    <CreditCard size={12} /> سداد المتبقي
-                  </button>
-                )}
               </div>
             )}
 

@@ -625,7 +625,7 @@ export default function DressesPage() {
       d.code?.toLowerCase().includes(q) ||
       (designerName && designerName.toLowerCase().includes(q))
     );
-  });
+  }).sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
 
   const getStageLabel = (stage) => {
     return DRESS_STAGES.find((s) => s.id === stage)?.label || stage;
