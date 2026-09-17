@@ -78,7 +78,7 @@ export function DressesReport() {
     } else if (viewMode === 'idle') {
       return list.sort((a, b) => a.timesBooked - b.timesBooked || a.totalRevenue - b.totalRevenue);
     } else {
-      return list.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      return list.sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true, sensitivity: 'base' }));
     }
   }, [dressStatsList, searchQuery, viewMode]);
 

@@ -202,7 +202,7 @@ export default function DressesTab({
             .sort((a, b) => {
               const codeA = (a.code || '').toString().toLowerCase();
               const codeB = (b.code || '').toString().toLowerCase();
-              return codeA.localeCompare(codeB);
+              return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
             })
             .filter((d) => {
               if (!dressSearch.trim()) return true;
