@@ -93,6 +93,7 @@ export default function BridesPage() {
   const [deletingBride, setDeletingBride] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dressesList, setDressesList] = useState([]);
+  const [fullyBookedSlots, setFullyBookedSlots] = useState([]);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -102,6 +103,9 @@ export default function BridesPage() {
     city: 'القاهرة',
     address: '',
     source: 'instagram',
+    visit_date: '',
+    visit_time: '',
+    sales_name: '',
     wedding_date: '',
     pickup_scheduled_on: '',
     return_scheduled_on: '',
@@ -125,6 +129,18 @@ export default function BridesPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (formData.visit_date) {
+      apiClient.get(`/public/fully-booked-slots?date=${formData.visit_date}`)
+        .then(res => {
+          setFullyBookedSlots(res.data || res || []);
+        })
+        .catch(err => console.error('Failed to fetch booked slots:', err));
+    } else {
+      setFullyBookedSlots([]);
+    }
+  }, [formData.visit_date]);
 
   const fetchBrides = async (
     page = currentPage,
@@ -214,6 +230,9 @@ export default function BridesPage() {
       city: 'القاهرة',
       address: '',
       source: 'instagram',
+      visit_date: '',
+      visit_time: '',
+      sales_name: '',
       wedding_date: '',
       pickup_scheduled_on: '',
       return_scheduled_on: '',
@@ -233,6 +252,21 @@ export default function BridesPage() {
   const handleOpenAdd = () => {
     resetForm();
     setIsAddModalOpen(true);
+  };
+
+  const formatTimeSlot = (ts) => {
+    if (!ts) return '';
+    if (ts.includes('AM') || ts.includes('PM')) return ts;
+    const parts = ts.split(':');
+    if (parts.length >= 2) {
+      let h = parseInt(parts[0], 10);
+      const m = parts[1];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
+    }
+    return ts;
   };
 
   const handleOpenEdit = (bride) => {
@@ -268,6 +302,9 @@ export default function BridesPage() {
       city: clientCity,
       address: bride.address || '',
       source: bride.source || 'instagram',
+      visit_date: bride.latest_visit_date || b?.visit_date || '',
+      visit_time: formatTimeSlot(b?.time_slot || bride.visits?.[0]?.time_slot || ''),
+      sales_name: b?.sales_name || bride.visits?.[0]?.sales_name || '',
       wedding_date: wDate,
       pickup_scheduled_on: initialPickup,
       return_scheduled_on: initialReturn,
@@ -393,6 +430,9 @@ export default function BridesPage() {
         city: formData.city,
         address: formData.address.trim() || null,
         source: formData.source,
+        visit_date: formData.visit_date || null,
+        visit_time: formData.visit_time || null,
+        sales_name: formData.sales_name.trim() || null,
         wedding_date: formData.wedding_date || null,
         pickup_scheduled_on: formData.pickup_scheduled_on || null,
         return_scheduled_on: formData.return_scheduled_on || null,
@@ -401,7 +441,13 @@ export default function BridesPage() {
         dress_2_id: (formData.has_dress_2 && formData.dress_2_id) ? parseInt(formData.dress_2_id) : null,
         dress_3_id: (formData.has_dress_3 && formData.dress_3_id) ? parseInt(formData.dress_3_id) : null,
         trying_fee: formData.trying_fee ? parseFloat(formData.trying_fee) : 0,
+        tried_dresses: [],
+        booked_dresses: []
       };
+
+      if (payload.dress_id) { payload.tried_dresses.push(payload.dress_id); payload.booked_dresses.push(payload.dress_id); }
+      if (payload.dress_2_id) { payload.tried_dresses.push(payload.dress_2_id); payload.booked_dresses.push(payload.dress_2_id); }
+      if (payload.dress_3_id) { payload.tried_dresses.push(payload.dress_3_id); payload.booked_dresses.push(payload.dress_3_id); }
 
       if (editingBride) {
         // Update existing bride
@@ -1065,8 +1111,43 @@ export default function BridesPage() {
                 </div>
               </div>
 
-              {/* Wedding Date & Trying Fee */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Visit Date & Time & Wedding Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
+                    تاريخ الزيارة (للمتابعة)
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.visit_date}
+                    onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
+                    وقت الزيارة
+                  </label>
+                  <select
+                    value={formData.visit_time}
+                    onChange={(e) => setFormData({ ...formData, visit_time: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="">-- اختر الوقت --</option>
+                    {[
+                      '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+                      '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM',
+                      '07:00 PM', '07:30 PM', '08:00 PM', '08:30 PM'
+                    ].map(time => {
+                      const isBooked = fullyBookedSlots.includes(time.replace(' PM', '').replace(' AM', ''));
+                      return (
+                        <option key={time} value={time} disabled={isBooked} className={isBooked ? 'text-rose-500 font-bold bg-rose-50' : ''}>
+                          {time} {isBooked ? '(ممتلئ)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
                 <div>
                   <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
                     تاريخ المناسبة / الزفاف
@@ -1078,6 +1159,10 @@ export default function BridesPage() {
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
                   />
                 </div>
+              </div>
+
+              {/* Trying Fee & Sales Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
                     رسوم قياس الفساتين (إن وجدت)
@@ -1088,6 +1173,18 @@ export default function BridesPage() {
                     onChange={(e) => setFormData({ ...formData, trying_fee: e.target.value })}
                     placeholder="0"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
+                    اسم مسؤولة المبيعات (Sales)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sales_name}
+                    onChange={(e) => setFormData({ ...formData, sales_name: e.target.value })}
+                    placeholder="مثال: ياسمين..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
                 </div>
               </div>
@@ -1574,12 +1671,89 @@ export default function BridesPage() {
                   </span>
                 </div>
 
+                {viewingBride.visit_date && (
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400 font-bold">تاريخ الزيارة (للمتابعة):</span>
+                    <span className="font-bold text-slate-700">
+                      {cleanDate(viewingBride.visit_date)}
+                    </span>
+                  </div>
+                )}
+
+                {(viewingBride.visits?.[0]?.time_slot || viewingBride.visits?.[0]?.sales_name) && (
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400 font-bold">تفاصيل الزيارة:</span>
+                    <span className="font-bold text-slate-700 text-left">
+                      {viewingBride.visits?.[0]?.time_slot && <span className="block" dir="ltr">{viewingBride.visits[0].time_slot}</span>}
+                      {viewingBride.visits?.[0]?.sales_name && <span className="block text-indigo-600 text-[10px]">مسؤولة المبيعات: {viewingBride.visits[0].sales_name}</span>}
+                    </span>
+                  </div>
+                )}
+
+                {viewingBride.visits?.[0]?.tried_dresses && viewingBride.visits[0].tried_dresses.length > 0 && (
+                  <div className="py-1 border-b border-slate-100">
+                    <span className="text-slate-400 font-bold block mb-1">الفساتين المجربة:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingBride.visits[0].tried_dresses.map(dress => (
+                        <span key={dress.id} className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                          {dress.name} {dress.code ? `(${dress.code})` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {viewingBride.notes && (
                   <div className="pt-1">
                     <span className="text-slate-400 font-bold block mb-1">الملاحظات:</span>
                     <p className="text-slate-700 font-semibold bg-white p-2.5 rounded-xl border border-slate-100">
                       {viewingBride.notes}
                     </p>
+                  </div>
+                )}
+
+                {/* Bookings / Dresses */}
+                {viewingBride.bookings && viewingBride.bookings.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100 mt-2">
+                    <span className="text-slate-400 font-bold block mb-2">تفاصيل الحجز (الفساتين والمبالغ):</span>
+                    {viewingBride.bookings.map((booking) => {
+                      const totalPaid = booking.revenues?.reduce((sum, rev) => sum + parseFloat(rev.amount), 0) || 0;
+                      const remaining = Math.max(0, parseFloat(booking.total_amount || 0) - totalPaid);
+                      return (
+                        <div key={booking.id} className="bg-slate-50 p-3 rounded-xl border border-slate-150 space-y-2 mb-2">
+                          {booking.dress && (
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-slate-500 font-bold">فستان 1:</span>
+                              <span className="font-extrabold text-indigo-700">{booking.dress.name} {booking.dress.code ? `(${booking.dress.code})` : ''}</span>
+                            </div>
+                          )}
+                          {booking.dress2 && (
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-slate-500 font-bold">فستان 2:</span>
+                              <span className="font-extrabold text-indigo-700">{booking.dress2.name} {booking.dress2.code ? `(${booking.dress2.code})` : ''}</span>
+                            </div>
+                          )}
+                          {booking.dress3 && (
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-slate-500 font-bold">فستان 3:</span>
+                              <span className="font-extrabold text-indigo-700">{booking.dress3.name} {booking.dress3.code ? `(${booking.dress3.code})` : ''}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-[11px] pt-1.5 border-t border-slate-200 mt-1">
+                            <span className="text-slate-500 font-bold">الإجمالي:</span>
+                            <span className="font-mono font-bold">{parseFloat(booking.total_amount || 0).toLocaleString()} ج.م</span>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-500 font-bold">المدفوع:</span>
+                            <span className="font-mono font-bold text-emerald-600">{parseFloat(totalPaid).toLocaleString()} ج.م</span>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-500 font-bold">المتبقي:</span>
+                            <span className="font-mono font-bold text-rose-600">{parseFloat(remaining).toLocaleString()} ج.م</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

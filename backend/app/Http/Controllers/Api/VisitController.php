@@ -11,7 +11,7 @@ class VisitController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Visit::whereHas('client')->with('client');
+        $query = Visit::whereHas('client')->with(['client', 'triedDresses', 'bookedDresses']);
 
         if ($clientId = $request->input('client_id')) {
             $query->where('client_id', $clientId);
@@ -67,6 +67,11 @@ class VisitController extends Controller
             'source' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'time_slot' => 'nullable|string|max:50',
+            'sales_name' => 'nullable|string|max:100',
+            'tried_dresses' => 'nullable|array',
+            'tried_dresses.*' => 'exists:dresses,id',
+            'booked_dresses' => 'nullable|array',
+            'booked_dresses.*' => 'exists:dresses,id',
         ]);
 
         if (!empty($validated['time_slot'])) {
@@ -87,12 +92,19 @@ class VisitController extends Controller
 
         $visit = Visit::create($validated);
 
-        return response()->json($visit->load('client'), 201);
+        if (isset($validated['tried_dresses'])) {
+            $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'], ['type' => 'tried']);
+        }
+        if (isset($validated['booked_dresses'])) {
+            $visit->bookedDresses()->syncWithPivotValues($validated['booked_dresses'], ['type' => 'booked']);
+        }
+
+        return response()->json($visit->load(['client', 'triedDresses', 'bookedDresses']), 201);
     }
 
     public function show(Visit $visit)
     {
-        $visit->load('client');
+        $visit->load(['client', 'triedDresses', 'bookedDresses']);
 
         return response()->json($visit);
     }
@@ -106,6 +118,11 @@ class VisitController extends Controller
             'source' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'time_slot' => 'nullable|string|max:50',
+            'sales_name' => 'nullable|string|max:100',
+            'tried_dresses' => 'nullable|array',
+            'tried_dresses.*' => 'exists:dresses,id',
+            'booked_dresses' => 'nullable|array',
+            'booked_dresses.*' => 'exists:dresses,id',
         ]);
 
         if (!empty($validated['time_slot'])) {
@@ -128,7 +145,14 @@ class VisitController extends Controller
 
         $visit->update($validated);
 
-        return response()->json($visit->load('client'));
+        if (array_key_exists('tried_dresses', $validated)) {
+            $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'] ?? [], ['type' => 'tried']);
+        }
+        if (array_key_exists('booked_dresses', $validated)) {
+            $visit->bookedDresses()->syncWithPivotValues($validated['booked_dresses'] ?? [], ['type' => 'booked']);
+        }
+
+        return response()->json($visit->load(['client', 'triedDresses', 'bookedDresses']));
     }
 
     public function destroy(Visit $visit): JsonResponse

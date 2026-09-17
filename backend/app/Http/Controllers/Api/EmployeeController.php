@@ -18,9 +18,9 @@ class EmployeeController extends Controller
     {
         $validated = $request->validated();
 
-        // Hash password before storing
-        if (!empty($validated['password'])) {
-            $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        // Remove empty password to avoid overriding
+        if (empty($validated['password'])) {
+            unset($validated['password']);
         }
 
         $employee = Employee::create($validated);
@@ -38,10 +38,8 @@ class EmployeeController extends Controller
     {
         $validated = $request->validated();
 
-        // Hash password before storing
-        if (!empty($validated['password'])) {
-            $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
-        } else {
+        // Remove empty password to avoid overriding
+        if (empty($validated['password'])) {
             unset($validated['password']);
         }
 

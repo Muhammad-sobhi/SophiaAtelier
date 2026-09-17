@@ -29,6 +29,23 @@ const STATUS_OPTIONS = [
 { value: 'لم يحضر', label: 'لم يحضر' }];
 
 
+const TIME_SLOTS = [
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', 
+  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', 
+  '19:00', '19:30', '20:00', '20:30'
+];
+
+const formatTime = (time) => {
+  if (!time) return '';
+  let [hours, minutes] = time.split(':');
+  let ampm = 'PM';
+  let h = parseInt(hours, 10);
+  if (h < 12) ampm = 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  return `${h}:${minutes} ${ampm}`;
+};
+
 const initialVisits = [
 { id: 1, client: 'سارة أحمد', date: '2026-07-12', source: 'انستقرام', status: 'وصل', triedDresses: ['فستان الأميرة كلاسيك', 'فستان الزفاف الأبيض الملكي'], bookedDresses: [] },
 { id: 2, client: 'نورة محمد', date: '2026-07-12', source: 'جوجل', status: 'انتهى', triedDresses: ['فستان السهرة ذهبي'], bookedDresses: ['فستان السهرة ذهبي'] },
@@ -58,12 +75,17 @@ export default function VisitsPage() {
   // Form states
   const [newClient, setNewClient] = useState('');
   const [newDate, setNewDate] = useState('2026-07-12');
+  const [newTime, setNewTime] = useState('');
   const [newSource, setNewSource] = useState('انستجرام');
   const [newStatus, setNewStatus] = useState('وصل');
   const [selectedTriedDresses, setSelectedTriedDresses] = useState([]);
   const [selectedBookedDresses, setSelectedBookedDresses] = useState([]);
+  const [salesName, setSalesName] = useState('');
+  const [employees, setEmployees] = useState([]);
   const [dressesData, setDressesData] = useState([]);
   const [clientsObjects, setClientsObjects] = useState([]);
+  const [bookingsList, setBookingsList] = useState([]);
+  const [fullyBookedSlots, setFullyBookedSlots] = useState([]);
 
   // Convert to Booking States
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
@@ -92,15 +114,28 @@ export default function VisitsPage() {
     setEditingVisit(v);
     setNewClient(v.client);
     setNewDate(v.date);
+    setNewTime(v.time_slot || '');
     setNewSource(v.source);
     setNewStatus(v.status);
-    setSelectedTriedDresses(v.triedDresses || []);
-    setSelectedBookedDresses(v.bookedDresses || []);
+    setSelectedTriedDresses(v.triedDresses?.map(d => d.id) || []);
+    setSelectedBookedDresses(v.bookedDresses?.map(d => d.id) || []);
+    setSalesName(v.salesName || '');
   };
 
   const handleEditVisitSubmit = async (e) => {
     e.preventDefault();
     if (!editingVisit) return;
+
+    const allSelectedDresses = [...new Set([...selectedTriedDresses, ...selectedBookedDresses])];
+    const conflictError = checkVisitDressConflict(allSelectedDresses, newDate, newTime);
+    if (conflictError) {
+      setAlertConfig({
+        isOpen: true,
+        title: 'تعارض في المواعيد',
+        message: conflictError
+      });
+      return;
+    }
 
     // Resolve client_id
     const clientObj = clientsObjects.find((c) => c.name === newClient);
@@ -124,9 +159,13 @@ export default function VisitsPage() {
       await apiClient.put(`/visits/${editingVisit.id}`, {
         client_id: clientId,
         visit_date: newDate,
+        time_slot: newTime || null,
         source: mappedSource,
         status: mappedStatus,
-        notes: `Tried: ${selectedTriedDresses.join(', ')}. Booked: ${selectedBookedDresses.join(', ')}`
+        notes: `Tried: ${selectedTriedDresses.join(', ')}. Booked: ${selectedBookedDresses.join(', ')}`,
+        sales_name: salesName,
+        tried_dresses: selectedTriedDresses,
+        booked_dresses: selectedBookedDresses
       });
 
       fetchVisits();
@@ -138,10 +177,12 @@ export default function VisitsPage() {
     // Reset Form
     setNewClient('');
     setNewDate('2026-07-12');
+    setNewTime('');
     setNewSource('انستجرام');
     setNewStatus('وصل');
     setSelectedTriedDresses([]);
     setSelectedBookedDresses([]);
+    setSalesName('');
   };
 
   const handleConvertToBookingClick = (v) => {
@@ -253,8 +294,10 @@ export default function VisitsPage() {
         id: v.id,
         client: v.client?.name || v.client_name || '-',
         date: v.visit_date || v.date || '',
+        time_slot: v.time_slot || null,
         source: v.source || 'مباشر',
         status: v.status === 'arrived' ? 'وصل' : v.status === 'done' ? 'انتهى' : v.status === 'booked' ? 'حجز' : 'لم يحضر',
+        salesName: v.sales_name || '',
         triedDresses: v.tried_dresses || [],
         bookedDresses: v.booked_dresses || []
       })));
@@ -273,16 +316,22 @@ export default function VisitsPage() {
 
     fetchVisits();
 
-    // Load clients
     apiClient.get('/clients').then((res) => {
       setClientsObjects(res.data || []);
+    }).catch(() => {});
+
+    apiClient.get('/bookings').then((res) => {
+      setBookingsList(res.data || []);
+    }).catch(() => {});
+
+    apiClient.get('/employees').then((res) => {
+      setEmployees(res.data || []);
     }).catch(() => {});
 
     // Load dresses catalog from API
     apiClient.get('/dresses?per_page=all').then((res) => {
       const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
       setDressesData(data);
-      if (data.length > 0) setAvailableDresses(data.map((d) => d.name));
     }).catch(() => {});
   }, []);
 
@@ -294,6 +343,17 @@ export default function VisitsPage() {
   const handleAddVisit = async (e) => {
     e.preventDefault();
     if (!newClient.trim()) return;
+
+    const allSelectedDresses = [...new Set([...selectedTriedDresses, ...selectedBookedDresses])];
+    const conflictError = checkVisitDressConflict(allSelectedDresses, newDate, newTime);
+    if (conflictError) {
+      setAlertConfig({
+        isOpen: true,
+        title: 'تعارض في المواعيد',
+        message: conflictError
+      });
+      return;
+    }
 
     // 1. Resolve or create client
     let clientObj = clientsObjects.find((c) => c.name.trim() === newClient.trim());
@@ -331,9 +391,13 @@ export default function VisitsPage() {
       await apiClient.post('/visits', {
         client_id: clientId,
         visit_date: newDate,
+        time_slot: newTime || null,
         source: mappedSource,
         status: mappedStatus,
-        notes: `Tried: ${selectedTriedDresses.join(', ')}. Booked: ${selectedBookedDresses.join(', ')}`
+        notes: `Tried: ${selectedTriedDresses.join(', ')}. Booked: ${selectedBookedDresses.join(', ')}`,
+        sales_name: salesName,
+        tried_dresses: selectedTriedDresses,
+        booked_dresses: selectedBookedDresses
       });
 
       fetchVisits();
@@ -352,10 +416,12 @@ export default function VisitsPage() {
     setIsModalOpen(false);
     setNewClient('');
     setNewDate(selectedDateStr);
+    setNewTime('');
     setNewSource('انستجرام');
     setNewStatus('وصل');
     setSelectedTriedDresses([]);
     setSelectedBookedDresses([]);
+    setSalesName('');
   };
 
   const updateVisitStatus = async (id, status) => {
@@ -375,44 +441,58 @@ export default function VisitsPage() {
   };
 
   const checkDressAvailability = (dress, targetDateStr) => {
-    // Using in-memory bookings data from API
+    // Legacy visual check
     return { available: true };
   };
 
-  const toggleTriedDress = (dress) => {
-    if (selectedTriedDresses.includes(dress)) {
-      setSelectedTriedDresses(selectedTriedDresses.filter((d) => d !== dress));
-      setSelectedBookedDresses(selectedBookedDresses.filter((d) => d !== dress));
-    } else {
-      const check = checkDressAvailability(dress, newDate);
-      if (!check.available) {
-        setAlertConfig({
-          isOpen: true,
-          title: 'الفستان مشغول/تحت التجهيز!',
-          message: `الفستان غير متاح للقياس في هذا التاريخ.\nهو مشغول في فترة التحضير أو فرح للعميلة "${check.conflictBride}".\nسيكون الفستان متاحاً مجدداً ابتداءً من تاريخ: ${check.nextAvailableDate}.`
-        });
-        return;
+  const checkVisitDressConflict = (dressIds, dateStr, timeStr) => {
+    for (const dressId of dressIds) {
+      const dress = dressesData.find(d => d.id === dressId);
+      if (!dress) continue;
+      
+      const dateObj = new Date(dateStr);
+      for (const booking of bookingsList) {
+        if (booking.status !== 'confirmed') continue;
+        if (booking.dress_id === dress.id || booking.dress_2_id === dress.id || booking.dress_3_id === dress.id) {
+          const bDate = new Date(booking.event_date);
+          const diffDays = (dateObj - bDate) / (1000 * 60 * 60 * 24);
+          if (diffDays >= -3 && diffDays <= 3) {
+            return `الفستان "${dress.name}" خارج المحل لحجز زفاف في هذا التاريخ (${booking.event_date}).`;
+          }
+        }
       }
-      setSelectedTriedDresses([...selectedTriedDresses, dress]);
+
+      if (timeStr) {
+        for (const v of visitsList) {
+          if (v.id === editingVisit?.id) continue;
+          if (v.date === dateStr && v.time_slot === timeStr && v.status !== 'no_show' && v.status !== 'done') {
+            const hasDress = v.triedDresses?.includes(dress.name) || v.triedDresses?.includes(dress.id) || v.tried_dresses?.includes(dress.id);
+            if (hasDress) {
+              return `الفستان "${dress.name}" محجوز لتجربة أخرى في نفس الوقت (${formatTime(timeStr)}).`;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const toggleTriedDress = (dressId) => {
+    if (selectedTriedDresses.includes(dressId)) {
+      setSelectedTriedDresses(selectedTriedDresses.filter((id) => id !== dressId));
+      setSelectedBookedDresses(selectedBookedDresses.filter((id) => id !== dressId));
+    } else {
+      setSelectedTriedDresses([...selectedTriedDresses, dressId]);
     }
   };
 
-  const toggleBookedDress = (dress) => {
-    if (selectedBookedDresses.includes(dress)) {
-      setSelectedBookedDresses(selectedBookedDresses.filter((d) => d !== dress));
+  const toggleBookedDress = (dressId) => {
+    if (selectedBookedDresses.includes(dressId)) {
+      setSelectedBookedDresses(selectedBookedDresses.filter((id) => id !== dressId));
     } else {
-      const check = checkDressAvailability(dress, newDate);
-      if (!check.available) {
-        setAlertConfig({
-          isOpen: true,
-          title: 'الفستان غير متاح للحجز!',
-          message: `الفستان مشغول بسبب فرح للعميلة "${check.conflictBride}".\nسيكون الفستان متاحاً مجدداً ابتداءً من تاريخ: ${check.nextAvailableDate}.`
-        });
-        return;
-      }
-      setSelectedBookedDresses([...selectedBookedDresses, dress]);
-      if (!selectedTriedDresses.includes(dress)) {
-        setSelectedTriedDresses([...selectedTriedDresses, dress]);
+      setSelectedBookedDresses([...selectedBookedDresses, dressId]);
+      if (!selectedTriedDresses.includes(dressId)) {
+        setSelectedTriedDresses([...selectedTriedDresses, dressId]);
       }
     }
   };
@@ -421,6 +501,14 @@ export default function VisitsPage() {
   useEffect(() => {
     setNewDate(selectedDateStr);
   }, [selectedDateStr]);
+
+  // Fetch fully booked slots when newDate changes
+  useEffect(() => {
+    if (!newDate) return;
+    apiClient.get(`/visits/fully-booked-slots?date=${newDate}`).then(res => {
+      setFullyBookedSlots(res.data?.full_slots || []);
+    }).catch(() => {});
+  }, [newDate]);
 
   // Calendar calculations
   const year = currentDate.getFullYear();
@@ -812,6 +900,26 @@ export default function VisitsPage() {
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">وقت الزيارة (اختياري)</label>
+                  <select
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                    <option value="">-- غير محدد --</option>
+                    {TIME_SLOTS.map((time) => {
+                      const isFull = fullyBookedSlots.includes(time);
+                      return (
+                        <option key={time} value={time} disabled={isFull}>
+                          {formatTime(time)} {isFull ? '(محجوز بالكامل - 4 زيارات)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">مصدر التسويق</label>
                   <select
                   value={newSource}
@@ -823,6 +931,20 @@ export default function VisitsPage() {
                   )}
                   </select>
                 </div>
+              </div>
+
+              {/* Sales Name */}
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-600">موظف المبيعات</label>
+                <select
+                value={salesName}
+                onChange={(e) => setSalesName(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                  <option value="">-- غير محدد --</option>
+                  {employees.map((emp) =>
+                    <option key={emp.id} value={emp.name}>{emp.name}</option>
+                  )}
+                </select>
               </div>
 
               {/* Status */}
@@ -843,16 +965,15 @@ export default function VisitsPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-slate-600 block">الفساتين التي قامت بقياسها (تجربة)</label>
                 <div className="flex flex-wrap gap-2 p-2 bg-slate-50 rounded-2xl border border-slate-100/50">
-                  {availableDresses.map((dress) => {
-                  const isSelected = selectedTriedDresses.includes(dress);
-                  const check = checkDressAvailability(dress, newDate);
-                  const detail = dressesData.find((d) => d.name === dress);
-                  const feeLabel = detail && detail.tryingFee ? ` (رسوم: ${detail.tryingFee})` : '';
+                  {dressesData.map((dress) => {
+                  const isSelected = selectedTriedDresses.includes(dress.id);
+                  const check = checkDressAvailability(dress.name, newDate);
+                  const feeLabel = dress.tryingFee ? ` (رسوم: ${dress.tryingFee})` : '';
                   return (
                     <button
                       type="button"
-                      key={dress}
-                      onClick={() => toggleTriedDress(dress)}
+                      key={dress.id}
+                      onClick={() => toggleTriedDress(dress.id)}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
                       isSelected ?
                       'bg-violet-600 border-violet-600 text-white shadow-sm' :
@@ -861,7 +982,7 @@ export default function VisitsPage() {
                       'bg-white border-slate-150 text-slate-600 hover:bg-slate-100'}`
                       }>
                       
-                        {dress}{feeLabel} {!check.available && '(مشغول/تجهيز)'}
+                        {dress.name}{feeLabel} {!check.available && '(مشغول/تجهيز)'}
                       </button>);
 
                 })}
@@ -872,16 +993,15 @@ export default function VisitsPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-slate-600 block">الفساتين المحجوزة فوراً (إن وُجدت)</label>
                 <div className="flex flex-wrap gap-2 p-2 bg-slate-50 rounded-2xl border border-slate-100/50">
-                  {availableDresses.map((dress) => {
-                  const isSelected = selectedBookedDresses.includes(dress);
-                  const check = checkDressAvailability(dress, newDate);
-                  const detail = dressesData.find((d) => d.name === dress);
-                  const feeLabel = detail && detail.tryingFee ? ` (رسوم: ${detail.tryingFee})` : '';
+                  {dressesData.map((dress) => {
+                  const isSelected = selectedBookedDresses.includes(dress.id);
+                  const check = checkDressAvailability(dress.name, newDate);
+                  const feeLabel = dress.tryingFee ? ` (رسوم: ${dress.tryingFee})` : '';
                   return (
                     <button
                       type="button"
-                      key={dress}
-                      onClick={() => toggleBookedDress(dress)}
+                      key={dress.id}
+                      onClick={() => toggleBookedDress(dress.id)}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
                       isSelected ?
                       'bg-indigo-600 border-indigo-600 text-white shadow-sm' :
@@ -890,7 +1010,7 @@ export default function VisitsPage() {
                       'bg-white border-slate-150 text-slate-600 hover:bg-slate-100'}`
                       }>
                       
-                        {dress}{feeLabel} {!check.available && '(مشغول/تجهيز)'}
+                        {dress.name}{feeLabel} {!check.available && '(مشغول/تجهيز)'}
                       </button>);
 
                 })}
@@ -977,6 +1097,24 @@ export default function VisitsPage() {
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">وقت الزيارة (اختياري)</label>
+                  <select
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none text-slate-700">
+                    <option value="">-- غير محدد --</option>
+                    {TIME_SLOTS.map((time) => {
+                      const isFull = fullyBookedSlots.includes(time) && newTime !== time;
+                      return (
+                        <option key={time} value={time} disabled={isFull}>
+                          {formatTime(time)} {isFull ? '(محجوز بالكامل - 4 زيارات)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">مصدر التسويق</label>
                   <select
                   value={newSource}
@@ -989,6 +1127,19 @@ export default function VisitsPage() {
                     <option value="إحالة">عميلة سابقة / إحالة</option>
                     <option value="موقع">الموقع الإلكتروني</option>
                     <option value="أخرى">أخرى / اتصال</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1 col-span-2">
+                  <label className="text-xs font-extrabold text-slate-600">موظف المبيعات</label>
+                  <select
+                  value={salesName}
+                  onChange={(e) => setSalesName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                    <option value="">-- غير محدد --</option>
+                    {employees.map((emp) =>
+                      <option key={emp.id} value={emp.name}>{emp.name}</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -1011,20 +1162,19 @@ export default function VisitsPage() {
               <div className="space-y-2">
                 <label className="text-xs font-extrabold text-slate-600 block">الفساتين التي تم قياسها / تجربتها</label>
                 <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto p-1 border border-slate-100 rounded-2xl bg-slate-50/50">
-                  {availableDresses.map((d) => {
-                  const isSelected = selectedTriedDresses.includes(d);
-                  const matchedDress = dressesData.find((item) => item.name === d);
-                  const feeText = matchedDress?.tryingFee ? ` (${matchedDress.tryingFee})` : '';
+                  {dressesData.map((d) => {
+                  const isSelected = selectedTriedDresses.includes(d.id);
+                  const feeText = d.tryingFee ? ` (${d.tryingFee})` : '';
 
                   return (
                     <button
                       type="button"
-                      key={d}
+                      key={d.id}
                       onClick={() => {
                         if (isSelected) {
-                          setSelectedTriedDresses(selectedTriedDresses.filter((item) => item !== d));
+                          setSelectedTriedDresses(selectedTriedDresses.filter((item) => item !== d.id));
                         } else {
-                          setSelectedTriedDresses([...selectedTriedDresses, d]);
+                          setSelectedTriedDresses([...selectedTriedDresses, d.id]);
                         }
                       }}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
@@ -1033,7 +1183,7 @@ export default function VisitsPage() {
                       'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`
                       }>
                       
-                        {d}{feeText}
+                        {d.name}{feeText}
                       </button>);
 
                 })}
@@ -1044,20 +1194,19 @@ export default function VisitsPage() {
               <div className="space-y-2">
                 <label className="text-xs font-extrabold text-slate-600 block">الفساتين التي تم الاستقرار على حجزها</label>
                 <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto p-1 border border-slate-100 rounded-2xl bg-slate-50/50">
-                  {availableDresses.map((d) => {
-                  const isSelected = selectedBookedDresses.includes(d);
-                  const matchedDress = dressesData.find((item) => item.name === d);
-                  const feeText = matchedDress?.tryingFee ? ` (${matchedDress.tryingFee})` : '';
+                  {dressesData.map((d) => {
+                  const isSelected = selectedBookedDresses.includes(d.id);
+                  const feeText = d.tryingFee ? ` (${d.tryingFee})` : '';
 
                   return (
                     <button
                       type="button"
-                      key={d}
+                      key={d.id}
                       onClick={() => {
                         if (isSelected) {
-                          setSelectedBookedDresses(selectedBookedDresses.filter((item) => item !== d));
+                          setSelectedBookedDresses(selectedBookedDresses.filter((item) => item !== d.id));
                         } else {
-                          setSelectedBookedDresses([...selectedBookedDresses, d]);
+                          setSelectedBookedDresses([...selectedBookedDresses, d.id]);
                         }
                       }}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
@@ -1066,7 +1215,7 @@ export default function VisitsPage() {
                       'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`
                       }>
                       
-                        {d}{feeText}
+                        {d.name}{feeText}
                       </button>);
 
                 })}

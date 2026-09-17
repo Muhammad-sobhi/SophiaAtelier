@@ -27,8 +27,21 @@ class Visit extends Model
         return $date->format('Y-m-d H:i');
     }
 
+    // removed appends
+
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
     }
+
+    public function triedDresses()
+    {
+        return $this->belongsToMany(Dress::class, 'visit_dresses')->wherePivot('type', 'tried');
+    }
+
+    public function bookedDresses()
+    {
+        return $this->belongsToMany(Dress::class, 'visit_dresses')->wherePivot('type', 'booked');
+    }
+
 }

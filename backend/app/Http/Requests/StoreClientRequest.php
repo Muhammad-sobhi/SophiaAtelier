@@ -32,6 +32,11 @@ class StoreClientRequest extends FormRequest
             'return_scheduled_on' => 'nullable|date',
             'visit_date' => 'nullable|date',
             'visit_time' => 'nullable|string|max:50',
+            'sales_name' => 'nullable|string|max:100',
+            'tried_dresses' => 'nullable|array',
+            'tried_dresses.*' => 'exists:dresses,id',
+            'booked_dresses' => 'nullable|array',
+            'booked_dresses.*' => 'exists:dresses,id',
         ];
     }
 }

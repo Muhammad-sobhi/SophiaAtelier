@@ -17,7 +17,7 @@ class StoreEmployeeRequest extends FormRequest
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email',
-            'position' => 'nullable|string|max:255',
+            'role' => 'nullable|string|max:255',
             'salary' => 'nullable|numeric|min:0',
             'pay_cycle' => 'nullable|in:monthly,weekly,custom',
             'pay_cycle_days' => 'nullable|integer|min:1|max:365',

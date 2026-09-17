@@ -138,9 +138,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
     Route::get('/finance/summary', [FinanceController::class, 'summary']);
 
-    // Employee read routes (staff & admin)
-    Route::get('/employees', [EmployeeController::class, 'index']);
-    Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
+    // Employee routes (staff & admin)
+    Route::apiResource('employees', EmployeeController::class);
 
     // Attendance (read & save for staff & admin)
     Route::get('/attendance', [AttendanceController::class, 'index']);

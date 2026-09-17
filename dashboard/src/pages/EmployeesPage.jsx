@@ -208,6 +208,7 @@ export default function EmployeesPage() {
           id: res.data?.id || Date.now(),
           name,
           role: role || 'موظف',
+          position: role || 'موظف',
           phone,
           salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
           payCycle,

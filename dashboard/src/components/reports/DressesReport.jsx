@@ -218,6 +218,7 @@ export function DressesReport() {
                 <th className="py-3 px-3">الفستان</th>
                 <th className="py-3 px-3">الكود</th>
                 <th className="py-3 px-3 text-center">مرات الحجز</th>
+                <th className="py-3 px-3 text-center">مرات القياس</th>
                 <th className="py-3 px-3 text-center">سعر الإيجار</th>
                 <th className="py-3 px-3 text-center">الحالة</th>
                 <th className="py-3 px-3 text-left">إجمالي الإيراد المحقق</th>
@@ -226,7 +227,7 @@ export function DressesReport() {
             <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
               {paginatedList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-bold text-xs">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-bold text-xs">
                     لا توجد فساتين مسجلة
                   </td>
                 </tr>
@@ -248,6 +249,9 @@ export function DressesReport() {
                     <td className="py-2.5 px-3 font-mono font-black text-rose-600">{dress.code}</td>
                     <td className="py-2.5 px-3 text-center font-mono font-black text-indigo-700">
                       {dress.timesBooked}
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-mono font-black text-slate-600">
+                      {dress.visits_as_tried_count || 0}
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono">
                       {parseFloat(dress.rental_price || 0).toLocaleString()} ج.م
@@ -316,11 +320,15 @@ export function DressesReport() {
                   </span>
                 </div>
 
-                {/* Stats 3-Column Grid */}
-                <div className="grid grid-cols-3 gap-1.5 text-center">
+                {/* Stats 4-Column Grid */}
+                <div className="grid grid-cols-4 gap-1.5 text-center">
                   <div className="bg-white border border-slate-150 rounded-xl py-1 px-1">
                     <span className="text-[9px] text-slate-400 block font-bold">مرات الحجز</span>
                     <span className="font-mono font-black text-indigo-700 text-xs">{dress.timesBooked}</span>
+                  </div>
+                  <div className="bg-white border border-slate-150 rounded-xl py-1 px-1">
+                    <span className="text-[9px] text-slate-400 block font-bold">مرات القياس</span>
+                    <span className="font-mono font-black text-slate-600 text-xs">{dress.visits_as_tried_count || 0}</span>
                   </div>
                   <div className="bg-white border border-slate-150 rounded-xl py-1 px-1">
                     <span className="text-[9px] text-slate-400 block font-bold">سعر الإيجار</span>

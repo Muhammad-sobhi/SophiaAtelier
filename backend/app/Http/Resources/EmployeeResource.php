@@ -16,7 +16,7 @@ class EmployeeResource extends JsonResource
             'name' => $this->name,
             'phone' => $this->phone,
             'email' => $this->email,
-            'position' => $this->position,
+            'role' => $this->role,
             'hire_date' => $this->hire_date,
             'attendance_count' => $this->whenCounted('attendance'),
             'created_at' => $this->created_at,

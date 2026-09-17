@@ -230,6 +230,8 @@ export default function FinancePage() {
   const [newPaymentMethod, setNewPaymentMethod] = useState('cash');
   const [revenueSplitPayments, setRevenueSplitPayments] = useState([{ amount: '', payment_method: 'cash' }]);
   const [newReceiptImage, setNewReceiptImage] = useState(null);
+  const [editingTxId, setEditingTxId] = useState(null);
+  const [editingTxOriginalType, setEditingTxOriginalType] = useState(null);
 
   // Cleaning Orders State
   const [cleaningOrders, setCleaningOrders] = useState([]);
@@ -293,7 +295,10 @@ export default function FinancePage() {
           isRevenue: true,
           paymentMethod: (r.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
           clientName: r.booking?.client?.name,
-          receiptImage: r.receipt_url
+          receiptImage: r.receipt_url,
+          rawDate: r.payment_date ? r.payment_date.split('T')[0] : '',
+          backendCategory: r.type,
+          payments: r.payments || []
         };
       });
 
@@ -320,7 +325,9 @@ export default function FinancePage() {
           date: formatDateStr(e.date || ''),
           isRevenue: false,
           paymentMethod: (e.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
-          receiptImage: e.receipt_url
+          receiptImage: e.receipt_url,
+          rawDate: e.date ? e.date.split('T')[0] : '',
+          backendCategory: e.category
         };
       });
 
@@ -359,6 +366,54 @@ export default function FinancePage() {
     if (showCleaningSection) loadCleaningOrders();
   }, [showCleaningSection, loadCleaningOrders]);
 
+  const handleOpenEditModal = (tx) => {
+    setIsModalOpen(true);
+    setEditingTxId(tx.id.replace(/^(revenue-|expense-)/, ''));
+    setEditingTxOriginalType(tx.isRevenue ? 'revenue' : 'expense');
+    
+    setNewDesc(tx.desc || '');
+    setNewType(tx.isRevenue ? 'إيراد' : 'مصروف');
+    
+    let frontendCat = 'other';
+    if (tx.isRevenue) {
+       if (tx.backendCategory === 'deposit') frontendCat = 'shop';
+    } else {
+       if (tx.backendCategory === 'purchase') frontendCat = 'operational';
+       else if (tx.backendCategory === 'maintenance') frontendCat = 'utilities';
+       else frontendCat = tx.backendCategory || 'other';
+    }
+    setNewCategory(frontendCat);
+    
+    setNewAmount(String(Math.abs(tx.rawAmount)));
+    setNewDate(tx.rawDate || new Date().toISOString().split('T')[0]);
+    setNewPaymentMethod(tx.paymentMethod || 'cash');
+    setNewReceiptImage(tx.receiptImage || null);
+    
+    const mappedPayments = tx.payments && tx.payments.length > 0 
+      ? tx.payments.map(p => ({ amount: String(p.amount), payment_method: p.payment_method }))
+      : [{ amount: String(Math.abs(tx.rawAmount)), payment_method: tx.paymentMethod || 'cash' }];
+    
+    setRevenueSplitPayments(mappedPayments);
+    setSelectedTx(null);
+  };
+
+  const handleDeleteTransaction = async (tx) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المعاملة؟')) return;
+    try {
+      const realId = tx.id.replace(/^(revenue-|expense-)/, '');
+      if (tx.isRevenue) {
+        await apiClient.delete(`/revenues/${realId}`);
+      } else {
+        await apiClient.delete(`/expenses/${realId}`);
+      }
+      setSelectedTx(null);
+      loadData();
+    } catch (e) {
+      console.error('Failed to delete transaction:', e);
+      alert('فشل حذف المعاملة');
+    }
+  };
+
   const handleAddTransactionSubmit = async (e) => {
     e.preventDefault();
     if (!newDesc.trim() || !newAmount.trim()) return;
@@ -372,8 +427,8 @@ export default function FinancePage() {
         const totalRev = validPayments.length > 0
           ? validPayments.reduce((s, p) => s + parseFloat(p.amount), 0)
           : amountVal;
-
-        await apiClient.post('/revenues', {
+        
+        const payload = {
           type: newCategory === 'shop' ? 'deposit' : 'other',
           amount: totalRev,
           payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : newPaymentMethod),
@@ -381,24 +436,38 @@ export default function FinancePage() {
           payment_date: newDate,
           notes: newDesc,
           receipt_image: newReceiptImage
-        });
+        };
+
+        if (editingTxId && editingTxOriginalType === 'revenue') {
+          await apiClient.put(`/revenues/${editingTxId}`, payload);
+        } else {
+          await apiClient.post('/revenues', payload);
+        }
       } else {
         let backendCat = 'other';
         if (newCategory === 'operational') backendCat = 'purchase';else
         if (newCategory === 'utilities') backendCat = 'maintenance';
 
-        await apiClient.post('/expenses', {
+        const payload = {
           category: backendCat,
           amount: amountVal,
           description: newDesc,
           date: newDate,
           payment_method: newPaymentMethod,
           receipt_image: newReceiptImage
-        });
+        };
+
+        if (editingTxId && editingTxOriginalType === 'expense') {
+          await apiClient.put(`/expenses/${editingTxId}`, payload);
+        } else {
+          await apiClient.post('/expenses', payload);
+        }
       }
 
       loadData();
       setIsModalOpen(false);
+      setEditingTxId(null);
+      setEditingTxOriginalType(null);
 
       setNewDesc('');
       setNewType('مصروف');
@@ -597,7 +666,19 @@ export default function FinancePage() {
             <span>تصدير Excel</span>
           </button>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setIsModalOpen(true);
+              setEditingTxId(null);
+              setEditingTxOriginalType(null);
+              setNewDesc('');
+              setNewType('مصروف');
+              setNewCategory('other');
+              setNewAmount('');
+              setRevenueSplitPayments([{ amount: '', payment_method: 'cash' }]);
+              setNewDate(new Date().toISOString().split('T')[0]);
+              setNewPaymentMethod('cash');
+              setNewReceiptImage(null);
+            }}
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-md shadow-indigo-600/10 active:scale-95 cursor-pointer w-full sm:w-auto"
           >
             <Plus size={16} />
@@ -1201,7 +1282,21 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+            <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleOpenEditModal(selectedTx)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  تعديل
+                </button>
+                <button
+                  onClick={() => handleDeleteTransaction(selectedTx)}
+                  className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  حذف
+                </button>
+              </div>
               <button
               onClick={() => setSelectedTx(null)}
               className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer">
@@ -1218,9 +1313,15 @@ export default function FinancePage() {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in text-slate-700">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-sm font-extrabold text-slate-800">إضافة معاملة مالية جديدة</h3>
+              <h3 className="text-sm font-extrabold text-slate-800">
+                {editingTxId ? 'تعديل المعاملة المالية' : 'إضافة معاملة مالية جديدة'}
+              </h3>
               <button
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingTxId(null);
+                setEditingTxOriginalType(null);
+              }}
               className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
               
                 <X size={16} />

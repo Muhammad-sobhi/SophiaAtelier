@@ -78,4 +78,11 @@ class Dress extends Model
     {
         return $this->hasMany(Booking::class, 'dress_3_id');
     }
+
+    public function visitsAsTried()
+    {
+        return $this->belongsToMany(Visit::class, 'visit_dresses')
+                    ->wherePivot('type', 'tried')
+                    ->withPivot('type');
+    }
 }

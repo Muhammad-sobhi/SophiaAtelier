@@ -19,6 +19,8 @@ class ClientController extends Controller
             'visits' => function ($q) {
                 $q->latest();
             },
+            'visits.triedDresses',
+            'visits.bookedDresses',
             'bookings' => function ($q) {
                 $q->latest();
             },
@@ -156,7 +158,7 @@ class ClientController extends Controller
         $rawEmail = $request->input('email');
 
         if ($clientId) {
-            $client = Client::with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->find($clientId);
+            $client = Client::with(['visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->find($clientId);
             if ($client) {
                 return response()->json($client);
             }
@@ -209,7 +211,7 @@ class ClientController extends Controller
             $query->where('email', $cleanEmail);
         }
 
-        $client = $query->with(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->first();
+        $client = $query->with(['visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->first();
 
         if (!$client) {
             return response()->json([
@@ -225,6 +227,8 @@ class ClientController extends Controller
         $client->loadMissing([
             'visits' => function ($q) {
                 $q->latest(); },
+            'visits.triedDresses',
+            'visits.bookedDresses',
             'bookings' => function ($q) {
                 $q->latest(); },
             'bookings.dress.accessories',
@@ -253,6 +257,22 @@ class ClientController extends Controller
             $validated['city'] = $validated['address'];
         }
 
+        // Check visit time slot limit before creating anything
+        $normalizedTimeSlot = null;
+        if (!empty($validated['visit_time']) && !empty($validated['visit_date'])) {
+            $normalizedTimeSlot = \App\Http\Controllers\Api\VisitController::normalizeTimeSlot($validated['visit_time']);
+            
+            $existingCount = \App\Models\Visit::whereDate('visit_date', $validated['visit_date'])
+                ->where('time_slot', $normalizedTimeSlot)
+                ->count();
+                
+            if ($existingCount >= 4) {
+                return response()->json([
+                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
+                ], 422);
+            }
+        }
+
         $client = Client::create($validated);
 
         // Auto-calculate scheduled dates if wedding_date is present and dates were not passed
@@ -266,7 +286,7 @@ class ClientController extends Controller
             }
         }
 
-        if (!empty($validated['dress_id']) || !empty($validated['dress_2_id']) || !empty($validated['dress_3_id']) || !empty($validated['pickup_scheduled_on']) || !empty($validated['return_scheduled_on']) || !empty($validated['wedding_date'])) {
+        if (!empty($validated['dress_id'])) {
             $client->bookings()->create([
                 'dress_id' => $validated['dress_id'] ?? null,
                 'dress_2_id' => $validated['dress_2_id'] ?? null,
@@ -282,13 +302,21 @@ class ClientController extends Controller
         }
 
         if (!empty($validated['visit_date'])) {
-            $client->visits()->create([
+            $visit = $client->visits()->create([
                 'visit_date' => $validated['visit_date'],
-                'time_slot' => $validated['visit_time'] ?? null,
+                'time_slot' => $normalizedTimeSlot,
                 'status' => 'pending',
                 'source' => $client->source ?: 'website',
+                'sales_name' => $validated['sales_name'] ?? null,
                 'notes' => 'موعد زيارة مبدئي',
             ]);
+
+            if (isset($validated['tried_dresses'])) {
+                $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'], ['type' => 'tried']);
+            }
+            if (isset($validated['booked_dresses'])) {
+                $visit->bookedDresses()->syncWithPivotValues($validated['booked_dresses'], ['type' => 'booked']);
+            }
         }
 
         return response()->json($client, 201);
@@ -308,6 +336,26 @@ class ClientController extends Controller
 
         if (array_key_exists('address', $validated) && empty($validated['city'])) {
             $validated['city'] = $validated['address'];
+        }
+
+        // Check visit time slot limit before updating anything
+        $normalizedTimeSlot = null;
+        if (!empty($validated['visit_date']) && !empty($validated['visit_time'])) {
+            $normalizedTimeSlot = \App\Http\Controllers\Api\VisitController::normalizeTimeSlot($validated['visit_time']);
+            
+            $visitQuery = \App\Models\Visit::whereDate('visit_date', $validated['visit_date'])
+                ->where('time_slot', $normalizedTimeSlot);
+            
+            $existingVisit = $client->visits()->whereDate('visit_date', $validated['visit_date'])->first();
+            if ($existingVisit) {
+                $visitQuery->where('id', '!=', $existingVisit->id);
+            }
+            
+            if ($visitQuery->count() >= 4) {
+                return response()->json([
+                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
+                ], 422);
+            }
         }
 
         $client->update($validated);
@@ -331,7 +379,7 @@ class ClientController extends Controller
                 if (!empty($bookingUpdates)) {
                     $booking->update($bookingUpdates);
                 }
-            } elseif (!empty($validated['dress_id']) || !empty($validated['dress_2_id']) || !empty($validated['dress_3_id']) || !empty($validated['pickup_scheduled_on']) || !empty($validated['return_scheduled_on']) || !empty($validated['wedding_date'])) {
+            } elseif (!empty($validated['dress_id'])) {
                 $client->bookings()->create([
                     'dress_id' => $validated['dress_id'] ?? null,
                     'dress_2_id' => $validated['dress_2_id'] ?? null,
@@ -344,6 +392,32 @@ class ClientController extends Controller
                     'total_amount' => 0,
                     'notes' => 'تم تحديد الفساتين ومواعيد الاستلام والإرجاع عند تعديل بيانات العروس',
                 ]);
+            }
+        }
+
+        if (!empty($validated['visit_date'])) {
+            $visit = $client->visits()->whereDate('visit_date', $validated['visit_date'])->first();
+            if (!$visit) {
+                $visit = $client->visits()->create([
+                    'visit_date' => $validated['visit_date'],
+                    'status' => 'pending',
+                    'source' => $client->source ?: 'website',
+                    'notes' => 'تمت الإضافة من تعديل العروس',
+                ]);
+            }
+            
+            $visitUpdates = [];
+            if (array_key_exists('visit_time', $validated)) $visitUpdates['time_slot'] = $normalizedTimeSlot;
+            if (array_key_exists('sales_name', $validated)) $visitUpdates['sales_name'] = $validated['sales_name'];
+            if (!empty($visitUpdates)) {
+                $visit->update($visitUpdates);
+            }
+            
+            if (array_key_exists('tried_dresses', $validated)) {
+                $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'] ?? [], ['type' => 'tried']);
+            }
+            if (array_key_exists('booked_dresses', $validated)) {
+                $visit->bookedDresses()->syncWithPivotValues($validated['booked_dresses'] ?? [], ['type' => 'booked']);
             }
         }
 

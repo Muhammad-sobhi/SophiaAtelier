@@ -87,7 +87,7 @@ class ReportController extends Controller
     public function topDresses(): JsonResponse
     {
         $dresses = Dress::with('category')
-            ->withCount('bookings')
+            ->withCount(['bookings', 'visitsAsTried'])
             ->orderByDesc('bookings_count')
             ->take(10)
             ->get();
@@ -98,7 +98,7 @@ class ReportController extends Controller
     public function worstDresses(): JsonResponse
     {
         $dresses = Dress::with('category')
-            ->withCount('bookings')
+            ->withCount(['bookings', 'visitsAsTried'])
             ->orderBy('bookings_count', 'asc')
             ->take(10)
             ->get();

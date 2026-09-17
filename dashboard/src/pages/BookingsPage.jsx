@@ -108,6 +108,7 @@ export default function BookingsPage() {
   const [mergedBookings, setMergedBookings] = useState([]);
   const [dressesObjects, setDressesObjects] = useState([]);
   const [clientsObjects, setClientsObjects] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [editingBooking, setEditingBooking] = useState(null);
@@ -122,12 +123,13 @@ export default function BookingsPage() {
 
   // Add Booking Form state
   const [newClient, setNewClient] = useState('');
-  const [newDress, setNewDress] = useState('فستان الأميرة كلاسيك');
+  const [newDresses, setNewDresses] = useState([]);
   const [newWeddingDate, setNewWeddingDate] = useState('2026-09-15');
-  const [newAmount, setNewAmount] = useState('12,000 ج.م');
+  const [newAmount, setNewAmount] = useState('0 ج.م');
   const [newStatus, setNewStatus] = useState('في الانتظار');
   const [newCity, setNewCity] = useState('القاهرة');
   const [newPaymentMethod, setNewPaymentMethod] = useState('cash');
+  const [newSalesName, setNewSalesName] = useState('');
   const [newReceiptImage, setNewReceiptImage] = useState(null);
 
   // Selected Booking Details Pop-up state
@@ -137,8 +139,8 @@ export default function BookingsPage() {
   const [alertConfig, setAlertConfig] = useState(null);
 
   // Local check helper
-  const checkLocalAvailabilityConflict = (dressName, dateStr, cityStr, excludeId) => {
-    if (!dressName || !dateStr) return null;
+  const checkLocalAvailabilityConflict = (dressNames, dateStr, cityStr, excludeId) => {
+    if (!dressNames || dressNames.length === 0 || !dateStr) return null;
 
     const proposedWedding = new Date(dateStr);
     if (isNaN(proposedWedding.getTime())) return null;
@@ -155,37 +157,41 @@ export default function BookingsPage() {
     proposedEnd.setDate(proposedWedding.getDate() + daysAfter);
     proposedEnd.setHours(23, 59, 59, 999);
 
-    const existing = mergedBookings.filter((b) =>
-    b.dress === dressName &&
-    b.status !== 'ملغي' && (
-    excludeId === undefined || b.id !== excludeId)
-    );
+    for (const dName of dressNames) {
+      const existing = mergedBookings.filter((b) => {
+        if (b.status === 'ملغي') return false;
+        if (excludeId !== undefined && b.id === excludeId) return false;
+        
+        const bDresses = b.dressNames || [];
+        return bDresses.includes(dName);
+      });
 
-    for (const eb of existing) {
-      if (!eb.weddingDate) continue;
-      const exWedding = new Date(eb.weddingDate);
-      if (isNaN(exWedding.getTime())) continue;
+      for (const eb of existing) {
+        if (!eb.weddingDate) continue;
+        const exWedding = new Date(eb.weddingDate);
+        if (isNaN(exWedding.getTime())) continue;
 
-      const exCity = eb.city || 'القاهرة';
-      const exIsCairo = exCity === 'القاهرة' || exCity === 'cairo';
-      const exDaysBefore = exIsCairo ? 1 : 2;
-      const exDaysAfter = 1;
+        const exCity = eb.city || 'القاهرة';
+        const exIsCairo = exCity === 'القاهرة' || exCity === 'cairo';
+        const exDaysBefore = exIsCairo ? 1 : 2;
+        const exDaysAfter = 1;
 
-      const exStart = new Date(exWedding);
-      exStart.setDate(exWedding.getDate() - exDaysBefore);
-      exStart.setHours(0, 0, 0, 0);
+        const exStart = new Date(exWedding);
+        exStart.setDate(exWedding.getDate() - exDaysBefore);
+        exStart.setHours(0, 0, 0, 0);
 
-      const exEnd = new Date(exWedding);
-      exEnd.setDate(exWedding.getDate() + exDaysAfter);
-      exEnd.setHours(23, 59, 59, 999);
+        const exEnd = new Date(exWedding);
+        exEnd.setDate(exWedding.getDate() + exDaysAfter);
+        exEnd.setHours(23, 59, 59, 999);
 
-      if (proposedStart <= exEnd && proposedEnd >= exStart) {
-        const nextAvail = new Date(exEnd);
-        nextAvail.setDate(exEnd.getDate() + 1);
-        const yyyy = nextAvail.getFullYear();
-        const mm = String(nextAvail.getMonth() + 1).padStart(2, '0');
-        const dd = String(nextAvail.getDate()).padStart(2, '0');
-        return `${dd}-${mm}-${yyyy}`;
+        if (proposedStart <= exEnd && proposedEnd >= exStart) {
+          const nextAvail = new Date(exEnd);
+          nextAvail.setDate(exEnd.getDate() + 1);
+          const yyyy = nextAvail.getFullYear();
+          const mm = String(nextAvail.getMonth() + 1).padStart(2, '0');
+          const dd = String(nextAvail.getDate()).padStart(2, '0');
+          return `الفستان "${dName}" غير متاح، سيكون متاحاً مجدداً بتاريخ: ${yyyy}-${mm}-${dd}`;
+        }
       }
     }
 
@@ -203,13 +209,15 @@ export default function BookingsPage() {
         return {
           id: b.id,
           client: b.client?.name || '-',
-          dress: b.dress?.name || '-',
+          dress: [b.dress?.name, b.dress2?.name, b.dress3?.name].filter(Boolean).join('، ') || '-',
+          dressNames: [b.dress?.name, b.dress2?.name, b.dress3?.name].filter(Boolean),
           weddingDate: b.event_date || '',
           pickupDate: pDate,
           returnDate: rDate,
           amount: `${parseFloat(b.total_amount || 0).toLocaleString()} ج.م`,
           status: b.status === 'confirmed' ? 'مؤكد' : b.status === 'cancelled' ? 'ملغي' : 'في الانتظار',
           city: b.client?.city || 'القاهرة',
+          salesName: b.sales_name || '',
           paymentMethod: 'cash',
           receiptImage: null
         };
@@ -238,6 +246,10 @@ export default function BookingsPage() {
       setClientsObjects(data);
     }).catch(() => {});
 
+    apiClient.get('/employees').then((res) => {
+      setEmployees(res.data || []);
+    }).catch(() => {});
+
     // Load dresses catalog from API
     apiClient.get('/dresses?per_page=all').then((res) => {
       const data = Array.isArray(res) ? res : (res.data?.data || res.data || []);
@@ -249,20 +261,29 @@ export default function BookingsPage() {
   // Check availability dynamically on field changes
   useEffect(() => {
     if (!isModalOpen && !editingBooking) return;
-    const conflict = checkLocalAvailabilityConflict(newDress, newWeddingDate, newCity, editingBooking?.id);
+    const conflict = checkLocalAvailabilityConflict(newDresses, newWeddingDate, newCity, editingBooking?.id);
     if (conflict) {
       setAlertConfig({
         isOpen: true,
         title: 'تنبيه بعدم توفر الفستان',
-        message: `هذا الفستان غير متاح في التاريخ المحدد نظراً لحجزه لعروس أخرى وفترة الشحن والتجهيز اللازمة لمدينتها.\n\nسيكون متاحاً مجدداً بتاريخ: ${conflict}`
+        message: `${conflict}\n\nنظراً لحجزه لعروس أخرى وفترة الشحن والتجهيز اللازمة لمدينتها.`
       });
     }
-  }, [newDress, newWeddingDate, newCity]);
+  }, [newDresses, newWeddingDate, newCity]);
 
   // Update dress price automatically in add form when dress changes
   useEffect(() => {
-    setNewAmount(DRESS_PRICES[newDress] || '10,000 ج.م');
-  }, [newDress]);
+    let total = 0;
+    newDresses.forEach(d => {
+      const priceStr = DRESS_PRICES[d];
+      if (priceStr) {
+        total += parseFloat(priceStr.replace(/[^\d.]/g, '')) || 0;
+      } else {
+        total += 10000;
+      }
+    });
+    setNewAmount(`${total.toLocaleString()} ج.م`);
+  }, [newDresses]);
 
   const saveBookings = (updatedManual) => {
     setManualBookings(updatedManual);
@@ -310,30 +331,35 @@ export default function BookingsPage() {
   const handleEditBookingClick = (b) => {
     setEditingBooking(b);
     setNewClient(b.client);
-    setNewDress(b.dress);
+    setNewDresses(b.dressNames || []);
     setNewWeddingDate(b.weddingDate);
     setNewAmount(b.amount);
     setNewStatus(b.status);
     setNewCity(b.city || 'القاهرة');
     setNewPaymentMethod(b.paymentMethod || 'cash');
+    setNewSalesName(b.salesName || '');
   };
 
   const handleEditBookingSubmit = async (e) => {
     e.preventDefault();
     if (!editingBooking) return;
 
-    const conflict = checkLocalAvailabilityConflict(newDress, newWeddingDate, newCity, editingBooking.id);
+    if (newDresses.length === 0) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: 'يجب اختيار فستان واحد على الأقل' });
+      return;
+    }
+
+    const conflict = checkLocalAvailabilityConflict(newDresses, newWeddingDate, newCity, editingBooking.id);
     if (conflict) {
       setAlertConfig({
         isOpen: true,
         title: 'تنبيه تعارض الحجز',
-        message: `الفستان غير متاح في هذا التاريخ. سيكون متاحاً مجدداً بتاريخ ${conflict}.`
+        message: conflict
       });
       return;
     }
 
-    const dressObj = dressesObjects.find((d) => d.name === newDress);
-    const dressId = dressObj?.id || 1;
+    const dressIds = newDresses.map(name => dressesObjects.find((d) => d.name === name)?.id).filter(Boolean);
 
     const clientObj = clientsObjects.find((c) => c.name === newClient);
     const clientId = clientObj?.id || 1;
@@ -344,23 +370,26 @@ export default function BookingsPage() {
     try {
       await apiClient.put(`/bookings/${editingBooking.id}`, {
         client_id: clientId,
-        dress_id: dressId,
+        dress_ids: dressIds,
         booking_date: new Date().toISOString().split('T')[0],
         event_date: newWeddingDate,
         status: mappedStatus,
         total_amount: amountNum,
-        payment_method: newPaymentMethod
+        payment_method: newPaymentMethod,
+        sales_name: newSalesName
       });
 
       fetchBookings();
       setEditingBooking(null);
 
       setNewClient('');
+      setNewDresses([]);
       setNewWeddingDate('2026-09-15');
       setNewAmount('12,000 ج.م');
       setNewStatus('في الانتظار');
       setNewCity('القاهرة');
       setNewPaymentMethod('cash');
+      setNewSalesName('');
     } catch (err) {
       console.error('Failed to update booking:', err);
       setAlertConfig({
@@ -375,12 +404,17 @@ export default function BookingsPage() {
     e.preventDefault();
     if (!newClient.trim()) return;
 
-    const conflict = checkLocalAvailabilityConflict(newDress, newWeddingDate, newCity);
+    if (newDresses.length === 0) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: 'يجب اختيار فستان واحد على الأقل' });
+      return;
+    }
+
+    const conflict = checkLocalAvailabilityConflict(newDresses, newWeddingDate, newCity);
     if (conflict) {
       setAlertConfig({
         isOpen: true,
         title: 'تنبيه تعارض الحجز',
-        message: `الفستان غير متاح في هذا التاريخ. سيكون متاحاً مجدداً بتاريخ ${conflict}.`
+        message: conflict
       });
       return;
     }
@@ -403,8 +437,7 @@ export default function BookingsPage() {
       }
     }
 
-    const dressObj = dressesObjects.find((d) => d.name === newDress);
-    const dressId = dressObj?.id || 1;
+    const dressIds = newDresses.map(name => dressesObjects.find((d) => d.name === name)?.id).filter(Boolean);
 
     const amountNum = parseFloat(newAmount.replace(/[^\d.]/g, '')) || 0;
     const mappedStatus = newStatus === 'مؤكد' ? 'confirmed' : newStatus === 'ملغي' ? 'cancelled' : 'pending';
@@ -412,19 +445,20 @@ export default function BookingsPage() {
     try {
       await apiClient.post('/bookings', {
         client_id: clientId,
-        dress_id: dressId,
+        dress_ids: dressIds,
         booking_date: new Date().toISOString().split('T')[0],
         event_date: newWeddingDate,
         status: mappedStatus,
         total_amount: amountNum,
-        payment_method: newPaymentMethod
+        payment_method: newPaymentMethod,
+        sales_name: newSalesName
       });
 
       fetchBookings();
 
       apiClient.post('/tasks', {
         title: `تجهيز فاتورة وتفاصيل سداد ${newClient}`,
-        description: `تجهيز العقد وإيصال سداد الدفعة وحفظ التفاصيل المالية للطلب للعروس ${newClient} لحجز ${newDress}.`,
+        description: `تجهيز العقد وإيصال سداد الدفعة وحفظ التفاصيل المالية للطلب للعروس ${newClient} لحجز ${newDresses.join('، ')}.`,
         status: 'pending',
         priority: 'high'
       }).catch(() => {});
@@ -432,11 +466,12 @@ export default function BookingsPage() {
       setIsModalOpen(false);
 
       setNewClient('');
-      setNewDress('فستان الأميرة كلاسيك');
+      setNewDresses([]);
       setNewWeddingDate('2026-09-15');
       setNewStatus('في الانتظار');
       setNewCity('القاهرة');
       setNewPaymentMethod('cash');
+      setNewSalesName('');
       setNewReceiptImage(null);
     } catch (err) {
       console.error('Failed to create booking:', err);
@@ -456,6 +491,18 @@ export default function BookingsPage() {
         setNewReceiptImage(reader.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const toggleDressSelection = (dressName) => {
+    if (newDresses.includes(dressName)) {
+      setNewDresses(newDresses.filter(d => d !== dressName));
+    } else {
+      if (newDresses.length >= 3) {
+        setAlertConfig({ isOpen: true, title: 'الحد الأقصى', message: 'لا يمكن اختيار أكثر من 3 فساتين للحجز الواحد' });
+        return;
+      }
+      setNewDresses([...newDresses, dressName]);
     }
   };
 
@@ -894,17 +941,22 @@ export default function BookingsPage() {
               </div>
 
               {/* Dress Selection */}
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">الفستان المطلوب حجزوه</label>
-                <select
-                value={newDress}
-                onChange={(e) => setNewDress(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
-                
-                  {availableDresses.map((dress) =>
-                <option key={dress} value={dress}>{dress}</option>
-                )}
-                </select>
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-600">الفساتين المطلوبة حجزها (الحد الأقصى 3)</label>
+                <div className="flex flex-wrap gap-2">
+                  {availableDresses.map((dress) => {
+                    const isSelected = newDresses.includes(dress);
+                    return (
+                      <button
+                        key={dress}
+                        type="button"
+                        onClick={() => toggleDressSelection(dress)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
+                        {dress}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Wedding Date */}
@@ -919,8 +971,8 @@ export default function BookingsPage() {
               
               </div>
 
-              {/* Amount, Status & City */}
-              <div className="grid grid-cols-3 gap-4">
+              {/* Amount, Status, City & Sales Name */}
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">القيمة الإجمالية</label>
                   <input
@@ -1075,17 +1127,22 @@ export default function BookingsPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">الفستان المطلوب</label>
-                  <select
-                  value={newDress}
-                  onChange={(e) => setNewDress(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
-                  
-                    {availableDresses.map((d) =>
-                  <option key={d} value={d}>{d}</option>
-                  )}
-                  </select>
+                <div className="space-y-2 col-span-2">
+                  <label className="text-xs font-extrabold text-slate-600">الفساتين المطلوبة حجزها</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableDresses.map((d) => {
+                      const isSelected = newDresses.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => toggleDressSelection(d)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1117,16 +1174,14 @@ export default function BookingsPage() {
                   <label className="text-xs font-extrabold text-slate-600">القيمة الإجمالية للإيجار</label>
                   <input
                   type="text"
-                  required
-                  placeholder="مثال: 5,000 ج.م"
+                  disabled
                   value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  className="w-full px-4 py-2.5 bg-slate-100 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-500 cursor-not-allowed" />
                 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">طريقة الدفع</label>
                   <select
@@ -1152,6 +1207,19 @@ export default function BookingsPage() {
                     <option value="مؤكد">مؤكد</option>
                     <option value="مكتمل">مكتمل</option>
                     <option value="ملغي">ملغي</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-slate-600">موظف المبيعات</label>
+                  <select
+                  value={newSalesName}
+                  onChange={(e) => setNewSalesName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
+                    <option value="">-- غير محدد --</option>
+                    {employees.map((emp) =>
+                      <option key={emp.id} value={emp.name}>{emp.name}</option>
+                    )}
                   </select>
                 </div>
               </div>

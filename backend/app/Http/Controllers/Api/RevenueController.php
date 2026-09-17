@@ -111,6 +111,8 @@ class RevenueController extends Controller
         $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
         if ($receiptPath) {
             $validated['receipt_path'] = $receiptPath;
+        } elseif (array_key_exists('receipt_image', $validated) && empty($validated['receipt_image'])) {
+            $validated['receipt_path'] = null;
         }
 
         $revenue->update($validated);
