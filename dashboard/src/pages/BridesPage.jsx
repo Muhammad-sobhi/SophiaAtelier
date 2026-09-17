@@ -124,8 +124,10 @@ export default function BridesPage() {
   useEffect(() => {
     apiClient.get('/dresses?per_page=1000&with_bookings=1')
       .then((res) => {
-        const list = res.data || res || [];
-        setDressesList(Array.isArray(list) ? list : []);
+        let list = res.data?.data || res.data || res || [];
+        if (!Array.isArray(list)) list = [];
+        list.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+        setDressesList(list);
       })
       .catch(() => {});
   }, []);

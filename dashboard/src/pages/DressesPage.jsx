@@ -138,7 +138,8 @@ export default function DressesPage() {
       const response = await apiClient.get('/dresses', { params });
 
       if (Array.isArray(response)) {
-        setDressesList(response);
+        const sortedList = [...response].sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+        setDressesList(sortedList);
         setPaginationMeta({
           total: response.length,
           lastPage: 1,
@@ -146,7 +147,8 @@ export default function DressesPage() {
           to: response.length,
         });
       } else if (response && response.data) {
-        setDressesList(response.data);
+        const sortedList = [...response.data.data].sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+        setDressesList(sortedList);
         setPaginationMeta({
           total: response.total || response.data.length,
           lastPage: response.last_page || 1,

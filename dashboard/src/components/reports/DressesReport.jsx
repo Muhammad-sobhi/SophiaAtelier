@@ -24,7 +24,10 @@ export function DressesReport() {
     ])
       .then(([dressRes, bookRes]) => {
         if (!isMounted) return;
-        setDresses(Array.isArray(dressRes) ? dressRes : dressRes?.data || []);
+        let dList = Array.isArray(dressRes) ? dressRes : dressRes?.data || [];
+        if (!Array.isArray(dList)) dList = [];
+        dList.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+        setDresses(dList);
         setBookings(Array.isArray(bookRes) ? bookRes : bookRes?.data || []);
       })
       .catch((err) => console.error('Failed to load dress report data:', err))

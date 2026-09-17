@@ -240,8 +240,9 @@ export function UnifiedStageModal({
   useEffect(() => {
     apiClient.get('/dresses?per_page=1000&with_bookings=1')
       .then((res) => {
-        const list = res.data || res || [];
-        const arr = Array.isArray(list) ? list : [];
+        let arr = res.data?.data || res.data || res || [];
+        if (!Array.isArray(arr)) arr = [];
+        arr.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
         if (arr.length > 0) {
           setDressesList(arr);
         }

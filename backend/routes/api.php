@@ -49,7 +49,9 @@ Route::get('/public/system-status', function () {
         'server_time' => now()->toDateTimeString(),
     ]);
 });
-Route::get('/public/dresses', [DressController::class, 'publicIndex']);
+Route::get('/dresses', [DressController::class, 'index']);
+Route::get('/dresses/release-code/{code}', [DressController::class, 'releaseCode']);
+Route::get('/dresses/{dress}', [DressController::class, 'show']);
 
 // Direct file serving route for uploads (bypasses web server symlink issues completely)
 Route::get('/storage/{path}', function ($path) {
@@ -107,7 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/dresses/best-sellers/reorder', [DressController::class, 'reorderBestSellers']);
     Route::patch('/dresses/{dress}/best-seller', [DressController::class, 'toggleBestSeller']);
     Route::get('/dresses/{dress}/availability-check', [DressController::class, 'checkAvailability']);
-    Route::apiResource('dresses', DressController::class);
+    Route::apiResource('dresses', DressController::class)->except(['index', 'show']);
     Route::put('/dresses/{dress}/stage-action', [DressController::class, 'stageAction']);
 
     Route::apiResource('categories', CategoryController::class);
