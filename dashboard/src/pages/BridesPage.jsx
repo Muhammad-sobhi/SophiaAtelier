@@ -1671,6 +1671,15 @@ export default function BridesPage() {
                   </span>
                 </div>
 
+                {(viewingBride.bookings?.[0]?.sales_name || viewingBride.visits?.[0]?.sales_name) && (
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-400 font-bold">مسؤولة المبيعات:</span>
+                    <span className="font-bold text-indigo-700">
+                      {viewingBride.bookings?.[0]?.sales_name || viewingBride.visits?.[0]?.sales_name}
+                    </span>
+                  </div>
+                )}
+
                 {viewingBride.visit_date && (
                   <div className="flex justify-between items-center py-1 border-b border-slate-100">
                     <span className="text-slate-400 font-bold">تاريخ الزيارة (للمتابعة):</span>
@@ -1680,12 +1689,11 @@ export default function BridesPage() {
                   </div>
                 )}
 
-                {(viewingBride.visits?.[0]?.time_slot || viewingBride.visits?.[0]?.sales_name) && (
+                {viewingBride.visits?.[0]?.time_slot && (
                   <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400 font-bold">تفاصيل الزيارة:</span>
+                    <span className="text-slate-400 font-bold">موعد الزيارة (الوقت):</span>
                     <span className="font-bold text-slate-700 text-left">
-                      {viewingBride.visits?.[0]?.time_slot && <span className="block" dir="ltr">{viewingBride.visits[0].time_slot}</span>}
-                      {viewingBride.visits?.[0]?.sales_name && <span className="block text-indigo-600 text-[10px]">مسؤولة المبيعات: {viewingBride.visits[0].sales_name}</span>}
+                      <span className="block" dir="ltr">{viewingBride.visits[0].time_slot}</span>
                     </span>
                   </div>
                 )}
