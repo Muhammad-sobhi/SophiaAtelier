@@ -113,7 +113,18 @@ class ApiClient {
       throw error;
     }
 
-    return response.json();
+    const json = await response.json();
+
+    // Globally sort dresses by natural code order if applicable
+    if (url.includes('/dresses') && !url.includes('/best-sellers/reorder') && !url.includes('/availability-check') && !url.includes('/stage-action')) {
+      if (Array.isArray(json)) {
+        json.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+      } else if (json && Array.isArray(json.data)) {
+        json.data.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+      }
+    }
+
+    return json;
   }
 
   get(endpoint, options = {}) {
