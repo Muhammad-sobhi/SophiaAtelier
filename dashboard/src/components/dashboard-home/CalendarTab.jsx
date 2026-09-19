@@ -165,7 +165,7 @@ export default function CalendarTab({
       return 'pickup';
     }
 
-    if (raw === 'fitting' || (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed'))) {
+    if (raw === 'fitting' || (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed' && f.status !== 'cancelled'))) {
       return 'fitting';
     }
 
@@ -233,7 +233,10 @@ export default function CalendarTab({
       // 2. Stage filter: Show ONLY brides in this stage, hide all others
       const brideStage = getBrideStage(b);
       if (selectedStageFilter !== 'all') {
-        const hasFitting = (Array.isArray(b.fittings) && b.fittings.length > 0) || b.has_fitting || brideStage === 'fitting';
+        const hasFitting =
+          (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed' && f.status !== 'cancelled')) ||
+          Boolean(b.has_fitting) ||
+          brideStage === 'fitting';
         const isBookedForPickup = (brideStage === 'pickup' || brideStage === 'picked_up' || b.bookings?.some((bk) => bk.status === 'confirmed'));
         const isReturned = brideStage === 'returned' || brideStage === 'receive' || brideStage === 'receiving';
 
@@ -260,7 +263,8 @@ export default function CalendarTab({
         latestBooking?.return_scheduled_on ||
         (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).returnDate : '')
       );
-      const effectiveFittingDate = cleanDate(b.fittings?.[0]?.fitting_date || b.latest_fitting_date || '');
+      const activeFitting = b.fittings?.find((f) => f.status !== 'completed' && f.status !== 'cancelled');
+      const effectiveFittingDate = cleanDate(activeFitting?.fitting_date || b.latest_fitting_date || '');
 
       let isMatchDay = false;
 
@@ -279,7 +283,7 @@ export default function CalendarTab({
       } else if (brideStage === 'fitting') {
         isMatchDay =
           effectiveFittingDate === dateStr ||
-          b.fittings?.some((f) => cleanDate(f.fitting_date) === dateStr) ||
+          b.fittings?.some((f) => f.status !== 'completed' && f.status !== 'cancelled' && cleanDate(f.fitting_date) === dateStr) ||
           calEvents.some((ev) => ev.client_id === b.id && cleanDate(ev.date)?.startsWith(dateStr));
       } else if (brideStage === 'returned') {
         // Receive from bride / returned are positioned on the return date

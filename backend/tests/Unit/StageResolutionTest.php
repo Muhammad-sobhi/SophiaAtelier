@@ -64,6 +64,14 @@ class StageResolutionTest extends TestCase
         $stage = LiveStageResolver::resolve($client, $booking);
         $this->assertEquals('picked_up', $stage);
         $this->assertTrue($client->has_fitting);
+
+        // When fitting is completed, has_fitting should be false
+        $fitting->status = 'completed';
+        $this->assertFalse($client->has_fitting);
+
+        // When fitting is cancelled, has_fitting should also be false
+        $fitting->status = 'cancelled';
+        $this->assertFalse($client->has_fitting);
     }
 
     public function test_bride_with_dress_out_is_in_returned_stage()

@@ -153,7 +153,7 @@ class Client extends Model
     public function getHasFittingAttribute(): bool
     {
         $fittingsList = $this->relationLoaded('fittings') ? $this->fittings : $this->fittings()->get();
-        return $fittingsList->count() > 0;
+        return $fittingsList->contains(fn($f) => $f->status !== 'completed' && $f->status !== 'cancelled');
     }
 
     public function getCurrentStageAttribute(): string

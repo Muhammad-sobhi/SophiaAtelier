@@ -94,9 +94,11 @@ export default function BridesTab({
       raw === 'returned' ||
       raw === 'completed';
 
-    const hasFitting = (Array.isArray(b.fittings) && b.fittings.length > 0) || b.has_fitting || raw === 'fitting';
+    const hasFitting =
+      (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed' && f.status !== 'cancelled')) ||
+      Boolean(b.has_fitting);
 
-    // 1. Fitting stage: show any bride who wants or has a fitting
+    // 1. Fitting stage: show any bride who has a pending/scheduled fitting
     if (targetStage === 'fitting') {
       return Boolean(hasFitting);
     }
