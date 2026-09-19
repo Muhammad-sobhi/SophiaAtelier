@@ -55,7 +55,7 @@ class Client extends Model
         }
     }
 
-    public function getLatestVisitTimeAttribute(): string
+    public function getLatestVisitTimeAttribute(): ?string
     {
         $visit = $this->relationLoaded('visits') ? $this->visits->sortByDesc('id')->first() : $this->visits()->latest()->first();
 
@@ -90,7 +90,7 @@ class Client extends Model
                 return $raw;
             }
         }
-        return 'خلال أوقات العمل الرسمية (من ١:٠٠ م حتى ٨:٣٠ م)';
+        return null;
     }
 
     public function getLatestDressNameAttribute(): ?string

@@ -172,6 +172,7 @@ export default function BridesPage() {
         pickup_scheduled_on: c.pickup_scheduled_on || c.bookings?.[0]?.pickup_scheduled_on || '',
         return_scheduled_on: c.return_scheduled_on || c.bookings?.[0]?.return_scheduled_on || '',
         latest_visit_date: c.latest_visit_date || c.visits?.[0]?.visit_date || '',
+        latest_visit_time: c.latest_visit_time || (c.visits?.[0]?.time_slot ? formatTimeSlot(c.visits[0].time_slot) : ''),
       }));
       setBrides(mapped);
 
@@ -1642,6 +1643,41 @@ export default function BridesPage() {
                   </span>
                 </div>
 
+                {/* تاريخ وتوقيت الزيارة */}
+                {(() => {
+                  const vDate = viewingBride.latest_visit_date || viewingBride.visits?.[0]?.visit_date || viewingBride.visit_date;
+                  const vSlot = viewingBride.visits?.[0]?.time_slot;
+                  let vTime = vSlot ? formatTimeSlot(vSlot) : (viewingBride.latest_visit_time || '');
+                  if (vTime && (vTime.includes('أوقات العمل') || vTime.includes('الرسمية'))) {
+                    vTime = '';
+                  }
+                  return (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                      <span className="text-slate-400 font-bold flex items-center gap-1">
+                        <Calendar size={12} className="text-indigo-600" />
+                        <span>تاريخ ووقت الزيارة:</span>
+                      </span>
+                      <div className="font-bold flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
+                        {vDate ? (
+                          <>
+                            <span className="font-mono font-extrabold text-indigo-700 whitespace-nowrap">
+                              {cleanDate(vDate)}
+                            </span>
+                            {vTime ? (
+                              <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-2xs flex items-center gap-1 whitespace-nowrap" dir="ltr">
+                                <Clock size={11} className="text-indigo-500" />
+                                <span>{vTime}</span>
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="text-slate-400 font-bold text-xs">غير محدد</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {(viewingBride.pickup_scheduled_on || viewingBride.bookings?.[0]?.pickup_scheduled_on) && (
                   <div className="flex justify-between items-center py-1 border-b border-slate-100">
                     <span className="text-slate-400 font-bold flex items-center gap-1">
@@ -1678,24 +1714,6 @@ export default function BridesPage() {
                     <span className="text-slate-400 font-bold">مسؤولة المبيعات:</span>
                     <span className="font-bold text-indigo-700">
                       {viewingBride.bookings?.[0]?.sales_name || viewingBride.visits?.[0]?.sales_name}
-                    </span>
-                  </div>
-                )}
-
-                {viewingBride.visit_date && (
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400 font-bold">تاريخ الزيارة (للمتابعة):</span>
-                    <span className="font-bold text-slate-700">
-                      {cleanDate(viewingBride.visit_date)}
-                    </span>
-                  </div>
-                )}
-
-                {viewingBride.visits?.[0]?.time_slot && (
-                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                    <span className="text-slate-400 font-bold">موعد الزيارة (الوقت):</span>
-                    <span className="font-bold text-slate-700 text-left">
-                      <span className="block" dir="ltr">{viewingBride.visits[0].time_slot}</span>
                     </span>
                   </div>
                 )}
