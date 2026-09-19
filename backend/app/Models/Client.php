@@ -14,7 +14,7 @@ class Client extends Model
 
     protected $fillable = ['name', 'phone', 'phone2', 'email', 'address', 'city', 'source', 'journey_mode', 'wedding_date', 'notes', 'image_path'];
 
-    protected $appends = ['visits_count', 'total_bookings', 'current_stage', 'latest_visit_date', 'latest_visit_time', 'latest_dress_name', 'latest_dress_trying_fee', 'wedding_date'];
+    protected $appends = ['visits_count', 'total_bookings', 'current_stage', 'latest_visit_date', 'latest_visit_time', 'latest_dress_name', 'latest_dress_trying_fee', 'wedding_date', 'has_fitting'];
 
     protected function serializeDate(\DateTimeInterface $date): string
     {
@@ -150,6 +150,12 @@ class Client extends Model
      * 4. Booking (حجز)
      * 5. Visit (طلب زيارة)
      */
+    public function getHasFittingAttribute(): bool
+    {
+        $fittingsList = $this->relationLoaded('fittings') ? $this->fittings : $this->fittings()->get();
+        return $fittingsList->count() > 0;
+    }
+
     public function getCurrentStageAttribute(): string
     {
         return \App\Services\StageComputer::compute($this);

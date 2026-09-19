@@ -137,27 +137,18 @@ export default function DressesPage() {
 
       const response = await apiClient.get('/dresses', { params });
 
-      if (Array.isArray(response)) {
-        const sortedList = [...response].sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
-        setDressesList(sortedList);
-        setPaginationMeta({
-          total: response.length,
-          lastPage: 1,
-          from: response.length > 0 ? 1 : 0,
-          to: response.length,
-        });
-      } else if (response && response.data) {
-        const sortedList = [...response.data.data].sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
-        setDressesList(sortedList);
-        setPaginationMeta({
-          total: response.total || response.data.length,
-          lastPage: response.last_page || 1,
-          from: response.from || 1,
-          to: response.to || response.data.length,
-        });
-      } else {
-        setDressesList([]);
-      }
+      const items = Array.isArray(response)
+        ? response
+        : (Array.isArray(response?.data) ? response.data : (Array.isArray(response?.data?.data) ? response.data.data : []));
+
+      const sortedList = [...items].sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+      setDressesList(sortedList);
+      setPaginationMeta({
+        total: response?.total ?? response?.meta?.total ?? items.length,
+        lastPage: response?.last_page ?? response?.meta?.last_page ?? 1,
+        from: response?.from ?? response?.meta?.from ?? (items.length > 0 ? 1 : 0),
+        to: response?.to ?? response?.meta?.to ?? items.length,
+      });
     } catch (e) {
       console.error('Failed to fetch dresses:', e);
     }

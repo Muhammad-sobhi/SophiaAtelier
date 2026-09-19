@@ -281,6 +281,18 @@ class BookingController extends Controller
         }
 
         unset($validated['force_override']);
+
+        if (array_key_exists('event_date', $validated) && empty($validated['pickup_scheduled_on']) && empty($booking->pickup_scheduled_on)) {
+            $clientModel = $booking->client ?? \App\Models\Client::find($clientId);
+            $scheduled = Booking::calculateScheduledDates($validated['event_date'], $clientModel ? $clientModel->city : null);
+            if (empty($validated['pickup_scheduled_on'])) {
+                $validated['pickup_scheduled_on'] = $scheduled['pickup_date'];
+            }
+            if (empty($validated['return_scheduled_on'])) {
+                $validated['return_scheduled_on'] = $scheduled['return_date'];
+            }
+        }
+
         $booking->update($validated);
 
         // Sync deposit payments if provided

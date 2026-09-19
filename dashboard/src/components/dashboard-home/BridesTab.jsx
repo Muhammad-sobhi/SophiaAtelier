@@ -74,12 +74,80 @@ export default function BridesTab({
     return raw === 'picked_up' && isDelivered ? 'returned' : raw;
   };
 
+  // Stage match helper:
+  // 1. Bookings > 15 days away stay in 'booking'
+  // 2. Bookings <= 15 days appear in 'picked_up'
+  // 3. Brides with fittings appear in 'fitting' without being removed from booking/pickup
+  // 4. Returned brides auto-disappear after receiving + return month has ended
+  const matchesStage = (b, targetStage) => {
+    if (targetStage === 'all') return true;
+
+    const raw = b.current_stage || b.stage || 'visit';
+    const latestBk = b.bookings?.[0];
+    const isDelivered =
+      latestBk?.status === 'picked_up' ||
+      latestBk?.status === 'out' ||
+      b.bookings?.some((bk) => bk.status === 'picked_up' || bk.status === 'out');
+    const isReturned =
+      latestBk?.status === 'returned' ||
+      b.bookings?.some((bk) => bk.status === 'returned') ||
+      raw === 'returned' ||
+      raw === 'completed';
+
+    const hasFitting = (Array.isArray(b.fittings) && b.fittings.length > 0) || b.has_fitting || raw === 'fitting';
+
+    // 1. Fitting stage: show any bride who wants or has a fitting
+    if (targetStage === 'fitting') {
+      return Boolean(hasFitting);
+    }
+
+    // 2. Return stage:
+    if (targetStage === 'returned') {
+      // Must be currently delivered/out OR returned in current month
+      if (isDelivered) return true;
+      if (isReturned) {
+        // Disappear if received + month ended:
+        const retDate = latestBk?.return_scheduled_on || latestBk?.updated_at || b.return_scheduled_on;
+        if (retDate) {
+          const retMonth = String(retDate).slice(0, 7);
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          if (retMonth < currentMonth) {
+            return false; // Month ended -> auto-disappear from active returned stage
+          }
+        }
+        return true;
+      }
+      return false;
+    }
+
+    // If already returned or delivered, she is not in visit/booking/pickup
+    if (isDelivered || isReturned) {
+      return false;
+    }
+
+    // 3. Pickup stage: booked AND pickup date is within 15 days (or today/past)
+    if (targetStage === 'picked_up' || targetStage === 'pickup') {
+      return raw === 'picked_up';
+    }
+
+    // 4. Booking stage: booked AND pickup date is > 15 days away
+    if (targetStage === 'booking') {
+      return raw === 'booking';
+    }
+
+    // 5. Visit stage:
+    if (targetStage === 'visit') {
+      return raw === 'visit';
+    }
+
+    return raw === targetStage;
+  };
+
   // Filtered Brides
   const filteredBrides = useMemo(() => {
     const list = brides.filter((b) => {
       // 1. Stage filter
-      const stage = getEffectiveStage(b);
-      if (stageFilter !== 'all' && stage !== stageFilter) {
+      if (!matchesStage(b, stageFilter)) {
         return false;
       }
 
@@ -136,7 +204,7 @@ export default function BridesTab({
         {STAGES.map((s) => {
           const count = s.id === 'all'
             ? brides.length
-            : brides.filter((b) => getEffectiveStage(b) === s.id).length;
+            : brides.filter((b) => matchesStage(b, s.id)).length;
           const isActive = stageFilter === s.id;
 
           return (
@@ -238,7 +306,8 @@ export default function BridesTab({
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3 select-none pb-4">
             {filteredBrides.map((bride) => {
               const stage = getEffectiveStage(bride);
-              const stageCfg = STAGE_MAP[stage] || STAGE_MAP.visit;
+              const activeStageKey = stageFilter !== 'all' ? stageFilter : stage;
+              const stageCfg = STAGE_MAP[activeStageKey] || STAGE_MAP[stage] || STAGE_MAP.visit;
               const displayDate = bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
               const wDate = bride.wedding_date || bride.bookings?.[0]?.event_date || bride.relevant_date;

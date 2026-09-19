@@ -218,12 +218,26 @@ export function BrideJourneyPopup({
 
         return (
           <div className="space-y-1.5">
-          {isPickupOverdue && (
+            {isPickupOverdue && (
               <div className="text-[10.5px] font-black text-rose-800 bg-rose-50/90 border border-rose-200 rounded-xl px-2.5 py-1.5 text-center leading-tight flex items-center justify-center gap-1">
                 <AlertTriangle size={12} className="text-rose-600" />
                 <span>تنبيه: حان موعد تسليم الفستان للعروس</span>
               </div>
             )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => openFormForStage('fitting')}
+                className={`${common} bg-indigo-600 hover:bg-indigo-700 text-white`}
+              >
+                <Ruler size={13} /> تحديد موعد بروفة
+              </button>
+              <button
+                onClick={() => openFormForStage('booking')}
+                className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}
+              >
+                <Calendar size={13} /> تعديل موعد الاستلام / الحجز
+              </button>
+            </div>
             <button
               onClick={() => openFormForStage('picked_up')}
               disabled={loading}

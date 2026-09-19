@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Booking;
 use App\Models\Client;
 use Carbon\Carbon;
 
@@ -14,26 +15,33 @@ class LegacyStageResolver
             return 'visit';
         }
 
-        if ($latestBooking->status === 'returned') return 'returned';
-        if (in_array($latestBooking->status, ['picked_up', 'out'])) return 'picked_up';
+        if ($latestBooking->status === 'returned') {
+            $returnDate = $latestBooking->return_scheduled_on
+                ? Carbon::parse($latestBooking->return_scheduled_on)->format('Y-m-d')
+                : Carbon::parse($latestBooking->updated_at)->format('Y-m-d');
 
-        $fittingsList = $client->relationLoaded('fittings') ? $client->fittings : $client->fittings()->get();
-        if ($fittingsList->count() > 0) {
-            $hasPendingFitting = $fittingsList->contains(fn($f) => $f->status !== 'completed');
-            if ($hasPendingFitting) {
-                return 'fitting';
+            $returnMonth = Carbon::parse($returnDate)->format('Y-m');
+            $currentMonth = Carbon::today()->format('Y-m');
+
+            if ($returnMonth < $currentMonth) {
+                return 'completed';
             }
-        }
 
-        $today = Carbon::today()->format('Y-m-d');
-        $pickupDate = $latestBooking->pickup_scheduled_on;
-        $returnDate = $latestBooking->return_scheduled_on;
-
-        if ($returnDate && $returnDate < $today) {
             return 'returned';
         }
 
-        if ($pickupDate && $pickupDate <= $today) {
+        if (in_array($latestBooking->status, ['picked_up', 'out'])) {
+            return 'returned';
+        }
+
+        $pickupDate = $latestBooking->pickup_scheduled_on ? Carbon::parse($latestBooking->pickup_scheduled_on)->format('Y-m-d') : null;
+        if (!$pickupDate && $latestBooking->event_date) {
+            $scheduled = Booking::calculateScheduledDates($latestBooking->event_date, $client->city);
+            $pickupDate = $scheduled['pickup_date'] ?? null;
+        }
+
+        $threshold = Carbon::today()->addDays(15)->format('Y-m-d');
+        if ($pickupDate && $pickupDate <= $threshold) {
             return 'picked_up';
         }
 

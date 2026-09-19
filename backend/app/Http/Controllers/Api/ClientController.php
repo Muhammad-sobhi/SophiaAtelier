@@ -518,6 +518,10 @@ class ClientController extends Controller
             'visit_date' => 'nullable|date',
             'visit_time' => 'nullable|string|max:50',
             'event_date' => 'nullable|date',
+            'pickup_scheduled_on' => 'nullable|date',
+            'return_scheduled_on' => 'nullable|date',
+            'pickup_date' => 'nullable|date',
+            'return_date' => 'nullable|date',
             'total_amount' => 'nullable|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
@@ -717,6 +721,30 @@ class ClientController extends Controller
                 $booking->is_override = $forceOverride;
                 $booking->booking_date = now()->toDateString();
                 $booking->event_date = $eventDate;
+
+                // Handle pickup and return dates
+                if ($request->filled('pickup_scheduled_on')) {
+                    $booking->pickup_scheduled_on = $request->input('pickup_scheduled_on');
+                } elseif ($request->filled('pickup_date')) {
+                    $booking->pickup_scheduled_on = $request->input('pickup_date');
+                }
+
+                if ($request->filled('return_scheduled_on')) {
+                    $booking->return_scheduled_on = $request->input('return_scheduled_on');
+                } elseif ($request->filled('return_date')) {
+                    $booking->return_scheduled_on = $request->input('return_date');
+                }
+
+                if (empty($booking->pickup_scheduled_on) || empty($booking->return_scheduled_on)) {
+                    $scheduled = \App\Models\Booking::calculateScheduledDates($eventDate, $client->city);
+                    if (empty($booking->pickup_scheduled_on)) {
+                        $booking->pickup_scheduled_on = $scheduled['pickup_date'];
+                    }
+                    if (empty($booking->return_scheduled_on)) {
+                        $booking->return_scheduled_on = $scheduled['return_date'];
+                    }
+                }
+
                 $booking->total_amount = floatval($request->input('total_amount', 0));
                 $booking->deposit_amount = floatval($request->input('deposit_amount', 0));
                 $booking->insurance_amount = floatval($request->input('insurance_amount', 5000));
@@ -823,6 +851,16 @@ class ClientController extends Controller
                     if ($request->has('sales_name')) {
                         $updateData['pickup_sales_name'] = $request->input('sales_name');
                     }
+                    if ($request->filled('pickup_scheduled_on')) {
+                        $updateData['pickup_scheduled_on'] = $request->input('pickup_scheduled_on');
+                    } elseif ($request->filled('pickup_date')) {
+                        $updateData['pickup_scheduled_on'] = $request->input('pickup_date');
+                    }
+                    if ($request->filled('return_scheduled_on')) {
+                        $updateData['return_scheduled_on'] = $request->input('return_scheduled_on');
+                    } elseif ($request->filled('return_date')) {
+                        $updateData['return_scheduled_on'] = $request->input('return_date');
+                    }
                     $booking->update($updateData);
 
                     // Sync deposit payments if provided
@@ -915,6 +953,11 @@ class ClientController extends Controller
                     }
                     if ($request->has('insurance_amount')) {
                         $returnUpdate['insurance_amount'] = floatval($request->input('insurance_amount'));
+                    }
+                    if ($request->filled('return_date')) {
+                        $returnUpdate['return_scheduled_on'] = $request->input('return_date');
+                    } elseif ($request->filled('return_scheduled_on')) {
+                        $returnUpdate['return_scheduled_on'] = $request->input('return_scheduled_on');
                     }
                     $booking->update($returnUpdate);
                     // Mark all dresses for dry clean

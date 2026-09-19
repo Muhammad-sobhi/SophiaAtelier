@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Booking;
 use App\Models\Client;
+use Carbon\Carbon;
 
 class LiveStageResolver
 {
@@ -13,20 +15,43 @@ class LiveStageResolver
             return 'visit';
         }
 
-        if ($latestBooking->status === 'returned') return 'returned';
-        if (in_array($latestBooking->status, ['picked_up', 'out'])) return 'picked_up';
+        // 1. Returned stage: if dress is returned
+        if ($latestBooking->status === 'returned') {
+            $returnDate = $latestBooking->return_scheduled_on
+                ? Carbon::parse($latestBooking->return_scheduled_on)->format('Y-m-d')
+                : Carbon::parse($latestBooking->updated_at)->format('Y-m-d');
 
-        $fittingsList = $client->relationLoaded('fittings') ? $client->fittings : $client->fittings()->get();
-        if ($fittingsList->count() > 0) {
-            $hasPendingFitting = $fittingsList->contains(fn($f) => $f->status !== 'completed');
-            if ($hasPendingFitting) {
-                return 'fitting';
+            $returnMonth = Carbon::parse($returnDate)->format('Y-m');
+            $currentMonth = Carbon::today()->format('Y-m');
+
+            // Disappear from active return stage after receiving + month ended
+            if ($returnMonth < $currentMonth) {
+                return 'completed';
             }
-            // All fittings are completed -> advance to pickup
+
+            return 'returned';
+        }
+
+        // 2. Dress is out with the bride -> awaiting return
+        if (in_array($latestBooking->status, ['picked_up', 'out'])) {
+            return 'returned';
+        }
+
+        // 3. Confirmed booking with scheduled pickup
+        $pickupDate = $latestBooking->pickup_scheduled_on ? Carbon::parse($latestBooking->pickup_scheduled_on)->format('Y-m-d') : null;
+
+        if (!$pickupDate && $latestBooking->event_date) {
+            $scheduled = Booking::calculateScheduledDates($latestBooking->event_date, $client->city);
+            $pickupDate = $scheduled['pickup_date'] ?? null;
+        }
+
+        // 15-day window: appears in pickup stage when within 15 days of pickup date
+        $threshold = Carbon::today()->addDays(15)->format('Y-m-d');
+        if ($pickupDate && $pickupDate <= $threshold) {
             return 'picked_up';
         }
 
+        // More than 15 days until pickup date -> booking stage
         return 'booking';
     }
 }
-

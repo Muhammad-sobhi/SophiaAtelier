@@ -143,6 +143,9 @@ export default function CalendarTab({
   // Stage mapping helper
   const getBrideStage = (b) => {
     const raw = (b.current_stage || b.stage || '').toLowerCase().trim();
+    if (raw === 'completed') {
+      return 'completed';
+    }
     if (raw === 'returned' || b.bookings?.some((bk) => bk.status === 'returned')) {
       return 'returned';
     }
@@ -230,10 +233,16 @@ export default function CalendarTab({
       // 2. Stage filter: Show ONLY brides in this stage, hide all others
       const brideStage = getBrideStage(b);
       if (selectedStageFilter !== 'all') {
-        if (selectedStageFilter === 'pickup') {
-          if (brideStage !== 'pickup' && brideStage !== 'picked_up') continue;
+        const hasFitting = (Array.isArray(b.fittings) && b.fittings.length > 0) || b.has_fitting || brideStage === 'fitting';
+        const isBookedForPickup = (brideStage === 'pickup' || brideStage === 'picked_up' || b.bookings?.some((bk) => bk.status === 'confirmed'));
+        const isReturned = brideStage === 'returned' || brideStage === 'receive' || brideStage === 'receiving';
+
+        if (selectedStageFilter === 'fitting') {
+          if (!hasFitting) continue;
+        } else if (selectedStageFilter === 'pickup') {
+          if (!isBookedForPickup || isReturned) continue;
         } else if (selectedStageFilter === 'returned') {
-          if (brideStage !== 'returned' && brideStage !== 'receive' && brideStage !== 'receiving') continue;
+          if (!isReturned) continue;
         } else {
           if (brideStage !== selectedStageFilter) continue;
         }

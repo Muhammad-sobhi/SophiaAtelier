@@ -97,7 +97,7 @@ class CalendarController extends Controller
 
                 $date = $pickupDateStr ?: $eventDateStr;
 
-                if ($fittingsCompleted || $booking->status === 'picked_up') {
+                if ($booking->status === 'picked_up' || $booking->status === 'out' || !empty($pickupDateStr) || $fittingsCompleted) {
                     $type = 'pickup';
                 }
 

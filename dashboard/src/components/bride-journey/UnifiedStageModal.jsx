@@ -93,6 +93,45 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
   return null;
 };
 
+export const calculateScheduledDates = (eventDateStr, cityStr = 'القاهرة') => {
+  if (!eventDateStr) return { pickup_date: '', return_date: '', isCairo: true };
+  try {
+    const cleanDateStr = String(eventDateStr).split('T')[0].split(' ')[0];
+    const d = new Date(`${cleanDateStr}T00:00:00`);
+    if (isNaN(d.getTime())) return { pickup_date: '', return_date: '', isCairo: true };
+
+    const cityLower = String(cityStr || '').toLowerCase();
+    const isCairo = !cityStr ||
+      cityLower.includes('قاهرة') ||
+      cityLower.includes('جيزة') ||
+      cityLower.includes('cairo') ||
+      cityLower.includes('giza') ||
+      cityLower.includes('نصر') ||
+      cityLower.includes('جديدة') ||
+      cityLower.includes('معادي') ||
+      cityLower.includes('تجمع') ||
+      cityLower.includes('زايد') ||
+      cityLower.includes('أكتوبر') ||
+      cityLower.includes('اكتوبر') ||
+      cityLower.includes('شروق') ||
+      cityLower.includes('مدينتي');
+
+    const daysBefore = isCairo ? 1 : 2;
+    const daysAfter = 1;
+
+    const pickupDateObj = new Date(d.getTime() - (daysBefore * 24 * 60 * 60 * 1000));
+    const returnDateObj = new Date(d.getTime() + (daysAfter * 24 * 60 * 60 * 1000));
+
+    return {
+      pickup_date: pickupDateObj.toISOString().split('T')[0],
+      return_date: returnDateObj.toISOString().split('T')[0],
+      isCairo,
+    };
+  } catch (e) {
+    return { pickup_date: '', return_date: '', isCairo: true };
+  }
+};
+
 const STAGES = [
   { id: 'visit', label: 'زيارة', icon: Calendar, color: 'text-indigo-600' },
   { id: 'booking', label: 'حجز', icon: Heart, color: 'text-rose-600' },
@@ -158,6 +197,20 @@ export function UnifiedStageModal({
   const [bookingDress1Details, setBookingDress1Details] = useState(null);
   const [bookingDress2Details, setBookingDress2Details] = useState(null);
   const [bookingEventDate, setBookingEventDate] = useState(cleanDate(booking?.event_date || bride.wedding_date || new Date().toISOString()));
+
+  // Scheduled pickup & return dates (auto-calculated default based on city, fully editable)
+  const [bookingPickupDate, setBookingPickupDate] = useState(() => {
+    if (booking?.pickup_scheduled_on) return cleanDate(booking.pickup_scheduled_on);
+    const initialEvent = booking?.event_date || bride.wedding_date || new Date().toISOString();
+    return calculateScheduledDates(initialEvent, bride.city || 'القاهرة').pickup_date;
+  });
+  const [bookingReturnDate, setBookingReturnDate] = useState(() => {
+    if (booking?.return_scheduled_on) return cleanDate(booking.return_scheduled_on);
+    const initialEvent = booking?.event_date || bride.wedding_date || new Date().toISOString();
+    return calculateScheduledDates(initialEvent, bride.city || 'القاهرة').return_date;
+  });
+  const [isCustomPickupDate, setIsCustomPickupDate] = useState(Boolean(booking?.pickup_scheduled_on));
+
   const [bookingTotalAmount, setBookingTotalAmount] = useState(booking?.total_amount ? String(booking.total_amount) : '3500');
   const [bookingDepositAmount, setBookingDepositAmount] = useState(booking?.deposit_amount ? String(booking.deposit_amount) : '1000');
   const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState(booking?.insurance_amount ? String(booking.insurance_amount) : '5000');
@@ -213,8 +266,17 @@ export function UnifiedStageModal({
   const currentDepositPaid = parseFloat(pickupDepositAmount || 0);
   const remainingForPickup = Math.max(0, parseFloat(pickupTotalAmount || 0) - currentDepositPaid);
 
-  const [pickupDate, setPickupDate] = useState(cleanDate(booking?.pickup_date || new Date().toISOString()));
+  const [pickupDate, setPickupDate] = useState(cleanDate(booking?.pickup_scheduled_on || booking?.pickup_date || new Date().toISOString()));
   const [pickupSalesName, setPickupSalesName] = useState(booking?.pickup_sales_name || salesName || '');
+
+  // Auto-sync pickup/return dates when event date or city changes (unless customized)
+  useEffect(() => {
+    if (!isCustomPickupDate && bookingEventDate) {
+      const dates = calculateScheduledDates(bookingEventDate, city);
+      if (dates.pickup_date) setBookingPickupDate(dates.pickup_date);
+      if (dates.return_date) setBookingReturnDate(dates.return_date);
+    }
+  }, [bookingEventDate, city, isCustomPickupDate]);
   const [balancePayments, setBalancePayments] = useState(
     existingBalances.length > 0
       ? existingBalances.map(r => ({ amount: String(r.amount), payment_method: r.payment_method || 'cash' }))
@@ -474,6 +536,8 @@ export function UnifiedStageModal({
           sales_name: salesName.trim() || null,
           force_override: true,
           event_date: bookingEventDate || weddingDate,
+          pickup_scheduled_on: bookingPickupDate || null,
+          return_scheduled_on: bookingReturnDate || null,
           total_amount: parseFloat(bookingTotalAmount || 0),
           deposit_amount: totalDepositCalculated,
           insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
@@ -511,6 +575,8 @@ export function UnifiedStageModal({
             ],
             force_override: true,
             event_date: bookingEventDate || weddingDate || booking.event_date,
+            pickup_scheduled_on: bookingPickupDate || null,
+            return_scheduled_on: bookingReturnDate || null,
           });
         }
       } else if (stage === 'picked_up') {
@@ -521,6 +587,7 @@ export function UnifiedStageModal({
         await apiClient.put(`/clients/${bride.id}/stage-action`, {
           action: 'mark_picked_up',
           pickup_date: pickupDate,
+          pickup_scheduled_on: pickupDate,
           sales_name: pickupSalesName.trim() || null,
           total_amount: parseFloat(pickupTotalAmount || booking?.total_amount || 0),
           deposit_amount: parseFloat(pickupDepositAmount || 0),
@@ -711,6 +778,63 @@ export function UnifiedStageModal({
                         : 'bg-white border-slate-200 focus:border-rose-500'
                       }`}
                   />
+                </div>
+
+                {/* Scheduled Dates: Pickup & Return (Auto-calculated, fully editable) */}
+                <div className="bg-blue-50/50 p-2.5 sm:p-3 rounded-2xl border border-blue-200/80 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs font-black text-blue-950 flex items-center gap-1.5">
+                      <Package size={14} className="text-blue-600" />
+                      📦 موعد الاستلام والإرجاع المجدول:
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded-lg">
+                      تظهر العروس في مرحلة الاستلام تلقائياً في هذا الموعد
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-extrabold text-slate-700 block text-right">
+                          تاريخ الاستلام (Pickup Date):
+                        </label>
+                        {isCustomPickupDate && (
+                          <span className="text-[9px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.5 rounded">
+                            معدل يدوياً
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={cleanDate(bookingPickupDate)}
+                        onChange={(e) => {
+                          setBookingPickupDate(cleanDate(e.target.value));
+                          setIsCustomPickupDate(true);
+                        }}
+                        className="w-full px-3 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 font-mono text-right"
+                      />
+                      <span className="text-[9.5px] text-slate-500 mt-0.5 block text-right">
+                        💡 الحساب الافتراضي: قبل المناسبة بيوم (القاهرة/الجيزة) أو يومين (المحافظات)
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-700 block mb-1 text-right">
+                        تاريخ الإرجاع (Return Date):
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={cleanDate(bookingReturnDate)}
+                        onChange={(e) => setBookingReturnDate(cleanDate(e.target.value))}
+                        className="w-full px-3 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 font-mono text-right"
+                      />
+                      <span className="text-[9.5px] text-slate-500 mt-0.5 block text-right">
+                        💡 الحساب الافتراضي: بعد المناسبة بيوم واحد
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Dress 1 Selection with Fast Search & Pills */}

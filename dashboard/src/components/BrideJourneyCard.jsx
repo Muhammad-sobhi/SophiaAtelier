@@ -22,7 +22,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
-import { UnifiedStageModal } from './bride-journey/UnifiedStageModal';
+import { UnifiedStageModal, calculateScheduledDates } from './bride-journey/UnifiedStageModal';
 import { cleanDate } from '@/lib/utils';
 
 
@@ -130,6 +130,17 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [bookingPhone, setBookingPhone] = useState(bride.phone || '');
   const [bookingPhone2, setBookingPhone2] = useState(bride.phone2 || '');
   const [bookingEventDate, setBookingEventDate] = useState(cleanDate(bride.wedding_date || new Date().toISOString()));
+  const [bookingPickupDate, setBookingPickupDate] = useState(() => {
+    if (bride.bookings?.[0]?.pickup_scheduled_on) return cleanDate(bride.bookings[0].pickup_scheduled_on);
+    const ev = bride.wedding_date || new Date().toISOString();
+    return calculateScheduledDates(ev, bride.city || 'القاهرة').pickup_date;
+  });
+  const [bookingReturnDate, setBookingReturnDate] = useState(() => {
+    if (bride.bookings?.[0]?.return_scheduled_on) return cleanDate(bride.bookings[0].return_scheduled_on);
+    const ev = bride.wedding_date || new Date().toISOString();
+    return calculateScheduledDates(ev, bride.city || 'القاهرة').return_date;
+  });
+  const [isCustomPickupDate, setIsCustomPickupDate] = useState(Boolean(bride.bookings?.[0]?.pickup_scheduled_on));
   const [bookingTotalAmount, setBookingTotalAmount] = useState('0');
   const [bookingDepositAmount, setBookingDepositAmount] = useState('0');
   const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState('5000');
@@ -217,9 +228,28 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       setBookingPaymentMethod('instapay');
       setBookingPhone(bride.phone || '');
       setBookingPhone2(bride.phone2 || '');
-      setBookingEventDate(cleanDate(bride.wedding_date || new Date().toISOString()));
+      const evDate = cleanDate(bride.wedding_date || new Date().toISOString());
+      setBookingEventDate(evDate);
+      if (bride.bookings?.[0]?.pickup_scheduled_on) {
+        setBookingPickupDate(cleanDate(bride.bookings[0].pickup_scheduled_on));
+        setBookingReturnDate(cleanDate(bride.bookings[0].return_scheduled_on || ''));
+        setIsCustomPickupDate(true);
+      } else {
+        const sched = calculateScheduledDates(evDate, bride.city || 'القاهرة');
+        setBookingPickupDate(sched.pickup_date);
+        setBookingReturnDate(sched.return_date);
+        setIsCustomPickupDate(false);
+      }
     }
   }, [showBookingModal, bride.id]);
+
+  React.useEffect(() => {
+    if (showBookingModal && !isCustomPickupDate && bookingEventDate) {
+      const sched = calculateScheduledDates(bookingEventDate, bride.city || 'القاهرة');
+      if (sched.pickup_date) setBookingPickupDate(sched.pickup_date);
+      if (sched.return_date) setBookingReturnDate(sched.return_date);
+    }
+  }, [showBookingModal, bookingEventDate, bride.city, isCustomPickupDate]);
 
   React.useEffect(() => {
     if (showFittingModal) {
@@ -402,6 +432,8 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         sales_name: salesName.trim() || null,
         force_override: forceOverride,
         event_date: bookingEventDate,
+        pickup_scheduled_on: bookingPickupDate || null,
+        return_scheduled_on: bookingReturnDate || null,
         total_amount: parseFloat(bookingTotalAmount),
         deposit_amount: totalDepositCalculated,
         insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
@@ -1854,6 +1886,47 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                       (isBookingDateBlocked || isBookingDate2Blocked) ? 'border-amber-300 bg-amber-50/20 text-amber-900' : 'bg-slate-50 border-slate-150'
                     }`}
                   />
+                </div>
+
+                {/* Scheduled Dates: Pickup & Return */}
+                <div className="bg-blue-50/50 p-2.5 rounded-2xl border border-blue-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-blue-950 flex items-center gap-1">
+                      <Package size={13} className="text-blue-600" />
+                      موعد الاستلام والإرجاع المجدول:
+                    </span>
+                    <span className="text-[9px] font-bold text-blue-800 bg-blue-100/80 px-1.5 py-0.5 rounded">
+                      تظهر العروس بالاستلام تلقائياً
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9.5px] font-extrabold text-slate-600 block text-right">موعد الاستلام (Pickup)</label>
+                        {isCustomPickupDate && <span className="text-[8.5px] text-amber-800 font-bold bg-amber-100 px-1 rounded">معدل</span>}
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={cleanDate(bookingPickupDate)}
+                        onChange={(e) => {
+                          setBookingPickupDate(cleanDate(e.target.value));
+                          setIsCustomPickupDate(true);
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9.5px] font-extrabold text-slate-600 block text-right">موعد الإرجاع (Return)</label>
+                      <input
+                        type="date"
+                        required
+                        value={cleanDate(bookingReturnDate)}
+                        onChange={(e) => setBookingReturnDate(cleanDate(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Financial Fields */}
