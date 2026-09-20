@@ -99,47 +99,6 @@ export default function CalendarTab({
     return arr;
   }, [daysInMonth]);
 
-  // Extract available months from all brides data for quick navigation
-  const availableMonths = useMemo(() => {
-    const map = {};
-    activeBridesList.forEach((b) => {
-      const pDate = b.pickup_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '');
-      const rDate = b.return_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).returnDate : '');
-      const dates = [
-        pDate,
-        rDate,
-        b.latest_visit_date,
-        b.visits?.[0]?.visit_date,
-        b.fittings?.[0]?.fitting_date,
-        b.latest_fitting_date,
-        b.bookings?.[0]?.booking_date,
-      ].filter(Boolean);
-
-      dates.forEach((dStr) => {
-        try {
-          const d = new Date(dStr);
-          if (!isNaN(d.getTime())) {
-            const y = d.getFullYear();
-            const m = d.getMonth() + 1;
-            const key = `${y}-${String(m).padStart(2, '0')}`;
-            if (!map[key]) {
-              map[key] = {
-                key,
-                year: y,
-                month: m,
-                label: `${monthNamesAr[m - 1]} ${y}`,
-                count: 0
-              };
-            }
-            map[key].count += 1;
-          }
-        } catch {}
-      });
-    });
-
-    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key));
-  }, [activeBridesList]);
-
   // Stage mapping helper
   const getBrideStage = (b) => {
     const raw = (b.current_stage || b.stage || '').toLowerCase().trim();
@@ -175,6 +134,153 @@ export default function CalendarTab({
 
     return 'booking';
   };
+
+  // Helper: does bride match selected stage filter?
+  const brideMatchesStageFilter = (b, stageFilter) => {
+    if (stageFilter === 'all') return true;
+    const brideStage = getBrideStage(b);
+    const hasFitting =
+      (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed' && f.status !== 'cancelled')) ||
+      Boolean(b.has_fitting) ||
+      brideStage === 'fitting';
+    const isBookedForPickup = (brideStage === 'pickup' || brideStage === 'picked_up' || b.bookings?.some((bk) => bk.status === 'confirmed'));
+    const isReturned = brideStage === 'returned' || brideStage === 'receive' || brideStage === 'receiving';
+
+    if (stageFilter === 'fitting') return hasFitting;
+    if (stageFilter === 'pickup') return isBookedForPickup && !isReturned;
+    if (stageFilter === 'returned') return isReturned;
+    return brideStage === stageFilter;
+  };
+
+  // Helper: does bride have an active date in the given month (matching the stage filter)?
+  const brideMatchesMonth = (b, monthKey, stageFilter) => {
+    if (!brideMatchesStageFilter(b, stageFilter)) return false;
+
+    const brideStage = getBrideStage(b);
+    const latestBooking = b.bookings?.[0];
+    const effectivePickupDate = cleanDate(
+      b.pickup_scheduled_on ||
+      latestBooking?.pickup_scheduled_on ||
+      (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '')
+    );
+    const effectiveReturnDate = cleanDate(
+      b.return_scheduled_on ||
+      latestBooking?.return_scheduled_on ||
+      (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).returnDate : '')
+    );
+    const activeFitting = b.fittings?.find((f) => f.status !== 'completed' && f.status !== 'cancelled');
+    const effectiveFittingDate = cleanDate(activeFitting?.fitting_date || b.latest_fitting_date || '');
+
+    const checkMonth = (d) => !!(d && cleanDate(d)?.startsWith(monthKey));
+
+    if (stageFilter === 'fitting' || (stageFilter === 'all' && brideStage === 'fitting')) {
+      return (
+        checkMonth(effectiveFittingDate) ||
+        (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed' && f.status !== 'cancelled' && checkMonth(f.fitting_date))) ||
+        calEvents.some((ev) => ev.client_id === b.id && checkMonth(ev.date))
+      );
+    }
+    if (stageFilter === 'returned' || (stageFilter === 'all' && brideStage === 'returned')) {
+      return (
+        checkMonth(effectiveReturnDate) ||
+        (Array.isArray(b.bookings) && b.bookings.some((bk) => checkMonth(bk.return_scheduled_on))) ||
+        calEvents.some((ev) => ev.client_id === b.id && checkMonth(ev.date))
+      );
+    }
+    if (stageFilter === 'pickup' || (stageFilter === 'all' && (brideStage === 'pickup' || brideStage === 'picked_up'))) {
+      return (
+        checkMonth(effectivePickupDate) ||
+        (Array.isArray(b.bookings) && b.bookings.some((bk) => checkMonth(bk.pickup_scheduled_on))) ||
+        calEvents.some((ev) => ev.client_id === b.id && checkMonth(ev.date))
+      );
+    }
+    if (stageFilter === 'visit' || (stageFilter === 'all' && brideStage === 'visit')) {
+      return (
+        checkMonth(b.latest_visit_date) ||
+        (Array.isArray(b.visits) && b.visits.some((v) => checkMonth(v.visit_date))) ||
+        calEvents.some((ev) => ev.client_id === b.id && checkMonth(ev.date))
+      );
+    }
+    if (stageFilter === 'booking' || (stageFilter === 'all' && brideStage === 'booking')) {
+      return (
+        checkMonth(b.wedding_date) ||
+        checkMonth(latestBooking?.booking_date) ||
+        checkMonth(b.latest_visit_date) ||
+        (Array.isArray(b.visits) && b.visits.some((v) => checkMonth(v.visit_date))) ||
+        calEvents.some((ev) => ev.client_id === b.id && checkMonth(ev.date))
+      );
+    }
+
+    return (
+      checkMonth(effectivePickupDate) ||
+      checkMonth(effectiveReturnDate) ||
+      checkMonth(effectiveFittingDate) ||
+      checkMonth(b.wedding_date) ||
+      checkMonth(b.latest_visit_date) ||
+      checkMonth(latestBooking?.booking_date) ||
+      calEvents.some((ev) => ev.client_id === b.id && checkMonth(ev.date))
+    );
+  };
+
+  // Extract available months with UNIQUE bride count per month (reflecting active stage filter & search)
+  const availableMonths = useMemo(() => {
+    const monthKeysSet = new Set();
+    activeBridesList.forEach((b) => {
+      const pDate = b.pickup_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).pickupDate : '');
+      const rDate = b.return_scheduled_on || (b.wedding_date ? calculateScheduledDates(b.wedding_date, b.city).returnDate : '');
+      const allDates = [
+        pDate,
+        rDate,
+        b.wedding_date,
+        b.latest_visit_date,
+        b.latest_fitting_date,
+        b.bookings?.[0]?.booking_date,
+        ...(b.visits?.map((v) => v.visit_date) || []),
+        ...(b.fittings?.map((f) => f.fitting_date) || []),
+      ].filter(Boolean);
+
+      allDates.forEach((dStr) => {
+        const cleaned = cleanDate(dStr);
+        const match = cleaned?.match(/^(\d{4})-(\d{2})/);
+        if (match) {
+          monthKeysSet.add(`${match[1]}-${match[2]}`);
+        }
+      });
+    });
+
+    const currentKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    monthKeysSet.add(currentKey);
+
+    const sortedKeys = Array.from(monthKeysSet).sort();
+
+    return sortedKeys.map((key) => {
+      const [yStr, mStr] = key.split('-');
+      const y = parseInt(yStr, 10);
+      const m = parseInt(mStr, 10);
+
+      const uniqueBrideIds = new Set();
+
+      activeBridesList.forEach((b) => {
+        if (searchQuery.trim()) {
+          const q = normalizeArabic(searchQuery);
+          const bName = normalizeArabic(b.name);
+          if (!bName.includes(q)) return;
+        }
+
+        if (brideMatchesMonth(b, key, selectedStageFilter)) {
+          uniqueBrideIds.add(b.id);
+        }
+      });
+
+      return {
+        key,
+        year: y,
+        month: m,
+        label: `${monthNamesAr[m - 1]} ${y}`,
+        count: uniqueBrideIds.size,
+      };
+    });
+  }, [activeBridesList, selectedStageFilter, searchQuery, currentYear, currentMonth, calEvents]);
 
   // Stage color scheme as specified:
   // visit: orange | booking: green | fitting: purple | pickup: blue | receive: dark blue | returned: red
@@ -231,25 +337,8 @@ export default function CalendarTab({
       }
 
       // 2. Stage filter: Show ONLY brides in this stage, hide all others
+      if (!brideMatchesStageFilter(b, selectedStageFilter)) continue;
       const brideStage = getBrideStage(b);
-      if (selectedStageFilter !== 'all') {
-        const hasFitting =
-          (Array.isArray(b.fittings) && b.fittings.some((f) => f.status !== 'completed' && f.status !== 'cancelled')) ||
-          Boolean(b.has_fitting) ||
-          brideStage === 'fitting';
-        const isBookedForPickup = (brideStage === 'pickup' || brideStage === 'picked_up' || b.bookings?.some((bk) => bk.status === 'confirmed'));
-        const isReturned = brideStage === 'returned' || brideStage === 'receive' || brideStage === 'receiving';
-
-        if (selectedStageFilter === 'fitting') {
-          if (!hasFitting) continue;
-        } else if (selectedStageFilter === 'pickup') {
-          if (!isBookedForPickup || isReturned) continue;
-        } else if (selectedStageFilter === 'returned') {
-          if (!isReturned) continue;
-        } else {
-          if (brideStage !== selectedStageFilter) continue;
-        }
-      }
 
       // 3. Date matching: base the bride's day on her CURRENT STAGE's own date
       const latestBooking = b.bookings?.[0];
