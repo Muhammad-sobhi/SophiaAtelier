@@ -33,7 +33,7 @@ class Client extends Model
                 return explode(' ', $this->attributes['wedding_date'])[0];
             }
         }
-        $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('id')->first() : $this->bookings()->latest()->first();
+        $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('id')->first() : $this->bookings()->latest()->latest('id')->first();
         if (!$booking || empty($booking->event_date))
             return null;
         try {
@@ -95,13 +95,13 @@ class Client extends Model
 
     public function getLatestDressNameAttribute(): ?string
     {
-        $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('created_at')->first() : $this->bookings()->latest()->first();
+        $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('created_at')->first() : $this->bookings()->latest()->latest('id')->first();
         return $booking && $booking->dress ? $booking->dress->name : null;
     }
 
     public function getLatestDressTryingFeeAttribute(): float
     {
-        $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('created_at')->first() : $this->bookings()->latest()->first();
+        $booking = $this->relationLoaded('bookings') ? $this->bookings->sortByDesc('created_at')->first() : $this->bookings()->latest()->latest('id')->first();
         return $booking && $booking->dress ? (float) ($booking->dress->trying_fee ?? 0) : 0;
     }
 

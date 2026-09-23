@@ -21,17 +21,26 @@ export function ReturnDressModal({
   // Insurance amount from booking
   const totalInsurance = parseFloat(booking?.insurance_amount ?? 5000);
 
+  // Saved settlement (when editing an already returned dress)
+  const existingRefund = (booking?.revenues || []).find(r => r.type === 'insurance_refund');
+  const existingDamage = (booking?.revenues || []).find(r => r.type === 'damage_fee');
+  const isAlreadyReturned = booking?.status === 'returned';
+
   // States
-  const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [returnDate, setReturnDate] = useState(
+    String(existingRefund?.payment_date || (isAlreadyReturned && booking?.return_scheduled_on) || new Date().toISOString()).split('T')[0].split(' ')[0]
+  );
   const [returnSalesName, setReturnSalesName] = useState(booking?.return_sales_name || booking?.sales_name || '');
   
   // Refund mode: 'full' (استرداد كامل) or 'deduction' (خصم تلفيات)
-  const [refundMode, setRefundMode] = useState('full');
-  const [damageDeduction, setDamageDeduction] = useState('0');
-  const [damageNotes, setDamageNotes] = useState('');
-  const [insuranceRefundMethod, setInsuranceRefundMethod] = useState('cash');
+  const [refundMode, setRefundMode] = useState(existingDamage ? 'deduction' : 'full');
+  const [damageDeduction, setDamageDeduction] = useState(existingDamage ? String(Math.abs(parseFloat(existingDamage.amount || 0))) : '0');
+  const [damageNotes, setDamageNotes] = useState(existingDamage?.notes ? String(existingDamage.notes).replace(/^خصم تلفيات من التأمين( - )?/, '') : '');
+  const [insuranceRefundMethod, setInsuranceRefundMethod] = useState(existingRefund?.payment_method || 'cash');
   const [receiptImage, setReceiptImage] = useState(null);
-  const [returnNotes, setReturnNotes] = useState('تم استلام الفستان بحالة جيدة');
+  const [returnNotes, setReturnNotes] = useState(
+    existingRefund?.notes ? String(existingRefund.notes).replace(/^استرداد تأمين( - )?/, '') : 'تم استلام الفستان بحالة جيدة'
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Accessories Checklist

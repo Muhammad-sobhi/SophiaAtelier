@@ -154,11 +154,12 @@ export function BrideJourneyPopup({
     }
   };
 
-  const openFormForStage = (targetStage) => {
+  // isEdit: opened from the "edit current stage" button -> update saved data instead of adding new records
+  const openFormForStage = (targetStage, isEdit = false) => {
     if (targetStage === 'returned') {
       setIsReturnModalOpen(true);
     } else {
-      setStageModal({ isOpen: true, stage: targetStage || stage });
+      setStageModal({ isOpen: true, stage: targetStage || stage, isEdit });
     }
   };
 
@@ -315,7 +316,7 @@ export function BrideJourneyPopup({
               </button>
               <button
                 type="button"
-                onClick={() => openFormForStage(stage)}
+                onClick={() => openFormForStage(stage, true)}
                 className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
                 title="تعديل بيانات المرحلة الحالية"
               >
@@ -589,6 +590,7 @@ export function BrideJourneyPopup({
           onClose={() => setStageModal({ isOpen: false, stage: null })}
           bride={bride}
           stage={stageModal.stage}
+          isEdit={stageModal.isEdit}
           onSuccess={async () => {
             setStageModal({ isOpen: false, stage: null });
             setLoading(true);

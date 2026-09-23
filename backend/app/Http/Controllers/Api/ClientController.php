@@ -22,7 +22,7 @@ class ClientController extends Controller
             'visits.triedDresses',
             'visits.bookedDresses',
             'bookings' => function ($q) {
-                $q->latest();
+                $q->latest()->latest('id');
             },
             'bookings.dress.accessories',
             'bookings.dress.images',
@@ -230,7 +230,7 @@ class ClientController extends Controller
             'visits.triedDresses',
             'visits.bookedDresses',
             'bookings' => function ($q) {
-                $q->latest(); },
+                $q->latest()->latest('id'); },
             'bookings.dress.accessories',
             'bookings.dress.images',
             'bookings.dress2.accessories',
@@ -360,14 +360,21 @@ class ClientController extends Controller
 
         $client->update($validated);
 
-        if (array_key_exists('wedding_date', $validated) && !empty($validated['wedding_date']) && empty($validated['pickup_scheduled_on'])) {
+        // Recalculate pickup/return only when the wedding date actually changed (or none were set),
+        // so manually edited scheduled dates are not silently overwritten.
+        $latestBookingBeforeUpdate = $client->bookings()->latest()->latest('id')->first();
+        $weddingDateChanged = !$latestBookingBeforeUpdate
+            || !$latestBookingBeforeUpdate->event_date
+            || empty($latestBookingBeforeUpdate->return_scheduled_on)
+            || (!empty($validated['wedding_date']) && $latestBookingBeforeUpdate->event_date->format('Y-m-d') !== \Carbon\Carbon::parse($validated['wedding_date'])->format('Y-m-d'));
+        if (array_key_exists('wedding_date', $validated) && !empty($validated['wedding_date']) && empty($validated['pickup_scheduled_on']) && $weddingDateChanged) {
             $scheduled = \App\Models\Booking::calculateScheduledDates($validated['wedding_date'], $client->city);
             $validated['pickup_scheduled_on'] = $scheduled['pickup_date'];
             $validated['return_scheduled_on'] = $scheduled['return_date'];
         }
 
         if (array_key_exists('dress_id', $validated) || array_key_exists('dress_2_id', $validated) || array_key_exists('dress_3_id', $validated) || array_key_exists('pickup_scheduled_on', $validated) || array_key_exists('return_scheduled_on', $validated) || array_key_exists('wedding_date', $validated)) {
-            $booking = $client->bookings()->latest()->first();
+            $booking = $client->bookings()->latest()->latest('id')->first();
             if ($booking) {
                 $bookingUpdates = [];
                 if (array_key_exists('wedding_date', $validated)) $bookingUpdates['event_date'] = $validated['wedding_date'];
@@ -573,7 +580,7 @@ class ClientController extends Controller
                 $dress2Id = $request->input('dress_2_id');
                 $dress3Id = $request->input('dress_3_id');
                 if ($dressId || $dress2Id || $dress3Id) {
-                    $booking = $client->bookings()->latest()->first();
+                    $booking = $client->bookings()->latest()->latest('id')->first();
                     if ($booking) {
                         $booking->update([
                             'dress_id' => $dressId ?: $booking->dress_id,
@@ -598,7 +605,7 @@ class ClientController extends Controller
 
             case 'schedule_fitting':
                 // Create a fitting record via the latest booking
-                $booking = $client->bookings()->latest()->first();
+                $booking = $client->bookings()->latest()->latest('id')->first();
                 $dressId = $request->input('dress_id') ?: ($booking ? $booking->dress_id : null);
                 if (!$dressId) {
                     $dressId = \App\Models\Dress::value('id');
@@ -689,7 +696,7 @@ class ClientController extends Controller
                 }
 
                 // Get or create booking
-                $booking = $client->bookings()->latest()->first();
+                $booking = $client->bookings()->latest()->latest('id')->first();
                 if (!$booking) {
                     $booking = new \App\Models\Booking();
                     $booking->client_id = $client->id;
@@ -813,7 +820,7 @@ class ClientController extends Controller
                 $fittings = $client->fittings()->get();
                 $endFittingSalesName = $request->input('sales_name');
                 if ($fittings->count() === 0) {
-                    $booking = $client->bookings()->latest()->first();
+                    $booking = $client->bookings()->latest()->latest('id')->first();
                     if ($booking) {
                         Fitting::create([
                             'booking_id' => $booking->id,
@@ -834,7 +841,7 @@ class ClientController extends Controller
                 break;
 
             case 'mark_picked_up':
-                $booking = $client->bookings()->latest()->first();
+                $booking = $client->bookings()->latest()->latest('id')->first();
                 if ($booking) {
                     $updateData = [
                         'status' => 'picked_up',
@@ -945,7 +952,7 @@ class ClientController extends Controller
                 break;
 
             case 'mark_returned':
-                $booking = $client->bookings()->latest()->first();
+                $booking = $client->bookings()->latest()->latest('id')->first();
                 if ($booking) {
                     $returnUpdate = ['status' => 'returned'];
                     if ($request->has('sales_name')) {
@@ -973,6 +980,16 @@ class ClientController extends Controller
                         floatval($request->input('insurance_refund', $maxRefund))
                     );
 
+                    // Settlement is dated on the actual return day (not the day the form was saved)
+                    $settlementDate = $request->filled('return_date')
+                        ? \Carbon\Carbon::parse($request->input('return_date'))->toDateString()
+                        : now()->toDateString();
+
+                    // Editing an existing return replaces its settlement instead of duplicating it
+                    $previousSettlement = $booking->revenues()->whereIn('type', ['insurance_refund', 'damage_fee'])->get();
+                    $previousRefundReceipt = optional($previousSettlement->firstWhere('type', 'insurance_refund'))->receipt_path;
+                    $booking->revenues()->whereIn('type', ['insurance_refund', 'damage_fee'])->delete();
+
                     $insuranceRev = $booking->revenues()
                         ->where('notes', 'like', '%تأمين%')
                         ->latest()
@@ -987,7 +1004,7 @@ class ClientController extends Controller
                             'type' => 'damage_fee',
                             'amount' => $damageDeduction,
                             'payment_method' => $insuranceMethod,
-                            'payment_date' => now()->toDateString(),
+                            'payment_date' => $settlementDate,
                             'notes' => 'خصم تلفيات من التأمين' . ($request->filled('damage_notes') ? ' - ' . $request->input('damage_notes') : ''),
                         ]);
                     }
@@ -997,14 +1014,15 @@ class ClientController extends Controller
                             ?: $insuranceMethod;
 
                         $receiptPath = self::saveReceipt($request, 'insurance_refund_receipt')
-                            ?? self::saveReceiptData($request->input('insurance_refund_receipt'));
+                            ?? self::saveReceiptData($request->input('insurance_refund_receipt'))
+                            ?? $previousRefundReceipt;
 
                         \App\Models\Revenue::create([
                             'booking_id' => $booking->id,
                             'type' => 'insurance_refund',
                             'amount' => -$refundAmount,
                             'payment_method' => $paymentMethod,
-                            'payment_date' => now()->toDateString(),
+                            'payment_date' => $settlementDate,
                             'notes' => 'استرداد تأمين' . ($request->filled('notes') ? ' - ' . $request->input('notes') : ''),
                             'receipt_path' => $receiptPath,
                         ]);
@@ -1013,7 +1031,7 @@ class ClientController extends Controller
                 break;
 
             case 'pay_remaining':
-                $booking = $client->bookings()->latest()->first();
+                $booking = $client->bookings()->latest()->latest('id')->first();
                 if ($booking) {
                     $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
                     $payments = $request->input('payments');

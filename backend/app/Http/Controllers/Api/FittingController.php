@@ -54,6 +54,7 @@ class FittingController extends Controller
             'measurements' => 'nullable|array',
             'alterations' => 'nullable|array',
             'sales_associate' => 'nullable|string|max:255',
+            'sales_name' => 'nullable|string|max:255',
             'alterations_notes' => 'nullable|string',
             'additional_notes' => 'nullable|string',
             'status' => 'nullable|in:scheduled,completed,rescheduled',

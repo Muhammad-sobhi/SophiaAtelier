@@ -148,6 +148,7 @@ export function UnifiedStageModal({
   onSuccess,
   dressesList: propDressesList,
   employeesList: propEmployeesList,
+  isEdit = false,
 }) {
   if (!isOpen || !bride) return null;
 
@@ -209,7 +210,8 @@ export function UnifiedStageModal({
     const initialEvent = booking?.event_date || bride.wedding_date || new Date().toISOString();
     return calculateScheduledDates(initialEvent, bride.city || 'القاهرة').return_date;
   });
-  const [isCustomPickupDate, setIsCustomPickupDate] = useState(Boolean(booking?.pickup_scheduled_on));
+  // Stored dates count as custom so the auto-sync below never overwrites saved values
+  const [isCustomPickupDate, setIsCustomPickupDate] = useState(Boolean(booking?.pickup_scheduled_on || booking?.return_scheduled_on));
 
   const [bookingTotalAmount, setBookingTotalAmount] = useState(booking?.total_amount ? String(booking.total_amount) : '3500');
   const [bookingDepositAmount, setBookingDepositAmount] = useState(booking?.deposit_amount ? String(booking.deposit_amount) : '1000');
@@ -237,14 +239,25 @@ export function UnifiedStageModal({
   const [visitDress3Id, setVisitDress3Id] = useState(booking?.dress_3_id ? String(booking.dress_3_id) : '');
   const [visitDress3Search, setVisitDress3Search] = useState('');
 
-  // Fitting Stage Fields
-  const latestFitting = bride.fittings?.[0];
+  // Fitting Stage Fields — prefer the latest active fitting (fittings are not ordered by the API)
+  const sortedFittings = [...(bride.fittings || [])].sort((a, b) =>
+    String(b.fitting_date || '').localeCompare(String(a.fitting_date || '')) || (b.id || 0) - (a.id || 0)
+  );
+  const activeFitting = sortedFittings.find((f) => f.status !== 'completed' && f.status !== 'cancelled');
+  const latestFitting = activeFitting || sortedFittings[0];
+  const editingFitting = isEdit ? activeFitting : null;
+  // Time is stored inside additional_notes as "الوقت: 02:00 م | notes"
+  const parsedFittingNotes = (() => {
+    const raw = latestFitting?.additional_notes || '';
+    const m = String(raw).match(/^الوقت:\s*([^|]*?)\s*\|\s*([\s\S]*)$/);
+    return m ? { time: m[1], notes: m[2] } : { time: '', notes: raw };
+  })();
   const [fittingDate, setFittingDate] = useState(cleanDate(latestFitting?.fitting_date || new Date().toISOString()));
-  const [fittingTime, setFittingTime] = useState(latestFitting?.fitting_time || '02:00 م');
+  const [fittingTime, setFittingTime] = useState(latestFitting?.fitting_time || parsedFittingNotes.time || '02:00 م');
   const [fittingSalesName, setFittingSalesName] = useState(latestFitting?.sales_name || latestFitting?.sales_associate || salesName || '');
   const [fittingDressId, setFittingDressId] = useState(booking?.dress_id ? String(booking.dress_id) : (bookingDressId || ''));
   const [fittingDressSearch, setFittingDressSearch] = useState('');
-  const [alterationNotes, setAlterationNotes] = useState(latestFitting?.alteration_notes || latestFitting?.additional_notes || '');
+  const [alterationNotes, setAlterationNotes] = useState(latestFitting?.alteration_notes || parsedFittingNotes.notes || '');
 
   // Pickup Stage Fields
   const existingBalances = (booking?.revenues || []).filter(r => r.type === 'balance');
@@ -288,15 +301,20 @@ export function UnifiedStageModal({
       : [{ amount: String(booking?.insurance_amount || 5000), payment_method: 'cash' }]
   );
 
-  // Return Stage Fields
+  // Return Stage Fields — prefilled from the saved settlement when the dress was already returned
+  const existingRefund = (booking?.revenues || []).find(r => r.type === 'insurance_refund');
+  const existingDamage = (booking?.revenues || []).find(r => r.type === 'damage_fee');
+  const isAlreadyReturned = booking?.status === 'returned';
   const [returnInsuranceAmount, setReturnInsuranceAmount] = useState(booking?.insurance_amount ? String(booking.insurance_amount) : '5000');
   const totalHeldInsurance = parseFloat(returnInsuranceAmount || 5000);
-  const [returnDate, setReturnDate] = useState(cleanDate(booking?.return_date || new Date().toISOString()));
+  const [returnDate, setReturnDate] = useState(cleanDate(
+    existingRefund?.payment_date || (isAlreadyReturned && booking?.return_scheduled_on) || new Date().toISOString()
+  ));
   const [returnSalesName, setReturnSalesName] = useState(booking?.return_sales_name || salesName || '');
-  const [returnRefundMode, setReturnRefundMode] = useState('full');
-  const [damageDeduction, setDamageDeduction] = useState('0');
-  const [damageNotes, setDamageNotes] = useState('');
-  const [insuranceRefundMethod, setInsuranceRefundMethod] = useState('cash');
+  const [returnRefundMode, setReturnRefundMode] = useState(existingDamage ? 'deduction' : 'full');
+  const [damageDeduction, setDamageDeduction] = useState(existingDamage ? String(Math.abs(parseFloat(existingDamage.amount || 0))) : '0');
+  const [damageNotes, setDamageNotes] = useState(existingDamage?.notes ? String(existingDamage.notes).replace(/^خصم تلفيات من التأمين( - )?/, '') : '');
+  const [insuranceRefundMethod, setInsuranceRefundMethod] = useState(existingRefund?.payment_method || 'cash');
 
   // Load dresses with active bookings and employees
   useEffect(() => {
@@ -550,14 +568,23 @@ export function UnifiedStageModal({
           ? parseInt(fittingDressId)
           : (booking?.dress_id ? parseInt(booking.dress_id) : (dressesList[0]?.id ? parseInt(dressesList[0].id) : null));
 
-        await apiClient.put(`/clients/${bride.id}/stage-action`, {
-          action: 'schedule_fitting',
-          fitting_date: fittingDate,
-          fitting_time: fittingTime,
-          dress_id: resolvedFittingDressId,
-          notes: alterationNotes || notes,
-          sales_name: fittingSalesName.trim() || null,
-        });
+        if (editingFitting) {
+          // Editing: update the existing fitting instead of creating a new one
+          await apiClient.put(`/fittings/${editingFitting.id}`, {
+            fitting_date: fittingDate,
+            sales_name: fittingSalesName.trim() || null,
+            additional_notes: `الوقت: ${fittingTime} | ${alterationNotes || ''}`,
+          });
+        } else {
+          await apiClient.put(`/clients/${bride.id}/stage-action`, {
+            action: 'schedule_fitting',
+            fitting_date: fittingDate,
+            fitting_time: fittingTime,
+            dress_id: resolvedFittingDressId,
+            notes: alterationNotes || notes,
+            sales_name: fittingSalesName.trim() || null,
+          });
+        }
 
         // Also sync booking financial updates if booking exists
         if (booking) {
