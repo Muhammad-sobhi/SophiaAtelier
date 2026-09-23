@@ -147,6 +147,7 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [transactionsError, setTransactionsError] = useState(false);
   const [paymentBreakdownData, setPaymentBreakdownData] = useState({});
   const transactionsRequestId = useRef(0);
   const [selectedTx, setSelectedTx] = useState(null);
@@ -391,8 +392,14 @@ export default function FinancePage() {
       }
       setTransactions((res?.data || []).map(mapTransaction));
       setTotalCount(res?.total || 0);
+      setTransactionsError(false);
     } catch (e) {
-      if (requestId === transactionsRequestId.current) console.error('Failed to load finance transactions:', e);
+      if (requestId === transactionsRequestId.current) {
+        console.error('Failed to load finance transactions:', e);
+        setTransactions([]);
+        setTotalCount(0);
+        setTransactionsError(true);
+      }
     } finally {
       if (requestId === transactionsRequestId.current) setIsLoadingTransactions(false);
     }
@@ -1076,7 +1083,9 @@ export default function FinancePage() {
 
         {totalCount === 0 ? (
           <div className="p-8 text-center text-xs font-bold text-slate-400">
-            {isLoadingTransactions ? 'جاري تحميل المعاملات...' : 'لا توجد قيود مالية مطابقة للبحث أو الفلتر المحدد.'}
+            {isLoadingTransactions ? 'جاري تحميل المعاملات...' :
+            transactionsError ? <span className="text-rose-500">تعذر تحميل المعاملات، يرجى المحاولة مرة أخرى.</span> :
+            'لا توجد قيود مالية مطابقة للبحث أو الفلتر المحدد.'}
           </div>
         ) : (
           <>
