@@ -65,6 +65,35 @@ export default function BridesTab({
     return raw === 'picked_up' && isDelivered ? 'returned' : raw;
   };
 
+  // Return-stage badge: "returned" only when the dress actually came back,
+  // otherwise show the countdown to (or delay past) the scheduled return date.
+  const getReturnBadge = (b) => {
+    const raw = b.current_stage || b.stage || 'visit';
+    const isOut = b.bookings?.some((bk) => bk.status === 'picked_up' || bk.status === 'out');
+    const isReturned =
+      !isOut &&
+      (b.bookings?.some((bk) => bk.status === 'returned') || raw === 'returned' || raw === 'completed');
+    if (isReturned) return null;
+
+    const retDate = getStageDate(b, 'returned');
+    if (!retDate) {
+      return { label: 'قيد الإرجاع', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-500' };
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ret = new Date(String(retDate).slice(0, 10));
+    ret.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((ret - today) / 86400000);
+
+    if (diffDays < 0) {
+      return { label: `متأخر ${Math.abs(diffDays)} يوم`, badgeClass: 'bg-rose-100 text-rose-800 border-rose-300', dotColor: 'bg-rose-500' };
+    }
+    if (diffDays === 0) {
+      return { label: 'الإرجاع اليوم', badgeClass: 'bg-amber-100 text-amber-900 border-amber-300', dotColor: 'bg-amber-500' };
+    }
+    return { label: `الإرجاع بعد ${diffDays} يوم`, badgeClass: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-500' };
+  };
+
   // Stage match helper:
   // 1. Bookings > 15 days away stay in 'booking'
   // 2. Bookings <= 15 days appear in 'picked_up'
@@ -376,7 +405,8 @@ export default function BridesTab({
             {filteredBrides.map((bride) => {
               const stage = getEffectiveStage(bride);
               const activeStageKey = stageFilter !== 'all' ? stageFilter : stage;
-              const stageCfg = STAGE_MAP[activeStageKey] || STAGE_MAP[stage] || STAGE_MAP.visit;
+              const baseStageCfg = STAGE_MAP[activeStageKey] || STAGE_MAP[stage] || STAGE_MAP.visit;
+              const stageCfg = activeStageKey === 'returned' ? getReturnBadge(bride) || baseStageCfg : baseStageCfg;
               const displayDate = bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
               const wDate = bride.wedding_date || bride.bookings?.[0]?.event_date || bride.relevant_date;

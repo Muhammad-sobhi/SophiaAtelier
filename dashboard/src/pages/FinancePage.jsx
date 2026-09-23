@@ -624,6 +624,7 @@ export default function FinancePage() {
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch = !query ||
       (t.desc && t.desc.toLowerCase().includes(query)) ||
+      (t.clientName && t.clientName.toLowerCase().includes(query)) ||
       (categoryLabels[t.category] && categoryLabels[t.category].toLowerCase().includes(query)) ||
       (paymentMethodLabels[t.paymentMethod] && paymentMethodLabels[t.paymentMethod].toLowerCase().includes(query)) ||
       (t.amount && t.amount.toLowerCase().includes(query)) ||
@@ -1057,7 +1058,10 @@ export default function FinancePage() {
                           <span>إيصال</span>
                         </button>
                       )}
-                      <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
+                        {t.clientName && <span className="text-[10px] font-extrabold text-indigo-600 block truncate">العروس: {t.clientName}</span>}
+                      </div>
                     </div>
                     <span className={`text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {t.amount}
@@ -1115,7 +1119,10 @@ export default function FinancePage() {
                               <span>إيصال</span>
                             </button>
                           )}
-                          <span className="truncate">{t.desc}</span>
+                          <div className="min-w-0">
+                            <span className="truncate block">{t.desc}</span>
+                            {t.clientName && <span className="text-[10px] font-extrabold text-indigo-600 block truncate">العروس: {t.clientName}</span>}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
@@ -1221,6 +1228,12 @@ export default function FinancePage() {
                   <span className="text-[10px] font-extrabold text-slate-400 block">وصف العملية</span>
                   <span className="text-xs font-bold text-slate-700 mt-1 block">{selectedTx.desc}</span>
                 </div>
+                {selectedTx.clientName && (
+                  <div className="col-span-2">
+                    <span className="text-[10px] font-extrabold text-slate-400 block">العروس</span>
+                    <span className="text-xs font-bold text-indigo-700 mt-1 block">{selectedTx.clientName}</span>
+                  </div>
+                )}
                 <div>
                   <span className="text-[10px] font-extrabold text-slate-400 block">نوع المعاملة</span>
                   <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg border w-fit block mt-1 ${

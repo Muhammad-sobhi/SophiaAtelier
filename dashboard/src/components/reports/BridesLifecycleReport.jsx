@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Share2, MapPin, TrendingUp, Heart, Ruler, Package, RotateCcw, Calendar } from 'lucide-react';
+import { Users, Share2, MapPin, TrendingUp, Heart, Ruler, Package, RotateCcw, Calendar, X } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
 export function BridesLifecycleReport() {
-  const [brides, setBrides] = useState([]);
+  const [allBrides, setAllBrides] = useState([]);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [visits, setVisits] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +19,7 @@ export function BridesLifecycleReport() {
     ])
       .then(([clientRes, visRes, bookRes]) => {
         if (!isMounted) return;
-        setBrides(Array.isArray(clientRes) ? clientRes : clientRes?.data || []);
+        setAllBrides(Array.isArray(clientRes) ? clientRes : clientRes?.data || []);
         setVisits(Array.isArray(visRes) ? visRes : visRes?.data || []);
         setBookings(Array.isArray(bookRes) ? bookRes : bookRes?.data || []);
       })
@@ -26,6 +28,18 @@ export function BridesLifecycleReport() {
 
     return () => { isMounted = false; };
   }, []);
+
+  // Brides registered within the selected period (by registration date)
+  const brides = useMemo(() => {
+    if (!fromDate && !toDate) return allBrides;
+    return allBrides.filter((b) => {
+      const d = String(b.created_at || '').slice(0, 10);
+      if (!d) return false;
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+      return true;
+    });
+  }, [allBrides, fromDate, toDate]);
 
   // Lifecycle Funnel Counts
   const funnel = useMemo(() => {
@@ -118,6 +132,45 @@ export function BridesLifecycleReport() {
           <span className="font-mono text-xs font-black bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-xl border border-indigo-100">
             {brides.length} عروس مسجلة
           </span>
+        </div>
+
+        {/* Date Filter (by registration date) */}
+        <div className="pt-2.5 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-black text-slate-400 flex items-center gap-1 ml-1">
+            <Calendar size={13} className="text-indigo-600" />
+            <span>تاريخ التسجيل:</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] font-bold text-slate-400">من:</label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] font-bold text-slate-400">إلى:</label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => setToDate(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              onClick={() => { setFromDate(''); setToDate(''); }}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 transition-all cursor-pointer"
+              title="إلغاء تصفية التاريخ"
+            >
+              <X size={12} />
+              <span>إلغاء</span>
+            </button>
+          )}
         </div>
 
         {/* Funnel Step Bars */}
