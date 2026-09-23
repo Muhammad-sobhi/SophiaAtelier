@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient, getAllPages } from '@/lib/api-client';
 import {
   DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
@@ -80,8 +80,75 @@ const pmIcons = {
   'bank_transfer': Building2
 };
 
+// Maps a row from /finance/transactions (a revenue or expense tagged with `kind`) to the page's transaction shape.
+const mapTransaction = (row) => {
+  if (row.kind === 'revenue') {
+    const val = parseFloat(row.amount || 0);
+    let mappedCat = 'shop';
+    let txType = val >= 0 ? 'إيراد' : 'مرتجع';
+    if (row.type === 'transfer_in') {
+      mappedCat = 'transfers';
+      txType = 'مناقلة (وارد)';
+    } else if (row.type === 'capital_deposit') {
+      mappedCat = 'transfers';
+      txType = 'إيداع رصيد';
+    }
+
+    return {
+      id: `revenue-${row.id}`,
+      desc: row.notes || `دفعة مالية (${row.type || 'other'})`,
+      type: txType,
+      category: mappedCat,
+      rawAmount: val,
+      amount: val >= 0 ? `+${val.toLocaleString()} ج.م` : `-${Math.abs(val).toLocaleString()} ج.م`,
+      date: formatDateStr(row.payment_date || ''),
+      isRevenue: true,
+      paymentMethod: (row.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
+      clientName: row.client_name,
+      receiptImage: row.receipt_url,
+      rawDate: row.payment_date ? row.payment_date.split('T')[0] : '',
+      backendCategory: row.type,
+      payments: row.payments || []
+    };
+  }
+
+  let mappedCat = 'other';
+  let txType = 'مصروف';
+  if (row.category === 'salary' || row.category === 'purchase') mappedCat = 'operational';
+  else if (row.category === 'cleaning' || row.category === 'maintenance') mappedCat = 'utilities';
+  else if (row.category === 'transfer_out') {
+    mappedCat = 'transfers';
+    txType = 'مناقلة (صادر)';
+  } else if (row.category === 'owner_withdrawal') {
+    mappedCat = 'transfers';
+    txType = 'سحب رصيد';
+  }
+
+  return {
+    id: `expense-${row.id}`,
+    desc: row.description || `مصروف (${row.category || 'other'})`,
+    type: txType,
+    category: mappedCat,
+    rawAmount: parseFloat(row.amount || 0),
+    amount: `-${parseFloat(row.amount || 0).toLocaleString()} ج.م`,
+    date: formatDateStr(row.date || ''),
+    isRevenue: false,
+    paymentMethod: (row.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
+    receiptImage: row.receipt_url,
+    rawDate: row.date ? row.date.split('T')[0] : '',
+    backendCategory: row.category
+  };
+};
+
+const ITEMS_PER_PAGE = 20;
+
 export default function FinancePage() {
-  const [allTransactions, setAllTransactions] = useState([]);
+  // Current page of transactions (filtered, searched and paginated on the server)
+  const [transactions, setTransactions] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [paymentBreakdownData, setPaymentBreakdownData] = useState({});
+  const transactionsRequestId = useRef(0);
   const [selectedTx, setSelectedTx] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,6 +156,7 @@ export default function FinancePage() {
 
   // Search & Pagination states
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Date range filter & presets ('all' | 'today' | 'this_month' | 'last_3_months' | 'custom')
@@ -114,37 +182,51 @@ export default function FinancePage() {
   const [selectedStatModalType, setSelectedStatModalType] = useState(null);
   const [dressesForStatModal, setDressesForStatModal] = useState([]);
   const [heldInsurancesForStatModal, setHeldInsurancesForStatModal] = useState([]);
+  const [statModalTransactions, setStatModalTransactions] = useState([]);
 
+  // Stats modal data is loaded only when its modal is opened
   useEffect(() => {
-    apiClient.get('/dresses?per_page=1000').then((res) => {
-      const list = Array.isArray(res) ? res : res?.data || [];
-      setDressesForStatModal(list);
-    }).catch(() => {});
+    if (selectedStatModalType === 'total_assets') {
+      apiClient.get('/dresses?per_page=1000').then((res) => {
+        const list = Array.isArray(res) ? res : res?.data || [];
+        setDressesForStatModal(list);
+      }).catch(() => {});
+    } else if (selectedStatModalType === 'held_insurances') {
+      apiClient.get('/clients?per_page=1000').then((res) => {
+        const list = Array.isArray(res) ? res : res?.data || [];
+        const held = [];
+        list.forEach((c) => {
+          const b = c.bookings?.[0];
+          const ins = parseFloat(b?.insurance_amount || 0);
+          if (b && ins > 0 && ['confirmed', 'picked_up'].includes(b.status)) {
+            held.push({
+              brideName: c.name,
+              bridePhone: c.phone,
+              dressName: b.dress?.name || c.latest_dress_name || 'فستان',
+              insuranceAmount: ins,
+              eventDate: b.event_date || c.wedding_date,
+              stage: c.current_stage || b.status
+            });
+          }
+        });
+        setHeldInsurancesForStatModal(held);
+      }).catch(() => {});
+    }
+  }, [selectedStatModalType]);
 
-    apiClient.get('/clients?per_page=1000').then((res) => {
-      const list = Array.isArray(res) ? res : res?.data || [];
-      const held = [];
-      list.forEach((c) => {
-        const b = c.bookings?.[0];
-        const ins = parseFloat(b?.insurance_amount || 0);
-        if (b && ins > 0 && ['confirmed', 'picked_up'].includes(b.status)) {
-          held.push({
-            brideName: c.name,
-            bridePhone: c.phone,
-            dressName: b.dress?.name || c.latest_dress_name || 'فستان',
-            insuranceAmount: ins,
-            eventDate: b.event_date || c.wedding_date,
-            stage: c.current_stage || b.status
-          });
-        }
-      });
-      setHeldInsurancesForStatModal(held);
-    }).catch(() => {});
-  }, []);
-
+  // Search the server only after typing pauses
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Go back to page 1 whenever a filter changes (in the same render, so only one request is sent)
+  const filterKey = [activeTab, activePaymentFilter, debouncedSearch, filterStart, filterEnd].join('|');
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
     setCurrentPage(1);
-  }, [activeTab, activePaymentFilter, searchQuery, filterStart, filterEnd]);
+  }
 
   const handleSelectDatePreset = (presetKey) => {
     setDatePreset(presetKey);
@@ -179,8 +261,16 @@ export default function FinancePage() {
     }
   };
 
-  const handleExportCSV = () => {
-    if (filteredTransactions.length === 0) {
+  const handleExportCSV = async () => {
+    let exportTransactions;
+    try {
+      exportTransactions = await fetchAllFilteredTransactions();
+    } catch (e) {
+      console.error('Failed to export transactions:', e);
+      alert('فشل تحميل المعاملات للتصدير');
+      return;
+    }
+    if (exportTransactions.length === 0) {
       alert('لا توجد معاملات لتصديرها');
       return;
     }
@@ -197,7 +287,7 @@ export default function FinancePage() {
       'يوجد إيصال'
     ];
 
-    const rows = filteredTransactions.map((t) => [
+    const rows = exportTransactions.map((t) => [
       `"${t.id}"`,
       `"${t.date}"`,
       `"${(t.desc || '').replace(/"/g, '""')}"`,
@@ -260,81 +350,18 @@ export default function FinancePage() {
     return new URLSearchParams(p).toString();
   }, [filterStart, filterEnd]);
 
-  const loadData = useCallback(async () => {
+  // Date range + tab + payment method + search, as sent to /finance/transactions
+  const buildTransactionsQS = useCallback(() => {
+    const p = new URLSearchParams(buildQS());
+    if (activeTab !== 'all') p.set('tab', activeTab);
+    if (activePaymentFilter) p.set('payment_method', activePaymentFilter);
+    if (debouncedSearch) p.set('search', debouncedSearch);
+    return p.toString();
+  }, [buildQS, activeTab, activePaymentFilter, debouncedSearch]);
+
+  const loadSummary = useCallback(async () => {
     try {
-      const qs = buildQS();
-      const [revRes, expRes, summaryRes] = await Promise.all([
-      getAllPages(`/revenues?${qs}`),
-      getAllPages(`/expenses?${qs}`),
-      apiClient.get(`/finance/summary?${qs}`)]
-      );
-
-      const revList = Array.isArray(revRes) ? revRes : revRes.data || [];
-      const expList = Array.isArray(expRes) ? expRes : expRes.data || [];
-
-      const revenueTxs = revList.map((r) => {
-        const val = parseFloat(r.amount || 0);
-        let mappedCat = 'shop';
-        let txType = val >= 0 ? 'إيراد' : 'مرتجع';
-        if (r.type === 'transfer_in') {
-          mappedCat = 'transfers';
-          txType = 'مناقلة (وارد)';
-        } else if (r.type === 'capital_deposit') {
-          mappedCat = 'transfers';
-          txType = 'إيداع رصيد';
-        }
-
-        return {
-          id: `revenue-${r.id}`,
-          desc: r.notes || `دفعة مالية (${r.type || 'other'})`,
-          type: txType,
-          category: mappedCat,
-          rawAmount: val,
-          amount: val >= 0 ? `+${val.toLocaleString()} ج.م` : `-${Math.abs(val).toLocaleString()} ج.م`,
-          date: formatDateStr(r.payment_date || ''),
-          isRevenue: true,
-          paymentMethod: (r.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
-          clientName: r.booking?.client?.name,
-          receiptImage: r.receipt_url,
-          rawDate: r.payment_date ? r.payment_date.split('T')[0] : '',
-          backendCategory: r.type,
-          payments: r.payments || []
-        };
-      });
-
-      const expenseTxs = expList.map((e) => {
-        let mappedCat = 'other';
-        let txType = 'مصروف';
-        if (e.category === 'salary' || e.category === 'purchase') mappedCat = 'operational';
-        else if (e.category === 'cleaning' || e.category === 'maintenance') mappedCat = 'utilities';
-        else if (e.category === 'transfer_out') {
-          mappedCat = 'transfers';
-          txType = 'مناقلة (صادر)';
-        } else if (e.category === 'owner_withdrawal') {
-          mappedCat = 'transfers';
-          txType = 'سحب رصيد';
-        }
-
-        return {
-          id: `expense-${e.id}`,
-          desc: e.description || `مصروف (${e.category || 'other'})`,
-          type: txType,
-          category: mappedCat,
-          rawAmount: parseFloat(e.amount || 0),
-          amount: `-${parseFloat(e.amount || 0).toLocaleString()} ج.م`,
-          date: formatDateStr(e.date || ''),
-          isRevenue: false,
-          paymentMethod: (e.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
-          receiptImage: e.receipt_url,
-          rawDate: e.date ? e.date.split('T')[0] : '',
-          backendCategory: e.category
-        };
-      });
-
-      const combined = [...revenueTxs, ...expenseTxs];
-      combined.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
-      setAllTransactions(combined);
-
+      const summaryRes = await apiClient.get(`/finance/summary?${buildQS()}`);
       if (summaryRes) {
         setTotals({
           net_revenue: summaryRes.net_revenue || 0,
@@ -343,13 +370,57 @@ export default function FinancePage() {
           held_insurances: summaryRes.held_insurances || 0,
           total_assets: summaryRes.total_assets || 0,
         });
+        setPaymentBreakdownData(summaryRes.payment_breakdown || {});
       }
     } catch (e) {
-      console.error('Failed to load finance data:', e);
+      console.error('Failed to load finance summary:', e);
     }
   }, [buildQS]);
 
-  useEffect(() => {loadData();}, [loadData]);
+  const loadTransactions = useCallback(async () => {
+    // Ignore responses of older requests (e.g. while typing in search)
+    const requestId = ++transactionsRequestId.current;
+    setIsLoadingTransactions(true);
+    try {
+      const qs = buildTransactionsQS();
+      const res = await apiClient.get(`/finance/transactions?${qs}${qs ? '&' : ''}page=${currentPage}&per_page=${ITEMS_PER_PAGE}`);
+      if (requestId !== transactionsRequestId.current) return;
+      if (res?.last_page && currentPage > res.last_page) {
+        setCurrentPage(res.last_page);
+        return;
+      }
+      setTransactions((res?.data || []).map(mapTransaction));
+      setTotalCount(res?.total || 0);
+    } catch (e) {
+      if (requestId === transactionsRequestId.current) console.error('Failed to load finance transactions:', e);
+    } finally {
+      if (requestId === transactionsRequestId.current) setIsLoadingTransactions(false);
+    }
+  }, [buildTransactionsQS, currentPage]);
+
+  const loadData = useCallback(
+    () => Promise.all([loadSummary(), loadTransactions()]),
+    [loadSummary, loadTransactions]
+  );
+
+  useEffect(() => {loadSummary();}, [loadSummary]);
+  useEffect(() => {loadTransactions();}, [loadTransactions]);
+
+  // Every matching transaction (all pages), used by the CSV export and the stats modal
+  const fetchAllFilteredTransactions = useCallback(async () => {
+    const rows = await getAllPages(`/finance/transactions?${buildTransactionsQS()}`);
+    return rows.map(mapTransaction);
+  }, [buildTransactionsQS]);
+
+  useEffect(() => {
+    if (!['net_profit', 'net_revenue', 'net_expense'].includes(selectedStatModalType)) return;
+    let cancelled = false;
+    setStatModalTransactions([]);
+    fetchAllFilteredTransactions()
+      .then((rows) => {if (!cancelled) setStatModalTransactions(rows);})
+      .catch((e) => console.error('Failed to load transactions for stats modal:', e));
+    return () => {cancelled = true;};
+  }, [selectedStatModalType, fetchAllFilteredTransactions]);
 
   // Load cleaning orders
   const loadCleaningOrders = useCallback(async () => {
@@ -605,38 +676,14 @@ export default function FinancePage() {
     }
   };
 
-  // Payment method breakdown
+  // Payment method breakdown (totals come from /finance/summary)
   const paymentBreakdown = paymentMethodKeys.map((key) => {
-    const methods = [key, key.replace('_', ' ')];
-    const txs = allTransactions.filter((t) => methods.includes(t.paymentMethod));
-    const income = txs.filter((t) => t.isRevenue).reduce((s, t) => s + t.rawAmount, 0);
-    const outcome = txs.filter((t) => !t.isRevenue).reduce((s, t) => s + t.rawAmount, 0);
-    const balance = income - outcome;
-    return { key, label: paymentMethodLabels[key] || key, income, outcome, balance, count: txs.length };
+    const { income = 0, outcome = 0, count = 0 } = paymentBreakdownData[key] || {};
+    return { key, label: paymentMethodLabels[key] || key, income, outcome, balance: income - outcome, count };
   });
 
-  // Filter transactions based on active tab, active payment filter, AND search query
-  const filteredTransactions = allTransactions.filter((t) => {
-    const tabOk = activeTab === 'all' || t.category === activeTab;
-    const methodOk = !activePaymentFilter ||
-    [activePaymentFilter, activePaymentFilter.replace('_', ' ')].includes(t.paymentMethod);
-
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch = !query ||
-      (t.desc && t.desc.toLowerCase().includes(query)) ||
-      (t.clientName && t.clientName.toLowerCase().includes(query)) ||
-      (categoryLabels[t.category] && categoryLabels[t.category].toLowerCase().includes(query)) ||
-      (paymentMethodLabels[t.paymentMethod] && paymentMethodLabels[t.paymentMethod].toLowerCase().includes(query)) ||
-      (t.amount && t.amount.toLowerCase().includes(query)) ||
-      (t.date && t.date.includes(query));
-
-    return tabOk && methodOk && matchesSearch;
-  });
-
-  const itemsPerPage = 20;
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const summaryCards = [
     { type: 'net_profit', label: 'صافي الأرباح', value: `${totals.net_profit.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
@@ -759,7 +806,7 @@ export default function FinancePage() {
             </div>
           )}
           <span className="text-[10px] font-extrabold text-indigo-500 bg-indigo-50 px-2.5 py-1.5 rounded-xl border border-indigo-100">
-            {filteredTransactions.length} معاملة
+            {totalCount} معاملة
           </span>
         </div>
       </div>
@@ -850,7 +897,7 @@ export default function FinancePage() {
           {activePaymentFilter &&
         <div className="mt-2 flex items-center gap-2">
               <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
-                عرض: {paymentMethodLabels[activePaymentFilter] || activePaymentFilter} ({filteredTransactions.length} معاملة)
+                عرض: {paymentMethodLabels[activePaymentFilter] || activePaymentFilter} ({totalCount} معاملة)
               </span>
               <button onClick={() => setActivePaymentFilter(null)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline cursor-pointer">
                 عرض الكل
@@ -1001,7 +1048,7 @@ export default function FinancePage() {
               activeTab === 'all' ? 'سجل كافة المعاملات المالية' : `سجل: ${categoryLabels[activeTab]}`}
             </h3>
             <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-              إجمالي نتائج البحث: {filteredTransactions.length} قيد (حد أقصى 20 معاملة بالصفحة)
+              إجمالي نتائج البحث: {totalCount} قيد (حد أقصى 20 معاملة بالصفحة)
             </p>
           </div>
 
@@ -1027,13 +1074,15 @@ export default function FinancePage() {
           </div>
         </div>
 
-        {filteredTransactions.length === 0 ? (
-          <div className="p-8 text-center text-xs font-bold text-slate-400">لا توجد قيود مالية مطابقة للبحث أو الفلتر المحدد.</div>
+        {totalCount === 0 ? (
+          <div className="p-8 text-center text-xs font-bold text-slate-400">
+            {isLoadingTransactions ? 'جاري تحميل المعاملات...' : 'لا توجد قيود مالية مطابقة للبحث أو الفلتر المحدد.'}
+          </div>
         ) : (
           <>
             {/* Mobile Cards View (Visible on screens < md) */}
             <div className="block md:hidden p-3 space-y-2.5">
-              {paginatedTransactions.map((t) => (
+              {transactions.map((t) => (
                 <div
                   key={t.id}
                   onClick={() => setSelectedTx(t)}
@@ -1094,7 +1143,7 @@ export default function FinancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedTransactions.map((t) => (
+                  {transactions.map((t) => (
                     <tr
                       key={t.id}
                       onClick={() => setSelectedTx(t)}
@@ -1147,10 +1196,10 @@ export default function FinancePage() {
             </div>
 
             {/* Pagination Controls Footer */}
-            {filteredTransactions.length > 0 && (
+            {totalCount > 0 && (
               <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-extrabold text-slate-500">
                 <div>
-                  عرض {startIndex + 1} - {Math.min(startIndex + itemsPerPage, filteredTransactions.length)} من إجمالي {filteredTransactions.length} قيد
+                  عرض {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, totalCount)} من إجمالي {totalCount} قيد
                 </div>
 
                 {totalPages > 1 && (
@@ -1904,7 +1953,7 @@ export default function FinancePage() {
         onClose={() => setSelectedStatModalType(null)}
         statType={selectedStatModalType}
         totals={totals}
-        transactions={filteredTransactions}
+        transactions={statModalTransactions}
         dresses={dressesForStatModal}
         heldInsurancesList={heldInsurancesForStatModal}
       />

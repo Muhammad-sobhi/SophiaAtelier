@@ -195,11 +195,9 @@ export async function getAllPages(path) {
   const sep = path.includes('?') ? '&' : '?';
   const first = await apiClient.get(`${path}${sep}per_page=100&page=1`);
   if (Array.isArray(first)) return first;
-  const items = [...(first?.data || [])];
   const lastPage = first?.last_page || 1;
-  for (let page = 2; page <= lastPage; page++) {
-    const res = await apiClient.get(`${path}${sep}per_page=100&page=${page}`);
-    items.push(...(res?.data || []));
-  }
-  return items;
+  const rest = await Promise.all(
+    Array.from({ length: lastPage - 1 }, (_, i) => apiClient.get(`${path}${sep}per_page=100&page=${i + 2}`))
+  );
+  return [first, ...rest].flatMap((res) => res?.data || []);
 }

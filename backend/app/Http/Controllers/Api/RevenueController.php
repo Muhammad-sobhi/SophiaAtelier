@@ -11,7 +11,7 @@ class RevenueController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Revenue::with('booking.client');
+        $query = Revenue::with('booking:id,client_id', 'booking.client:id,name');
 
         if ($type = $request->input('type')) {
             $query->where('type', $type);
@@ -25,7 +25,12 @@ class RevenueController extends Controller
             $query->where('payment_date', '<=', $endDate);
         }
 
-        return response()->json($query->latest('payment_date')->latest('id')->paginate(min((int) $request->input('per_page', 50), 100)));
+        $page = $query->latest('payment_date')->latest('id')->paginate(min((int) $request->input('per_page', 50), 100));
+
+        // Only the client's id and name are returned; skip Client's computed attributes (each one runs queries).
+        $page->getCollection()->each(fn ($revenue) => $revenue->booking?->client?->setAppends([]));
+
+        return response()->json($page);
     }
 
     public function store(Request $request): JsonResponse
