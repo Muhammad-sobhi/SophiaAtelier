@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Wallet, PieChart, Shield, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getAllPages } from '@/lib/api-client';
 
 export function FinancialSummaryReport() {
   const [summary, setSummary] = useState({ net_profit: 0, net_revenue: 0, net_expense: 0, held_insurances: 0 });
@@ -12,8 +12,8 @@ export function FinancialSummaryReport() {
     let isMounted = true;
     Promise.all([
       apiClient.get('/finance/summary'),
-      apiClient.get('/revenues?per_page=500'),
-      apiClient.get('/expenses?per_page=500'),
+      getAllPages('/revenues'),
+      getAllPages('/expenses'),
     ])
       .then(([sumRes, revRes, expRes]) => {
         if (!isMounted) return;

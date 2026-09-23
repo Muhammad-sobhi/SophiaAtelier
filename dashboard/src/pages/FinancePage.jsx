@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getAllPages } from '@/lib/api-client';
 import {
   DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
   X, FileText, Image as ImageIcon, Plus, CreditCard, Banknote,
@@ -254,7 +254,7 @@ export default function FinancePage() {
   });
 
   const buildQS = useCallback(() => {
-    const p = { per_page: '500' };
+    const p = {};
     if (filterStart) p.start_date = filterStart;
     if (filterEnd) p.end_date = filterEnd;
     return new URLSearchParams(p).toString();
@@ -264,8 +264,8 @@ export default function FinancePage() {
     try {
       const qs = buildQS();
       const [revRes, expRes, summaryRes] = await Promise.all([
-      apiClient.get(`/revenues?${qs}`),
-      apiClient.get(`/expenses?${qs}`),
+      getAllPages(`/revenues?${qs}`),
+      getAllPages(`/expenses?${qs}`),
       apiClient.get(`/finance/summary?${qs}`)]
       );
 
