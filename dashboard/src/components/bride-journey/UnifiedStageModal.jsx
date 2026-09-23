@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
-import { cleanDate } from '@/lib/utils';
+import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates } from '@/lib/utils';
 import {
   X, Heart, Calendar, Ruler, Package, RotateCcw,
   Search, CheckCircle2, AlertTriangle, User, CreditCard, Trash2, Loader2
@@ -22,11 +22,7 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
   const targetTime = new Date(`${cleanTargetDateStr}T00:00:00`).getTime();
   if (isNaN(targetTime)) return null;
 
-  const isTargetCairo = !targetCity ||
-    targetCity.includes('القاهرة') ||
-    targetCity.includes('الجيزة') ||
-    targetCity.toLowerCase().includes('cairo') ||
-    targetCity.toLowerCase().includes('giza');
+  const isTargetCairo = isCairoCity(targetCity);
 
   // 1 day before wedding for Cairo & Giza, 2 days before for other cities
   const targetDaysBefore = isTargetCairo ? 1 : 2;
@@ -41,11 +37,7 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
     if (!b.event_date) continue;
 
     const bCity = b.client?.city || 'القاهرة';
-    const isBCairo = !bCity ||
-      bCity.includes('القاهرة') ||
-      bCity.includes('الجيزة') ||
-      bCity.toLowerCase().includes('cairo') ||
-      bCity.toLowerCase().includes('giza');
+    const isBCairo = isCairoCity(bCity);
 
     let bStart, bEnd, bStartDateStr, bEndDateStr;
 
@@ -94,43 +86,8 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
 };
 
 export const calculateScheduledDates = (eventDateStr, cityStr = 'القاهرة') => {
-  if (!eventDateStr) return { pickup_date: '', return_date: '', isCairo: true };
-  try {
-    const cleanDateStr = String(eventDateStr).split('T')[0].split(' ')[0];
-    // Parse as UTC so toISOString() below doesn't shift the day in UTC+ timezones (Egypt)
-    const d = new Date(`${cleanDateStr}T00:00:00Z`);
-    if (isNaN(d.getTime())) return { pickup_date: '', return_date: '', isCairo: true };
-
-    const cityLower = String(cityStr || '').toLowerCase();
-    const isCairo = !cityStr ||
-      cityLower.includes('قاهرة') ||
-      cityLower.includes('جيزة') ||
-      cityLower.includes('cairo') ||
-      cityLower.includes('giza') ||
-      cityLower.includes('نصر') ||
-      cityLower.includes('جديدة') ||
-      cityLower.includes('معادي') ||
-      cityLower.includes('تجمع') ||
-      cityLower.includes('زايد') ||
-      cityLower.includes('أكتوبر') ||
-      cityLower.includes('اكتوبر') ||
-      cityLower.includes('شروق') ||
-      cityLower.includes('مدينتي');
-
-    const daysBefore = isCairo ? 1 : 2;
-    const daysAfter = 1;
-
-    const pickupDateObj = new Date(d.getTime() - (daysBefore * 24 * 60 * 60 * 1000));
-    const returnDateObj = new Date(d.getTime() + (daysAfter * 24 * 60 * 60 * 1000));
-
-    return {
-      pickup_date: pickupDateObj.toISOString().split('T')[0],
-      return_date: returnDateObj.toISOString().split('T')[0],
-      isCairo,
-    };
-  } catch (e) {
-    return { pickup_date: '', return_date: '', isCairo: true };
-  }
+  const { pickupDate, returnDate } = calculateDates(eventDateStr, cityStr);
+  return { pickup_date: pickupDate, return_date: returnDate, isCairo: isCairoCity(cityStr) };
 };
 
 const STAGES = [

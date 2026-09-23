@@ -3,6 +3,7 @@ import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2, Settings, LogOut
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
+import { isCairoCity } from '@/lib/utils';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
 
 const typeStyles = {
@@ -222,7 +223,7 @@ export function Header({ onMenuClick }) {
             weddingDate = booking.event_date.split(' ')[0].split('T')[0];
 
             const city = booking.client?.city || 'القاهرة';
-            const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+            const isCairo = isCairoCity(city);
             const daysBefore = isCairo ? 1 : 2;
 
             const evDt = new Date(weddingDate);

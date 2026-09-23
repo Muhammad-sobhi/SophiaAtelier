@@ -18,7 +18,7 @@ class DressAvailabilityService
         $client = Client::find($clientId);
         $city = $client ? ($client->city ?? 'Cairo') : 'Cairo';
         
-        $isCairoOrGiza = (! $city || stripos($city, 'cairo') !== false || stripos($city, 'giza') !== false || $city === 'القاهرة' || $city === 'الجيزة');
+        $isCairoOrGiza = \App\Models\Booking::isCairoCity($city);
         $daysBefore = $isCairoOrGiza ? 2 : 3;
         $daysAfter = 1;
 

@@ -55,6 +55,29 @@ class Booking extends Model
         return $date->format('Y-m-d H:i');
     }
 
+    /**
+     * Cities/areas that count as Cairo & Giza (pickup 1 day before the wedding instead of 2).
+     * Keep in sync with CAIRO_CITY_KEYWORDS in dashboard/src/lib/utils.js (checked by ScheduledDatesTest).
+     */
+    public const CAIRO_CITY_KEYWORDS = [
+        'قاهر', 'جيز', 'cairo', 'giza', 'gize', 'نصر', 'مصر الجديد', 'معادي', 'تجمع', 'زايد',
+        'أكتوبر', 'اكتوبر', 'شروق', 'مدينتي', 'حلوان', 'بدر',
+    ];
+
+    public static function isCairoCity(?string $city): bool
+    {
+        $city = mb_strtolower(trim($city ?? ''));
+        if ($city === '') {
+            return true;
+        }
+        foreach (self::CAIRO_CITY_KEYWORDS as $keyword) {
+            if (str_contains($city, $keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static function calculateScheduledDates(?string $weddingDate, ?string $city = null): array
     {
         if (empty($weddingDate)) {
@@ -63,21 +86,7 @@ class Booking extends Model
 
         try {
             $wDate = \Carbon\Carbon::parse($weddingDate);
-            $cityLower = mb_strtolower($city ?? '');
-            $isCairo = empty($city) ||
-                str_contains($cityLower, 'قاهرة') ||
-                str_contains($cityLower, 'جيزة') ||
-                str_contains($cityLower, 'cairo') ||
-                str_contains($cityLower, 'giza') ||
-                str_contains($cityLower, 'نصر') ||
-                str_contains($cityLower, 'جديدة') ||
-                str_contains($cityLower, 'معادي') ||
-                str_contains($cityLower, 'تجمع') ||
-                str_contains($cityLower, 'زايد') ||
-                str_contains($cityLower, 'أكتوبر') ||
-                str_contains($cityLower, 'اكتوبر') ||
-                str_contains($cityLower, 'شروق') ||
-                str_contains($cityLower, 'مدينتي');
+            $isCairo = self::isCairoCity($city);
 
             // 1 day before wedding for Cairo & Giza, 2 days before wedding for other cities
             $daysBefore = $isCairo ? 1 : 2;
@@ -167,7 +176,7 @@ class Booking extends Model
         if (!$client) return null;
 
         $city = $client->city ?? 'القاهرة';
-        $isCairoOrGiza = (! $city || stripos($city, 'cairo') !== false || stripos($city, 'giza') !== false || $city === 'القاهرة' || $city === 'الجيزة');
+        $isCairoOrGiza = self::isCairoCity($city);
         // 1 day before for Cairo/Giza, 2 days before for other cities
         $daysBefore = $isCairoOrGiza ? 1 : 2;
         $daysAfter = 1;
@@ -241,7 +250,7 @@ class Booking extends Model
             } else {
                 $bClient = $b->client;
                 $bCity = $bClient ? ($bClient->city ?? 'القاهرة') : 'القاهرة';
-                $isCairoOrGiza = (! $bCity || stripos($bCity, 'cairo') !== false || stripos($bCity, 'giza') !== false || $bCity === 'القاهرة' || $bCity === 'الجيزة');
+                $isCairoOrGiza = self::isCairoCity($bCity);
                 // 1 day before for Cairo/Giza, 2 days before for other cities
                 $daysBefore = $isCairoOrGiza ? 1 : 2;
                 $daysAfter = 1;

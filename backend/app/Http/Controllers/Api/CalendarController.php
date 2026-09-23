@@ -24,9 +24,8 @@ class CalendarController extends Controller
             ->whereBetween('visit_date', [$startDate, $endDate])
             ->get()
             ->map(function ($visit) {
-                $cairoAliases = ['القاهرة', 'الجيزة', 'cairo', 'giza', '6 أكتوبر', 'حلوان', 'المعادي', 'مدينة نصر', 'التجمع'];
                 $clientCity = $visit->client->city ?? $visit->client->address ?? '';
-                $isCairo = collect($cairoAliases)->contains(fn ($alias) => str_contains(mb_strtolower($clientCity), mb_strtolower($alias)));
+                $isCairo = Booking::isCairoCity($clientCity);
 
                 $booking = null;
                 if ($visit->client && $visit->client->bookings) {
@@ -75,9 +74,8 @@ class CalendarController extends Controller
             })
             ->get()
             ->map(function ($booking) {
-                $cairoAliases = ['القاهرة', 'الجيزة', 'cairo', 'giza', '6 أكتوبر', 'حلوان', 'المعادي', 'مدينة نصر', 'التجمع'];
                 $clientCity = $booking->client->city ?? $booking->client->address ?? '';
-                $isCairo = collect($cairoAliases)->contains(fn ($alias) => str_contains(mb_strtolower($clientCity), mb_strtolower($alias)));
+                $isCairo = Booking::isCairoCity($clientCity);
 
                 $hasFittings = $booking->fittings()->exists();
                 $fittingsCompleted = $hasFittings && !$booking->fittings()->where('fittings.status', '!=', 'completed')->exists();
@@ -158,8 +156,7 @@ class CalendarController extends Controller
                 $clientPhone = $client->phone ?? '';
                 $clientCity = $client->city ?? $client->address ?? '';
                 
-                $cairoAliases = ['القاهرة', 'الجيزة', 'cairo', 'giza', '6 أكتوبر', 'حلوان', 'المعادي', 'مدينة نصر', 'التجمع'];
-                $isCairo = collect($cairoAliases)->contains(fn ($alias) => str_contains(mb_strtolower($clientCity), mb_strtolower($alias)));
+                $isCairo = Booking::isCairoCity($clientCity);
 
                 return [
                     'id' => 'fitting-' . $fitting->id,

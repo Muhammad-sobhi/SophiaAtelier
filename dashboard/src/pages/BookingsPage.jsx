@@ -16,7 +16,7 @@ import {
   Trash2,
   Edit3 } from
 'lucide-react';
-import { calculateScheduledDates } from '@/lib/utils';
+import { calculateScheduledDates, isCairoCity } from '@/lib/utils';
 
 export function getOccupiedDatesForBooking(weddingDateStr, city) {
   if (!weddingDateStr) return [];
@@ -25,7 +25,7 @@ export function getOccupiedDatesForBooking(weddingDateStr, city) {
 
   // Cairo / Giza: 1 day before pickup, wedding day, 1 day after return
   // Other cities: 2 days before pickup, wedding day, 1 day after return
-  const isCairoOrGiza = !city || city === 'القاهرة' || city === 'الجيزة' || city === 'cairo' || city === 'giza';
+  const isCairoOrGiza = isCairoCity(city);
   const daysBefore = isCairoOrGiza ? 1 : 2;
   const daysAfter = 1;
 
@@ -145,7 +145,7 @@ export default function BookingsPage() {
     const proposedWedding = new Date(dateStr);
     if (isNaN(proposedWedding.getTime())) return null;
 
-    const isCairo = cityStr === 'القاهرة' || cityStr === 'cairo' || !cityStr;
+    const isCairo = isCairoCity(cityStr);
     const daysBefore = isCairo ? 1 : 2;
     const daysAfter = 1;
 
@@ -172,7 +172,7 @@ export default function BookingsPage() {
         if (isNaN(exWedding.getTime())) continue;
 
         const exCity = eb.city || 'القاهرة';
-        const exIsCairo = exCity === 'القاهرة' || exCity === 'cairo';
+        const exIsCairo = isCairoCity(exCity);
         const exDaysBefore = exIsCairo ? 1 : 2;
         const exDaysAfter = 1;
 

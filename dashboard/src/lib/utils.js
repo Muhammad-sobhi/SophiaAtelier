@@ -25,17 +25,23 @@ export function formatDate(raw) {
   }
 }
 
+// Cities/areas that count as Cairo & Giza (pickup 1 day before the wedding instead of 2).
+// Keep in sync with Booking::CAIRO_CITY_KEYWORDS in the backend (checked by ScheduledDatesTest).
+export const CAIRO_CITY_KEYWORDS = [
+  'قاهر', 'جيز', 'cairo', 'giza', 'gize', 'نصر', 'مصر الجديد', 'معادي', 'تجمع', 'زايد',
+  'أكتوبر', 'اكتوبر', 'شروق', 'مدينتي', 'حلوان', 'بدر',
+];
+
+export function isCairoCity(city) {
+  const c = String(city || '').trim().toLowerCase();
+  if (!c) return true;
+  return CAIRO_CITY_KEYWORDS.some((keyword) => c.includes(keyword));
+}
+
 export function calculateScheduledDates(weddingDate, city) {
   if (!weddingDate) return { pickupDate: '', returnDate: '' };
   try {
-    const c = (city || '').trim().toLowerCase();
-    const isCairo = !city ||
-      c.includes('قاهر') ||
-      c.includes('جيز') ||
-      c.includes('cairo') ||
-      c.includes('giza') ||
-      c.includes('gize') ||
-      ['أكتوبر', 'اكتوبر', 'زايد', 'حلوان', 'المعادي', 'معادي', 'مدينة نصر', 'مدينه نصر', 'التجمع', 'الشروق', 'مدينتي', 'بدر'].some((sub) => c.includes(sub));
+    const isCairo = isCairoCity(city);
     
     // 1 day before wedding for Cairo & Giza, 2 days before for other cities
     const daysBefore = isCairo ? 1 : 2;

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
 import { UnifiedStageModal, calculateScheduledDates } from './bride-journey/UnifiedStageModal';
-import { cleanDate } from '@/lib/utils';
+import { cleanDate, isCairoCity } from '@/lib/utils';
 
 
 
@@ -279,7 +279,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       if (b.client_id === bride.id) return false;
 
       const city = b.client?.city ?? 'القاهرة';
-      const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+      const isCairo = isCairoCity(city);
       const daysBefore = isCairo ? 2 : 3;
       const daysAfter = 1;
 
@@ -306,7 +306,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       if (b.client_id === bride.id) return false;
 
       const city = b.client?.city ?? 'القاهرة';
-      const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+      const isCairo = isCairoCity(city);
       const daysBefore = isCairo ? 2 : 3;
       const daysAfter = 1;
 
@@ -335,7 +335,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       if (b.client_id === bride.id) return false;
 
       const city = b.client?.city ?? 'القاهرة';
-      const isCairo = city.includes('القاهرة') || city.toLowerCase().includes('cairo');
+      const isCairo = isCairoCity(city);
       const daysBefore = isCairo ? 2 : 3;
       const daysAfter = 1;
 
@@ -1181,7 +1181,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                   const weddingDate = bride.wedding_date || booking?.event_date;
                   let isPickupOverdue = false;
                   if (weddingDate && !isDelivered) {
-                    const isCairo = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة';
+                    const isCairo = isCairoCity(bride.city);
                     const pickupDate = new Date(new Date(weddingDate).getTime() - (isCairo ? 1 : 2) * 24 * 60 * 60 * 1000);
                     if (new Date() > pickupDate) {
                       isPickupOverdue = true;

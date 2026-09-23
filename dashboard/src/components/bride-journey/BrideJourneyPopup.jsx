@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
-import { calculateScheduledDates } from '@/lib/utils';
+import { calculateScheduledDates, isCairoCity } from '@/lib/utils';
 import { StageBadge } from './StageBadge';
 import { UnifiedStageModal } from './UnifiedStageModal';
 import { ReturnDressModal } from './ReturnDressModal';
@@ -210,7 +210,7 @@ export function BrideJourneyPopup({
         const weddingDate = bride.wedding_date || booking?.event_date;
         let isPickupOverdue = false;
         if (weddingDate) {
-          const isCairo = !bride.city || bride.city === 'القاهرة' || bride.city === 'الجيزة';
+          const isCairo = isCairoCity(bride.city);
           const pickupDate = new Date(new Date(weddingDate).getTime() - (isCairo ? 1 : 2) * 24 * 60 * 60 * 1000);
           if (new Date() > pickupDate) {
             isPickupOverdue = true;

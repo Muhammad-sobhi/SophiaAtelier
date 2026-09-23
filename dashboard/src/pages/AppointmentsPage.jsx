@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
+import { isCairoCity } from '@/lib/utils';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -427,7 +428,7 @@ export default function AppointmentsPage() {
 
   const handleSendPickupReminder = async (event) => {
     const clientCity = event.client_city || 'القاهرة';
-    const isCairo = clientCity.toLowerCase().includes('cairo') || clientCity.includes('القاهرة');
+    const isCairo = isCairoCity(clientCity);
     const daysBefore = isCairo ? 1 : 2;
 
     const rawWeddingDate = event.event_date || event.wedding_date || '';

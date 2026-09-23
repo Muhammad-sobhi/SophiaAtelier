@@ -9,7 +9,7 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
-import { cleanDate, calculateScheduledDates } from '@/lib/utils';
+import { cleanDate, calculateScheduledDates, isCairoCity } from '@/lib/utils';
 import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
 
 export { calculateScheduledDates };
@@ -1201,7 +1201,7 @@ export default function BridesPage() {
                       <span>تاريخ استلام الفستان (Pickup)</span>
                     </label>
                     <span className="text-[9.5px] font-bold text-indigo-600 bg-indigo-100/70 px-1.5 py-0.5 rounded">
-                      {formData.wedding_date ? (['القاهرة', 'الجيزة', 'مدينة نصر', 'مصر الجديدة', 'المعادي', 'التجمع الأول', 'التجمع الخامس', 'الشيخ زايد', '6 أكتوبر', 'الشروق', 'مدينتي'].some(c => (formData.city || '').includes(c)) ? 'قبل الفرح بيوم' : 'قبل الفرح بيومين') : 'تلقائي'}
+                      {formData.wedding_date ? (isCairoCity(formData.city) ? 'قبل الفرح بيوم' : 'قبل الفرح بيومين') : 'تلقائي'}
                     </span>
                   </div>
                   <input
