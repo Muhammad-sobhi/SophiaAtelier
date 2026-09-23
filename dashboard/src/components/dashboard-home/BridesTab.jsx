@@ -23,7 +23,7 @@ export default function BridesTab({
 
   // Returns the stage-relevant date used for month filtering & sorting
   const getStageDate = (b, targetStage) => {
-    const wDate = b.wedding_date || b.bookings?.[0]?.event_date || b.relevant_date;
+    const wDate = b.bookings?.[0]?.event_date || b.wedding_date || b.relevant_date;
     switch (targetStage) {
       case 'visit':
         return b.latest_visit_date || b.visits?.[0]?.visit_date || b.bookings?.[0]?.booking_date;
@@ -33,7 +33,7 @@ export default function BridesTab({
         return b.fittings?.[0]?.fitting_date || b.latest_fitting_date;
       case 'pickup':
       case 'picked_up': {
-        const direct = b.pickup_scheduled_on || b.bookings?.[0]?.pickup_scheduled_on;
+        const direct = b.bookings?.[0]?.pickup_scheduled_on || b.pickup_scheduled_on;
         if (direct) return direct;
         if (wDate) {
           const scheduled = calculateScheduledDates(wDate, b.city);
@@ -43,7 +43,7 @@ export default function BridesTab({
       }
       case 'receive':
       case 'returned': {
-        const direct = b.return_scheduled_on || b.bookings?.[0]?.return_scheduled_on || b.expected_return_date;
+        const direct = b.bookings?.[0]?.return_scheduled_on || b.return_scheduled_on || b.expected_return_date;
         if (direct) return direct;
         if (wDate) {
           const scheduled = calculateScheduledDates(wDate, b.city);
@@ -188,10 +188,10 @@ export default function BridesTab({
     if (dateBasis === 'booking_date') {
       return b.bookings?.[0]?.booking_date?.slice(0, 7) === month;
     }
-    const wDate = b.wedding_date || b.bookings?.[0]?.event_date || b.relevant_date;
+    const wDate = b.bookings?.[0]?.event_date || b.wedding_date || b.relevant_date;
     const scheduled = calculateScheduledDates(wDate, b.city);
-    const pDate = b.pickup_scheduled_on || b.bookings?.[0]?.pickup_scheduled_on || scheduled.pickupDate;
-    const rDate = b.return_scheduled_on || b.bookings?.[0]?.return_scheduled_on || scheduled.returnDate;
+    const pDate = b.bookings?.[0]?.pickup_scheduled_on || b.pickup_scheduled_on || scheduled.pickupDate;
+    const rDate = b.bookings?.[0]?.return_scheduled_on || b.return_scheduled_on || scheduled.returnDate;
     return (
       (wDate && wDate.slice(0, 7) === month) ||
       (b.latest_visit_date && b.latest_visit_date.slice(0, 7) === month) ||
@@ -213,7 +213,7 @@ export default function BridesTab({
         const sd = getStageDate(b, stageFilter);
         if (sd) dates.push(sd);
       } else if (dateBasis === 'wedding_date') {
-        const wd = b.wedding_date || b.bookings?.[0]?.event_date;
+        const wd = b.bookings?.[0]?.event_date || b.wedding_date;
         if (wd) dates.push(wd);
       } else if (dateBasis === 'visit_date') {
         if (b.latest_visit_date) dates.push(b.latest_visit_date);
@@ -221,10 +221,10 @@ export default function BridesTab({
         const bd = b.bookings?.[0]?.booking_date;
         if (bd) dates.push(bd);
       } else {
-        const wDate = b.wedding_date || b.bookings?.[0]?.event_date || b.relevant_date;
+        const wDate = b.bookings?.[0]?.event_date || b.wedding_date || b.relevant_date;
         const scheduled = calculateScheduledDates(wDate, b.city);
-        const pDate = b.pickup_scheduled_on || b.bookings?.[0]?.pickup_scheduled_on || scheduled.pickupDate;
-        const rDate = b.return_scheduled_on || b.bookings?.[0]?.return_scheduled_on || scheduled.returnDate;
+        const pDate = b.bookings?.[0]?.pickup_scheduled_on || b.pickup_scheduled_on || scheduled.pickupDate;
+        const rDate = b.bookings?.[0]?.return_scheduled_on || b.return_scheduled_on || scheduled.returnDate;
         dates = [
           wDate,
           b.latest_visit_date,
@@ -407,11 +407,11 @@ export default function BridesTab({
               const activeStageKey = stageFilter !== 'all' ? stageFilter : stage;
               const baseStageCfg = STAGE_MAP[activeStageKey] || STAGE_MAP[stage] || STAGE_MAP.visit;
               const stageCfg = activeStageKey === 'returned' ? getReturnBadge(bride) || baseStageCfg : baseStageCfg;
-              const displayDate = bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
+              const displayDate = bride.bookings?.[0]?.event_date || bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
-              const wDate = bride.wedding_date || bride.bookings?.[0]?.event_date || bride.relevant_date;
+              const wDate = bride.bookings?.[0]?.event_date || bride.wedding_date || bride.relevant_date;
               const scheduled = calculateScheduledDates(wDate, bride.city);
-              const pickupDate = bride.pickup_scheduled_on || bride.bookings?.[0]?.pickup_scheduled_on || scheduled.pickupDate;
+              const pickupDate = bride.bookings?.[0]?.pickup_scheduled_on || bride.pickup_scheduled_on || scheduled.pickupDate;
 
               return (
                 <div
@@ -453,7 +453,7 @@ export default function BridesTab({
                     </span>
 
                     {(() => {
-                      const cardReturnDate = bride.return_scheduled_on || bride.bookings?.[0]?.return_scheduled_on || scheduled.returnDate;
+                      const cardReturnDate = bride.bookings?.[0]?.return_scheduled_on || bride.return_scheduled_on || scheduled.returnDate;
                       if (stage === 'returned' && cardReturnDate) {
                         return (
                           <span className="text-[9.5px] sm:text-[10px] font-mono text-rose-600 font-bold truncate" title="تاريخ الإرجاع">

@@ -43,6 +43,18 @@ class Client extends Model
         }
     }
 
+    /**
+     * Update the stored wedding date when it no longer matches the booking's event date.
+     * A null wedding_date already falls back to the latest booking in the accessor above.
+     */
+    public function syncWeddingDateFrom(Booking $booking): void
+    {
+        $eventDate = $booking->event_date ? $booking->event_date->toDateString() : null;
+        if ($eventDate && !empty($this->attributes['wedding_date']) && $this->wedding_date !== $eventDate) {
+            $this->update(['wedding_date' => $eventDate]);
+        }
+    }
+
     public function getLatestVisitDateAttribute(): ?string
     {
         $visit = $this->relationLoaded('visits') ? $this->visits->sortByDesc('id')->first() : $this->visits()->latest()->first();

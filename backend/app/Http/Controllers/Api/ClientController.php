@@ -767,6 +767,10 @@ class ClientController extends Controller
                 }
 
                 $booking->save();
+
+                // Keep the bride's wedding date in sync with the booking's event date
+                $client->syncWeddingDateFrom($booking);
+
                 $payments = $request->input('payments');
                 // Clean up previous deposit revenues for this booking to prevent duplicate entries when editing
                 $booking->revenues()->where('type', 'deposit')->delete();

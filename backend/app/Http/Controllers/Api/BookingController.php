@@ -295,6 +295,11 @@ class BookingController extends Controller
 
         $booking->update($validated);
 
+        // Keep the bride's wedding date in sync with the booking's event date
+        if (array_key_exists('event_date', $validated) && $booking->client) {
+            $booking->client->syncWeddingDateFrom($booking);
+        }
+
         // Sync deposit payments if provided
         $depositPayments = $request->input('payments') ?? $request->input('deposit_payments');
         if (is_array($depositPayments)) {

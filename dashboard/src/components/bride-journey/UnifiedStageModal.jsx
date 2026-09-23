@@ -97,7 +97,8 @@ export const calculateScheduledDates = (eventDateStr, cityStr = 'القاهرة'
   if (!eventDateStr) return { pickup_date: '', return_date: '', isCairo: true };
   try {
     const cleanDateStr = String(eventDateStr).split('T')[0].split(' ')[0];
-    const d = new Date(`${cleanDateStr}T00:00:00`);
+    // Parse as UTC so toISOString() below doesn't shift the day in UTC+ timezones (Egypt)
+    const d = new Date(`${cleanDateStr}T00:00:00Z`);
     if (isNaN(d.getTime())) return { pickup_date: '', return_date: '', isCairo: true };
 
     const cityLower = String(cityStr || '').toLowerCase();
@@ -210,8 +211,15 @@ export function UnifiedStageModal({
     const initialEvent = booking?.event_date || bride.wedding_date || new Date().toISOString();
     return calculateScheduledDates(initialEvent, bride.city || 'القاهرة').return_date;
   });
-  // Stored dates count as custom so the auto-sync below never overwrites saved values
-  const [isCustomPickupDate, setIsCustomPickupDate] = useState(Boolean(booking?.pickup_scheduled_on || booking?.return_scheduled_on));
+  // A stored date counts as custom (manually edited) only when it differs from the default for the
+  // stored event date; defaults keep following the event date / city, edited dates are never overwritten.
+  const storedDefaults = calculateScheduledDates(booking?.event_date, bride.city || 'القاهرة');
+  const [isCustomPickupDate, setIsCustomPickupDate] = useState(
+    Boolean(booking?.pickup_scheduled_on) && cleanDate(booking.pickup_scheduled_on) !== storedDefaults.pickup_date
+  );
+  const [isCustomReturnDate, setIsCustomReturnDate] = useState(
+    Boolean(booking?.return_scheduled_on) && cleanDate(booking.return_scheduled_on) !== storedDefaults.return_date
+  );
 
   const [bookingTotalAmount, setBookingTotalAmount] = useState(booking?.total_amount ? String(booking.total_amount) : '3500');
   const [bookingDepositAmount, setBookingDepositAmount] = useState(booking?.deposit_amount ? String(booking.deposit_amount) : '1000');
@@ -284,12 +292,11 @@ export function UnifiedStageModal({
 
   // Auto-sync pickup/return dates when event date or city changes (unless customized)
   useEffect(() => {
-    if (!isCustomPickupDate && bookingEventDate) {
-      const dates = calculateScheduledDates(bookingEventDate, city);
-      if (dates.pickup_date) setBookingPickupDate(dates.pickup_date);
-      if (dates.return_date) setBookingReturnDate(dates.return_date);
-    }
-  }, [bookingEventDate, city, isCustomPickupDate]);
+    if (!bookingEventDate) return;
+    const dates = calculateScheduledDates(bookingEventDate, city);
+    if (!isCustomPickupDate && dates.pickup_date) setBookingPickupDate(dates.pickup_date);
+    if (!isCustomReturnDate && dates.return_date) setBookingReturnDate(dates.return_date);
+  }, [bookingEventDate, city, isCustomPickupDate, isCustomReturnDate]);
   const [balancePayments, setBalancePayments] = useState(
     existingBalances.length > 0
       ? existingBalances.map(r => ({ amount: String(r.amount), payment_method: r.payment_method || 'cash' }))
@@ -847,14 +854,24 @@ export function UnifiedStageModal({
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-700 block mb-1 text-right">
-                        تاريخ الإرجاع (Return Date):
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-extrabold text-slate-700 block text-right">
+                          تاريخ الإرجاع (Return Date):
+                        </label>
+                        {isCustomReturnDate && (
+                          <span className="text-[9px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.5 rounded">
+                            معدل يدوياً
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="date"
                         required
                         value={cleanDate(bookingReturnDate)}
-                        onChange={(e) => setBookingReturnDate(cleanDate(e.target.value))}
+                        onChange={(e) => {
+                          setBookingReturnDate(cleanDate(e.target.value));
+                          setIsCustomReturnDate(true);
+                        }}
                         className="w-full px-3 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 font-mono text-right"
                       />
                       <span className="text-[9.5px] text-slate-500 mt-0.5 block text-right">
