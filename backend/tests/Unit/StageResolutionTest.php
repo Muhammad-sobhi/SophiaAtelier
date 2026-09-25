@@ -145,4 +145,29 @@ class StageResolutionTest extends TestCase
         $stagePast = LegacyStageResolver::resolve($client, $booking);
         $this->assertEquals('completed', $stagePast);
     }
+
+    public function test_cancelled_booking_resolves_to_cancelled_stage()
+    {
+        $client = new Client();
+        $booking = new Booking();
+        $booking->status = 'cancelled';
+        $booking->cancelled_at = Carbon::now()->subDay();
+        $client->setRelation('visits', collect([]));
+
+        $this->assertEquals('cancelled', LiveStageResolver::resolve($client, $booking));
+        $this->assertEquals('cancelled', LegacyStageResolver::resolve($client, $booking));
+    }
+
+    public function test_cancelled_bride_with_new_visit_returns_to_visit_stage()
+    {
+        $client = new Client();
+        $booking = new Booking();
+        $booking->status = 'cancelled';
+        $booking->cancelled_at = Carbon::now()->subDays(3);
+        $visit = new \App\Models\Visit();
+        $visit->created_at = Carbon::now();
+        $client->setRelation('visits', collect([$visit]));
+
+        $this->assertEquals('visit', LiveStageResolver::resolve($client, $booking));
+    }
 }

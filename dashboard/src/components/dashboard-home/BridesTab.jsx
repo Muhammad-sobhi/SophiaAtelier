@@ -51,6 +51,8 @@ export default function BridesTab({
         }
         return null;
       }
+      case 'cancelled':
+        return b.bookings?.[0]?.cancelled_at;
       default:
         return null;
     }
@@ -104,6 +106,11 @@ export default function BridesTab({
 
     const raw = b.current_stage || b.stage || 'visit';
     const latestBk = b.bookings?.[0];
+
+    // Cancelled brides appear only under their own filter
+    if (targetStage === 'cancelled' || raw === 'cancelled') {
+      return targetStage === 'cancelled' && raw === 'cancelled';
+    }
     const isDelivered =
       latestBk?.status === 'picked_up' ||
       latestBk?.status === 'out' ||
@@ -454,6 +461,14 @@ export default function BridesTab({
 
                     {(() => {
                       const cardReturnDate = bride.bookings?.[0]?.return_scheduled_on || bride.return_scheduled_on || scheduled.returnDate;
+                      const cancelledAt = bride.bookings?.[0]?.cancelled_at;
+                      if (stage === 'cancelled' && cancelledAt) {
+                        return (
+                          <span className="text-[9.5px] sm:text-[10px] font-mono text-red-600 font-bold truncate" title="تاريخ الإلغاء">
+                            {cleanDate(cancelledAt)}
+                          </span>
+                        );
+                      }
                       if (stage === 'returned' && cardReturnDate) {
                         return (
                           <span className="text-[9.5px] sm:text-[10px] font-mono text-rose-600 font-bold truncate" title="تاريخ الإرجاع">

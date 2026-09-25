@@ -152,6 +152,7 @@ class ReportController extends Controller
         $totalRevenue = Revenue::whereBetween('payment_date', [$start, $end])->sum('amount');
         $totalExpenses = Expense::whereBetween('date', [$start, $end])->sum('amount');
         $totalBookings = Booking::whereBetween('booking_date', [$start, $end])->count();
+        $cancelledBookings = Booking::where('status', 'cancelled')->whereBetween('cancelled_at', [$start, $end])->count();
         $totalClients = Client::count();
         $totalDresses = Dress::count();
 
@@ -163,9 +164,90 @@ class ReportController extends Controller
             'expenses' => (float) $totalExpenses,
             'net' => (float) ($totalRevenue - $totalExpenses),
             'bookings' => $totalBookings,
+            'cancelled_bookings' => $cancelledBookings,
             'total_clients' => $totalClients,
             'total_dresses' => $totalDresses,
             'top_dresses' => $topDresses,
+        ]);
+    }
+
+    /**
+     * GET /api/reports/cancellations
+     * Cancelled bookings in a period with what was paid, refunded and kept.
+     */
+    public function cancellations(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date',
+        ]);
+
+        $query = Booking::where('status', 'cancelled')
+            ->with(['client:id,name,phone', 'dress:id,name,code', 'revenues:id,booking_id,type,amount'])
+            ->orderByDesc('cancelled_at')
+            ->orderByDesc('id');
+        if (!empty($validated['from_date'])) {
+            $query->whereDate('cancelled_at', '>=', $validated['from_date']);
+        }
+        if (!empty($validated['to_date'])) {
+            $query->whereDate('cancelled_at', '<=', $validated['to_date']);
+        }
+
+        $rows = $query->get()->map(function (Booking $booking) {
+            $sum = fn(array $types) => round((float) $booking->revenues->whereIn('type', $types)->sum('amount'), 2);
+            $paidRent = $sum(['deposit', 'balance']);
+            $paidInsurance = $sum(['insurance', 'security_deposit']);
+            $depositRefund = abs($sum(['deposit_refund']));
+            $insuranceRefund = abs($sum(['insurance_refund']));
+
+            return [
+                'booking_id' => $booking->id,
+                'client_id' => $booking->client_id,
+                'client_name' => $booking->client?->name,
+                'client_phone' => $booking->client?->phone,
+                'dress_name' => $booking->dress?->name,
+                'dress_code' => $booking->dress?->code,
+                'event_date' => $booking->event_date?->format('Y-m-d'),
+                'cancelled_at' => $booking->cancelled_at?->format('Y-m-d H:i'),
+                'cancelled_stage' => $booking->cancelled_stage,
+                'cancelled_by_name' => $booking->cancelled_by_name,
+                'sales_name' => $booking->sales_name,
+                'reason' => $booking->cancellation_reason,
+                'reason_label' => Booking::CANCELLATION_REASONS[$booking->cancellation_reason] ?? 'غير محدد',
+                'note' => $booking->cancellation_note,
+                'paid_rent' => $paidRent,
+                'paid_insurance' => $paidInsurance,
+                'deposit_refund' => $depositRefund,
+                'insurance_refund' => $insuranceRefund,
+                'kept_amount' => round(($paidRent - $depositRefund) + ($paidInsurance - $insuranceRefund), 2),
+            ];
+        });
+
+        $byReason = $rows->groupBy('reason_label')
+            ->map(fn($group, $label) => ['reason' => $label, 'count' => $group->count()])
+            ->sortByDesc('count')->values();
+
+        $bookingsInPeriod = Booking::whereIn('status', ['confirmed', 'picked_up', 'returned', 'cancelled']);
+        if (!empty($validated['from_date'])) {
+            $bookingsInPeriod->whereDate('booking_date', '>=', $validated['from_date']);
+        }
+        if (!empty($validated['to_date'])) {
+            $bookingsInPeriod->whereDate('booking_date', '<=', $validated['to_date']);
+        }
+        $totalBookings = $bookingsInPeriod->count();
+
+        return response()->json([
+            'summary' => [
+                'count' => $rows->count(),
+                'total_bookings' => $totalBookings,
+                'cancellation_rate' => $totalBookings > 0 ? round($rows->count() / $totalBookings * 100, 1) : 0,
+                'deposit_refunded' => round($rows->sum('deposit_refund'), 2),
+                'insurance_refunded' => round($rows->sum('insurance_refund'), 2),
+                'kept_amount' => round($rows->sum('kept_amount'), 2),
+            ],
+            'by_reason' => $byReason,
+            'reasons' => Booking::CANCELLATION_REASONS,
+            'data' => $rows->values(),
         ]);
     }
 

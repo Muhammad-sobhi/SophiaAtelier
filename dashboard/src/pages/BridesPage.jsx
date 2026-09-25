@@ -61,6 +61,7 @@ const STAGE_LABELS = {
   fitting: { label: 'بروفة / قياس', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   picked_up: { label: 'استلام الفستان', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   returned: { label: 'مرتجع مكتمل', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  cancelled: { label: 'حجز ملغي', color: 'bg-red-50 text-red-700 border-red-200' },
 };
 
 export default function BridesPage() {

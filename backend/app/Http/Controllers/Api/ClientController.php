@@ -514,7 +514,7 @@ class ClientController extends Controller
     public function stageAction(Request $request, Client $client): JsonResponse
     {
         $request->validate([
-            'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining',
+            'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining,cancel_booking',
             'phone' => 'nullable|string|max:50',
             'phone2' => 'nullable|string|max:50',
             'dress_id' => 'nullable|integer|exists:dresses,id',
@@ -546,6 +546,12 @@ class ClientController extends Controller
             'insurance_refund' => 'nullable|numeric|min:0',
             'insurance_refund_method' => 'nullable|string|max:50',
             'insurance_refund_receipt' => 'nullable',
+            'cancellation_reason' => 'required_if:action,cancel_booking|nullable|string|in:' . implode(',', array_keys(Booking::CANCELLATION_REASONS)),
+            'cancellation_note' => 'required_if:cancellation_reason,other|nullable|string|max:1000',
+            'deposit_refund' => 'nullable|numeric|min:0',
+            'deposit_refund_method' => 'nullable|string|max:50',
+            'deposit_refund_receipt' => 'nullable',
+            'refund_date' => 'nullable|date',
         ]);
 
         $action = $request->input('action');
@@ -581,7 +587,7 @@ class ClientController extends Controller
                 $dress3Id = $request->input('dress_3_id');
                 if ($dressId || $dress2Id || $dress3Id) {
                     $booking = $client->bookings()->latest()->latest('id')->first();
-                    if ($booking) {
+                    if ($booking && $booking->status !== 'cancelled') {
                         $booking->update([
                             'dress_id' => $dressId ?: $booking->dress_id,
                             'dress_2_id' => $dress2Id,
@@ -1108,6 +1114,83 @@ class ClientController extends Controller
                 }
                 break;
 
+            case 'cancel_booking':
+                $booking = $client->bookings()->latest()->latest('id')->first();
+                if (!$booking || $booking->status !== 'confirmed') {
+                    return response()->json([
+                        'message' => 'لا يمكن إلغاء الحجز: لا يوجد حجز مؤكد لم يتم تسليم فستانه بعد'
+                    ], 422);
+                }
+
+                $revenues = $booking->revenues()->get();
+                $paidRent = (float) $revenues->whereIn('type', ['deposit', 'balance'])->sum('amount');
+                $paidInsurance = (float) $revenues->whereIn('type', ['insurance', 'security_deposit'])->sum('amount');
+                $depositRefund = round(floatval($request->input('deposit_refund', 0)), 2);
+                $insuranceRefund = round(floatval($request->input('insurance_refund', 0)), 2);
+
+                if ($depositRefund > round($paidRent, 2)) {
+                    return response()->json(['message' => 'مبلغ رد العربون أكبر من المدفوع (' . $paidRent . ' ج.م)'], 422);
+                }
+                if ($insuranceRefund > round($paidInsurance, 2)) {
+                    return response()->json(['message' => 'مبلغ رد التأمين أكبر من المدفوع (' . $paidInsurance . ' ج.م)'], 422);
+                }
+
+                $stageBefore = $client->current_stage;
+                $refundDate = $request->filled('refund_date')
+                    ? \Carbon\Carbon::parse($request->input('refund_date'))->toDateString()
+                    : now()->toDateString();
+                $reasonLabel = Booking::CANCELLATION_REASONS[$request->input('cancellation_reason')];
+                $user = $request->user();
+
+                \Illuminate\Support\Facades\DB::transaction(function () use ($request, $client, $booking, $stageBefore, $refundDate, $reasonLabel, $user, $depositRefund, $insuranceRefund) {
+                    $booking->update([
+                        'status' => 'cancelled',
+                        'cancelled_at' => now(),
+                        'cancelled_by' => $user?->id,
+                        'cancelled_by_name' => $request->input('sales_name') ?: $user?->name,
+                        'cancelled_stage' => $stageBefore,
+                        'cancellation_reason' => $request->input('cancellation_reason'),
+                        'cancellation_note' => $request->input('cancellation_note'),
+                    ]);
+
+                    // Close open fittings of this booking
+                    Fitting::where('booking_id', $booking->id)
+                        ->whereIn('status', ['scheduled', 'rescheduled'])
+                        ->update(['status' => 'cancelled']);
+
+                    // Free reserved dresses unless another active booking still holds them
+                    foreach (array_filter([$booking->dress_id, $booking->dress_2_id, $booking->dress_3_id]) as $dressId) {
+                        $stillHeld = Booking::where('id', '!=', $booking->id)
+                            ->whereIn('status', ['confirmed', 'picked_up'])
+                            ->where(fn($q) => $q->where('dress_id', $dressId)->orWhere('dress_2_id', $dressId)->orWhere('dress_3_id', $dressId))
+                            ->exists();
+                        if (!$stillHeld) {
+                            \App\Models\Dress::where('id', $dressId)->where('status', 'booked')->update(['status' => 'available']);
+                        }
+                    }
+
+                    // Refunds are negative revenue rows so finance totals and transactions reflect them
+                    $refunds = [
+                        ['deposit_refund', $depositRefund, 'deposit_refund_method', 'deposit_refund_receipt', 'رد عربون (إلغاء حجز)'],
+                        ['insurance_refund', $insuranceRefund, 'insurance_refund_method', 'insurance_refund_receipt', 'رد تأمين (إلغاء حجز)'],
+                    ];
+                    foreach ($refunds as [$type, $amount, $methodField, $receiptField, $label]) {
+                        if ($amount <= 0) {
+                            continue;
+                        }
+                        \App\Models\Revenue::create([
+                            'booking_id' => $booking->id,
+                            'type' => $type,
+                            'amount' => -$amount,
+                            'payment_method' => $request->input($methodField) ?: 'cash',
+                            'payment_date' => $refundDate,
+                            'notes' => $label . ' للعروس: ' . $client->name . ' - ' . $reasonLabel,
+                            'receipt_path' => self::saveReceipt($request, $receiptField),
+                        ]);
+                    }
+                });
+                break;
+
             default:
                 return response()->json(['message' => 'Unknown action'], 400);
         }
@@ -1121,6 +1204,7 @@ class ClientController extends Controller
             'mark_picked_up' => 'تسليم الفستان للعروس',
             'mark_returned' => 'استلام الفستان وتسوية التأمين',
             'pay_remaining' => 'سداد دفعة مالية',
+            'cancel_booking' => 'إلغاء حجز عروس',
         ];
         $actionTitle = $actionLabels[$action] ?? "إجراء مرحلة: {$action}";
         \App\Services\ActivityLogger::log(
@@ -1132,6 +1216,9 @@ class ClientController extends Controller
                 'bride_phone' => $client->phone,
                 'sales_name' => $request->input('sales_name'),
                 'action_key' => $action,
+                'cancellation_reason' => $request->input('cancellation_reason'),
+                'deposit_refund' => $action === 'cancel_booking' ? floatval($request->input('deposit_refund', 0)) : null,
+                'insurance_refund' => $action === 'cancel_booking' ? floatval($request->input('insurance_refund', 0)) : null,
             ],
             $request->input('sales_name')
         );

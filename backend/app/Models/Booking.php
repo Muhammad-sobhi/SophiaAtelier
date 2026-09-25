@@ -16,6 +16,18 @@ class Booking extends Model
         'pickup_scheduled_on', 'return_scheduled_on',
         'status', 'total_amount', 'deposit_amount', 'insurance_amount', 'notes',
         'receipt_path', 'payment_method', 'sales_name', 'is_override',
+        'cancelled_at', 'cancelled_by', 'cancelled_by_name', 'cancelled_stage',
+        'cancellation_reason', 'cancellation_note',
+    ];
+
+    /** Allowed cancellation reasons (key => Arabic label shown in the dashboard) */
+    public const CANCELLATION_REASONS = [
+        'wedding_cancelled' => 'إلغاء الفرح',
+        'wedding_postponed' => 'تأجيل الفرح',
+        'other_shop' => 'اختارت محل آخر',
+        'financial' => 'ظروف مادية',
+        'unhappy_dress' => 'غير راضية عن الفستان',
+        'other' => 'سبب آخر',
     ];
 
     protected $appends = ['receipt_url'];
@@ -44,6 +56,7 @@ class Booking extends Model
             'deposit_amount' => 'decimal:2',
             'insurance_amount' => 'decimal:2',
             'is_override' => 'boolean',
+            'cancelled_at' => 'datetime',
         ];
     }
 

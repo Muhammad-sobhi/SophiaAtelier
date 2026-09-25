@@ -7,9 +7,10 @@ import { StageBadge } from './StageBadge';
 import { UnifiedStageModal } from './UnifiedStageModal';
 import { ReturnDressModal } from './ReturnDressModal';
 import { BookingPaymentsModal } from './BookingPaymentsModal';
+import { CancelBookingModal, CANCELLATION_REASONS } from './CancelBookingModal';
 import {
   X, Phone, MapPin, Calendar, Heart, Ruler, Package, RotateCcw,
-  Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle
+  Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle, Ban
 } from 'lucide-react';
 
 const STAGES = [
@@ -45,6 +46,7 @@ export function BrideJourneyPopup({
   const [stageModal, setStageModal] = useState({ isOpen: false, stage: null });
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -187,6 +189,15 @@ export function BrideJourneyPopup({
             <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
               <Heart size={13} /> تعديل الحجز
             </button>
+            {booking?.status === 'confirmed' && (
+              <button
+                onClick={() => setIsCancelModalOpen(true)}
+                disabled={loading}
+                className={`${common} col-span-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200`}
+              >
+                <Ban size={13} /> إلغاء الحجز
+              </button>
+            )}
           </div>
         );
       case 'fitting':
@@ -275,12 +286,29 @@ export function BrideJourneyPopup({
           </div>
         );
       }
+      case 'cancelled': {
+        const refunded = (type) => Math.abs((booking?.revenues || []).filter((r) => r.type === type).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0));
+        return (
+          <div className="text-[11px] font-bold text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-2.5 space-y-1">
+            <div className="flex items-center justify-between font-black">
+              <span className="flex items-center gap-1"><Ban size={13} /> تم إلغاء الحجز</span>
+              <span className="font-mono text-[10px]">{formatDate(booking?.cancelled_at)}</span>
+            </div>
+            <div>السبب: {CANCELLATION_REASONS[booking?.cancellation_reason] || '—'}{booking?.cancellation_note ? ` — ${booking.cancellation_note}` : ''}</div>
+            <div className="flex flex-wrap gap-x-3 text-rose-700">
+              <span>رد عربون: {formatMoney(refunded('deposit_refund'))} ج.م</span>
+              <span>رد تأمين: {formatMoney(refunded('insurance_refund'))} ج.م</span>
+              {booking?.cancelled_by_name && <span>بواسطة: {booking.cancelled_by_name}</span>}
+            </div>
+          </div>
+        );
+      }
       default:
         return null;
     }
   };
 
-  const isAnySubModalOpen = stageModal.isOpen || isReturnModalOpen;
+  const isAnySubModalOpen = stageModal.isOpen || isReturnModalOpen || isCancelModalOpen;
 
   const modalContent = (
     <>
@@ -314,14 +342,16 @@ export function BrideJourneyPopup({
               >
                 <Trash2 size={16} />
               </button>
-              <button
-                type="button"
-                onClick={() => openFormForStage(stage, true)}
-                className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
-                title="تعديل بيانات المرحلة الحالية"
-              >
-                <Edit3 size={16} />
-              </button>
+              {stage !== 'cancelled' && (
+                <button
+                  type="button"
+                  onClick={() => openFormForStage(stage, true)}
+                  className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                  title="تعديل بيانات المرحلة الحالية"
+                >
+                  <Edit3 size={16} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -389,6 +419,7 @@ export function BrideJourneyPopup({
                     <button
                       key={s.id}
                       type="button"
+                      disabled={stage === 'cancelled'}
                       onClick={() => {
                         if (isCurrent || isFuture) {
                           openFormForStage(s.id);
@@ -612,6 +643,24 @@ export function BrideJourneyPopup({
           bride={bride}
           onSuccess={async () => {
             setIsReturnModalOpen(false);
+            setLoading(true);
+            try {
+              const fresh = await reloadBride();
+              await onUpdate?.(fresh);
+            } finally {
+              setLoading(false);
+            }
+          }}
+        />
+      )}
+
+      {/* Cancel Booking Modal */}
+      {isCancelModalOpen && (
+        <CancelBookingModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          bride={bride}
+          onSuccess={async () => {
             setLoading(true);
             try {
               const fresh = await reloadBride();

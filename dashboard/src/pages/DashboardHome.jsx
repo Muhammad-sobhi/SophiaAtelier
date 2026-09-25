@@ -14,6 +14,7 @@ const STAGES = [
   { id: 'fitting', label: 'بروفة', dotColor: 'bg-violet-500' },
   { id: 'picked_up', label: 'استلام', dotColor: 'bg-blue-500' },
   { id: 'returned', label: 'مرتجع', dotColor: 'bg-rose-500' },
+  { id: 'cancelled', label: 'ملغية', dotColor: 'bg-red-600' },
 ];
 
 const STAGE_MAP = {
@@ -22,6 +23,7 @@ const STAGE_MAP = {
   fitting: { label: 'بروفة قياس', badgeClass: 'bg-violet-50 text-violet-700 border-violet-200', dotColor: 'bg-violet-500' },
   picked_up: { label: 'تم الاستلام', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-500' },
   returned: { label: 'تم الإرجاع', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200', dotColor: 'bg-slate-400' },
+  cancelled: { label: 'حجز ملغي', badgeClass: 'bg-red-50 text-red-700 border-red-200', dotColor: 'bg-red-600' },
 };
 
 export default function DashboardPage() {

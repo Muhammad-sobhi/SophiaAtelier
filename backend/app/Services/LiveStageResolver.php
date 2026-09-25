@@ -10,6 +10,10 @@ class LiveStageResolver
 {
     public static function resolve(Client $client, $latestBooking): string
     {
+        if ($latestBooking && $latestBooking->status === 'cancelled' && !self::hasVisitAfterCancel($client, $latestBooking)) {
+            return 'cancelled';
+        }
+
         if (!$latestBooking || in_array($latestBooking->status, ['pending', 'cancelled'])) {
             $visitsCount = $client->relationLoaded('visits') ? $client->visits->count() : $client->visits()->count();
             return 'visit';
@@ -53,5 +57,16 @@ class LiveStageResolver
 
         // More than 15 days until pickup date -> booking stage
         return 'booking';
+    }
+
+    /** A cancelled bride who came back for a new visit is treated as a visit again */
+    private static function hasVisitAfterCancel(Client $client, $booking): bool
+    {
+        $cancelledAt = $booking->cancelled_at ?? $booking->updated_at;
+        if (!$cancelledAt) {
+            return false;
+        }
+        $visits = $client->relationLoaded('visits') ? $client->visits : $client->visits()->get();
+        return $visits->contains(fn($v) => $v->created_at && Carbon::parse($v->created_at)->gt(Carbon::parse($cancelledAt)));
     }
 }

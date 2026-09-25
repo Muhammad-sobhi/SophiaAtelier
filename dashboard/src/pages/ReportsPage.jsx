@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Users, Sparkles, Heart, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { Users, Sparkles, Heart, FileSpreadsheet, RefreshCw, Ban } from 'lucide-react';
 import { SalesEmployeesReport } from '@/components/reports/SalesEmployeesReport';
 import { DressesReport } from '@/components/reports/DressesReport';
 import { BridesLifecycleReport } from '@/components/reports/BridesLifecycleReport';
+import { CancellationsReport } from '@/components/reports/CancellationsReport';
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('sales'); // 'sales' | 'dresses' | 'brides'
+  const [activeTab, setActiveTab] = useState('sales'); // 'sales' | 'dresses' | 'brides' | 'cancellations'
   const [refreshKey, setRefreshKey] = useState(0);
 
   const tabs = [
@@ -29,6 +30,13 @@ export default function ReportsPage() {
       description: 'تتبع المراحل من الزيارة الأولية حتى الاسترداد ومصادر الإعلانات',
       icon: Heart,
       badge: 'العرائس'
+    },
+    {
+      id: 'cancellations',
+      label: 'الحجوزات الملغية',
+      description: 'عدد الإلغاءات وأسبابها والمبالغ المرتجعة والمتبقية للمحل',
+      icon: Ban,
+      badge: 'الإلغاءات'
     },
   ];
 
@@ -69,7 +77,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Modern Navigation Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -119,6 +127,7 @@ export default function ReportsPage() {
         {activeTab === 'sales' && <SalesEmployeesReport />}
         {activeTab === 'dresses' && <DressesReport />}
         {activeTab === 'brides' && <BridesLifecycleReport />}
+        {activeTab === 'cancellations' && <CancellationsReport />}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ export function StageBadge({ stage, journeyMode }) {
     fitting: { label: 'بروفة', className: 'bg-purple-50 text-purple-600 border-purple-100' },
     picked_up: { label: 'استلام', className: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
     returned: { label: 'إرجاع', className: 'bg-blue-50 text-blue-600 border-blue-100' },
+    cancelled: { label: 'حجز ملغي', className: 'bg-rose-100 text-rose-700 border-rose-300' },
   };
   const current = meta[stage] || meta.visit;
   return (
