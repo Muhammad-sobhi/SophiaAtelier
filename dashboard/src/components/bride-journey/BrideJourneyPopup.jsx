@@ -257,6 +257,15 @@ export function BrideJourneyPopup({
             >
               <Package size={14} /> تسليم الفستان للعروس (فحص الإكسسوارات + التأمين والمتبقي) 📦
             </button>
+            {booking?.status === 'confirmed' && (
+              <button
+                onClick={() => setIsCancelModalOpen(true)}
+                disabled={loading}
+                className={`${common} w-full bg-white hover:bg-rose-50 text-rose-600 border border-rose-200`}
+              >
+                <Ban size={13} /> إلغاء الحجز
+              </button>
+            )}
           </div>
         );
       }
