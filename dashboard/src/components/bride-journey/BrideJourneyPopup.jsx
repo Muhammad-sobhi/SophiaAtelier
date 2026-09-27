@@ -8,9 +8,13 @@ import { UnifiedStageModal } from './UnifiedStageModal';
 import { ReturnDressModal } from './ReturnDressModal';
 import { BookingPaymentsModal } from './BookingPaymentsModal';
 import { CancelBookingModal, CANCELLATION_REASONS } from './CancelBookingModal';
+import { OPEN_VISIT_STATUSES, getLatestVisit, getVisitDresses, getVisitStatus, needsWhatsApp } from './visitStatus';
+import { DressAvailability } from './DressAvailability';
+import { buildVisitConfirmationUrl, formatVisitTime } from '@/lib/whatsapp';
 import {
   X, Phone, MapPin, Calendar, Heart, Ruler, Package, RotateCcw,
-  Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle, Ban
+  Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle, Ban,
+  UserX, XCircle, CalendarPlus
 } from 'lucide-react';
 
 const STAGES = [
@@ -31,6 +35,20 @@ function formatDate(d) {
   return String(d).split('T')[0].split(' ')[0];
 }
 
+const VISIT_SOURCE_LABELS = {
+  website: 'الموقع',
+  walkin: 'في المحل',
+  phone: 'تليفون',
+  whatsapp: 'واتساب',
+  instagram: 'انستجرام',
+  referral: 'ترشيح',
+};
+
+function getDressImage(dress) {
+  const path = dress?.image_path || dress?.images?.find((i) => i.is_primary)?.image_path || dress?.images?.[0]?.image_path;
+  return path ? getStorageUrl(path) : null;
+}
+
 function getAvatar(bride) {
   if (bride.image_path) return getStorageUrl(bride.image_path);
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(bride.name || '?')}&background=e2e8f0&color=475569`;
@@ -49,6 +67,8 @@ export function BrideJourneyPopup({
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [availability, setAvailability] = useState({ loading: false, error: false, byDress: {} });
+  const [triedDressIds, setTriedDressIds] = useState([]);
 
   // Keep local state synced if parent passes a newer bride object
   useEffect(() => {
@@ -59,6 +79,32 @@ export function BrideJourneyPopup({
       });
     }
   }, [initialBride]);
+
+  // Visit stage: check each requested dress on the try-on date and on the wedding date
+  const availabilityBride = localBride || initialBride;
+  const availabilityVisit = getLatestVisit(availabilityBride);
+  const isVisitStage = (availabilityBride?.current_stage || availabilityBride?.stage || 'visit') === 'visit';
+  const requestedKey = (availabilityVisit?.requested_dresses || []).map((d) => d.id).join(',');
+  const triedKey = (availabilityVisit?.tried_dresses || []).map((d) => d.id).join(',');
+  useEffect(() => {
+    setTriedDressIds(triedKey ? triedKey.split(',').map(Number) : []);
+  }, [triedKey]);
+  useEffect(() => {
+    if (!isVisitStage || !availabilityVisit?.id || !requestedKey) {
+      setAvailability({ loading: false, error: false, byDress: {} });
+      return;
+    }
+    let cancelled = false;
+    setAvailability((prev) => ({ ...prev, loading: true, error: false }));
+    apiClient.get(`/visits/${availabilityVisit.id}/availability`)
+      .then((res) => {
+        if (cancelled) return;
+        const rows = Array.isArray(res) ? res : res?.data || [];
+        setAvailability({ loading: false, error: false, byDress: Object.fromEntries(rows.map((r) => [r.dress_id, r])) });
+      })
+      .catch(() => !cancelled && setAvailability({ loading: false, error: true, byDress: {} }));
+    return () => { cancelled = true; };
+  }, [isVisitStage, availabilityVisit?.id, availabilityVisit?.visit_date, availabilityBride?.wedding_date, requestedKey]);
 
   const bride = localBride || initialBride;
   if (!bride) return null;
@@ -88,7 +134,12 @@ export function BrideJourneyPopup({
   const stage = rawStage === 'picked_up' && isDelivered ? 'returned' : rawStage;
   const dress = booking?.dress;
   const dress2 = booking?.dress2;
-  const dresses = [dress, dress2, booking?.dress3].filter(Boolean);
+  const latestVisit = getLatestVisit(bride);
+  const visitStatusKey = latestVisit?.status || 'pending';
+  const visitStatusCfg = getVisitStatus(bride);
+  const whatsAppPending = needsWhatsApp(latestVisit);
+  const isVisitOpen = Boolean(latestVisit) && OPEN_VISIT_STATUSES.includes(visitStatusKey);
+  const dresses = stage === 'visit' ? getVisitDresses(bride) : [dress, dress2, booking?.dress3].filter(Boolean);
 
   const weddingDate = booking?.event_date || bride.wedding_date || bride.relevant_date;
   const scheduled = calculateScheduledDates(weddingDate, bride.city);
@@ -106,10 +157,10 @@ export function BrideJourneyPopup({
 
   const currentStageIndex = STAGES.findIndex((s) => s.id === stage);
 
-  const handleQuickAction = async (action) => {
+  const handleQuickAction = async (action, payload = {}) => {
     setLoading(true);
     try {
-      await apiClient.put(`/clients/${bride.id}/stage-action`, { action });
+      await apiClient.put(`/clients/${bride.id}/stage-action`, { action, ...payload });
       const fresh = await reloadBride();
       await onUpdate?.(fresh);
       toast.success('تم تنفيذ الإجراء بنجاح ✨');
@@ -118,6 +169,55 @@ export function BrideJourneyPopup({
       toast.error('حدث خطأ أثناء تنفيذ الإجراء');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Opens WhatsApp with the visit confirmation template (date, time, trying fee)
+  const sendVisitWhatsApp = async (targetBride = bride) => {
+    const url = await buildVisitConfirmationUrl(targetBride, getLatestVisit(targetBride));
+    if (!url) {
+      toast.error('لا يوجد رقم هاتف صالح للعروس');
+      return;
+    }
+    if (!window.open(url, '_blank')) {
+      toast.warning('المتصفح منع فتح واتساب، اضغط زر "إرسال تفاصيل الزيارة واتساب"');
+      return;
+    }
+    // Remember that the bride got her confirmation (clears the "send WhatsApp" badge)
+    try {
+      await apiClient.post(`/visits/${getLatestVisit(targetBride).id}/confirmation-sent`, {});
+      const fresh = await reloadBride();
+      await onUpdate?.(fresh);
+    } catch (e) {
+      console.error('Failed to record WhatsApp confirmation:', e);
+    }
+  };
+
+  const closeVisit = (visitStatus) => {
+    const confirmText = visitStatus === 'no_show'
+      ? 'تسجيل أن العروس لم تحضر الزيارة؟'
+      : 'تسجيل أن العروس جربت الفساتين ولم تختر فستاناً؟';
+    if (!window.confirm(confirmText)) return;
+    handleQuickAction('close_visit', {
+      visit_status: visitStatus,
+      ...(visitStatus === 'no_show' ? { tried_dresses: [] } : {}),
+    });
+  };
+
+  // Marks which requested dresses the bride actually tried (saved right away on the visit)
+  const toggleTriedDress = async (dressId) => {
+    if (!latestVisit?.id) return;
+    const previous = triedDressIds;
+    const next = previous.includes(dressId) ? previous.filter((id) => id !== dressId) : [...previous, dressId];
+    setTriedDressIds(next);
+    try {
+      await apiClient.put(`/visits/${latestVisit.id}`, { tried_dresses: next });
+      const fresh = await reloadBride();
+      await onUpdate?.(fresh);
+    } catch (e) {
+      console.error(e);
+      setTriedDressIds(previous);
+      toast.error('تعذر حفظ الفساتين التي تمت تجربتها');
     }
   };
 
@@ -170,10 +270,54 @@ export function BrideJourneyPopup({
 
     switch (stage) {
       case 'visit':
+        // 1. Request not reviewed yet -> review date/time/dresses, confirm, then send WhatsApp
+        if (!latestVisit || visitStatusKey === 'pending') {
+          return (
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => openFormForStage('visit')} disabled={loading} className={`${common} bg-emerald-600 hover:bg-emerald-700 text-white`}>
+                <CheckCircle2 size={13} /> مراجعة وتأكيد الزيارة
+              </button>
+              <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
+                <Heart size={13} /> حجز فستان
+              </button>
+            </div>
+          );
+        }
+        // 2. Confirmed / arrived -> remind on WhatsApp, then record the outcome of the try-on
+        if (isVisitOpen) {
+          return (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => sendVisitWhatsApp()}
+                  disabled={loading}
+                  className={`${common} text-white ${whatsAppPending ? 'bg-lime-600 hover:bg-lime-700 ring-2 ring-lime-200' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                >
+                  <MessageCircle size={13} /> {whatsAppPending ? 'أرسل تأكيد الزيارة واتساب' : 'إعادة إرسال تفاصيل الزيارة'}
+                </button>
+                <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
+                  <Heart size={13} /> اختارت فستاناً — حجز
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => openFormForStage('visit', true)} disabled={loading} className={`${common} bg-white hover:bg-slate-50 text-slate-700 border border-slate-200`}>
+                  <Calendar size={13} /> تغيير الموعد
+                </button>
+                <button onClick={() => closeVisit('done')} disabled={loading} className={`${common} bg-white hover:bg-slate-50 text-slate-700 border border-slate-200`}>
+                  <XCircle size={13} /> لم تختر فستاناً
+                </button>
+                <button onClick={() => closeVisit('no_show')} disabled={loading} className={`${common} bg-white hover:bg-rose-50 text-rose-600 border border-rose-200`}>
+                  <UserX size={13} /> لم تحضر
+                </button>
+              </div>
+            </div>
+          );
+        }
+        // 3. Visit closed without a booking -> she can come again or book directly
         return (
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => handleQuickAction('confirm_visit')} disabled={loading} className={`${common} bg-emerald-600 hover:bg-emerald-700 text-white`}>
-              <MessageCircle size={13} /> تأكيد الزيارة
+            <button onClick={() => openFormForStage('visit')} disabled={loading} className={`${common} bg-indigo-600 hover:bg-indigo-700 text-white`}>
+              <CalendarPlus size={13} /> زيارة جديدة
             </button>
             <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
               <Heart size={13} /> حجز فستان
@@ -387,6 +531,12 @@ export function BrideJourneyPopup({
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <StageBadge stage={stage} journeyMode={bride.journey_mode} />
+                  {stage === 'visit' && (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border ${visitStatusCfg.badgeClass}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${visitStatusCfg.dotColor}`} />
+                      {visitStatusCfg.label}
+                    </span>
+                  )}
                   {remaining > 0 && (
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-100">
                       متبقي {formatMoney(remaining)} ج.م
@@ -461,25 +611,60 @@ export function BrideJourneyPopup({
             {/* Dresses */}
             {dresses.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-amber-500" /> {stage === 'visit' ? 'فساتين مطلوب تجربتها بالزيارة' : 'الفساتين المحجوزة'}
-                </h4>
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-500" /> {stage === 'visit' ? 'فساتين مطلوب تجربتها بالزيارة' : 'الفساتين المحجوزة'}
+                  </h4>
+                  {stage === 'visit' && availability.loading && (
+                    <span className="text-[9.5px] font-bold text-slate-400 flex items-center gap-1">
+                      <Loader2 size={11} className="animate-spin" /> جاري فحص الإتاحة...
+                    </span>
+                  )}
+                </div>
+                {stage === 'visit' && availability.error && (
+                  <div className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                    تعذر فحص إتاحة الفساتين، حاول فتح البطاقة مرة أخرى.
+                  </div>
+                )}
                 <div className="space-y-1.5">
-                  {dresses.map((d, idx) => (
-                    <div key={d.id || idx} className="flex items-center gap-2 p-2 bg-white border border-slate-100 rounded-xl shadow-2xs">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-100 bg-slate-50 flex-shrink-0">
-                        {d.image_path ? (
-                          <img src={getStorageUrl(d.image_path)} alt={d.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300"><Sparkles size={16} /></div>
-                        )}
+                  {dresses.map((d, idx) => {
+                    const image = getDressImage(d);
+                    const avail = stage === 'visit' ? availability.byDress[d.id] : null;
+                    const isTried = triedDressIds.includes(d.id);
+                    return (
+                      <div key={d.id || idx} className="p-2 bg-white border border-slate-100 rounded-xl shadow-2xs space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-100 bg-slate-50 flex-shrink-0">
+                            {image ? (
+                              <img src={image} alt={d.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-300"><Sparkles size={16} /></div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-black text-slate-800 truncate">{d.name}</div>
+                            <div className="text-[10px] text-slate-500 font-bold">{d.code ? `كود: ${d.code}` : ''} {d.size ? `مقاس: ${d.size}` : ''}</div>
+                          </div>
+                          {stage === 'visit' && isVisitOpen && visitStatusKey !== 'pending' && (
+                            <label className="flex items-center gap-1 text-[10px] font-black text-slate-600 cursor-pointer select-none flex-shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={isTried}
+                                onChange={() => toggleTriedDress(d.id)}
+                                className="w-3.5 h-3.5 accent-emerald-600 cursor-pointer"
+                              />
+                              جرّبته
+                            </label>
+                          )}
+                          {stage === 'visit' && !isVisitOpen && isTried && (
+                            <span className="text-[9.5px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md flex-shrink-0">تمت التجربة</span>
+                          )}
+                        </div>
+
+                        <DressAvailability row={avail} />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-black text-slate-800 truncate">{d.name}</div>
-                        <div className="text-[10px] text-slate-500 font-bold">{d.code ? `كود: ${d.code}` : ''} {d.size ? `مقاس: ${d.size}` : ''}</div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -491,10 +676,24 @@ export function BrideJourneyPopup({
                 <div className="text-xs font-black text-slate-800 mt-0.5">{formatDate(weddingDate)}</div>
               </div>
               <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5">
-                <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> تاريخ الزيارة</div>
+                <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1"><Clock size={11} /> موعد الزيارة</div>
                 <div className="text-xs font-black text-slate-800 mt-0.5">
-                  {bride.latest_visit_date || bride.visits?.[0]?.visit_date || formatDate(booking?.booking_date)}
+                  {formatDate(latestVisit?.visit_date || bride.latest_visit_date || booking?.booking_date)}
+                  {latestVisit?.time_slot && <span className="text-slate-500 font-bold"> — {formatVisitTime(latestVisit.time_slot)}</span>}
                 </div>
+                {stage === 'visit' && latestVisit && (
+                  <div className="mt-1 space-y-0.5 text-[9.5px] font-bold text-slate-500 leading-snug">
+                    <div>المصدر: {VISIT_SOURCE_LABELS[latestVisit.source] || latestVisit.source || '—'}</div>
+                    {latestVisit.confirmed_at && (
+                      <div>{latestVisit.auto_confirmed ? '⚡ تأكيد تلقائي (كل الفساتين متاحة)' : '👤 تأكيد بواسطة الموظف'}</div>
+                    )}
+                    {latestVisit.status === 'confirmed' && (
+                      <div className={whatsAppPending ? 'text-lime-700' : 'text-emerald-700'}>
+                        {whatsAppPending ? '✗ لم تُرسل رسالة التأكيد بعد' : `✓ أُرسلت رسالة التأكيد ${formatDate(latestVisit.confirmation_sent_at)}`}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               {stage !== 'visit' && (
                 <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5">
@@ -554,13 +753,13 @@ export function BrideJourneyPopup({
             )}
 
             {/* Trying fee card if in visit stage */}
-            {stage === 'visit' && parseFloat(bride.latest_dress_trying_fee || 0) > 0 && (
+            {stage === 'visit' && latestVisit && (
               <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-2.5 flex items-center justify-between text-xs">
                 <span className="font-bold text-purple-900 flex items-center gap-1.5">
-                  <Banknote size={14} className="text-purple-600" /> رسوم تجربة الفساتين المقترحة:
+                  <Banknote size={14} className="text-purple-600" /> رسوم تجربة الفساتين:
                 </span>
                 <span className="font-black text-purple-700 font-mono">
-                  {parseFloat(bride.latest_dress_trying_fee).toLocaleString()} ج.م
+                  {parseFloat(latestVisit.trying_fee || 0).toLocaleString()} ج.م
                 </span>
               </div>
             )}
@@ -632,10 +831,15 @@ export function BrideJourneyPopup({
           stage={stageModal.stage}
           isEdit={stageModal.isEdit}
           onSuccess={async () => {
+            const savedStage = stageModal.stage;
             setStageModal({ isOpen: false, stage: null });
             setLoading(true);
             try {
               const fresh = await reloadBride();
+              // Confirming or rescheduling a visit sends the details to the bride
+              if (savedStage === 'visit' && fresh && getLatestVisit(fresh)?.status === 'confirmed') {
+                await sendVisitWhatsApp(fresh);
+              }
               await onUpdate?.(fresh);
             } finally {
               setLoading(false);

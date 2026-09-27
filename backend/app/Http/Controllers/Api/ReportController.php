@@ -16,6 +16,19 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
+    /** Try-on visits report for a date range (defaults to the current month) */
+    public function visits(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from' => 'nullable|date',
+            'to' => 'nullable|date|after_or_equal:from',
+        ]);
+        $from = $validated['from'] ?? Carbon::now()->startOfMonth()->toDateString();
+        $to = $validated['to'] ?? Carbon::now()->endOfMonth()->toDateString();
+
+        return response()->json(\App\Services\VisitReportService::build($from, $to));
+    }
+
     public function sales(Request $request): JsonResponse
     {
         $period = $request->input('period', 'monthly');

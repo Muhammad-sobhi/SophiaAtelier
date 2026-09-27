@@ -35,6 +35,7 @@ Route::post('/public/find-client', [ClientController::class, 'findClient'])->mid
 Route::post('/public/bookings', [BookingController::class, 'publicStore'])->middleware('throttle:5,1');
 Route::post('/public/contact-messages', [\App\Http\Controllers\Api\ContactMessageController::class, 'publicStore'])->middleware('throttle:5,1');
 Route::get('/public/fully-booked-slots', [VisitController::class, 'getFullyBookedSlots']);
+Route::post('/public/availability', [\App\Http\Controllers\Api\AvailabilityController::class, 'publicCheck'])->middleware('throttle:60,1');
 Route::get('/public/reviews', [ReviewController::class, 'publicIndex']);
 Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
 Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionController::class, 'publicIndex']);
@@ -116,6 +117,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('collections', \App\Http\Controllers\Api\CollectionController::class);
     Route::apiResource('client-gallery', \App\Http\Controllers\Api\ClientGalleryController::class);
     Route::apiResource('designers', DesignerController::class);
+    Route::get('visits/{visit}/availability', [VisitController::class, 'availability']);
+    Route::post('visits/{visit}/confirmation-sent', [VisitController::class, 'markConfirmationSent']);
+    Route::post('availability', [\App\Http\Controllers\Api\AvailabilityController::class, 'check']);
     Route::apiResource('visits', VisitController::class);
     Route::apiResource('bookings', BookingController::class);
     Route::apiResource('fittings', FittingController::class);
@@ -128,6 +132,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reports endpoints
     Route::get('/reports/dresses', [ReportController::class, 'dressesReport']);
+    Route::get('/reports/visits', [ReportController::class, 'visits']);
     Route::get('/reports/cancellations', [ReportController::class, 'cancellations']);
     Route::get('/reports/sales', [ReportController::class, 'sales']);
     Route::get('/reports/sales-by-stage', [ReportController::class, 'salesByStage']);

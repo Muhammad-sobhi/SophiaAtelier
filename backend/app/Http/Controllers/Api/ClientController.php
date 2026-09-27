@@ -19,6 +19,7 @@ class ClientController extends Controller
             'visits' => function ($q) {
                 $q->latest();
             },
+            'visits.requestedDresses.images',
             'visits.triedDresses',
             'visits.bookedDresses',
             'bookings' => function ($q) {
@@ -158,7 +159,7 @@ class ClientController extends Controller
         $rawEmail = $request->input('email');
 
         if ($clientId) {
-            $client = Client::with(['visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->find($clientId);
+            $client = Client::with(['visits.requestedDresses.images', 'visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->find($clientId);
             if ($client) {
                 return response()->json($client);
             }
@@ -211,7 +212,7 @@ class ClientController extends Controller
             $query->where('email', $cleanEmail);
         }
 
-        $client = $query->with(['visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->first();
+        $client = $query->with(['visits.requestedDresses.images', 'visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->first();
 
         if (!$client) {
             return response()->json([
@@ -227,6 +228,7 @@ class ClientController extends Controller
         $client->loadMissing([
             'visits' => function ($q) {
                 $q->latest(); },
+            'visits.requestedDresses.images',
             'visits.triedDresses',
             'visits.bookedDresses',
             'bookings' => function ($q) {
@@ -286,30 +288,28 @@ class ClientController extends Controller
             }
         }
 
-        if (!empty($validated['dress_id'])) {
-            $client->bookings()->create([
-                'dress_id' => $validated['dress_id'] ?? null,
-                'dress_2_id' => $validated['dress_2_id'] ?? null,
-                'dress_3_id' => $validated['dress_3_id'] ?? null,
-                'booking_date' => $validated['visit_date'] ?? now()->toDateString(),
-                'event_date' => $validated['wedding_date'] ?? null,
-                'pickup_scheduled_on' => $validated['pickup_scheduled_on'] ?? null,
-                'return_scheduled_on' => $validated['return_scheduled_on'] ?? null,
-                'status' => 'pending',
-                'total_amount' => 0,
-                'notes' => 'تم تحديد الفساتين ومواعيد الاستلام والإرجاع عند إنشاء العروس',
-            ]);
-        }
+        $dressIds = array_values(array_unique(array_filter([
+            $validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
+        ])));
 
-        if (!empty($validated['visit_date'])) {
+        if (!empty($validated['visit_date']) || $dressIds) {
+            $validated['visit_date'] = $validated['visit_date'] ?? now()->toDateString();
+            // Registered by staff (shop / phone / chat): the dresses to try go on the visit, which is confirmed
+            // by that employee. Website requests go through the public booking endpoint instead.
             $visit = $client->visits()->create([
                 'visit_date' => $validated['visit_date'],
                 'time_slot' => $normalizedTimeSlot,
-                'status' => 'pending',
-                'source' => $client->source ?: 'website',
+                'trying_fee' => array_key_exists('trying_fee', $validated)
+                    ? (float) $validated['trying_fee']
+                    : \App\Models\Dress::whereIn('id', $dressIds)->sum('trying_fee'),
+                'source' => in_array($client->source, Visit::SOURCES) ? $client->source : 'walkin',
                 'sales_name' => $validated['sales_name'] ?? null,
-                'notes' => 'موعد زيارة مبدئي',
+                'notes' => 'تم تسجيل الزيارة من الداشبورد',
             ]);
+            $visit->requestedDresses()->syncWithPivotValues($dressIds, ['type' => 'requested']);
+            if ($request->user()) {
+                $visit->markConfirmed($request->user()->id);
+            }
 
             if (isset($validated['tried_dresses'])) {
                 $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'], ['type' => 'tried']);
@@ -375,7 +375,12 @@ class ClientController extends Controller
 
         if (array_key_exists('dress_id', $validated) || array_key_exists('dress_2_id', $validated) || array_key_exists('dress_3_id', $validated) || array_key_exists('pickup_scheduled_on', $validated) || array_key_exists('return_scheduled_on', $validated) || array_key_exists('wedding_date', $validated)) {
             $booking = $client->bookings()->latest()->latest('id')->first();
-            if ($booking) {
+            // Cancelled / returned bookings are history and are never edited from here
+            if ($booking && in_array($booking->status, ['cancelled', 'returned'])) {
+                $booking = null;
+            }
+            $hasActiveBooking = $booking && $booking->status !== 'pending';
+            if ($booking && ($hasActiveBooking || !$this->syncOpenVisitDresses($client, $validated))) {
                 $bookingUpdates = [];
                 if (array_key_exists('wedding_date', $validated)) $bookingUpdates['event_date'] = $validated['wedding_date'];
                 if (array_key_exists('dress_id', $validated)) $bookingUpdates['dress_id'] = $validated['dress_id'];
@@ -386,19 +391,9 @@ class ClientController extends Controller
                 if (!empty($bookingUpdates)) {
                     $booking->update($bookingUpdates);
                 }
-            } elseif (!empty($validated['dress_id'])) {
-                $client->bookings()->create([
-                    'dress_id' => $validated['dress_id'] ?? null,
-                    'dress_2_id' => $validated['dress_2_id'] ?? null,
-                    'dress_3_id' => $validated['dress_3_id'] ?? null,
-                    'booking_date' => $validated['visit_date'] ?? now()->toDateString(),
-                    'event_date' => $validated['wedding_date'] ?? null,
-                    'pickup_scheduled_on' => $validated['pickup_scheduled_on'] ?? null,
-                    'return_scheduled_on' => $validated['return_scheduled_on'] ?? null,
-                    'status' => 'pending',
-                    'total_amount' => 0,
-                    'notes' => 'تم تحديد الفساتين ومواعيد الاستلام والإرجاع عند تعديل بيانات العروس',
-                ]);
+            } elseif (!$booking) {
+                // No booking yet: the chosen dresses are the ones she wants to try on her visit
+                $this->syncOpenVisitDresses($client, $validated);
             }
         }
 
@@ -429,6 +424,24 @@ class ClientController extends Controller
         }
 
         return response()->json($client);
+    }
+
+    /** Put the dresses from a client form on her open visit. Returns false when no dress fields were sent. */
+    private function syncOpenVisitDresses(Client $client, array $validated): bool
+    {
+        if (!array_key_exists('dress_id', $validated) && !array_key_exists('dress_2_id', $validated) && !array_key_exists('dress_3_id', $validated)) {
+            return false;
+        }
+        $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+        if (!$visit) {
+            return false;
+        }
+        $dressIds = array_values(array_unique(array_filter([
+            $validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
+        ])));
+        $visit->requestedDresses()->syncWithPivotValues($dressIds, ['type' => 'requested']);
+
+        return true;
     }
 
     public function destroy(Client $client): JsonResponse
@@ -514,7 +527,7 @@ class ClientController extends Controller
     public function stageAction(Request $request, Client $client): JsonResponse
     {
         $request->validate([
-            'action' => 'required|string|in:confirm_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining,cancel_booking',
+            'action' => 'required|string|in:confirm_visit,close_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining,cancel_booking',
             'phone' => 'nullable|string|max:50',
             'phone2' => 'nullable|string|max:50',
             'dress_id' => 'nullable|integer|exists:dresses,id',
@@ -552,60 +565,70 @@ class ClientController extends Controller
             'deposit_refund_method' => 'nullable|string|max:50',
             'deposit_refund_receipt' => 'nullable',
             'refund_date' => 'nullable|date',
+            'visit_status' => 'required_if:action,close_visit|nullable|string|in:arrived,done,no_show',
+            'visit_source' => 'nullable|string|in:' . implode(',', Visit::SOURCES),
+            'tried_dresses' => 'nullable|array|max:3',
+            'tried_dresses.*' => 'integer|exists:dresses,id',
         ]);
 
         $action = $request->input('action');
         switch ($action) {
             case 'confirm_visit':
-                $visit = $client->visits()->latest()->first();
-                $visitSalesName = $request->input('sales_name');
-                $visitDate = $request->input('visit_date', now()->toDateString());
-                $visitTime = $request->input('visit_time');
+                // Confirm the bride's open visit request (or register a walk-in visit) without
+                // overwriting the date/time she asked for unless the employee changed them
+                $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+                $visitTime = $request->filled('visit_time') ? VisitController::normalizeTimeSlot($request->input('visit_time')) : null;
 
-                if ($visit) {
-                    $visit->update([
-                        'status' => 'confirmed',
-                        'sales_name' => $visitSalesName ?: $visit->sales_name,
-                        'visit_date' => $visitDate ?: $visit->visit_date,
-                        'time_slot' => $visitTime ?: $visit->time_slot,
-                    ]);
-                } else {
-                    \App\Models\Visit::create([
-                        'client_id' => $client->id,
-                        'visit_date' => $visitDate,
-                        'time_slot' => $visitTime,
-                        'status' => 'confirmed',
-                        'source' => $client->source ?: 'website',
-                        'sales_name' => $visitSalesName,
-                        'notes' => 'تم تأكيد موعد الزيارة'
-                    ]);
+                $visitData = array_filter([
+                    'visit_date' => $request->input('visit_date'),
+                    'time_slot' => $visitTime,
+                    'sales_name' => $request->input('sales_name'),
+                ], fn($v) => $v !== null && $v !== '');
+                if ($request->has('trying_fee')) {
+                    $visitData['trying_fee'] = floatval($request->input('trying_fee', 0));
                 }
 
-                // Associate or update up to 3 interested dresses in a pending booking
-                $dressId = $request->input('dress_id');
-                $dress2Id = $request->input('dress_2_id');
-                $dress3Id = $request->input('dress_3_id');
-                if ($dressId || $dress2Id || $dress3Id) {
-                    $booking = $client->bookings()->latest()->latest('id')->first();
-                    if ($booking && $booking->status !== 'cancelled') {
-                        $booking->update([
-                            'dress_id' => $dressId ?: $booking->dress_id,
-                            'dress_2_id' => $dress2Id,
-                            'dress_3_id' => $dress3Id,
-                            'event_date' => $request->input('event_date') ?: ($client->wedding_date ?: $booking->event_date),
-                        ]);
-                    } else {
-                        $client->bookings()->create([
-                            'dress_id' => $dressId,
-                            'dress_2_id' => $dress2Id,
-                            'dress_3_id' => $dress3Id,
-                            'booking_date' => $visitDate,
-                            'event_date' => $request->input('event_date', $client->wedding_date),
-                            'status' => 'pending',
-                            'total_amount' => 0,
-                            'notes' => 'تم تسجيل الفساتين المراد تجربتها',
-                        ]);
+                if ($visit) {
+                    // A new date/time means the bride must get a new WhatsApp confirmation
+                    $rescheduled = (isset($visitData['visit_date']) && $visitData['visit_date'] !== $visit->visit_date?->toDateString())
+                        || (isset($visitData['time_slot']) && $visitData['time_slot'] !== $visit->time_slot);
+                    if ($rescheduled) {
+                        $visitData['confirmation_sent_at'] = null;
                     }
+                    $visit->update($visitData);
+                } else {
+                    // Visit registered by staff (in the shop, by phone or chat)
+                    $visit = Visit::create($visitData + [
+                        'client_id' => $client->id,
+                        'visit_date' => now()->toDateString(),
+                        'source' => $request->input('visit_source') ?: 'walkin',
+                        'notes' => 'تم تسجيل الزيارة من الداشبورد',
+                    ]);
+                }
+                $visit->markConfirmed($request->user()?->id);
+
+                if ($request->filled('event_date')) {
+                    $client->update(['wedding_date' => $request->input('event_date')]);
+                }
+
+                // The dresses to try live on the visit itself; a booking is only created when she chooses
+                if ($request->hasAny(['dress_id', 'dress_2_id', 'dress_3_id'])) {
+                    $dressIds = array_values(array_unique(array_filter([
+                        $request->input('dress_id'), $request->input('dress_2_id'), $request->input('dress_3_id'),
+                    ])));
+                    $visit->requestedDresses()->syncWithPivotValues($dressIds, ['type' => 'requested']);
+                }
+                break;
+
+            case 'close_visit':
+                // After the try-on: she arrived, left without choosing (done), or did not show up
+                $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+                if (!$visit) {
+                    return response()->json(['message' => 'لا توجد زيارة مفتوحة لهذه العروس'], 422);
+                }
+                $visit->update(['status' => $request->input('visit_status')]);
+                if ($request->has('tried_dresses')) {
+                    $visit->triedDresses()->syncWithPivotValues($request->input('tried_dresses', []), ['type' => 'tried']);
                 }
                 break;
 
@@ -701,15 +724,16 @@ class ClientController extends Controller
                     $client->update($clientUpdates);
                 }
 
-                // Get or create booking
+                // Edit the current booking; a cancelled or finished one is history and starts a new booking
                 $booking = $client->bookings()->latest()->latest('id')->first();
-                if (!$booking) {
+                if (!$booking || in_array($booking->status, ['cancelled', 'returned'])) {
                     $booking = new \App\Models\Booking();
                     $booking->client_id = $client->id;
                 }
 
                 $dressId = $request->input('dress_id');
                 $dress2Id = $request->input('dress_2_id');
+                $dress3Id = $request->input('dress_3_id');
                 $eventDate = $request->input('event_date', $client->wedding_date);
                 $forceOverride = ($request->boolean('force_override') || $request->boolean('is_override')) && $request->user()->role === 'admin';
 
@@ -717,7 +741,8 @@ class ClientController extends Controller
                 if (!$forceOverride) {
                     $conflicts = array_merge(
                         \App\Services\DressAvailabilityService::getConflicts($client->id, $dressId, $eventDate, $booking->id),
-                        $dress2Id ? \App\Services\DressAvailabilityService::getConflicts($client->id, $dress2Id, $eventDate, $booking->id) : []
+                        $dress2Id ? \App\Services\DressAvailabilityService::getConflicts($client->id, $dress2Id, $eventDate, $booking->id) : [],
+                        $dress3Id ? \App\Services\DressAvailabilityService::getConflicts($client->id, $dress3Id, $eventDate, $booking->id) : []
                     );
 
                     if (!empty($conflicts)) {
@@ -730,6 +755,7 @@ class ClientController extends Controller
 
                 $booking->dress_id = $dressId;
                 $booking->dress_2_id = $dress2Id;
+                $booking->dress_3_id = $dress3Id;
                 $booking->sales_name = $request->input('sales_name');
                 $booking->is_override = $forceOverride;
                 $booking->booking_date = now()->toDateString();
@@ -776,6 +802,13 @@ class ClientController extends Controller
 
                 // Keep the bride's wedding date in sync with the booking's event date
                 $client->syncWeddingDateFrom($booking);
+
+                // The try-on visit ends with this booking
+                $bookedVisit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+                if ($bookedVisit) {
+                    $bookedVisit->update(['status' => 'booked']);
+                    $bookedVisit->bookedDresses()->syncWithPivotValues(array_values(array_filter([$dressId, $dress2Id, $dress3Id])), ['type' => 'booked']);
+                }
 
                 $payments = $request->input('payments');
                 // Clean up previous deposit revenues for this booking to prevent duplicate entries when editing
@@ -1198,6 +1231,7 @@ class ClientController extends Controller
         // Log the activity
         $actionLabels = [
             'confirm_visit' => 'تأكيد زيارة عروس',
+            'close_visit' => 'تحديث نتيجة زيارة عروس',
             'schedule_fitting' => 'جدولة بروفة قياس',
             'confirm_booking' => 'تأكيد حجز فستان',
             'end_fitting' => 'إنهاء بروفات القياس',
@@ -1246,7 +1280,15 @@ class ClientController extends Controller
                 $booking->fittings()->delete();
                 if ($booking->dress) $booking->dress->update(['status' => 'available']);
                 if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+                if ($booking->dress3) $booking->dress3->update(['status' => 'available']);
                 $booking->delete();
+
+                // The visit that ended with this booking is open again
+                $bookedVisit = $client->visits()->where('status', 'booked')->latest()->latest('id')->first();
+                if ($bookedVisit) {
+                    $bookedVisit->update(['status' => 'arrived']);
+                    $bookedVisit->bookedDresses()->detach();
+                }
                 
                 $client->update(['current_stage' => 'visit']);
             } 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Visit;
+use App\Services\DressAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -11,7 +12,7 @@ class VisitController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Visit::whereHas('client')->with(['client', 'triedDresses', 'bookedDresses']);
+        $query = Visit::whereHas('client')->with(['client', 'requestedDresses', 'triedDresses', 'bookedDresses']);
 
         if ($clientId = $request->input('client_id')) {
             $query->where('client_id', $clientId);
@@ -63,7 +64,8 @@ class VisitController extends Controller
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'visit_date' => 'required|date',
-            'status' => 'nullable|in:arrived,done,booked,no_show',
+            'status' => 'nullable|in:' . implode(',', Visit::STATUSES),
+            'trying_fee' => 'nullable|numeric|min:0',
             'source' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'time_slot' => 'nullable|string|max:50',
@@ -99,12 +101,12 @@ class VisitController extends Controller
             $visit->bookedDresses()->syncWithPivotValues($validated['booked_dresses'], ['type' => 'booked']);
         }
 
-        return response()->json($visit->load(['client', 'triedDresses', 'bookedDresses']), 201);
+        return response()->json($visit->load(['client', 'requestedDresses', 'triedDresses', 'bookedDresses']), 201);
     }
 
     public function show(Visit $visit)
     {
-        $visit->load(['client', 'triedDresses', 'bookedDresses']);
+        $visit->load(['client', 'requestedDresses', 'triedDresses', 'bookedDresses']);
 
         return response()->json($visit);
     }
@@ -114,7 +116,8 @@ class VisitController extends Controller
         $validated = $request->validate([
             'client_id' => 'sometimes|required|exists:clients,id',
             'visit_date' => 'sometimes|required|date',
-            'status' => 'nullable|in:arrived,done,booked,no_show',
+            'status' => 'nullable|in:' . implode(',', Visit::STATUSES),
+            'trying_fee' => 'nullable|numeric|min:0',
             'source' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'time_slot' => 'nullable|string|max:50',
@@ -152,7 +155,21 @@ class VisitController extends Controller
             $visit->bookedDresses()->syncWithPivotValues($validated['booked_dresses'] ?? [], ['type' => 'booked']);
         }
 
-        return response()->json($visit->load(['client', 'triedDresses', 'bookedDresses']));
+        return response()->json($visit->load(['client', 'requestedDresses', 'triedDresses', 'bookedDresses']));
+    }
+
+    /** Per requested dress: availability on the try-on date and on the bride's wedding date */
+    public function availability(Visit $visit): JsonResponse
+    {
+        return response()->json(DressAvailabilityService::forVisit($visit));
+    }
+
+    /** The employee opened the WhatsApp confirmation for this visit */
+    public function markConfirmationSent(Visit $visit): JsonResponse
+    {
+        $visit->update(['confirmation_sent_at' => now()]);
+
+        return response()->json($visit);
     }
 
     public function destroy(Visit $visit): JsonResponse

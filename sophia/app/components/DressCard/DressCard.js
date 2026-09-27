@@ -16,7 +16,8 @@ export default function DressCard({
   dataDelay,
   className = '',
 }) {
-  const { t, lang } = useStore();
+  const { t, lang, weddingDate, catalogAvailability } = useStore();
+  const onWedding = weddingDate ? catalogAvailability[product.id] : null;
   const [currentIdx, setCurrentIdx] = useState(0);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
@@ -174,6 +175,17 @@ export default function DressCard({
         <h3 className={styles.name}>
           {lang === 'ar' && product.name_ar ? product.name_ar : product.name}
         </h3>
+        {onWedding && (
+          <p className={`${styles.availability} ${onWedding.available ? styles.availableYes : styles.availableNo}`}>
+            <span className={styles.availabilityDot} aria-hidden="true" />
+            {onWedding.available ? t.availability.availableOnDate : (
+              <>
+                {t.availability.bookedOnDate}
+                {onWedding.available_from && <> · {t.availability.availableFrom(onWedding.available_from)}</>}
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   );

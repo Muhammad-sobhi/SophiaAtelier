@@ -10,12 +10,28 @@ class Visit extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'sales_name'];
+    /** pending = request awaiting staff confirmation; confirmed = date/time agreed with the bride */
+    public const STATUSES = ['pending', 'confirmed', 'arrived', 'done', 'booked', 'no_show'];
+
+    /** Visits that are still open (the bride has not come yet or is being served) */
+    public const OPEN_STATUSES = ['pending', 'confirmed', 'arrived'];
+
+    /** Where the request came from: the website, or registered by staff (in the shop / by phone / chat) */
+    public const SOURCES = ['website', 'walkin', 'phone', 'whatsapp', 'instagram', 'referral'];
+
+    protected $fillable = [
+        'client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'trying_fee', 'sales_name',
+        'confirmed_at', 'confirmed_by', 'auto_confirmed', 'confirmation_sent_at',
+    ];
 
     protected function casts(): array
     {
         return [
             'visit_date' => 'date:Y-m-d',
+            'trying_fee' => 'decimal:2',
+            'confirmed_at' => 'datetime',
+            'auto_confirmed' => 'boolean',
+            'confirmation_sent_at' => 'datetime',
         ];
     }
 
@@ -32,6 +48,27 @@ class Visit extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /** Confirm the visit; without a user it was confirmed automatically (all dresses available) */
+    public function markConfirmed(?int $userId): void
+    {
+        $this->forceFill([
+            'status' => 'confirmed',
+            'confirmed_at' => $this->confirmed_at ?? now(),
+            'confirmed_by' => $this->confirmed_by ?? $userId,
+            'auto_confirmed' => $this->confirmed_at ? $this->auto_confirmed : $userId === null,
+        ])->save();
+    }
+
+    public function confirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function requestedDresses()
+    {
+        return $this->belongsToMany(Dress::class, 'visit_dresses')->wherePivot('type', 'requested');
     }
 
     public function triedDresses()

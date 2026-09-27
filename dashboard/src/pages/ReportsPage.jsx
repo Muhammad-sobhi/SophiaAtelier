@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Users, Sparkles, Heart, FileSpreadsheet, RefreshCw, Ban } from 'lucide-react';
+import { Users, Sparkles, Heart, FileSpreadsheet, RefreshCw, Ban, CalendarCheck } from 'lucide-react';
 import { SalesEmployeesReport } from '@/components/reports/SalesEmployeesReport';
 import { DressesReport } from '@/components/reports/DressesReport';
 import { BridesLifecycleReport } from '@/components/reports/BridesLifecycleReport';
 import { CancellationsReport } from '@/components/reports/CancellationsReport';
+import { VisitsReport } from '@/components/reports/VisitsReport';
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('sales'); // 'sales' | 'dresses' | 'brides' | 'cancellations'
+  const [activeTab, setActiveTab] = useState('sales'); // 'sales' | 'visits' | 'dresses' | 'brides' | 'cancellations'
   const [refreshKey, setRefreshKey] = useState(0);
 
   const tabs = [
@@ -16,6 +17,13 @@ export default function ReportsPage() {
       description: 'أداء الفريق في مراحل الزيارة والحجز والبروفات والاستلام والترجيع',
       icon: Users,
       badge: 'مبيعات'
+    },
+    {
+      id: 'visits',
+      label: 'تقرير الزيارات',
+      description: 'قمع الزيارات والمصادر وعدم الحضور والفساتين المطلوبة والطلب الضائع',
+      icon: CalendarCheck,
+      badge: 'الزيارات'
     },
     {
       id: 'dresses',
@@ -77,7 +85,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Modern Navigation Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -125,6 +133,7 @@ export default function ReportsPage() {
       {/* Active Tab Content - Completely separated components */}
       <div key={`${activeTab}-${refreshKey}`} className="transition-all duration-300">
         {activeTab === 'sales' && <SalesEmployeesReport />}
+        {activeTab === 'visits' && <VisitsReport />}
         {activeTab === 'dresses' && <DressesReport />}
         {activeTab === 'brides' && <BridesLifecycleReport />}
         {activeTab === 'cancellations' && <CancellationsReport />}

@@ -1,10 +1,28 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { fetchDresses, fetchPublicCategories, fetchPublicCollections, fetchPublicGallery } from '../lib/api';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { fetchDresses, fetchPublicCategories, fetchPublicCollections, fetchPublicGallery, checkAvailability } from '../lib/api';
 import { translations } from '../lib/translations';
 
 const StoreContext = createContext(null);
+
+export const MAX_BAG_DRESSES = 3;
+
+function readStored(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function writeStored(key, value) {
+  try {
+    if (value === null || value === undefined || value === '') localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {}
+}
 
 export function StoreProvider({ children }) {
   const [lang, setLangState] = useState('en');
@@ -22,6 +40,30 @@ export function StoreProvider({ children }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
+  // Short message shown in the bag (limit reached, favorites moved…)
+  const [bagNotice, setBagNotice] = useState('');
+  // Bride's wedding date: drives the availability badges on every dress
+  const [weddingDate, setWeddingDateState] = useState('');
+  const [catalogAvailability, setCatalogAvailability] = useState({});
+  const storageLoaded = useRef(false);
+
+  // Bag, favorites and wedding date survive page reloads so the bride never refills them
+  useEffect(() => {
+    const savedCart = readStored('sophia_cart', []);
+    const savedWishlist = readStored('sophia_wishlist', []);
+    const savedWedding = readStored('sophia_wedding_date', '');
+    if (Array.isArray(savedCart)) setCart(savedCart.slice(0, MAX_BAG_DRESSES).map((x) => ({ ...x, qty: 1 })));
+    if (Array.isArray(savedWishlist)) setWishlist(savedWishlist);
+    const today = new Date().toISOString().split('T')[0];
+    if (typeof savedWedding === 'string' && savedWedding >= today) setWeddingDateState(savedWedding);
+    storageLoaded.current = true;
+  }, []);
+
+  useEffect(() => { if (storageLoaded.current) writeStored('sophia_cart', cart); }, [cart]);
+  useEffect(() => { if (storageLoaded.current) writeStored('sophia_wishlist', wishlist); }, [wishlist]);
+  useEffect(() => { if (storageLoaded.current) writeStored('sophia_wedding_date', weddingDate); }, [weddingDate]);
+
+  const setWeddingDate = useCallback((date) => setWeddingDateState(date || ''), []);
 
   useEffect(() => {
     const savedLang = localStorage.getItem('sophia_lang');
@@ -138,42 +180,59 @@ export function StoreProvider({ children }) {
     loadApiData();
   }, [loadApiData]);
 
-  /* Cart */
-  const addToCart = useCallback((product, qty = 1) => {
-    setCart((prev) => {
-      const currentTotal = prev.reduce((sum, item) => sum + item.qty, 0);
-      const existing = prev.find((x) => x.id === product.id);
-      if (existing) {
-        if (currentTotal + qty > 3) {
-          alert('You can select a maximum of 3 dresses for your boutique visit.');
-          return prev;
-        }
-        return prev.map((x) => (x.id === product.id ? { ...x, qty: x.qty + qty } : x));
-      }
-      if (currentTotal + qty > 3) {
-        alert('You can select a maximum of 3 dresses for your boutique visit.');
-        return prev;
-      }
-      return [...prev, { ...product, qty }];
-    });
+  /* Cart — one piece of each dress, up to 3 dresses per visit */
+  const addToCart = useCallback((product) => {
+    const tr = translations[lang] || translations.en;
+    if (cart.some((x) => x.id === product.id)) {
+      setBagNotice(tr.availability.alreadyInBag);
+    } else if (cart.length >= MAX_BAG_DRESSES) {
+      setBagNotice(tr.availability.bagLimit);
+    } else {
+      setBagNotice('');
+      setCart([...cart, { ...product, qty: 1 }]);
+    }
     setCartOpen(true);
-  }, []);
+  }, [cart, lang]);
 
   const removeFromCart = useCallback((id) => {
     setCart((prev) => prev.filter((x) => x.id !== id));
+    setBagNotice('');
   }, []);
 
-  const updateCartQty = useCallback((id, qty) => {
-    if (qty < 1) return removeFromCart(id);
-    setCart((prev) => {
-      const otherTotal = prev.filter((x) => x.id !== id).reduce((sum, item) => sum + item.qty, 0);
-      if (otherTotal + qty > 3) {
-        alert('You can select a maximum of 3 dresses for your boutique visit.');
-        return prev;
-      }
-      return prev.map((x) => (x.id === id ? { ...x, qty } : x));
-    });
-  }, [removeFromCart]);
+  const clearCart = useCallback(() => setCart([]), []);
+
+  /** Moves every favorite that fits into the bag (max 3 dresses) and reports what happened */
+  const moveWishlistToCart = useCallback(() => {
+    const tr = translations[lang] || translations.en;
+    const candidates = wishlist.filter((w) => !cart.some((c) => c.id === w.id));
+    if (candidates.length === 0) {
+      setBagNotice(tr.wishlist.alreadyInBag);
+      setCartOpen(true);
+      return;
+    }
+    const room = Math.max(0, MAX_BAG_DRESSES - cart.length);
+    const added = candidates.slice(0, room);
+    const skipped = candidates.length - added.length;
+    setCart([...cart, ...added.map((x) => ({ ...x, qty: 1 }))]);
+    setBagNotice([added.length ? tr.wishlist.sentAll(added.length) : '', skipped ? tr.wishlist.bagLimitSkipped(skipped) : ''].filter(Boolean).join(' — '));
+    setCartOpen(true);
+  }, [wishlist, cart, lang]);
+
+  /* Catalog availability for the bride's wedding date */
+  useEffect(() => {
+    if (!weddingDate) {
+      setCatalogAvailability({});
+      return;
+    }
+    let cancelled = false;
+    checkAvailability({ wedding_date: weddingDate, city: brideUser?.city })
+      .then((res) => {
+        if (cancelled || !res) return;
+        setCatalogAvailability(Object.fromEntries((res.dresses || []).map((r) => [r.dress_id, r.wedding_date])));
+      })
+      .catch(() => !cancelled && setCatalogAvailability({}));
+    return () => { cancelled = true; };
+  }, [weddingDate, brideUser?.city]);
 
   /* Wishlist */
   const toggleWishlist = useCallback((product) => {
@@ -192,7 +251,8 @@ export function StoreProvider({ children }) {
 
   const value = {
     lang, toggleLang, t: translations[lang] || translations.en,
-    cart, addToCart, removeFromCart, updateCartQty,
+    cart, addToCart, removeFromCart, clearCart, bagNotice, setBagNotice, moveWishlistToCart,
+    weddingDate, setWeddingDate, catalogAvailability,
     wishlist, toggleWishlist, isWishlisted,
     dresses, categories, collections, clientGallery, loadingDresses, refreshData: loadApiData,
     brideUser, loginBride, registerBride, logoutBride,

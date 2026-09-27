@@ -22,3 +22,6 @@
 .addBtn:hover{background:var(--color-accent)}
 .removeBtn{color:var(--color-text-muted);transition:color var(--transition-fast);padding:4px;background:transparent}
 .removeBtn:hover{color:#c00}
+.footer{padding:16px 28px 24px;border-top:1px solid var(--color-border)}
+.sendAllBtn{width:100%;padding:14px 20px;border-radius:var(--radius-full);background:var(--color-text);color:white;font-family:var(--font-body);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;transition:all var(--transition-fast);cursor:pointer}
+.sendAllBtn:hover{background:var(--color-accent)}

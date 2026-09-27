@@ -96,8 +96,8 @@
 }
 
 .items {
-  flex: 1;
-  overflow-y: auto;
+  /* the whole bag scrolls as one; the list must not be squeezed by the visit form */
+  flex: 0 0 auto;
   padding: 24px 28px;
   display: flex;
   flex-direction: column;
@@ -138,40 +138,6 @@
   font-size: 15px;
   color: var(--color-accent, #6366f1);
   font-weight: 600;
-}
-
-.qtyRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 6px;
-}
-
-.qtyBtn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--color-border, #cbd5e1);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text, #0f172a);
-  transition: all var(--transition-fast, 0.2s);
-  background: white;
-  cursor: pointer;
-}
-
-.qtyBtn:hover {
-  border-color: var(--color-accent, #6366f1);
-  color: var(--color-accent, #6366f1);
-}
-
-.qtyNum {
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 700;
-  min-width: 24px;
-  text-align: center;
 }
 
 .removeBtn {
@@ -227,4 +193,119 @@
 
 .checkoutBtn:hover {
   background: var(--color-accent, #6366f1);
+}
+
+.checkoutBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.checkoutBtn:disabled:hover {
+  background: var(--color-text, #0f172a);
+}
+
+/* Bag messages and live availability */
+.notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fbf6ec;
+  border: 1px solid #efdfbd;
+  color: #7a5a1c;
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.checking {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.itemBlocked {
+  border-radius: 12px;
+  background: #fdf6f5;
+  box-shadow: 0 0 0 1px #f0cfcb;
+  padding: 10px;
+}
+
+.itemMeta {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--color-text-light, #666);
+}
+
+.statusOk,
+.statusBad,
+.statusWarn {
+  margin: 2px 0 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.statusOk { color: #3f7d4e; }
+.statusBad { color: #a8423b; }
+.statusWarn { color: #9a6b12; }
+
+.fixActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.fixBtn,
+.suggestBtn {
+  padding: 7px 12px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid var(--color-text, #0f172a);
+  background: #fff;
+  color: var(--color-text, #0f172a);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.2s);
+}
+
+.fixBtn:hover,
+.suggestBtn:hover {
+  background: var(--color-text, #0f172a);
+  color: #fff;
+}
+
+.suggestBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-color: var(--color-accent, #c8a96a);
+  font-size: 11px;
+}
+
+.blockedNote {
+  margin: 0 0 10px;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: #a8423b;
 }

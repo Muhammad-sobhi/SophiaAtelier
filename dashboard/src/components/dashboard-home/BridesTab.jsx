@@ -2,6 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import { Search, Filter, MessageCircle } from 'lucide-react';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates } from '@/lib/utils';
+import { getVisitStatus } from '@/components/bride-journey/visitStatus';
 
 export default function BridesTab({
   brides,
@@ -413,7 +414,10 @@ export default function BridesTab({
               const stage = getEffectiveStage(bride);
               const activeStageKey = stageFilter !== 'all' ? stageFilter : stage;
               const baseStageCfg = STAGE_MAP[activeStageKey] || STAGE_MAP[stage] || STAGE_MAP.visit;
-              const stageCfg = activeStageKey === 'returned' ? getReturnBadge(bride) || baseStageCfg : baseStageCfg;
+              const stageCfg =
+                activeStageKey === 'returned' ? getReturnBadge(bride) || baseStageCfg :
+                activeStageKey === 'visit' ? getVisitStatus(bride) :
+                baseStageCfg;
               const displayDate = bride.bookings?.[0]?.event_date || bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
               const wDate = bride.bookings?.[0]?.event_date || bride.wedding_date || bride.relevant_date;

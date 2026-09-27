@@ -16,7 +16,8 @@ class DressController extends Controller
     {
         $query = Dress::with(['category', 'collection', 'designer', 'images', 'accessories'])->withCount(['bookings', 'visitsAsTried']);
 
-        if ($request->boolean('with_bookings')) {
+        // Bookings include other brides' personal data: staff only (this route is also public for the website)
+        if ($request->boolean('with_bookings') && auth('sanctum')->check()) {
             $query->with([
                 'bookings' => function($q) {
                     $q->where('status', '!=', 'cancelled')->with('client');
@@ -66,18 +67,18 @@ class DressController extends Controller
         if ($request->boolean('best_sellers_only')) {
             $query->where('is_best_seller', true)->orderBy('best_seller_sort', 'asc')->orderBy('id', 'desc');
             if ($request->input('per_page') === 'all') {
-                return response()->json($query->get());
+                return response()->json($this->guestSafe($query->get()));
             }
             $perPage = (int) $request->input('per_page', 50);
-            return response()->json($query->paginate($perPage));
+            return response()->json($this->guestSafe($query->paginate($perPage)));
         }
 
         if ($request->input('per_page') === 'all') {
-            return response()->json($query->latest()->get());
+            return response()->json($this->guestSafe($query->latest()->get()));
         }
 
         $perPage = (int) $request->input('per_page', 15);
-        return response()->json($query->latest()->paginate($perPage));
+        return response()->json($this->guestSafe($query->latest()->paginate($perPage)));
     }
 
     public function store(Request $request): JsonResponse
@@ -143,8 +144,25 @@ class DressController extends Controller
         return response()->json($dress->load(['category', 'collection', 'designer', 'images', 'accessories']), 201);
     }
 
+    /** Hide purchase cost and internal notes from website visitors */
+    private function guestSafe($result)
+    {
+        if (auth('sanctum')->check()) {
+            return $result;
+        }
+        $items = $result instanceof \Illuminate\Pagination\AbstractPaginator ? $result->getCollection() : $result;
+        $items->each->makeHidden(['purchase_price', 'purchase_date', 'notes']);
+
+        return $result;
+    }
+
     public function show(Dress $dress)
     {
+        if (!auth('sanctum')->check()) {
+            $dress->load(['category', 'collection', 'designer', 'images', 'accessories']);
+            return response()->json($this->guestSafe(collect([$dress]))->first());
+        }
+
         $dress->load([
             'category', 
             'collection',

@@ -444,14 +444,9 @@ export default function BridesPage() {
         dress_id: formData.dress_id ? parseInt(formData.dress_id) : null,
         dress_2_id: (formData.has_dress_2 && formData.dress_2_id) ? parseInt(formData.dress_2_id) : null,
         dress_3_id: (formData.has_dress_3 && formData.dress_3_id) ? parseInt(formData.dress_3_id) : null,
+        // The chosen dresses are the ones she will try; tried/booked are recorded after the visit
         trying_fee: formData.trying_fee ? parseFloat(formData.trying_fee) : 0,
-        tried_dresses: [],
-        booked_dresses: []
       };
-
-      if (payload.dress_id) { payload.tried_dresses.push(payload.dress_id); payload.booked_dresses.push(payload.dress_id); }
-      if (payload.dress_2_id) { payload.tried_dresses.push(payload.dress_2_id); payload.booked_dresses.push(payload.dress_2_id); }
-      if (payload.dress_3_id) { payload.tried_dresses.push(payload.dress_3_id); payload.booked_dresses.push(payload.dress_3_id); }
 
       if (editingBride) {
         // Update existing bride

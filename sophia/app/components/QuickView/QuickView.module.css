@@ -488,3 +488,23 @@ html[dir="rtl"] .newBadge {
     grid-column: span 1;
   }
 }
+
+/* Availability for the bride's wedding date */
+.availability {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.availableYes {
+  background: #eef6f0;
+  color: #3f7d4e;
+}
+
+.availableNo {
+  background: #fbefee;
+  color: #a8423b;
+}

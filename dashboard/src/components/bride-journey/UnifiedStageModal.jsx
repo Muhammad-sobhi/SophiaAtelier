@@ -4,6 +4,9 @@ import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates } from '@/lib/utils';
+import { formatVisitTime } from '@/lib/whatsapp';
+import { OPEN_VISIT_STATUSES, getLatestVisit, getVisitDresses } from './visitStatus';
+import { DressAvailability } from './DressAvailability';
 import {
   X, Heart, Calendar, Ruler, Package, RotateCcw,
   Search, CheckCircle2, AlertTriangle, User, CreditCard, Trash2, Loader2
@@ -13,8 +16,9 @@ export const getDressConflict = (dress, targetDate, currentClientId = null, targ
   if (!dress || !targetDate) return null;
   const bookings = [
     ...(Array.isArray(dress.bookings) ? dress.bookings : []),
-    ...(Array.isArray(dress.secondBookings) ? dress.secondBookings : []),
-    ...(Array.isArray(dress.thirdBookings) ? dress.thirdBookings : []),
+    // Laravel serializes relations in snake_case (second_bookings); keep camelCase for older callers
+    ...(Array.isArray(dress.second_bookings) ? dress.second_bookings : Array.isArray(dress.secondBookings) ? dress.secondBookings : []),
+    ...(Array.isArray(dress.third_bookings) ? dress.third_bookings : Array.isArray(dress.thirdBookings) ? dress.thirdBookings : []),
   ];
   if (bookings.length === 0) return null;
 
@@ -90,6 +94,8 @@ export const calculateScheduledDates = (eventDateStr, cityStr = 'القاهرة'
   return { pickup_date: pickupDate, return_date: returnDate, isCairo: isCairoCity(cityStr) };
 };
 
+const TIME_SLOTS = ["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"];
+
 const STAGES = [
   { id: 'visit', label: 'زيارة', icon: Calendar, color: 'text-indigo-600' },
   { id: 'booking', label: 'حجز', icon: Heart, color: 'text-rose-600' },
@@ -113,6 +119,21 @@ export function UnifiedStageModal({
   const currentStage = bride.current_stage || bride.stage || 'visit';
   const stage = propStage || currentStage;
   const booking = bride.bookings?.[0];
+  // A cancelled / returned booking is history: a new booking starts from the visit's dresses
+  const activeBooking = booking && !['cancelled', 'returned'].includes(booking.status) ? booking : null;
+  const latestVisit = getLatestVisit(bride);
+  const openVisit = latestVisit && OPEN_VISIT_STATUSES.includes(latestVisit.status) ? latestVisit : null;
+  const visitDresses = getVisitDresses(bride);
+  // Booking prefill: current booking's dresses, else the dresses she tried, else the ones she asked to try
+  const bookingPrefill = (() => {
+    if (activeBooking?.dress_id) {
+      return [activeBooking.dress_id, activeBooking.dress_2_id, activeBooking.dress_3_id].filter(Boolean).map(String);
+    }
+    const tried = latestVisit?.tried_dresses || [];
+    return (tried.length > 0 ? tried : visitDresses).slice(0, 3).map((d) => String(d.id));
+  })();
+  const prefillDressObjs = [...(latestVisit?.tried_dresses || []), ...visitDresses];
+  const prefillTotal = bookingPrefill.reduce((sum, id) => sum + parseFloat(prefillDressObjs.find((d) => String(d.id) === id)?.rental_price || 0), 0);
 
   // Lists
   const [dressesList, setDressesList] = useState(propDressesList || []);
@@ -148,11 +169,14 @@ export function UnifiedStageModal({
 
   // Booking Stage Fields
   const [salesName, setSalesName] = useState(booking?.sales_name || bride.sales_name || '');
-  const [bookingDressId, setBookingDressId] = useState(booking?.dress_id ? String(booking.dress_id) : '');
+  const [bookingDressId, setBookingDressId] = useState(bookingPrefill[0] || '');
   const [bookingDressSearch, setBookingDressSearch] = useState('');
-  const [bookingHasSecondDress, setBookingHasSecondDress] = useState(Boolean(booking?.dress_2_id));
-  const [bookingDress2Id, setBookingDress2Id] = useState(booking?.dress_2_id ? String(booking.dress_2_id) : '');
+  const [bookingHasSecondDress, setBookingHasSecondDress] = useState(Boolean(bookingPrefill[1]));
+  const [bookingDress2Id, setBookingDress2Id] = useState(bookingPrefill[1] || '');
   const [bookingDress2Search, setBookingDress2Search] = useState('');
+  const [bookingHasThirdDress, setBookingHasThirdDress] = useState(Boolean(bookingPrefill[2]));
+  const [bookingDress3Id, setBookingDress3Id] = useState(bookingPrefill[2] || '');
+  const [bookingDress3Search, setBookingDress3Search] = useState('');
   const [bookingDress1Details, setBookingDress1Details] = useState(null);
   const [bookingDress2Details, setBookingDress2Details] = useState(null);
   const [bookingEventDate, setBookingEventDate] = useState(cleanDate(booking?.event_date || bride.wedding_date || new Date().toISOString()));
@@ -178,9 +202,13 @@ export function UnifiedStageModal({
     Boolean(booking?.return_scheduled_on) && cleanDate(booking.return_scheduled_on) !== storedDefaults.return_date
   );
 
-  const [bookingTotalAmount, setBookingTotalAmount] = useState(booking?.total_amount ? String(booking.total_amount) : '3500');
+  const [bookingTotalAmount, setBookingTotalAmount] = useState(
+    activeBooking?.total_amount && parseFloat(activeBooking.total_amount) > 0 ? String(activeBooking.total_amount) : (prefillTotal > 0 ? String(prefillTotal) : '3500')
+  );
   const [bookingDepositAmount, setBookingDepositAmount] = useState(booking?.deposit_amount ? String(booking.deposit_amount) : '1000');
-  const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState(booking?.insurance_amount ? String(booking.insurance_amount) : '5000');
+  const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState(
+    activeBooking?.insurance_amount && parseFloat(activeBooking.insurance_amount) > 0 ? String(activeBooking.insurance_amount) : String(5000 * Math.max(1, bookingPrefill.length))
+  );
   const [bookingPayments, setBookingPayments] = useState(
     booking?.revenues?.filter(r => r.type === 'deposit')?.length
       ? booking.revenues.filter(r => r.type === 'deposit').map(r => ({ amount: String(r.amount), payment_method: r.payment_method || 'cash' }))
@@ -188,21 +216,27 @@ export function UnifiedStageModal({
   );
 
   // Visit Stage Fields
-  const [visitDate, setVisitDate] = useState(cleanDate(bride.latest_visit_date || bride.visits?.[0]?.visit_date || new Date().toISOString()));
-  const [visitTime, setVisitTime] = useState(bride.latest_visit_time || bride.visits?.[0]?.time_slot || '02:00 م');
-  const [visitSalesName, setVisitSalesName] = useState(bride.visits?.[0]?.sales_name || bride.sales_name || salesName || '');
-  const [tryingFee, setTryingFee] = useState(bride.latest_dress_trying_fee ? String(bride.latest_dress_trying_fee) : '0');
+  // Reviewing an open visit keeps the date/time/fee the bride asked for; a new visit starts from today
+  const [visitDate, setVisitDate] = useState(cleanDate(openVisit?.visit_date || new Date().toISOString()));
+  const [visitTime, setVisitTime] = useState(formatVisitTime(openVisit?.time_slot) || '02:00 م');
+  const [visitSalesName, setVisitSalesName] = useState(openVisit?.sales_name || bride.sales_name || salesName || '');
+  const [tryingFee, setTryingFee] = useState(() => {
+    if (openVisit) return String(parseFloat(openVisit.trying_fee || 0));
+    return String(visitDresses.slice(0, 3).reduce((sum, d) => sum + parseFloat(d.trying_fee || 0), 0));
+  });
   const [visitPaymentMethod, setVisitPaymentMethod] = useState('cash');
 
   // Visit Stage Dresses (up to 3 dresses)
-  const [visitDress1Id, setVisitDress1Id] = useState(booking?.dress_id ? String(booking.dress_id) : '');
+  const [visitDress1Id, setVisitDress1Id] = useState(visitDresses[0] ? String(visitDresses[0].id) : '');
   const [visitDress1Search, setVisitDress1Search] = useState('');
-  const [visitHasDress2, setVisitHasDress2] = useState(Boolean(booking?.dress_2_id));
-  const [visitDress2Id, setVisitDress2Id] = useState(booking?.dress_2_id ? String(booking.dress_2_id) : '');
+  const [visitHasDress2, setVisitHasDress2] = useState(Boolean(visitDresses[1]));
+  const [visitDress2Id, setVisitDress2Id] = useState(visitDresses[1] ? String(visitDresses[1].id) : '');
   const [visitDress2Search, setVisitDress2Search] = useState('');
-  const [visitHasDress3, setVisitHasDress3] = useState(Boolean(booking?.dress_3_id));
-  const [visitDress3Id, setVisitDress3Id] = useState(booking?.dress_3_id ? String(booking.dress_3_id) : '');
+  const [visitHasDress3, setVisitHasDress3] = useState(Boolean(visitDresses[2]));
+  const [visitDress3Id, setVisitDress3Id] = useState(visitDresses[2] ? String(visitDresses[2].id) : '');
   const [visitDress3Search, setVisitDress3Search] = useState('');
+  const [visitSource, setVisitSource] = useState('walkin');
+  const [visitAvailability, setVisitAvailability] = useState({ loading: false, error: false, rows: [], suggested: null });
 
   // Fitting Stage Fields — prefer the latest active fitting (fittings are not ordered by the API)
   const sortedFittings = [...(bride.fittings || [])].sort((a, b) =>
@@ -340,24 +374,45 @@ export function UnifiedStageModal({
     return getDressConflict(dress2SelectedObj, bookingEventDate, bride?.id, city);
   }, [bookingHasSecondDress, bookingDress2Id, dress2SelectedObj, bookingEventDate, bride?.id, city]);
 
+  const dress3SelectedObj = dressesList.find(d => String(d.id) === String(bookingDress3Id));
+  const dress3Conflict = useMemo(() => {
+    if (!bookingHasSecondDress || !bookingHasThirdDress || !bookingDress3Id) return null;
+    return getDressConflict(dress3SelectedObj, bookingEventDate, bride?.id, city);
+  }, [bookingHasSecondDress, bookingHasThirdDress, bookingDress3Id, dress3SelectedObj, bookingEventDate, bride?.id, city]);
+
   const isBookingDateBlocked = Boolean(dress1Conflict);
   const isBookingDate2Blocked = Boolean(dress2Conflict);
+  const isBookingDate3Blocked = Boolean(dress3Conflict);
+
+  // Rental total = sum of the selected dresses' prices
+  const recalcBookingTotal = (ids) => {
+    const total = ids.filter(Boolean).reduce((sum, id) => sum + parseFloat(dressesList.find(x => String(x.id) === String(id))?.rental_price || 0), 0);
+    setBookingTotalAmount(String(total));
+  };
+  const selectedBookingIds = (overrides = {}) => {
+    const has2 = overrides.has2 ?? bookingHasSecondDress;
+    const has3 = has2 && (overrides.has3 ?? bookingHasThirdDress);
+    return [
+      overrides.d1 ?? bookingDressId,
+      has2 ? (overrides.d2 ?? bookingDress2Id) : null,
+      has3 ? (overrides.d3 ?? bookingDress3Id) : null,
+    ];
+  };
 
   // Selection helpers
   const handleSelectDress1 = (dress) => {
     setBookingDressId(String(dress.id));
-    const p1 = parseFloat(dress.rental_price || 0);
-    const d2 = bookingHasSecondDress ? dressesList.find(x => String(x.id) === bookingDress2Id) : null;
-    const p2 = parseFloat(d2?.rental_price || 0);
-    setBookingTotalAmount(String(p1 + p2));
+    recalcBookingTotal(selectedBookingIds({ d1: String(dress.id) }));
   };
 
   const handleSelectDress2 = (dress) => {
     setBookingDress2Id(String(dress.id));
-    const d1 = dressesList.find(x => String(x.id) === bookingDressId);
-    const p1 = parseFloat(d1?.rental_price || 0);
-    const p2 = parseFloat(dress.rental_price || 0);
-    setBookingTotalAmount(String(p1 + p2));
+    recalcBookingTotal(selectedBookingIds({ d2: String(dress.id) }));
+  };
+
+  const handleSelectDress3 = (dress) => {
+    setBookingDress3Id(String(dress.id));
+    recalcBookingTotal(selectedBookingIds({ d3: String(dress.id) }));
   };
 
   // Selected dress objects in Visit
@@ -377,6 +432,32 @@ export function UnifiedStageModal({
   const visitDress3Conflict = useMemo(() => {
     return getDressConflict(visitDress3Obj, weddingDate, bride?.id, city);
   }, [visitDress3Obj, weddingDate, bride?.id, city]);
+
+  // Backend availability check for the visit form (visit day + wedding day)
+  const visitDressKey = [visitDress1Id, visitHasDress2 ? visitDress2Id : '', visitHasDress3 ? visitDress3Id : ''].filter(Boolean).join(',');
+  useEffect(() => {
+    if (stage !== 'visit' || !visitDressKey) {
+      setVisitAvailability({ loading: false, error: false, rows: [], suggested: null });
+      return;
+    }
+    let cancelled = false;
+    setVisitAvailability((prev) => ({ ...prev, loading: true, error: false }));
+    const timer = setTimeout(() => {
+      apiClient.post('/availability', {
+        dress_ids: visitDressKey.split(',').map(Number),
+        visit_date: cleanDate(visitDate) || null,
+        wedding_date: cleanDate(weddingDate) || null,
+        city,
+        client_id: bride.id,
+      })
+        .then((res) => {
+          if (cancelled) return;
+          setVisitAvailability({ loading: false, error: false, rows: res?.dresses || [], suggested: res?.suggested_visit_date || null });
+        })
+        .catch(() => !cancelled && setVisitAvailability({ loading: false, error: true, rows: [], suggested: null }));
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [stage, visitDressKey, visitDate, weddingDate, city, bride.id]);
 
   const calculateVisitTryingFee = (d1Id, d2Id, d3Id, hasD2, hasD3) => {
     let total = 0;
@@ -475,6 +556,12 @@ export function UnifiedStageModal({
         const d3 = (visitHasDress3 && visitDress3Id) ? parseInt(visitDress3Id) : null;
         const parsedFee = parseFloat(tryingFee || 0);
 
+        if (!visitDate) {
+          toast.error('يرجى تحديد تاريخ الزيارة');
+          return;
+        }
+
+        // Bride details only; the dresses to try are stored on the visit (no booking before she chooses)
         await apiClient.put(`/clients/${bride.id}`, {
           name: name.trim(),
           phone: phone.trim(),
@@ -483,26 +570,21 @@ export function UnifiedStageModal({
           source: source,
           wedding_date: weddingDate || null,
           notes: notes.trim() || null,
+        });
+
+        await apiClient.put(`/clients/${bride.id}/stage-action`, {
+          action: 'confirm_visit',
+          visit_source: openVisit ? undefined : visitSource,
+          visit_date: visitDate,
+          visit_time: visitTime,
+          sales_name: visitSalesName.trim() || null,
+          trying_fee: Number.isFinite(parsedFee) ? parsedFee : 0,
+          payment_method: visitPaymentMethod,
           dress_id: d1,
           dress_2_id: d2,
           dress_3_id: d3,
-          trying_fee: parsedFee,
+          event_date: weddingDate || null,
         });
-
-        if (visitDate) {
-          await apiClient.put(`/clients/${bride.id}/stage-action`, {
-            action: 'confirm_visit',
-            visit_date: visitDate,
-            visit_time: visitTime,
-            sales_name: visitSalesName.trim() || null,
-            trying_fee: parsedFee,
-            payment_method: visitPaymentMethod,
-            dress_id: d1,
-            dress_2_id: d2,
-            dress_3_id: d3,
-            event_date: weddingDate || null,
-          });
-        }
       } else if (stage === 'booking') {
         const validPayments = bookingPayments.filter(p => parseFloat(p.amount) > 0);
         const totalDepositCalculated = validPayments.length > 0
@@ -515,6 +597,7 @@ export function UnifiedStageModal({
           phone2: phone2.trim() || null,
           dress_id: parseInt(bookingDressId),
           dress_2_id: bookingHasSecondDress && bookingDress2Id ? parseInt(bookingDress2Id) : null,
+          dress_3_id: bookingHasSecondDress && bookingHasThirdDress && bookingDress3Id ? parseInt(bookingDress3Id) : null,
           sales_name: salesName.trim() || null,
           force_override: true,
           event_date: bookingEventDate || weddingDate,
@@ -616,7 +699,9 @@ export function UnifiedStageModal({
     switch (stage) {
       case 'visit':
         return {
-          title: `تعديل بيانات زيارة العروس (${bride.name})`,
+          title: openVisit?.status === 'pending'
+            ? `مراجعة وتأكيد زيارة العروس (${bride.name})`
+            : openVisit ? `تعديل موعد زيارة العروس (${bride.name})` : `تسجيل زيارة جديدة للعروس (${bride.name})`,
           icon: <Calendar size={14} className="text-indigo-600 animate-pulse" />,
         };
       case 'booking':
@@ -764,7 +849,7 @@ export function UnifiedStageModal({
                     required
                     value={cleanDate(bookingEventDate)}
                     onChange={(e) => setBookingEventDate(cleanDate(e.target.value))}
-                    className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-800 focus:outline-none text-right transition-colors ${(isBookingDateBlocked || isBookingDate2Blocked)
+                    className={`w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-800 focus:outline-none text-right transition-colors ${(isBookingDateBlocked || isBookingDate2Blocked || isBookingDate3Blocked)
                         ? 'border-rose-300 bg-rose-50/60 text-rose-900 ring-2 ring-rose-200/50'
                         : 'bg-white border-slate-200 focus:border-rose-500'
                       }`}
@@ -995,11 +1080,8 @@ export function UnifiedStageModal({
                       onChange={(e) => {
                         const checked = e.target.checked;
                         setBookingHasSecondDress(checked);
-                        const d1 = dressesList.find(d => String(d.id) === bookingDressId);
-                        const d2 = dressesList.find(d => String(d.id) === bookingDress2Id);
-                        const p1 = parseFloat(d1?.rental_price || 0);
-                        const p2 = checked && d2 ? parseFloat(d2?.rental_price || 0) : 0;
-                        setBookingTotalAmount(String(p1 + p2));
+                        if (!checked) setBookingHasThirdDress(false);
+                        recalcBookingTotal(selectedBookingIds({ has2: checked, has3: false }));
                         setBookingInsuranceAmount(checked ? '10000' : '5000');
                       }}
                       className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
@@ -1140,6 +1222,90 @@ export function UnifiedStageModal({
                   )}
                 </div>
 
+                {/* Third Dress Toggle & Selection (after a second dress) */}
+                {bookingHasSecondDress && (
+                  <div className="bg-indigo-50/30 p-2.5 rounded-2xl border border-indigo-100 space-y-2">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-xs font-black text-indigo-900">✨ حجز فستان ثالث لنفس العروس (3 Dresses)</span>
+                      <input
+                        type="checkbox"
+                        checked={bookingHasThirdDress}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setBookingHasThirdDress(checked);
+                          recalcBookingTotal(selectedBookingIds({ has3: checked }));
+                          setBookingInsuranceAmount(checked ? '15000' : '10000');
+                        }}
+                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </label>
+
+                    {bookingHasThirdDress && (
+                      <div className="space-y-1.5 pt-1 border-t border-indigo-100">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="🔍 بحث سريع عن الفستان الثالث..."
+                            value={bookingDress3Search}
+                            onChange={(e) => setBookingDress3Search(e.target.value)}
+                            className="w-full pl-8 pr-7 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-right"
+                          />
+                          <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-indigo-100 max-h-24 overflow-y-auto scrollbar-thin">
+                          {dressesList
+                            .filter((d) => String(d.id) !== bookingDressId && String(d.id) !== bookingDress2Id)
+                            .filter((d) => {
+                              if (!bookingDress3Search.trim()) return true;
+                              const q = bookingDress3Search.toLowerCase().trim();
+                              return d.name?.toLowerCase().includes(q) || d.code?.toLowerCase().includes(q);
+                            })
+                            .map((d) => {
+                              const isSelected = bookingDress3Id === String(d.id);
+                              const conflict = bookingEventDate ? getDressConflict(d, bookingEventDate, bride?.id, city) : null;
+                              const isBlocked = Boolean(conflict);
+                              return (
+                                <button
+                                  type="button"
+                                  key={d.id}
+                                  onClick={() => handleSelectDress3(d)}
+                                  title={isBlocked ? `⚠️ محجوز للعروس: ${conflict.clientName} (المناسبة: ${conflict.eventDate})` : '🟢 متاح في تاريخ المناسبة'}
+                                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${isSelected
+                                      ? 'bg-indigo-600 border-indigo-600 text-white font-black'
+                                      : isBlocked
+                                        ? 'bg-rose-50/70 border-rose-200 text-rose-800 hover:bg-rose-100/80'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50'
+                                    }`}
+                                >
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${isBlocked ? (isSelected ? 'bg-white' : 'bg-rose-500 animate-pulse') : (isSelected ? 'bg-white' : 'bg-emerald-500')}`} />
+                                  <span>{d.name} {d.code ? `(${d.code})` : ''} - {d.rental_price} ج.م</span>
+                                </button>
+                              );
+                            })}
+                        </div>
+
+                        {dress3SelectedObj && (
+                          <div className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/60 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                            <span>الفستان 3 المختار: <strong className="font-black">{dress3SelectedObj.name}</strong></span>
+                            <span className="font-mono text-[9.5px]">السعر: {parseFloat(dress3SelectedObj.rental_price || 0).toLocaleString()} ج.م</span>
+                          </div>
+                        )}
+
+                        {dress3Conflict && (
+                          <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[10.5px] text-slate-700 space-y-0.5 text-right">
+                            <div className="font-black text-rose-800 flex items-center gap-1">
+                              <AlertTriangle size={13} className="text-rose-600" /> تعارض في الفستان الثالث مع حجز #{dress3Conflict.bookingId}
+                            </div>
+                            <div>👰 العروس: <strong className="text-rose-700">{dress3Conflict.clientName}</strong> ({dress3Conflict.clientCity}) — المناسبة: <span className="font-mono">{dress3Conflict.eventDate}</span></div>
+                            <div>⏳ فترة الحظر: من <span className="font-mono">{dress3Conflict.startDate}</span> إلى <span className="font-mono">{dress3Conflict.endDate}</span></div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Bride Phone Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -1279,7 +1445,7 @@ export function UnifiedStageModal({
                       onChange={(e) => setVisitTime(e.target.value)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
                     >
-                      {["01:00 م", "01:30 م", "02:00 م", "02:30 م", "03:00 م", "03:30 م", "04:00 م", "04:30 م", "05:00 م", "05:30 م", "06:00 م", "06:30 م", "07:00 م", "07:30 م", "08:00 م", "08:30 م"].map((t) => (
+                      {(TIME_SLOTS.includes(visitTime) ? TIME_SLOTS : [visitTime, ...TIME_SLOTS]).map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
@@ -1624,6 +1790,55 @@ export function UnifiedStageModal({
                     )
                   )}
                 </div>
+
+                {/* Availability of the chosen dresses on the visit day and the wedding day (same check as the website) */}
+                {visitAvailability.rows.length > 0 && (
+                  <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">📅 إتاحة الفساتين يوم الزيارة ويوم الفرح</span>
+                      {visitAvailability.loading && <Loader2 size={13} className="animate-spin text-slate-400" />}
+                    </div>
+                    {visitAvailability.rows.map((row) => (
+                      <div key={row.dress_id} className="space-y-1">
+                        <div className="text-[10.5px] font-black text-slate-700">{row.name} {row.code ? `(${row.code})` : ''}</div>
+                        <DressAvailability row={row} />
+                      </div>
+                    ))}
+                    {visitAvailability.suggested && visitAvailability.suggested !== cleanDate(visitDate) && visitAvailability.rows.some((r) => r.visit_date?.reason_code === 'booked') && (
+                      <button
+                        type="button"
+                        onClick={() => setVisitDate(visitAvailability.suggested)}
+                        className="w-full py-1.5 border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-xl text-[10.5px] font-black cursor-pointer"
+                      >
+                        نقل الزيارة إلى {visitAvailability.suggested} (كل الفساتين متاحة للتجربة)
+                      </button>
+                    )}
+                  </div>
+                )}
+                {visitAvailability.error && (
+                  <div className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                    تعذر فحص إتاحة الفساتين، يمكنك المتابعة والتأكد يدوياً.
+                  </div>
+                )}
+
+                {/* New visits registered by staff: where did the request come from? */}
+                {!openVisit && (
+                  <div>
+                    <label htmlFor="visit-source" className="text-[10px] font-extrabold text-slate-500 block mb-1">مصدر طلب الزيارة</label>
+                    <select
+                      id="visit-source"
+                      value={visitSource}
+                      onChange={(e) => setVisitSource(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
+                    >
+                      <option value="walkin">في المحل</option>
+                      <option value="phone">تليفون</option>
+                      <option value="whatsapp">واتساب</option>
+                      <option value="instagram">انستجرام</option>
+                      <option value="referral">ترشيح</option>
+                    </select>
+                  </div>
+                )}
               </>
             )}
 
@@ -2033,8 +2248,10 @@ export function UnifiedStageModal({
               {isSubmitting
                 ? 'جاري الحفظ...'
                 : stage === 'booking'
-                  ? ((isBookingDateBlocked || isBookingDate2Blocked) ? 'تأكيد الحجز (يوجد تعارض)' : 'تأكيد الحجز وتثبيت التاريخ')
-                  : 'حفظ التعديلات'}
+                  ? ((isBookingDateBlocked || isBookingDate2Blocked || isBookingDate3Blocked) ? 'تأكيد الحجز (يوجد تعارض)' : 'تأكيد الحجز وتثبيت التاريخ')
+                  : stage === 'visit'
+                    ? 'تأكيد الزيارة وإرسال واتساب 💬'
+                    : 'حفظ التعديلات'}
             </button>
 
             {canRevert && (

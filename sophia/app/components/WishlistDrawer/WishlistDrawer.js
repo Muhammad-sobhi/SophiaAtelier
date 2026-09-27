@@ -7,7 +7,7 @@ import { useStore } from '../../context/StoreContext';
 import styles from './WishlistDrawer.module.css';
 
 export default function WishlistDrawer() {
-  const { wishlist, wishlistOpen, setWishlistOpen, toggleWishlist, openQuickView, addToCart, t, lang } = useStore();
+  const { wishlist, wishlistOpen, setWishlistOpen, toggleWishlist, openQuickView, addToCart, moveWishlistToCart, t, lang } = useStore();
 
   useEffect(() => {
     if (wishlistOpen) document.body.style.overflow = 'hidden';
@@ -50,6 +50,14 @@ export default function WishlistDrawer() {
                 <button className={styles.removeBtn} onClick={() => toggleWishlist(item)} aria-label="Remove"><Trash2 size={16} /></button>
               </div>
             ))}
+          </div>
+        )}
+
+        {wishlist.length > 0 && (
+          <div className={styles.footer}>
+            <button className={styles.sendAllBtn} onClick={() => { moveWishlistToCart(); setWishlistOpen(false); }}>
+              {t.wishlist.sendAllToBag}
+            </button>
           </div>
         )}
       </div>

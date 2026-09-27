@@ -409,11 +409,12 @@ class BookingController extends Controller
             'dress_id' => 'nullable|exists:dresses,id',
             'dress_2_id' => 'nullable|exists:dresses,id',
             'dress_3_id' => 'nullable|exists:dresses,id',
-            'dress_ids' => 'nullable|array',
+            'dress_ids' => 'nullable|array|max:3',
+            'dress_ids.*' => 'integer|exists:dresses,id',
             'booking_date' => 'nullable|date',
-            'visit_date' => 'nullable|date',
-            'event_date' => 'nullable|date',
-            'wedding_date' => 'nullable|date',
+            'visit_date' => 'nullable|date|after_or_equal:today',
+            'event_date' => 'nullable|date|after_or_equal:today',
+            'wedding_date' => 'nullable|date|after_or_equal:today',
             'total_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'time_slot' => 'nullable|string|max:50',
@@ -428,21 +429,11 @@ class BookingController extends Controller
         $bookingDate = $validated['visit_date'] ?? $validated['booking_date'] ?? now()->toDateString();
         $eventDate = $validated['wedding_date'] ?? $validated['event_date'] ?? $bookingDate;
 
-        // Resolve dress IDs
-        $dressId = $validated['dress_id'] ?? null;
-        $dress2Id = $validated['dress_2_id'] ?? null;
-        $dress3Id = $validated['dress_3_id'] ?? null;
-
-        if (!empty($validated['dress_ids']) && is_array($validated['dress_ids'])) {
-            $dressId = $validated['dress_ids'][0] ?? $dressId;
-            $dress2Id = $validated['dress_ids'][1] ?? $dress2Id;
-            $dress3Id = $validated['dress_ids'][2] ?? $dress3Id;
-        }
-
-        if (!$dressId) {
-            $firstDress = \App\Models\Dress::first();
-            $dressId = $firstDress ? $firstDress->id : 1;
-        }
+        // Dresses the bride wants to try (max 3), in the order she picked them
+        $dressIds = !empty($validated['dress_ids'])
+            ? $validated['dress_ids']
+            : array_filter([$validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null]);
+        $dressIds = array_slice(array_values(array_unique(array_map('intval', $dressIds))), 0, 3);
 
         // 1. Find or create the client (bride) automatically
         $client = null;
@@ -470,6 +461,17 @@ class BookingController extends Controller
         $timeSlot = null;
         if (!empty($validated['time_slot'])) {
             $timeSlot = VisitController::normalizeTimeSlot($validated['time_slot']);
+
+            if (!preg_match('/^\d{2}:\d{2}$/', $timeSlot)) {
+                return response()->json(['message' => 'صيغة وقت الزيارة غير صحيحة', 'code' => 'invalid_slot'], 422);
+            }
+            // Visit slots are local shop time
+            if (\Carbon\Carbon::parse($bookingDate . ' ' . $timeSlot, 'Africa/Cairo')->isPast()) {
+                return response()->json([
+                    'message' => 'عذراً، هذا الموعد قد مضى. يرجى اختيار وقت لاحق.',
+                    'code' => 'slot_in_past',
+                ], 422);
+            }
             
             // Check visit limit of 4 per 30 mins
             $existingCount = \App\Models\Visit::whereDate('visit_date', $bookingDate)
@@ -478,21 +480,44 @@ class BookingController extends Controller
 
             if ($existingCount >= 4) {
                 return response()->json([
-                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
+                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.',
+                    'code' => 'slot_full',
                 ], 422);
             }
         }
 
+        // Re-check the dresses at submit time: another bride may have booked one since the cart was checked
+        $availability = \App\Services\DressAvailabilityService::check(
+            \App\Models\Dress::whereIn('id', $dressIds)->get(),
+            $bookingDate,
+            $validated['wedding_date'] ?? $validated['event_date'] ?? null,
+            $client->city ?? $validated['client_city'] ?? null,
+            $client->id
+        );
+        $blocking = collect($availability['dresses'])->filter(fn($r) =>
+            ($r['wedding_date'] && !$r['wedding_date']['available'])
+            || ($r['visit_date'] && ($r['visit_date']['reason_code'] ?? null) === 'booked')
+        );
+        if ($blocking->isNotEmpty()) {
+            return response()->json([
+                'message' => 'بعض الفساتين غير متاحة في التواريخ المختارة',
+                'code' => 'dresses_unavailable',
+                'availability' => \App\Services\DressAvailabilityService::publicView($availability),
+            ], 422);
+        }
+        // Every dress is free on both dates: no employee review needed
+        $autoConfirm = !empty($dressIds) && $timeSlot && $availability['all_available'];
+
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            // 2. Create the Visit record to start the journey from the visit stage
-            $dressesList = [];
-            if ($dressId) $dressesList[] = \App\Models\Dress::find($dressId)->name ?? '';
-            if ($dress2Id) $dressesList[] = \App\Models\Dress::find($dress2Id)->name ?? '';
-            if ($dress3Id) $dressesList[] = \App\Models\Dress::find($dress3Id)->name ?? '';
-            $dressesStr = implode(', ', array_filter($dressesList));
+            // Keep the wedding date on the bride; it drives the dress availability check
+            if (!empty($validated['wedding_date']) || !empty($validated['event_date'])) {
+                $client->update(['wedding_date' => $eventDate]);
+            }
 
-            $visitNotes = trim(($validated['notes'] ?? '') . " | الفساتين المهتمة بها: " . $dressesStr);
+            // A website request is only a try-on visit: no booking is created until the bride chooses a dress
+            $dressNames = \App\Models\Dress::whereIn('id', $dressIds)->pluck('name')->implode(', ');
+            $visitNotes = trim(($validated['notes'] ?? '') . ($dressNames ? " | الفساتين المهتمة بها: " . $dressNames : ''));
 
             $visit = \App\Models\Visit::create([
                 'client_id' => $client->id,
@@ -501,37 +526,19 @@ class BookingController extends Controller
                 'source' => 'website',
                 'notes' => $visitNotes,
                 'time_slot' => $timeSlot,
+                'trying_fee' => \App\Models\Dress::whereIn('id', $dressIds)->sum('trying_fee'),
             ]);
+            $visit->requestedDresses()->syncWithPivotValues($dressIds, ['type' => 'requested']);
+            if ($autoConfirm) {
+                $visit->markConfirmed(null);
+            }
 
-            $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
-
-            // Calculate pickup and return dates automatically for website brides
-            $scheduledDates = Booking::calculateScheduledDates($eventDate, $client->city ?? $validated['client_city'] ?? null);
-
-            // Also create a pending booking record so it can be confirmed later in stage 2
-            $booking = Booking::create([
-                'client_id' => $client->id,
-                'dress_id' => $dressId,
-                'dress_2_id' => $dress2Id,
-                'dress_3_id' => $dress3Id,
-                'booking_date' => $bookingDate,
-                'event_date' => $eventDate,
-                'pickup_scheduled_on' => $scheduledDates['pickup_date'],
-                'return_scheduled_on' => $scheduledDates['return_date'],
-                'status' => 'pending',
-                'total_amount' => $validated['total_amount'] ?? 0,
-                'notes' => $validated['notes'],
-                'payment_method' => $validated['payment_method'] ?? null,
-                'receipt_path' => $receiptPath,
-            ]);
-
-            // Create new booking notification
             \App\Models\Notification::create([
                 'type' => 'new_appointment',
-                'title' => 'طلب موعد زيارة جديد من الموقع',
-                'message' => 'تم إرسال طلب موعد زيارة جديد من العروس: ' . $client->name . ' لفترة: ' . ($validated['time_slot'] ?? 'غير محدد'),
-                'related_type' => 'booking',
-                'related_id' => $booking->id
+                'title' => $autoConfirm ? 'زيارة مؤكدة تلقائياً من الموقع — أرسل رسالة التأكيد' : 'طلب موعد زيارة جديد من الموقع يحتاج مراجعة',
+                'message' => 'العروس: ' . $client->name . ' — موعد الزيارة: ' . $bookingDate . ' ' . ($validated['time_slot'] ?? 'غير محدد'),
+                'related_type' => 'visit',
+                'related_id' => $visit->id
             ]);
 
             \Illuminate\Support\Facades\DB::commit();
@@ -539,8 +546,8 @@ class BookingController extends Controller
             return response()->json([
                 'message' => 'Appointment request received successfully',
                 'client' => $client,
-                'visit' => $visit,
-                'booking' => $booking
+                'visit' => $visit->load('requestedDresses'),
+                'auto_confirmed' => $autoConfirm,
             ], 201);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\DB::rollBack();

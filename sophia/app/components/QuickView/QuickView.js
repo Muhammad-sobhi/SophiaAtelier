@@ -7,7 +7,7 @@ import { useStore } from '../../context/StoreContext';
 import styles from './QuickView.module.css';
 
 export default function QuickView() {
-  const { quickViewProduct: product, closeQuickView, addToCart, toggleWishlist, isWishlisted, t, lang } = useStore();
+  const { quickViewProduct: product, closeQuickView, addToCart, toggleWishlist, isWishlisted, t, lang, weddingDate, catalogAvailability } = useStore();
   const [activeImage, setActiveImage] = useState('');
 
   const isAr = lang === 'ar';
@@ -26,7 +26,7 @@ export default function QuickView() {
   if (!product) return null;
 
   const handleAdd = () => {
-    addToCart(product, 1);
+    addToCart(product);
     closeQuickView();
   };
 
@@ -245,6 +245,21 @@ export default function QuickView() {
                 </div>
               </div>
             )}
+
+            {/* Availability for the bride's wedding date */}
+            {weddingDate && catalogAvailability[product.id] && (() => {
+              const onWedding = catalogAvailability[product.id];
+              return (
+                <p className={`${styles.availability} ${onWedding.available ? styles.availableYes : styles.availableNo}`}>
+                  {onWedding.available ? `✓ ${t.availability.availableOnDate}` : (
+                    <>
+                      ✗ {t.availability.bookedOnDate}
+                      {onWedding.available_from && <> · {t.availability.availableFrom(onWedding.available_from)}</>}
+                    </>
+                  )}
+                </p>
+              );
+            })()}
 
             {/* Actions */}
             <div className={styles.actionsBlock}>

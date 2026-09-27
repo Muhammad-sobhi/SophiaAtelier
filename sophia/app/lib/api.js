@@ -169,3 +169,18 @@ export async function fetchPublicFaqs() {
     return [];
   }
 }
+
+/**
+ * Dress availability for the bride's try-on date and wedding date.
+ * Without dress_ids it checks the whole catalog (wedding date only).
+ * Returns { dresses: [...], suggested_visit_date, all_available } or throws.
+ */
+export async function checkAvailability({ dress_ids, visit_date, wedding_date, city, client_id } = {}) {
+  const res = await fetchWithTimeout(`${API_BASE}/public/availability`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ dress_ids, visit_date, wedding_date, city, client_id }),
+  }, 15000);
+  if (!res.ok) throw new Error(`Availability check failed (${res.status})`);
+  return res.json();
+}

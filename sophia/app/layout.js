@@ -7,6 +7,7 @@ import CartDrawer from "./components/CartDrawer/CartDrawer";
 import WishlistDrawer from "./components/WishlistDrawer/WishlistDrawer";
 import AuthModalWrapper from "./components/AuthModal/AuthModalWrapper";
 import ScrollToTop from "./components/ScrollToTop/ScrollToTop";
+import WeddingDateWidget from "./components/WeddingDateWidget/WeddingDateWidget";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -52,6 +53,7 @@ export default function RootLayout({ children }) {
           <WishlistDrawer />
           <AuthModalWrapper />
           <ScrollToTop />
+          <WeddingDateWidget />
         </StoreProvider>
       </body>
     </html>

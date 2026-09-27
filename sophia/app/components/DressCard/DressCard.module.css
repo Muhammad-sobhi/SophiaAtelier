@@ -256,3 +256,31 @@
     transform: none;
   }
 }
+
+/* Availability for the bride's wedding date */
+.availability {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  font-family: var(--font-body);
+}
+
+.availabilityDot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.availableYes {
+  color: #3f7d4e;
+}
+
+.availableNo {
+  color: #a8423b;
+}
