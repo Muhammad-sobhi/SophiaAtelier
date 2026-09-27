@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { X, Trash2, Calendar, Clock, CheckCircle, AlertCircle, Heart, Loader2 } from 'lucide-react';
 import { useStore, MAX_BAG_DRESSES } from '../../context/StoreContext';
-import { checkAvailability } from '../../lib/api';
+import { checkAvailability, isVideoUrl } from '../../lib/api';
 import styles from './CartDrawer.module.css';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -287,7 +287,11 @@ export default function CartDrawer() {
                 const blocking = isBlocking(row);
                 return (
                   <div key={item.id} className={`${styles.item} ${blocking ? styles.itemBlocked : ''}`}>
+                    {isVideoUrl(item.image) ? (
+                    <video src={item.image} className={styles.itemImage} muted loop autoPlay playsInline aria-label={item.name} />
+                  ) : (
                     <Image src={item.image} alt={item.name} width={80} height={100} className={styles.itemImage} />
+                  )}
                     <div className={styles.itemInfo}>
                       <h4 className={styles.itemName}>{isAr && item.name_ar ? item.name_ar : item.name}</h4>
                       <p className={styles.itemMeta}>

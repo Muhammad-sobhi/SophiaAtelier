@@ -184,3 +184,8 @@ export async function checkAvailability({ dress_ids, visit_date, wedding_date, c
   if (!res.ok) throw new Error(`Availability check failed (${res.status})`);
   return res.json();
 }
+
+/** Dress media can be a video (some dresses only have a video) */
+export function isVideoUrl(url) {
+  return typeof url === 'string' && /\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(url);
+}

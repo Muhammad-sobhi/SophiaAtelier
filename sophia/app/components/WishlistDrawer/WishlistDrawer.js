@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Image from 'next/image';
 import { X, Trash2, Eye } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { isVideoUrl } from '../../lib/api';
 import styles from './WishlistDrawer.module.css';
 
 export default function WishlistDrawer() {
@@ -34,7 +35,11 @@ export default function WishlistDrawer() {
           <div className={styles.items}>
             {wishlist.map((item) => (
               <div key={item.id} className={styles.item}>
-                <Image src={item.image} alt={item.name} width={80} height={100} className={styles.itemImage} />
+                {isVideoUrl(item.image) ? (
+                    <video src={item.image} className={styles.itemImage} muted loop autoPlay playsInline aria-label={item.name} />
+                  ) : (
+                    <Image src={item.image} alt={item.name} width={80} height={100} className={styles.itemImage} />
+                  )}
                 <div className={styles.itemInfo}>
                   <h4 className={styles.itemName}>{lang === 'ar' && item.name_ar ? item.name_ar : item.name}</h4>
                   <p className={styles.itemPrice}>{item.price}</p>
