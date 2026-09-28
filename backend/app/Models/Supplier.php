@@ -29,8 +29,9 @@ class Supplier extends Model
     /** Paid minus bought: negative = the shop still owes the supplier, positive = overpaid */
     public function getBalanceAttribute(): float
     {
-        $purchases = $this->purchases_total ?? $this->purchases()->sum('total_amount');
-        $payments = $this->payments_total ?? $this->payments()->sum('amount');
+        // withBalance() sets the totals to null when there are no rows, which means 0 — no need to re-query
+        $purchases = array_key_exists('purchases_total', $this->attributes) ? $this->purchases_total : $this->purchases()->sum('total_amount');
+        $payments = array_key_exists('payments_total', $this->attributes) ? $this->payments_total : $this->payments()->sum('amount');
         return round((float) $payments - (float) $purchases, 2);
     }
 }

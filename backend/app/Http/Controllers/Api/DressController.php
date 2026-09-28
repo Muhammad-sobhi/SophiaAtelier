@@ -18,17 +18,7 @@ class DressController extends Controller
 
         // Bookings include other brides' personal data: staff only (this route is also public for the website)
         if ($request->boolean('with_bookings') && auth('sanctum')->check()) {
-            $query->with([
-                'bookings' => function($q) {
-                    $q->where('status', '!=', 'cancelled')->with('client');
-                },
-                'secondBookings' => function($q) {
-                    $q->where('status', '!=', 'cancelled')->with('client');
-                },
-                'thirdBookings' => function($q) {
-                    $q->where('status', '!=', 'cancelled')->with('client');
-                }
-            ]);
+            $query->with($this->bookingsWithClients());
         }
 
         if ($status = $request->input('status')) {
@@ -145,12 +135,38 @@ class DressController extends Controller
     }
 
     /** Hide purchase cost and internal notes from website visitors */
+    /**
+     * Non-cancelled bookings in each dress slot with their bride. The bride's appended
+     * attributes read her own bookings/visits/fittings, so those are eager-loaded too.
+     */
+    private function bookingsWithClients(): array
+    {
+        $load = fn($q) => $q->where('status', '!=', 'cancelled')
+            ->with(['client', ...\App\Models\Client::appendedRelations('client')]);
+
+        return ['bookings' => $load, 'secondBookings' => $load, 'thirdBookings' => $load];
+    }
+
+    /** Keep the relations loaded only for the appended attributes out of the JSON */
+    private function hideClientAppendedRelations($dresses): void
+    {
+        foreach ($dresses as $dress) {
+            foreach (['bookings', 'secondBookings', 'thirdBookings'] as $relation) {
+                if ($dress->relationLoaded($relation)) {
+                    $dress->$relation->each(fn($booking) => $booking->client?->hideAppendedRelations());
+                }
+            }
+        }
+    }
+
     private function guestSafe($result)
     {
+        $items = $result instanceof \Illuminate\Pagination\AbstractPaginator ? $result->getCollection() : $result;
+        $this->hideClientAppendedRelations($items);
+
         if (auth('sanctum')->check()) {
             return $result;
         }
-        $items = $result instanceof \Illuminate\Pagination\AbstractPaginator ? $result->getCollection() : $result;
         $items->each->makeHidden(['purchase_price', 'purchase_date', 'notes']);
 
         return $result;
@@ -169,16 +185,9 @@ class DressController extends Controller
             'designer', 
             'images', 
             'accessories', 
-            'bookings' => function($q) {
-                $q->where('status', '!=', 'cancelled')->with('client');
-            },
-            'secondBookings' => function($q) {
-                $q->where('status', '!=', 'cancelled')->with('client');
-            },
-            'thirdBookings' => function($q) {
-                $q->where('status', '!=', 'cancelled')->with('client');
-            }
+            ...$this->bookingsWithClients(),
         ]);
+        $this->hideClientAppendedRelations(collect([$dress]));
 
         return response()->json($dress);
     }

@@ -166,7 +166,8 @@ class DashboardController extends Controller
             'designer',
             'bookings' => function ($q) {
                 $q->latest()->limit(1);
-            }
+            },
+            'bookings.client:id,name',
         ])
             ->latest()
             ->get()
