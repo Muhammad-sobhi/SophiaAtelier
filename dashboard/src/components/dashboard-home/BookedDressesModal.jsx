@@ -32,6 +32,7 @@ export default function BookedDressesModal({
   const [bookedDressesDateType, setBookedDressesDateType] = useState('wedding');
   const [bookedDressesPage, setBookedDressesPage] = useState(1);
   const [bookedDressesPerPage, setBookedDressesPerPage] = useState(12);
+  const [bookedDressesSort, setBookedDressesSort] = useState('wedding_asc');
 
   // Fetch complete client records to ensure all bookings (dress 1, 2, 3) are loaded
   useEffect(() => {
@@ -192,7 +193,8 @@ export default function BookedDressesModal({
           return (dress.name || '').toLowerCase().includes(q);
         }
         if (bookedDressesSearchType === 'dress_code') {
-          return (dress.code || '').toString().toLowerCase().includes(q);
+          // Exact code match so searching "52" doesn't also show 152 or 520
+          return (dress.code || '').toString().trim().toLowerCase() === q;
         }
         if (bookedDressesSearchType === 'bride_name') {
           return (bride.name || '').toLowerCase().includes(q);
@@ -212,9 +214,23 @@ export default function BookedDressesModal({
       }
 
       return true;
+    }).sort((a, b) => {
+      const [field, dir] = bookedDressesSort.split('_');
+      const dateOf = (item) =>
+        field === 'booking'
+          ? cleanDate(item.booking.booking_date || item.booking.created_at)
+          : field === 'return'
+          ? item.returnDate
+          : item.eventDate;
+      const da = dateOf(a) || '';
+      const db = dateOf(b) || '';
+      // Items without a date always go last
+      if (!da || !db) return da ? -1 : db ? 1 : 0;
+      return dir === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
     });
   }, [
     allBookedDressesList,
+    bookedDressesSort,
     bookedDressesMonthFilter,
     bookedDressesDateFilter,
     bookedDressesDateType,
@@ -336,6 +352,24 @@ export default function BookedDressesModal({
               </select>
             </div>
 
+            {/* Sort by date */}
+            <select
+              value={bookedDressesSort}
+              onChange={(e) => {
+                setBookedDressesSort(e.target.value);
+                setBookedDressesPage(1);
+              }}
+              aria-label="ترتيب الفساتين"
+              className="w-full sm:w-auto bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-[11px] font-bold text-slate-600 focus:outline-none"
+            >
+              <option value="wedding_asc">تاريخ الحفلة: الأقرب أولاً</option>
+              <option value="wedding_desc">تاريخ الحفلة: الأبعد أولاً</option>
+              <option value="booking_desc">تاريخ الحجز: الأحدث أولاً</option>
+              <option value="booking_asc">تاريخ الحجز: الأقدم أولاً</option>
+              <option value="return_asc">تاريخ الإرجاع: الأقرب أولاً</option>
+              <option value="return_desc">تاريخ الإرجاع: الأبعد أولاً</option>
+            </select>
+
             {/* Specific Date Filter */}
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1 w-full sm:w-auto">
               <select
@@ -441,6 +475,7 @@ export default function BookedDressesModal({
                 const dress = item.dress || {};
                 const bride = item.bride || {};
                 const booking = item.booking || {};
+                const isOut = booking.status === 'picked_up' || booking.status === 'out';
 
                 // Image Resolution
                 let rawImagePath = null;
@@ -495,18 +530,18 @@ export default function BookedDressesModal({
                         )}
                       </div>
 
-                      {/* Stage Badge */}
+                      {/* Status Badge — from this booking's own status, not the bride's journey stage */}
                       <div className="absolute top-2 left-2">
                         <span
                           className={`font-black text-[8px] px-2 py-0.5 rounded-lg backdrop-blur-md shadow-xs ${
-                            bride.current_stage === 'picked_up'
+                            isOut
                               ? 'bg-amber-500/90 text-white'
                               : bride.current_stage === 'fitting'
                               ? 'bg-purple-600/90 text-white'
                               : 'bg-indigo-600/90 text-white'
                           }`}
                         >
-                          {bride.current_stage === 'picked_up'
+                          {isOut
                             ? 'مستلم خارج الأتيليه'
                             : bride.current_stage === 'fitting'
                             ? 'غرفة القياس'

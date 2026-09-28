@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Expense;
 use App\Models\FinanceTransaction;
 use App\Models\Revenue;
+use App\Services\ManufacturingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class FinanceController extends Controller
         'operational' => ['salary', 'purchase'],
         'utilities' => ['cleaning', 'maintenance'],
         'transfers' => ['transfer_out', 'owner_withdrawal'],
+        'manufacturing' => ManufacturingService::EXPENSE_CATEGORIES,
     ];
     private const EXPENSE_DEFAULT_TAB = 'other';
 
@@ -29,6 +31,7 @@ class FinanceController extends Controller
         'operational' => 'المشتريات والرواتب',
         'utilities' => 'المرافق والخدمات العامة',
         'transfers' => 'مناقلات وسحب وإيداع',
+        'manufacturing' => 'التصنيع والخامات والموردين',
         'other' => 'مصروفات أخرى',
     ];
 
@@ -51,7 +54,7 @@ class FinanceController extends Controller
         $validated = $request->validate([
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
-            'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,other',
+            'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,manufacturing,other',
             'payment_method' => 'nullable|string|max:50',
             'search' => 'nullable|string|max:100',
             'per_page' => 'nullable|integer|min:1|max:100',

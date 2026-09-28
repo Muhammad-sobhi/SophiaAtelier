@@ -19,19 +19,9 @@ class LegacyStageResolver
             return 'visit';
         }
 
+        // Returned: stays in the return stage for 15 days after the actual return, then moves to the archive
         if ($latestBooking->status === 'returned') {
-            $returnDate = $latestBooking->return_scheduled_on
-                ? Carbon::parse($latestBooking->return_scheduled_on)->format('Y-m-d')
-                : Carbon::parse($latestBooking->updated_at)->format('Y-m-d');
-
-            $returnMonth = Carbon::parse($returnDate)->format('Y-m');
-            $currentMonth = Carbon::today()->format('Y-m');
-
-            if ($returnMonth < $currentMonth) {
-                return 'completed';
-            }
-
-            return 'returned';
+            return $latestBooking->isArchivedReturn() ? 'completed' : 'returned';
         }
 
         if (in_array($latestBooking->status, ['picked_up', 'out'])) {

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 import { FinanceStatsDetailModal } from '@/components/finance/FinanceStatsDetailModal';
+import SupplierBalancesCard from '@/components/finance/SupplierBalancesCard';
 
 
 
@@ -61,7 +62,11 @@ const categoryLabels = {
   'operational': 'المشتريات والرواتب',
   'utilities': 'المرافق والخدمات العامة',
   'transfers': 'مناقلات وسحب وإيداع',
+  'manufacturing': 'التصنيع والخامات والموردين',
   'other': 'مصروفات أخرى',
+  'materials': 'شراء خامات',
+  'supplier_payment': 'دفعة لمورد',
+  'manufacturing_wages': 'أجور عمال التصنيع',
   'deposit': 'مقدم حجز فستان',
   'balance': 'باقي مستحقات الحجز',
   'fitting_fee': 'رسوم تجربة (قياس)',
@@ -79,6 +84,9 @@ const pmIcons = {
   'cash': Banknote, 'credit_card': CreditCard, 'instapay': Smartphone, 'vodafone_cash': Smartphone,
   'bank_transfer': Building2
 };
+
+// Expenses written by the manufacturing page (edited/deleted from there only)
+const MANUFACTURING_CATEGORIES = ['materials', 'supplier_payment', 'manufacturing_wages'];
 
 // Maps a row from /finance/transactions (a revenue or expense tagged with `kind`) to the page's transaction shape.
 const mapTransaction = (row) => {
@@ -116,6 +124,7 @@ const mapTransaction = (row) => {
   let txType = 'مصروف';
   if (row.category === 'salary' || row.category === 'purchase') mappedCat = 'operational';
   else if (row.category === 'cleaning' || row.category === 'maintenance') mappedCat = 'utilities';
+  else if (MANUFACTURING_CATEGORIES.includes(row.category)) mappedCat = 'manufacturing';
   else if (row.category === 'transfer_out') {
     mappedCat = 'transfers';
     txType = 'مناقلة (صادر)';
@@ -914,6 +923,8 @@ export default function FinancePage() {
         </div>
       }
 
+      <SupplierBalancesCard />
+
       {/* Section Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none flex-shrink-0 -mx-1 px-1">
         {[
@@ -922,6 +933,7 @@ export default function FinancePage() {
         { id: 'operational', label: 'المشتريات والرواتب' },
         { id: 'utilities', label: 'المرافق والخدمات' },
         { id: 'transfers', label: 'مناقلات وسحب وإيداع 🔄' },
+        { id: 'manufacturing', label: 'التصنيع والموردين' },
         { id: 'other', label: 'مصروفات أخرى' }].
         map((tab) =>
         <button key={tab.id} onClick={() => setActiveTab(tab.id)}

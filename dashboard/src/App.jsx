@@ -24,6 +24,7 @@ const TasksPage = lazy(() => import('./pages/TasksPage'));
 const VisitsPage = lazy(() => import('./pages/VisitsPage'));
 const WhatsappTemplatesPage = lazy(() => import('./pages/WhatsappTemplatesPage'));
 const LogsPage = lazy(() => import('./pages/LogsPage'));
+const ManufacturingPage = lazy(() => import('./pages/ManufacturingPage'));
 
 const AdminRoute = ({ children }) => {
   const userStr = typeof window !== 'undefined' ? localStorage.getItem('atelier_current_employee') : null;
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="dresses" element={<DressesPage />} />
             <Route path="employees" element={<EmployeesPage />} />
             <Route path="finance" element={<FinancePage />} />
+            <Route path="manufacturing" element={<ManufacturingPage />} />
             <Route path="fittings" element={<FittingsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="reports" element={<ReportsPage />} />

@@ -102,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/calendar/events', [CalendarController::class, 'events']);
 
     Route::get('/clients/export-csv', [ClientController::class, 'exportCsv']);
+    Route::get('/clients/excel-template', [ClientController::class, 'excelTemplate']);
     Route::post('/clients/import-excel', [ClientController::class, 'importExcel']);
     Route::apiResource('clients', ClientController::class);
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
@@ -129,6 +130,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('expenses', ExpenseController::class);
     Route::apiResource('cleaning-orders', CleaningOrderController::class);
     Route::apiResource('faqs', FaqController::class);
+
+    // Manufacturing: suppliers, materials stock, purchases, workshop workers and manufacturing orders
+    Route::apiResource('suppliers', \App\Http\Controllers\Api\SupplierController::class);
+    Route::post('/suppliers/{supplier}/payments', [\App\Http\Controllers\Api\SupplierController::class, 'storePayment']);
+    Route::delete('/suppliers/{supplier}/payments/{payment}', [\App\Http\Controllers\Api\SupplierController::class, 'destroyPayment']);
+    Route::get('/materials/movements', [\App\Http\Controllers\Api\MaterialController::class, 'movements']);
+    Route::delete('/materials/movements/{movement}', [\App\Http\Controllers\Api\MaterialController::class, 'destroyMovement']);
+    Route::post('/materials/maintenance-use', [\App\Http\Controllers\Api\MaterialController::class, 'useForMaintenance']);
+    Route::post('/materials/{material}/adjust', [\App\Http\Controllers\Api\MaterialController::class, 'adjust']);
+    Route::apiResource('materials', \App\Http\Controllers\Api\MaterialController::class)->except(['show']);
+    Route::apiResource('material-purchases', \App\Http\Controllers\Api\MaterialPurchaseController::class)->only(['index', 'store', 'destroy']);
+    Route::apiResource('workers', \App\Http\Controllers\Api\WorkerController::class);
+    Route::post('/workers/{worker}/payments', [\App\Http\Controllers\Api\WorkerController::class, 'storePayment']);
+    Route::delete('/workers/{worker}/payments/{payment}', [\App\Http\Controllers\Api\WorkerController::class, 'destroyPayment']);
+    Route::apiResource('manufacturing-orders', \App\Http\Controllers\Api\ManufacturingOrderController::class);
+    Route::post('/manufacturing-orders/{manufacturingOrder}/materials', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'addMaterials']);
+    Route::delete('/manufacturing-orders/{manufacturingOrder}/materials/{movement}', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'removeMaterial']);
+    Route::put('/manufacturing-orders/{manufacturingOrder}/dress', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'linkDress']);
 
     // Reports endpoints
     Route::get('/reports/dresses', [ReportController::class, 'dressesReport']);
@@ -194,6 +213,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
 
     Route::get('/activity-logs', [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
+    Route::post('/manufacturing-orders/{manufacturingOrder}/approve', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'approve']);
 
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::get('/dashboard/executive', [DashboardController::class, 'executive']);

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["backend/artisan", "serve", "--port=8010"],
+      "port": 8010
+    },
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["VITE_API_URL=http://localhost:8010/api", "npm", "--prefix", "dashboard", "run", "dev", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
+    }
+  ]
+}

@@ -10,6 +10,12 @@ export function cleanDate(raw) {
   return String(raw).trim().split('T')[0].split(' ')[0];
 }
 
+/** Today as YYYY-MM-DD in local time (toISOString() would give the UTC day) */
+export function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function formatDate(raw) {
   if (!raw) return '-';
   const clean = cleanDate(raw);

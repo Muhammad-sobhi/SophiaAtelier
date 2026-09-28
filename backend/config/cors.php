@@ -14,9 +14,11 @@ return [
         'http://localhost:5173',
         'http://localhost:3000',
     ]),
-    'allowed_origins_patterns' => [
+    'allowed_origins_patterns' => array_filter([
         '#^https?://.*\.sophiadresses\.cloud$#',
-    ],
+        // Local development: any localhost port (vite moves to 5174+ when 5173 is taken)
+        env('APP_ENV') === 'local' ? '#^http://(localhost|127\.0\.0\.1):\d+$#' : null,
+    ]),
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
     'max_age' => 0,

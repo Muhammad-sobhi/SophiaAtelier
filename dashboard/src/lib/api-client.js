@@ -159,6 +159,30 @@ class ApiClient {
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 
+  /** Download a file endpoint (auth header included) and save it with the given name */
+  async download(endpoint, filename) {
+    const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const response = await fetch(url, { headers: this.getAuthHeader() });
+
+    if (response.status === 401) {
+      clearAuth();
+      throw new Error('انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.');
+    }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Download failed with status ${response.status}`);
+    }
+
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+  }
+
   async postFormData(endpoint, formData) {
     const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const response = await fetch(url, {

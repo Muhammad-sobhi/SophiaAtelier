@@ -565,6 +565,7 @@ class ClientController extends Controller
             'deposit_refund_method' => 'nullable|string|max:50',
             'deposit_refund_receipt' => 'nullable',
             'refund_date' => 'nullable|date',
+            'payment_date' => 'nullable|date',
             'visit_status' => 'required_if:action,close_visit|nullable|string|in:arrived,done,no_show',
             'visit_source' => 'nullable|string|in:' . implode(',', Visit::SOURCES),
             'tried_dresses' => 'nullable|array|max:3',
@@ -942,6 +943,11 @@ class ClientController extends Controller
 
                     $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
 
+                    // Pickup money is dated on the actual pickup day chosen by staff (not the day the form was saved)
+                    $pickupPaymentDate = ($request->input('pickup_date') ?: $request->input('pickup_scheduled_on'))
+                        ? \Carbon\Carbon::parse($request->input('pickup_date') ?: $request->input('pickup_scheduled_on'))->toDateString()
+                        : now()->toDateString();
+
                     // 1. Record balance payment(s)
                     $balancePayments = $request->input('balance_payments');
                     if (is_array($balancePayments)) {
@@ -959,7 +965,7 @@ class ClientController extends Controller
                                     'type' => 'balance',
                                     'amount' => $bpAmt,
                                     'payment_method' => $bpMethod,
-                                    'payment_date' => now()->toDateString(),
+                                    'payment_date' => $pickupPaymentDate,
                                     'notes' => 'دفعة استلام الفستان النهائية للعروس: ' . $client->name,
                                     'receipt_path' => $rowReceipt,
                                 ]);
@@ -984,7 +990,7 @@ class ClientController extends Controller
                                     'type' => 'insurance',
                                     'amount' => $ipAmt,
                                     'payment_method' => $ipMethod,
-                                    'payment_date' => now()->toDateString(),
+                                    'payment_date' => $pickupPaymentDate,
                                     'notes' => 'تأمين الفستان المسترد للعروس: ' . $client->name,
                                     'receipt_path' => $rowReceipt,
                                 ]);
@@ -1078,6 +1084,9 @@ class ClientController extends Controller
                 if ($booking) {
                     $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
                     $payments = $request->input('payments');
+                    $paidOn = $request->filled('payment_date')
+                        ? \Carbon\Carbon::parse($request->input('payment_date'))->toDateString()
+                        : now()->toDateString();
 
                     if (is_array($payments) && count($payments) > 0) {
                         foreach ($payments as $p) {
@@ -1093,7 +1102,7 @@ class ClientController extends Controller
                                     'type' => 'balance',
                                     'amount' => $pAmt,
                                     'payment_method' => $pMethod,
-                                    'payment_date' => now()->toDateString(),
+                                    'payment_date' => $paidOn,
                                     'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
                                     'receipt_path' => $rowReceipt,
                                 ]);
@@ -1107,7 +1116,7 @@ class ClientController extends Controller
                                 'type' => 'balance',
                                 'amount' => $payAmount,
                                 'payment_method' => $request->input('payment_method', 'cash'),
-                                'payment_date' => now()->toDateString(),
+                                'payment_date' => $paidOn,
                                 'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
                                 'receipt_path' => $receiptPath,
                             ]);
@@ -1131,7 +1140,7 @@ class ClientController extends Controller
                                     'type' => 'security_deposit',
                                     'amount' => $iAmt,
                                     'payment_method' => $iMethod,
-                                    'payment_date' => now()->toDateString(),
+                                    'payment_date' => $paidOn,
                                     'notes' => 'تأمين مسترد للعروس: ' . $client->name . ' (يُسترد عند إعادة الفستان)',
                                     'receipt_path' => $iReceipt,
                                 ]);
@@ -1400,5 +1409,38 @@ class ClientController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /** Empty brides template (.xlsx) to fill and import back */
+    public function excelTemplate(\App\Services\BridesExcelService $excel)
+    {
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($excel->template(), 'Xlsx');
+
+        return response()->streamDownload(fn () => $writer->save('php://output'), 'قالب_العرائس.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /** Import a filled brides template: each row becomes a bride + booking + her payments */
+    public function importExcel(Request $request, \App\Services\BridesExcelService $excel): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx|max:10240',
+        ]);
+
+        try {
+            $result = $excel->import($request->file('file')->getRealPath());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\PhpOffice\PhpSpreadsheet\Reader\Exception $e) {
+            return response()->json(['message' => 'تعذر قراءة الملف. تأكدي أنه ملف إكسل (xlsx) صحيح.'], 422);
+        }
+
+        \App\Services\ActivityLogger::log('استيراد عرائس من إكسل', 'Client', null, [
+            'created' => $result['created'],
+            'skipped' => count($result['skipped']),
+        ]);
+
+        return response()->json($result);
     }
 }

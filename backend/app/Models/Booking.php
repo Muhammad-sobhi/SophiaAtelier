@@ -114,6 +114,19 @@ class Booking extends Model
         }
     }
 
+    /** Days a returned booking stays in the return stage before moving to the archive */
+    public const RETURN_ARCHIVE_DAYS = 15;
+
+    /** Returned more than RETURN_ARCHIVE_DAYS ago (return_scheduled_on holds the actual return date once returned) */
+    public function isArchivedReturn(): bool
+    {
+        if ($this->status !== 'returned') {
+            return false;
+        }
+        $returnedOn = $this->return_scheduled_on ?? $this->updated_at;
+        return $returnedOn && \Carbon\Carbon::parse($returnedOn)->startOfDay()->addDays(self::RETURN_ARCHIVE_DAYS)->lt(\Carbon\Carbon::today());
+    }
+
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);

@@ -26,6 +26,7 @@ const AVAILABLE_PAGES = [
 { path: '/dashboard/fittings', label: 'القياسات' },
 { path: '/dashboard/tasks', label: 'المهام' },
 { path: '/dashboard/finance', label: 'المالية' },
+{ path: '/dashboard/manufacturing', label: 'التصنيع' },
 { path: '/dashboard/employees', label: 'الموظفين' },
 { path: '/dashboard/attendance', label: 'الحضور والرواتب' },
 { path: '/dashboard/reports', label: 'التقارير' },

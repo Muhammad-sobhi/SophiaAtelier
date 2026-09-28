@@ -4,6 +4,8 @@ import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates } from '@/lib/utils';
 import { getVisitStatus } from '@/components/bride-journey/visitStatus';
 
+const RETURN_ARCHIVE_DAYS = 15;
+
 export default function BridesTab({
   brides,
   stageFilter,
@@ -43,6 +45,7 @@ export default function BridesTab({
         return null;
       }
       case 'receive':
+      case 'archive':
       case 'returned': {
         const direct = b.bookings?.[0]?.return_scheduled_on || b.return_scheduled_on || b.expected_return_date;
         if (direct) return direct;
@@ -66,6 +69,20 @@ export default function BridesTab({
       (b.bookings?.[0]?.status === 'picked_up' || b.bookings?.[0]?.status === 'out') ||
       b.bookings?.some((bk) => bk.status === 'picked_up' || bk.status === 'out');
     return raw === 'picked_up' && isDelivered ? 'returned' : raw;
+  };
+
+  // Returned more than RETURN_ARCHIVE_DAYS days ago (matches Booking::isArchivedReturn on the backend)
+  const isArchivedReturn = (b) => {
+    const latestBk = b.bookings?.[0];
+    if (b.current_stage === 'completed') return true;
+    if (latestBk?.status !== 'returned') return false;
+    const retDate = latestBk.return_scheduled_on || latestBk.updated_at;
+    if (!retDate) return false;
+    const ret = new Date(String(retDate).slice(0, 10));
+    ret.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return (today - ret) / 86400000 > RETURN_ARCHIVE_DAYS;
   };
 
   // Return-stage badge: "returned" only when the dress actually came back,
@@ -103,7 +120,8 @@ export default function BridesTab({
   // 3. Brides with fittings appear in 'fitting' without being removed from booking/pickup
   // 4. Returned brides auto-disappear after receiving + return month has ended
   const matchesStage = (b, targetStage) => {
-    if (targetStage === 'all') return true;
+    // Archived brides appear only under the archive filter
+    if (targetStage === 'all') return !isArchivedReturn(b);
 
     const raw = b.current_stage || b.stage || 'visit';
     const latestBk = b.bookings?.[0];
@@ -131,23 +149,12 @@ export default function BridesTab({
       return Boolean(hasFitting);
     }
 
-    // 2. Return stage:
-    if (targetStage === 'returned') {
-      // Must be currently delivered/out OR returned in current month
-      if (isDelivered) return true;
-      if (isReturned) {
-        // Disappear if received + month ended:
-        const retDate = latestBk?.return_scheduled_on || latestBk?.updated_at || b.return_scheduled_on;
-        if (retDate) {
-          const retMonth = String(retDate).slice(0, 7);
-          const currentMonth = new Date().toISOString().slice(0, 7);
-          if (retMonth < currentMonth) {
-            return false; // Month ended -> auto-disappear from active returned stage
-          }
-        }
-        return true;
-      }
-      return false;
+    // 2. Return stage: dress still out, or returned within the last RETURN_ARCHIVE_DAYS days
+    // 2b. Archive: returned more than RETURN_ARCHIVE_DAYS days ago
+    if (targetStage === 'returned' || targetStage === 'archive') {
+      if (isDelivered) return targetStage === 'returned';
+      if (!isReturned) return false;
+      return targetStage === 'archive' ? isArchivedReturn(b) : !isArchivedReturn(b);
     }
 
     // If already returned or delivered, she is not in visit/booking/pickup

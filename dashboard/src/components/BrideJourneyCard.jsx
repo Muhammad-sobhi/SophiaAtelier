@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
 import { UnifiedStageModal, calculateScheduledDates } from './bride-journey/UnifiedStageModal';
-import { cleanDate, isCairoCity } from '@/lib/utils';
+import { cleanDate, isCairoCity, todayStr } from '@/lib/utils';
 
 
 
@@ -87,6 +87,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
   const [customPayments, setCustomPayments] = useState([{ amount: '', payment_method: 'cash' }]);
   const [paymentType, setPaymentType] = useState('fitting_fee');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentDate, setPaymentDate] = useState(todayStr());
   const [paymentReceipt, setPaymentReceipt] = useState(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -713,7 +714,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
           amount: totalAmt,
           payment_method: validPayments.length === 1 ? validPayments[0].payment_method : 'multiple',
           payments: validPayments.length > 0 ? validPayments : [{ amount: totalAmt, payment_method: paymentMethod }],
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: paymentDate || todayStr(),
           notes: paymentNotes || (paymentType === 'fitting_fee' ? `رسوم قياس وتجربة للعروس: ${bride.name}` : `دفعة حجز للعروس: ${bride.name}`),
           receipt_image: paymentReceipt
         });
@@ -722,6 +723,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         setCustomPayments([{ amount: '', payment_method: 'cash' }]);
         setPaymentMethod('cash');
         setPaymentNotes('');
+        setPaymentDate(todayStr());
         setPaymentReceipt(null);
         onStageUpdate?.();
       }
@@ -1450,6 +1452,17 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                     <img src={paymentReceipt} alt="معاينة الإيصال" className="w-full h-full object-contain max-h-[75px]" />
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-500 block text-right">تاريخ الدفع</label>
+                <input
+                  type="date"
+                  required
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none"
+                />
               </div>
 
               <div className="space-y-1">

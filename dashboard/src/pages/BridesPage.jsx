@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
+import BridesExcelImport from '@/components/BridesExcelImport';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates, isCairoCity } from '@/lib/utils';
 import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
@@ -517,6 +518,8 @@ export default function BridesPage() {
             <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : ''} />
             <span className="hidden sm:inline">تحديث</span>
           </button>
+
+          <BridesExcelImport onImported={handleRefresh} />
 
           <button
             type="button"

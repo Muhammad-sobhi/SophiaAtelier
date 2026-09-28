@@ -19,6 +19,7 @@ import {
   HelpCircle,
   Layers,
   ShieldCheck,
+  Factory,
   Image as ImageIcon } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -32,6 +33,7 @@ const menuItems = [
 { icon: Ruler, label: 'القياسات', path: '/dashboard/fittings' },
 { icon: CheckSquare, label: 'المهام', path: '/dashboard/tasks' },
 { icon: DollarSign, label: 'المالية', path: '/dashboard/finance' },
+{ icon: Factory, label: 'التصنيع', path: '/dashboard/manufacturing' },
 { icon: UserCheck, label: 'الموظفين', path: '/dashboard/employees' },
 { icon: Clock, label: 'الحضور والرواتب', path: '/dashboard/attendance' },
 { icon: BarChart3, label: 'التقارير', path: '/dashboard/reports' },

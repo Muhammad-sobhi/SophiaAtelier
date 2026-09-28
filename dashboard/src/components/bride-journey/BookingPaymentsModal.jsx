@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
+import { todayStr } from '@/lib/utils';
 import {
   X, Banknote, Edit3, Trash2, Plus, Check, AlertCircle, Sparkles, Shield, DollarSign, RefreshCw
 } from 'lucide-react';
@@ -53,7 +54,7 @@ export function BookingPaymentsModal({
   // Payments / revenues state
   const [revenues, setRevenues] = useState(booking?.revenues || []);
   const [editingRevId, setEditingRevId] = useState(null);
-  const [editForm, setEditForm] = useState({ amount: '', payment_method: 'cash', notes: '', type: 'deposit' });
+  const [editForm, setEditForm] = useState({ amount: '', payment_method: 'cash', notes: '', type: 'deposit', payment_date: '' });
   const [isSavingRev, setIsSavingRev] = useState(false);
 
   // New payment form
@@ -63,6 +64,7 @@ export function BookingPaymentsModal({
     amount: '',
     payment_method: 'cash',
     notes: '',
+    payment_date: todayStr(),
   });
   const [isAddingPayment, setIsAddingPayment] = useState(false);
 
@@ -125,6 +127,7 @@ export function BookingPaymentsModal({
       payment_method: rev.payment_method || 'cash',
       notes: rev.notes || '',
       type: rev.type || 'deposit',
+      payment_date: rev.payment_date ? String(rev.payment_date).split('T')[0].split(' ')[0] : todayStr(),
     });
   };
 
@@ -141,6 +144,7 @@ export function BookingPaymentsModal({
         payment_method: editForm.payment_method,
         notes: editForm.notes,
         type: editForm.type,
+        payment_date: editForm.payment_date || todayStr(),
       });
       toast.success('تم تعديل الدفعة بنجاح ✨');
       setEditingRevId(null);
@@ -183,11 +187,11 @@ export function BookingPaymentsModal({
         type: newPayment.type,
         amount: parseFloat(newPayment.amount),
         payment_method: newPayment.payment_method,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: newPayment.payment_date || todayStr(),
         notes: newPayment.notes || (newPayment.type === 'balance' ? 'سداد دفعة' : 'دفعة جديدة'),
       });
       toast.success('تمت إضافة الدفعة بنجاح ✨');
-      setNewPayment({ type: 'balance', amount: '', payment_method: 'cash', notes: '' });
+      setNewPayment({ type: 'balance', amount: '', payment_method: 'cash', notes: '', payment_date: todayStr() });
       setShowAddPayment(false);
       await reloadData();
     } catch (err) {
@@ -328,7 +332,7 @@ export function BookingPaymentsModal({
             {showAddPayment && (
               <form onSubmit={handleAddNewPayment} className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="text-xs font-black text-indigo-900">تسجيل دفعة جديدة</div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">نوع الدفعة</label>
                     <select
@@ -367,6 +371,16 @@ export function BookingPaymentsModal({
                         <option key={m.id} value={m.id}>{m.label}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">تاريخ الدفع</label>
+                    <input
+                      type="date"
+                      value={newPayment.payment_date}
+                      onChange={(e) => setNewPayment({ ...newPayment, payment_date: e.target.value })}
+                      className="w-full bg-white border border-indigo-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-hidden"
+                      required
+                    />
                   </div>
                 </div>
 
@@ -422,7 +436,7 @@ export function BookingPaymentsModal({
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-600 mb-1">نوع الدفعة</label>
                             <select
@@ -461,6 +475,16 @@ export function BookingPaymentsModal({
                                 <option key={m.id} value={m.id}>{m.label}</option>
                               ))}
                             </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-600 mb-1">تاريخ الدفع</label>
+                            <input
+                              type="date"
+                              value={editForm.payment_date}
+                              onChange={(e) => setEditForm({ ...editForm, payment_date: e.target.value })}
+                              className="w-full bg-white border border-amber-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800"
+                              required
+                            />
                           </div>
                         </div>
 

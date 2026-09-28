@@ -87,12 +87,12 @@ class StageResolutionTest extends TestCase
         $this->assertEquals('returned', $stage);
     }
 
-    public function test_bride_returned_in_current_month_remains_in_returned_stage()
+    public function test_bride_returned_within_15_days_remains_in_returned_stage()
     {
         $client = new Client();
         $booking = new Booking();
         $booking->status = 'returned';
-        $booking->return_scheduled_on = Carbon::today()->toDateString();
+        $booking->return_scheduled_on = Carbon::today()->subDays(15)->toDateString();
 
         $client->setRelation('fittings', collect([]));
         $client->setRelation('visits', collect([]));
@@ -101,13 +101,12 @@ class StageResolutionTest extends TestCase
         $this->assertEquals('returned', $stage);
     }
 
-    public function test_bride_returned_in_previous_month_auto_disappears_to_completed()
+    public function test_bride_returned_more_than_15_days_ago_moves_to_archive()
     {
         $client = new Client();
         $booking = new Booking();
         $booking->status = 'returned';
-        // Returned in previous month
-        $booking->return_scheduled_on = Carbon::today()->subMonths(1)->startOfMonth()->toDateString();
+        $booking->return_scheduled_on = Carbon::today()->subDays(16)->toDateString();
 
         $client->setRelation('fittings', collect([]));
         $client->setRelation('visits', collect([]));
@@ -126,7 +125,7 @@ class StageResolutionTest extends TestCase
         $this->assertEquals('visit', $stage);
     }
 
-    public function test_legacy_resolver_respects_15_day_window_and_month_archiving()
+    public function test_legacy_resolver_respects_15_day_window_and_archiving()
     {
         $client = new Client();
         $booking = new Booking();
@@ -139,9 +138,9 @@ class StageResolutionTest extends TestCase
         $stage = LegacyStageResolver::resolve($client, $booking);
         $this->assertEquals('picked_up', $stage);
 
-        // Previous month returned legacy bride
+        // Returned more than 15 days ago -> archive
         $booking->status = 'returned';
-        $booking->return_scheduled_on = Carbon::today()->subMonths(1)->toDateString();
+        $booking->return_scheduled_on = Carbon::today()->subDays(20)->toDateString();
         $stagePast = LegacyStageResolver::resolve($client, $booking);
         $this->assertEquals('completed', $stagePast);
     }

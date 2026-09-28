@@ -15,6 +15,7 @@ const STAGES = [
   { id: 'picked_up', label: 'استلام', dotColor: 'bg-blue-500' },
   { id: 'returned', label: 'مرتجع', dotColor: 'bg-rose-500' },
   { id: 'cancelled', label: 'ملغية', dotColor: 'bg-red-600' },
+  { id: 'archive', label: 'الأرشيف', dotColor: 'bg-slate-400' },
 ];
 
 const STAGE_MAP = {
@@ -24,7 +25,9 @@ const STAGE_MAP = {
   picked_up: { label: 'تم الاستلام', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-500' },
   returned: { label: 'تم الإرجاع', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200', dotColor: 'bg-slate-400' },
   cancelled: { label: 'حجز ملغي', badgeClass: 'bg-red-50 text-red-700 border-red-200', dotColor: 'bg-red-600' },
+  completed: { label: 'مؤرشفة', badgeClass: 'bg-slate-100 text-slate-500 border-slate-200', dotColor: 'bg-slate-400' },
 };
+STAGE_MAP.archive = STAGE_MAP.completed;
 
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();

@@ -19,21 +19,9 @@ class LiveStageResolver
             return 'visit';
         }
 
-        // 1. Returned stage: if dress is returned
+        // Returned: stays in the return stage for 15 days after the actual return, then moves to the archive
         if ($latestBooking->status === 'returned') {
-            $returnDate = $latestBooking->return_scheduled_on
-                ? Carbon::parse($latestBooking->return_scheduled_on)->format('Y-m-d')
-                : Carbon::parse($latestBooking->updated_at)->format('Y-m-d');
-
-            $returnMonth = Carbon::parse($returnDate)->format('Y-m');
-            $currentMonth = Carbon::today()->format('Y-m');
-
-            // Disappear from active return stage after receiving + month ended
-            if ($returnMonth < $currentMonth) {
-                return 'completed';
-            }
-
-            return 'returned';
+            return $latestBooking->isArchivedReturn() ? 'completed' : 'returned';
         }
 
         // 2. Dress is out with the bride -> awaiting return
