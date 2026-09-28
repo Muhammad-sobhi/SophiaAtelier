@@ -78,6 +78,44 @@ class BridesExcelService
 
     private const TEMPLATE_ROWS = 500;
 
+    /** Name prefix of the sample row: shows staff how to fill each column, skipped on import */
+    private const EXAMPLE_PREFIX = 'مثال';
+
+    /** Sample row written under the headers (dates are relative so the example never looks stale) */
+    private function exampleRow(): array
+    {
+        $wedding = now()->addMonth()->startOfDay();
+
+        return [
+            'name' => self::EXAMPLE_PREFIX . ': سارة أحمد (احذفي هذا الصف)',
+            'phone' => '01012345678',
+            'phone2' => '01112345678',
+            'city' => 'القاهرة',
+            'address' => 'مدينة نصر - شارع عباس العقاد',
+            'source' => self::SOURCES['instagram'],
+            'wedding_date' => $wedding,
+            'dress_code' => 'SD-101',
+            'dress_2_code' => null,
+            'dress_3_code' => null,
+            'booking_date' => now()->startOfDay(),
+            'pickup_date' => $wedding->copy()->subDay(),
+            'return_date' => $wedding->copy()->addDays(2),
+            'status' => self::STATUSES['confirmed'],
+            'total_amount' => 15000,
+            'deposit_amount' => 5000,
+            'deposit_method' => self::PAYMENT_METHODS['instapay'],
+            'balance_amount' => 10000,
+            'balance_method' => self::PAYMENT_METHODS['cash'],
+            'balance_date' => $wedding->copy()->subDay(),
+            'insurance_amount' => 3000,
+            'insurance_paid' => 3000,
+            'insurance_method' => self::PAYMENT_METHODS['cash'],
+            'insurance_refund' => null,
+            'sales_name' => 'منى',
+            'notes' => 'التواريخ تكتب يوم/شهر/سنة مثل 25/12/2026',
+        ];
+    }
+
     public function template(): Spreadsheet
     {
         $book = new Spreadsheet();
@@ -99,10 +137,20 @@ class BridesExcelService
         $lists->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_HIDDEN);
 
         $lastRow = self::TEMPLATE_ROWS + 1;
+        $example = $this->exampleRow();
         $c = 1;
         foreach (self::COLUMNS as $key => [$header, $type]) {
             $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++);
             $sheet->setCellValue("{$letter}1", $header);
+            if (($value = $example[$key] ?? null) !== null) {
+                if ($type === 'date') {
+                    $sheet->setCellValue("{$letter}2", ExcelDate::PHPToExcel($value));
+                } elseif ($type === 'text') {
+                    $sheet->setCellValueExplicit("{$letter}2", $value, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                } else {
+                    $sheet->setCellValue("{$letter}2", $value);
+                }
+            }
             $sheet->getColumnDimension($letter)->setWidth(max(14, mb_strlen($header) + 6));
             $range = "{$letter}2:{$letter}{$lastRow}";
 
@@ -131,6 +179,10 @@ class BridesExcelService
         $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E11D48']],
+        ]);
+        $sheet->getStyle("A2:{$lastCol}2")->applyFromArray([
+            'font' => ['italic' => true, 'color' => ['rgb' => '64748B']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF1F2']],
         ]);
         $sheet->freezePane('A2');
         $book->setActiveSheetIndex(0);
@@ -162,6 +214,9 @@ class BridesExcelService
             $raw = array_combine($keys, array_pad(array_slice($values, 0, count($keys)), count($keys), null));
             if (collect($raw)->every(fn ($v) => $v === null || trim((string) $v) === '')) {
                 continue; // empty template row
+            }
+            if (str_starts_with(trim((string) $raw['name']), self::EXAMPLE_PREFIX)) {
+                continue; // the sample row shipped with the template
             }
 
             try {
@@ -204,6 +259,14 @@ class BridesExcelService
 
         foreach (['total_amount', 'deposit_amount', 'balance_amount', 'insurance_amount', 'insurance_paid', 'insurance_refund'] as $k) {
             $row[$k] = $this->parseAmount($raw[$k] ?? null, self::COLUMNS[$k][0]);
+        }
+        if ($row['deposit_amount'] + $row['balance_amount'] > $row['total_amount']) {
+            throw new \InvalidArgumentException('العربون + الباقي أكبر من إجمالي الإيجار');
+        }
+        // Old returned booking with an empty refund cell: the insurance was given back in full
+        // (same default as the return form). Typing 0 means the shop kept it.
+        if ($row['status'] === 'returned' && $text('insurance_refund') === null) {
+            $row['insurance_refund'] = $row['insurance_paid'];
         }
         foreach (['deposit_method', 'balance_method', 'insurance_method'] as $k) {
             $row[$k] = $this->fromList($text($k), self::PAYMENT_METHODS, self::COLUMNS[$k][0]) ?? 'cash';
@@ -275,6 +338,7 @@ class BridesExcelService
         // No booking date: today, or the pickup day for an old booking (its deposit can't be paid after pickup)
         $bookingDate = $row['booking_date'] ?? min(now()->toDateString(), $pickupDate);
         $returnDate = $row['return_date'] ?? $scheduled['return_date'];
+        $this->checkDates($row, $bookingDate, $pickupDate, $returnDate);
 
         $booking = Booking::create([
             'client_id' => $client->id,
@@ -320,6 +384,36 @@ class BridesExcelService
         }
 
         return $isNew;
+    }
+
+    /** Dates must follow booking -> pickup -> wedding -> return, and match the booking status */
+    private function checkDates(array $row, string $bookingDate, string $pickupDate, string $returnDate): void
+    {
+        $today = now()->toDateString();
+        $wedding = $row['wedding_date'];
+
+        if ($bookingDate > $pickupDate) {
+            throw new \InvalidArgumentException('تاريخ الحجز بعد تاريخ الاستلام');
+        }
+        if ($pickupDate > $wedding) {
+            throw new \InvalidArgumentException('تاريخ الاستلام بعد تاريخ الفرح');
+        }
+        if ($returnDate < $wedding) {
+            throw new \InvalidArgumentException('تاريخ الإرجاع قبل تاريخ الفرح');
+        }
+        if ($row['balance_date'] && $row['balance_date'] < $bookingDate) {
+            throw new \InvalidArgumentException('تاريخ دفع الباقي قبل تاريخ الحجز');
+        }
+
+        if ($row['status'] === 'returned' && $returnDate > $today) {
+            throw new \InvalidArgumentException('الحالة "تم الإرجاع" لكن تاريخ الإرجاع لم يأتِ بعد');
+        }
+        if ($row['status'] === 'picked_up' && $pickupDate > $today) {
+            throw new \InvalidArgumentException('الحالة "تم الاستلام" لكن تاريخ الاستلام لم يأتِ بعد');
+        }
+        if ($row['status'] === 'confirmed' && $wedding < $today) {
+            throw new \InvalidArgumentException('الحالة "حجز مؤكد" لكن تاريخ الفرح فات — اختاري "تم الإرجاع" للحجوزات القديمة');
+        }
     }
 
     private function fromList(?string $value, array $options, string $label): ?string
