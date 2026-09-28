@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { Plus, Phone, DollarSign, Mail, Lock, MapPin, CreditCard, Image, X, Trash2, Eye, EyeOff, Edit3 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 
 
@@ -244,7 +245,7 @@ export default function EmployeesPage() {
   };
 
   const handleDeleteEmployee = async (id) => {
-    if (confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
+    if (await confirmDialog('هل أنت متأكد من حذف هذا الموظف؟')) {
       try {
         await apiClient.delete(`/employees/${id}`);
         setEmployeesList((prev) => prev.filter((emp) => emp.id !== id));

@@ -9,6 +9,8 @@ import {
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 import { FinanceStatsDetailModal } from '@/components/finance/FinanceStatsDetailModal';
 import SupplierBalancesCard from '@/components/finance/SupplierBalancesCard';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 
 
 
@@ -277,11 +279,11 @@ export default function FinancePage() {
       exportTransactions = await fetchAllFilteredTransactions();
     } catch (e) {
       console.error('Failed to export transactions:', e);
-      alert('فشل تحميل المعاملات للتصدير');
+      toast.error('فشل تحميل المعاملات للتصدير');
       return;
     }
     if (exportTransactions.length === 0) {
-      alert('لا توجد معاملات لتصديرها');
+      toast.error('لا توجد معاملات لتصديرها');
       return;
     }
 
@@ -485,7 +487,7 @@ export default function FinancePage() {
   };
 
   const handleDeleteTransaction = async (tx) => {
-    if (!confirm('هل أنت متأكد من حذف هذه المعاملة؟')) return;
+    if (!await confirmDialog('هل أنت متأكد من حذف هذه المعاملة؟')) return;
     try {
       const realId = tx.id.replace(/^(revenue-|expense-)/, '');
       if (tx.isRevenue) {
@@ -497,7 +499,7 @@ export default function FinancePage() {
       loadData();
     } catch (e) {
       console.error('Failed to delete transaction:', e);
-      alert('فشل حذف المعاملة');
+      toast.error('فشل حذف المعاملة');
     }
   };
 
@@ -595,7 +597,7 @@ export default function FinancePage() {
   };
 
   const handleDeleteCleaningOrder = async (id) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+    if (!await confirmDialog('هل أنت متأكد من حذف هذا الطلب؟')) return;
     try {
       await apiClient.delete(`/cleaning-orders/${id}`);
       loadCleaningOrders();
@@ -640,7 +642,7 @@ export default function FinancePage() {
   const handleVaultSubmit = async (e) => {
     e.preventDefault();
     if (!vaultAmount || parseFloat(vaultAmount) <= 0) {
-      alert('يرجى إدخال مبلغ صحيح');
+      toast.error('يرجى إدخال مبلغ صحيح');
       return;
     }
 
@@ -648,7 +650,7 @@ export default function FinancePage() {
     try {
       if (vaultTab === 'transfer') {
         if (vaultFromMethod === vaultToMethod) {
-          alert('لا يمكن التحويل لنفس وسيلة الدفع');
+          toast.error('لا يمكن التحويل لنفس وسيلة الدفع');
           setIsSubmittingVault(false);
           return;
         }
@@ -686,7 +688,7 @@ export default function FinancePage() {
       setVaultDate(new Date().toISOString().split('T')[0]);
     } catch (err) {
       console.error('Failed vault operation:', err);
-      alert(err.response?.data?.message || 'حدث خطأ أثناء تنفيذ العملية');
+      toast.error(err.response?.data?.message || 'حدث خطأ أثناء تنفيذ العملية');
     } finally {
       setIsSubmittingVault(false);
     }

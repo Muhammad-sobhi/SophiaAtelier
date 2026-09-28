@@ -4,6 +4,7 @@ import {
   HelpCircle, Plus, Edit3, Trash2, Check, X, Search,
   CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, MessageSquareText, MoveUp, MoveDown
 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function FaqsPage() {
   const [faqs, setFaqs] = useState([]);
@@ -136,7 +137,7 @@ export default function FaqsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('هل أنت تأكد من رغبتك في حذف هذا السؤال؟')) return;
+    if (!await confirmDialog('هل أنت تأكد من رغبتك في حذف هذا السؤال؟')) return;
 
     const previousFaqs = [...faqs];
     setFaqs((prev) => prev.filter((f) => f.id !== id));

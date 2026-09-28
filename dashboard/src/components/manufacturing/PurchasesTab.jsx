@@ -9,6 +9,7 @@ import {
 } from './shared';
 import { IconBtn } from './MaterialsTab';
 import { PurchaseWizard } from './Wizards';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function PurchasesTab({ materials, meta, suppliers, stepMode, reloadShared }) {
   const [rows, setRows] = useState(null);
@@ -30,7 +31,7 @@ export default function PurchasesTab({ materials, meta, suppliers, stepMode, rel
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (p) => {
-    if (!window.confirm('حذف فاتورة الشراء نهائياً؟ ستُخصم كمياتها من المخزن ويُعاد حساب متوسط التكلفة، وتُحذف دفعاتها من المالية ومن رصيد المورد.')) return;
+    if (!await confirmDialog('حذف فاتورة الشراء نهائياً؟ ستُخصم كمياتها من المخزن ويُعاد حساب متوسط التكلفة، وتُحذف دفعاتها من المالية ومن رصيد المورد.')) return;
     try {
       await apiClient.delete(`/material-purchases/${p.id}`);
       toast.success('تم حذف الفاتورة');

@@ -11,6 +11,7 @@ import {
   X, Heart, Calendar, Ruler, Package, RotateCcw,
   Search, CheckCircle2, AlertTriangle, User, CreditCard, Trash2, Loader2
 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export const getDressConflict = (dress, targetDate, currentClientId = null, targetCity = 'القاهرة') => {
   if (!dress || !targetDate) return null;
@@ -523,7 +524,7 @@ export function UnifiedStageModal({
     const prevStage = stageFlow[idx - 1];
     const prevLabel = STAGES.find(s => s.id === prevStage)?.label || prevStage;
 
-    if (!window.confirm(`هل أنت متأكد من العودة بالعروس إلى مرحلة: (${prevLabel})؟`)) return;
+    if (!await confirmDialog(`هل أنت متأكد من العودة بالعروس إلى مرحلة: (${prevLabel})؟`)) return;
 
     try {
       setIsSubmitting(true);

@@ -4,6 +4,8 @@ import {
   Mail, Trash2, CheckCircle2, Circle, Search,
   RefreshCw, Phone, User, MessageSquare, AlertCircle, Clock
 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 
 export default function ContactMessagesPage() {
   const [messages, setMessages] = useState([]);
@@ -43,12 +45,12 @@ export default function ContactMessagesPage() {
         setSelectedMessage((prev) => ({ ...prev, is_read: newStatus }));
       }
     } catch (e) {
-      alert('فشل تحديث حالة الرسالة');
+      toast.error('فشل تحديث حالة الرسالة');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('هل أنت تأكد من حذف هذه الرسالة؟')) return;
+    if (!await confirmDialog('هل أنت تأكد من حذف هذه الرسالة؟')) return;
     try {
       await apiClient.delete(`/contact-messages/${id}`);
       setMessages((prev) => prev.filter((m) => m.id !== id));
@@ -56,7 +58,7 @@ export default function ContactMessagesPage() {
         setSelectedMessage(null);
       }
     } catch (e) {
-      alert('فشل حذف الرسالة');
+      toast.error('فشل حذف الرسالة');
     }
   };
 

@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/utils';
 import {
   Modal, Field, SubmitRow, EmptyState, PrimaryButton, inputClass, money, qty, todayStr, errorMessage,
 } from './shared';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const MOVEMENT_LABELS = { purchase: 'شراء', manufacturing: 'تصنيع', maintenance: 'صيانة فستان', adjustment: 'تسوية جرد' };
 
@@ -22,7 +23,7 @@ export default function MaterialsTab({ materials, meta, suppliers, reload }) {
   );
 
   const handleDelete = async (m) => {
-    if (!window.confirm(`حذف الخامة "${m.name}"؟`)) return;
+    if (!await confirmDialog(`حذف الخامة "${m.name}"؟`)) return;
     try {
       await apiClient.delete(`/materials/${m.id}`);
       toast.success('تم حذف الخامة');
@@ -246,7 +247,7 @@ function MovementsModal({ material, onClose, onChanged }) {
   React.useEffect(() => { load(); }, [load]);
 
   const undo = async (mv) => {
-    if (!window.confirm('التراجع عن هذه الحركة وإرجاع الكمية للمخزن؟')) return;
+    if (!await confirmDialog('التراجع عن هذه الحركة وإرجاع الكمية للمخزن؟')) return;
     try {
       await apiClient.delete(`/materials/movements/${mv.id}`);
       toast.success('تم التراجع عن الحركة');

@@ -8,6 +8,7 @@ import {
   Modal, Field, SubmitRow, EmptyState, PrimaryButton, inputClass, money, qty, todayStr, errorMessage, PAYMENT_METHODS,
 } from './shared';
 import { IconBtn } from './MaterialsTab';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function SuppliersTab({ suppliers, totalBalance, reload, initialSupplierId }) {
   const [editing, setEditing] = useState(null);
@@ -15,7 +16,7 @@ export default function SuppliersTab({ suppliers, totalBalance, reload, initialS
   const [paying, setPaying] = useState(null);
 
   const handleDelete = async (s) => {
-    if (!window.confirm(`حذف المورد "${s.name}"؟`)) return;
+    if (!await confirmDialog(`حذف المورد "${s.name}"؟`)) return;
     try {
       await apiClient.delete(`/suppliers/${s.id}`);
       toast.success('تم حذف المورد');
@@ -169,7 +170,7 @@ function SupplierStatement({ supplierId, onClose, onChanged }) {
   useEffect(() => { load(); }, [load]);
 
   const deletePayment = async (p) => {
-    if (!window.confirm('حذف هذه الدفعة؟ ستُحذف أيضاً من صفحة المالية.')) return;
+    if (!await confirmDialog('حذف هذه الدفعة؟ ستُحذف أيضاً من صفحة المالية.')) return;
     try {
       await apiClient.delete(`/suppliers/${supplierId}/payments/${p.id}`);
       toast.success('تم حذف الدفعة');

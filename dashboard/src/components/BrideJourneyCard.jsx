@@ -24,6 +24,7 @@ import {
 import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
 import { UnifiedStageModal, calculateScheduledDates } from './bride-journey/UnifiedStageModal';
 import { cleanDate, isCairoCity, todayStr } from '@/lib/utils';
+import { toast } from '@/components/ui/Toast';
 
 
 
@@ -390,7 +391,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       onStageUpdate?.();
     } catch (err) {
       console.error(err);
-      alert(err?.message || 'حدث خطأ أثناء حفظ البيانات');
+      toast.error(err?.message || 'حدث خطأ أثناء حفظ البيانات');
     } finally {
       setIsSubmitting(false);
     }
@@ -495,7 +496,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         setConflictWarningMessage(err?.response?.data?.message || err?.message || 'هذا الفستان غير متوفر في الفترة المحددة.');
         setShowConflictConfirmDialog(true);
       } else {
-        alert(err?.response?.data?.message || err?.message || 'حدث خطأ أثناء حفظ حجز الفستان');
+        toast.error(err?.response?.data?.message || err?.message || 'حدث خطأ أثناء حفظ حجز الفستان');
       }
     } finally {
       setIsSubmitting(false);
@@ -672,7 +673,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       }
     } catch (e) {
       console.error('Failed to perform bride stage action:', e);
-      alert(e?.message || 'فشل تنفيذ الإجراء.');
+      toast.error(e?.message || 'فشل تنفيذ الإجراء.');
     } finally {
       setIsSubmitting(false);
     }
@@ -682,7 +683,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     e?.stopPropagation?.();
     const phone = (bride.phone || '').replace(/[^\d]/g, '');
     if (!phone) {
-      alert('لا يوجد رقم هاتف مسجل للعروس');
+      toast.error('لا يوجد رقم هاتف مسجل للعروس');
       return;
     }
 
@@ -729,7 +730,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       }
     } catch (e) {
       console.error('Failed to record payment:', e);
-      alert('حدث خطأ أثناء تسجيل الدفعة');
+      toast.error('حدث خطأ أثناء تسجيل الدفعة');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -754,7 +755,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
     e?.stopPropagation?.();
     const phone = (bride.phone || '').replace(/[^\d]/g, '');
     if (!phone) {
-      alert('لا يوجد رقم هاتف مسجل للعروس');
+      toast.error('لا يوجد رقم هاتف مسجل للعروس');
       return;
     }
 

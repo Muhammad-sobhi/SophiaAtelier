@@ -16,6 +16,7 @@ import {
   Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle, Ban,
   UserX, XCircle, CalendarPlus
 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const STAGES = [
   { id: 'visit', label: 'زيارة', icon: Calendar },
@@ -193,11 +194,11 @@ export function BrideJourneyPopup({
     }
   };
 
-  const closeVisit = (visitStatus) => {
+  const closeVisit = async (visitStatus) => {
     const confirmText = visitStatus === 'no_show'
       ? 'تسجيل أن العروس لم تحضر الزيارة؟'
       : 'تسجيل أن العروس جربت الفساتين ولم تختر فستاناً؟';
-    if (!window.confirm(confirmText)) return;
+    if (!await confirmDialog(confirmText)) return;
     handleQuickAction('close_visit', {
       visit_status: visitStatus,
       ...(visitStatus === 'no_show' ? { tried_dresses: [] } : {}),
@@ -224,7 +225,7 @@ export function BrideJourneyPopup({
   const handleRevertTo = async (targetStageId, targetStageLabel) => {
     if (!booking?.id) return;
     const confirmMessage = `هل أنت متأكد من العودة إلى مرحلة (${targetStageLabel})؟\nسيتم حذف البيانات المالية والمواعيد المسجلة بعد هذه المرحلة وإعادة الفستان للحالة المتاحة.`;
-    if (!window.confirm(confirmMessage)) return;
+    if (!await confirmDialog(confirmMessage)) return;
 
     setLoading(true);
     try {

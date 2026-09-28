@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, Check, Clock, AlertCircle, Trash2, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useNavigate } from 'react-router-dom';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const typeStyles = {
   info: { icon: Bell, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -71,7 +72,7 @@ export default function NotificationsPage() {
   };
 
   const deleteAllNotifications = async () => {
-    if (!window.confirm('هل أنت متأكد من حذف جميع التنبيهات؟')) return;
+    if (!await confirmDialog('هل أنت متأكد من حذف جميع التنبيهات؟')) return;
     try {
       await apiClient.delete('/notifications/delete-all');
       setNotifications([]);

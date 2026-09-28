@@ -19,6 +19,7 @@ import {
   CalendarDays,
   X } from
 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 
 
@@ -292,7 +293,7 @@ export default function AppointmentsPage() {
       setNewNotes('');
     } catch (err) {
       console.error('Failed to save appointment:', err);
-      alert(err?.message || 'فشل حفظ الموعد. يرجى المحاولة مرة أخرى.');
+      toast.error(err?.message || 'فشل حفظ الموعد. يرجى المحاولة مرة أخرى.');
     }
   };
 
@@ -317,7 +318,7 @@ export default function AppointmentsPage() {
       }
     } catch (err) {
       console.error(err);
-      alert(err?.message || 'فشل تحديث حالة المرحلة.');
+      toast.error(err?.message || 'فشل تحديث حالة المرحلة.');
     }
   };
 
@@ -369,7 +370,7 @@ export default function AppointmentsPage() {
         setConflictActionType('date');
         setIsConflictModalOpen(true);
       } else {
-        alert(err?.message || 'فشل تحديث حالة الحجز.');
+        toast.error(err?.message || 'فشل تحديث حالة الحجز.');
       }
     }
   };
@@ -403,10 +404,10 @@ export default function AppointmentsPage() {
       setIsConflictModalOpen(false);
       setConflictBooking(null);
       fetchEvents();
-      alert('تم تحديث الحجز بنجاح.');
+      toast.success('تم تحديث الحجز بنجاح.');
     } catch (err) {
       console.error('Failed to resolve conflict:', err);
-      alert(err?.message || 'فشل تحديث الحجز.');
+      toast.error(err?.message || 'فشل تحديث الحجز.');
     } finally {
       setIsConflictSubmitting(false);
     }
@@ -419,10 +420,10 @@ export default function AppointmentsPage() {
         [dressField]: newDressIdVal ? parseInt(newDressIdVal) : null
       });
       fetchEvents();
-      alert('تم تحديث الفستان بنجاح.');
+      toast.success('تم تحديث الفستان بنجاح.');
     } catch (err) {
       console.error('Failed to update booking dress:', err);
-      alert(err?.message || 'فشل تحديث الفستان.');
+      toast.error(err?.message || 'فشل تحديث الفستان.');
     }
   };
 

@@ -4,6 +4,7 @@ import {
   MessageSquare, Eye, Edit3, X, Save, Copy,
   HelpCircle, CheckCircle, RefreshCw } from
 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 
 
@@ -83,7 +84,7 @@ export default function WhatsappTemplatesPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(`{{${text}}}`);
-    alert(`تم نسخ المتغير: {{${text}}}`);
+    toast.success(`تم نسخ المتغير: {{${text}}}`);
   };
 
   const formatDate = (dateStr) => {

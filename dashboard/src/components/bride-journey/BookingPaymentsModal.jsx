@@ -6,6 +6,7 @@ import { todayStr } from '@/lib/utils';
 import {
   X, Banknote, Edit3, Trash2, Plus, Check, AlertCircle, Sparkles, Shield, DollarSign, RefreshCw
 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const PAYMENT_METHODS = [
   { id: 'cash', label: 'كاش (نقدي)' },
@@ -160,7 +161,7 @@ export function BookingPaymentsModal({
   // Delete a Revenue
   const handleDeleteRevenue = async (revId, revType, revAmount) => {
     const meta = getTypeMeta(revType);
-    if (!window.confirm(`هل أنت متأكد من حذف هذه الدفعة (${meta.label} بمبلغ ${formatMoney(revAmount)} ج.م) نهائياً؟`)) {
+    if (!await confirmDialog(`هل أنت متأكد من حذف هذه الدفعة (${meta.label} بمبلغ ${formatMoney(revAmount)} ج.م) نهائياً؟`)) {
       return;
     }
     try {

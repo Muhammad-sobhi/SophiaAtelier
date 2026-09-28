@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/utils';
 import {
   Field, EmptyState, LoadError, MaterialItemsInput, emptyItem, inputClass, money, qty, todayStr, errorMessage,
 } from './shared';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 /** Use shop materials to maintain dresses: stock only (the material was already paid when bought) */
 export default function MaintenanceTab({ materials, dresses, reloadShared }) {
@@ -43,7 +44,7 @@ export default function MaintenanceTab({ materials, dresses, reloadShared }) {
   };
 
   const undo = async (mv) => {
-    if (!window.confirm('التراجع وإرجاع الخامة للمخزن؟')) return;
+    if (!await confirmDialog('التراجع وإرجاع الخامة للمخزن؟')) return;
     try {
       await apiClient.delete(`/materials/movements/${mv.id}`);
       toast.success('تم إرجاع الخامة للمخزن');

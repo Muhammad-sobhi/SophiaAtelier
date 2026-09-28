@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api-client';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { isCairoCity } from '@/lib/utils';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const typeStyles = {
   info: { icon: Bell, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -194,7 +195,7 @@ export function Header({ onMenuClick }) {
   };
 
   const deleteAllNotifications = async () => {
-    if (!window.confirm('هل أنت تأكد من حذف جميع التنبيهات؟')) return;
+    if (!await confirmDialog('هل أنت تأكد من حذف جميع التنبيهات؟')) return;
     try {
       await apiClient.delete('/notifications/delete-all');
       setNotifications([]);

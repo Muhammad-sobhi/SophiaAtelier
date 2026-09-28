@@ -4,6 +4,7 @@ import {
   Star, Plus, Edit3, Trash2, Check, X, Search,
   CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, MessageSquare } from
 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 
 
@@ -161,7 +162,7 @@ export default function ReviewsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('هل أنت تأكد من رغبتك في حذف هذا الرأي؟')) return;
+    if (!await confirmDialog('هل أنت تأكد من رغبتك في حذف هذا الرأي؟')) return;
 
     const nextReviews = reviews.filter((r) => r.id !== id);
     try {

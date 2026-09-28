@@ -10,6 +10,7 @@ import {
 } from './shared';
 import { IconBtn } from './MaterialsTab';
 import { OrderWizard } from './Wizards';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export const ORDER_STATUSES = {
   planned: { label: 'مخطط', cls: 'bg-slate-100 text-slate-600' },
@@ -43,7 +44,7 @@ export default function OrdersTab({ materials, meta, suppliers, workers, dresses
   const afterChange = () => { load(); reloadShared(); };
 
   const handleDelete = async (o) => {
-    if (!window.confirm(`حذف أمر التصنيع "${o.title}" نهائياً؟\nالخامات المصروفة له سترجع للمخزن، ومدفوعات العامل المسجلة عليه ستُحذف من المالية.`)) return;
+    if (!await confirmDialog(`حذف أمر التصنيع "${o.title}" نهائياً؟\nالخامات المصروفة له سترجع للمخزن، ومدفوعات العامل المسجلة عليه ستُحذف من المالية.`)) return;
     try {
       await apiClient.delete(`/manufacturing-orders/${o.id}`);
       toast.success('تم حذف أمر التصنيع');
@@ -268,7 +269,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
   };
 
   const returnMaterial = async (mv) => {
-    if (!window.confirm('إرجاع هذه الخامة للمخزن؟')) return;
+    if (!await confirmDialog('إرجاع هذه الخامة للمخزن؟')) return;
     try {
       await apiClient.delete(`/manufacturing-orders/${orderId}/materials/${mv.id}`);
       toast.success('تم إرجاع الخامة للمخزن');
@@ -279,7 +280,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
   };
 
   const approve = async () => {
-    if (!window.confirm('الموافقة على القطعة بعد مراجعتها؟ سيتم إنشاء فستان لها في صفحة الفساتين، ولن يمكن تعديل الأمر بعد الموافقة.')) return;
+    if (!await confirmDialog('الموافقة على القطعة بعد مراجعتها؟ سيتم إنشاء فستان لها في صفحة الفساتين، ولن يمكن تعديل الأمر بعد الموافقة.')) return;
     try {
       const res = await apiClient.post(`/manufacturing-orders/${orderId}/approve`, {});
       toast.success('تمت الموافقة وإنشاء الفستان — أكمل بياناته');
@@ -292,7 +293,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
   };
 
   const changeStatus = async (status, confirmText) => {
-    if (confirmText && !window.confirm(confirmText)) return;
+    if (confirmText && !await confirmDialog(confirmText)) return;
     try {
       await apiClient.patch(`/manufacturing-orders/${orderId}/status`, { status });
       toast.success(`تم تغيير الحالة إلى "${ORDER_STATUSES[status].label}"`);
@@ -304,7 +305,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
 
   const unapprove = async () => {
     const note = order.dress_auto_created && order.dress ? `\nالفستان "${order.dress.name}" الذي أُنشئ عند الموافقة سيُحذف.` : '';
-    if (!window.confirm(`إلغاء الموافقة ليمكن تعديل الأمر أو حذفه؟${note}`)) return;
+    if (!await confirmDialog(`إلغاء الموافقة ليمكن تعديل الأمر أو حذفه؟${note}`)) return;
     try {
       await apiClient.post(`/manufacturing-orders/${orderId}/unapprove`, {});
       toast.success('تم إلغاء الموافقة');

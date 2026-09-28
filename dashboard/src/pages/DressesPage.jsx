@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
 import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft, Calendar, ArrowUp, ArrowDown, GripVertical, Star, Check } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 
 const DRESS_STAGES = [
 { id: 'ready', label: 'جاهز', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
@@ -104,14 +106,14 @@ export default function DressesPage() {
   const handleDeleteCategory = async (catId) => {
     const targetCat = categories.find((c) => c.id.toString() === catId.toString());
     if (!targetCat) return;
-    if (!window.confirm(`هل أنت تأكد من حذف التصنيف "${targetCat.name}"؟`)) return;
+    if (!await confirmDialog(`هل أنت تأكد من حذف التصنيف "${targetCat.name}"؟`)) return;
 
     try {
       await apiClient.delete(`/categories/${catId}`);
       loadDependencies();
     } catch (err) {
       console.error('Failed to delete category:', err);
-      alert('تعذر حذف التصنيف لوجود عناصر مرتبطة به أو حدث خطأ أثناء الحذف.');
+      toast.error('تعذر حذف التصنيف لوجود عناصر مرتبطة به أو حدث خطأ أثناء الحذف.');
     }
   };
 
@@ -315,7 +317,7 @@ export default function DressesPage() {
         } catch (imgErr) {
           console.error('Failed to upload media:', imgErr);
           const uploadMsg = imgErr?.data?.message || imgErr?.response?.data?.message || imgErr?.message || 'تعذر رفع بعض ملفات الصور أو الفيديو';
-          alert(`تم حفظ بيانات الفستان، لكن حدث خطأ أثناء رفع الوسائط: ${uploadMsg}`);
+          toast.warning(`تم حفظ بيانات الفستان، لكن حدث خطأ أثناء رفع الوسائط: ${uploadMsg}`);
         }
       }
 
@@ -335,10 +337,10 @@ export default function DressesPage() {
         } else {
           const firstKey = Object.keys(errors)[0];
           const firstMsg = firstKey && Array.isArray(errors[firstKey]) ? errors[firstKey][0] : (err.response?.data?.message || err.message || 'بيانات غير صالحة');
-          alert('تعذر حفظ الفستان: ' + firstMsg);
+          toast.error('تعذر حفظ الفستان: ' + firstMsg);
         }
       } else {
-        alert('حدث خطأ أثناء حفظ الفستان. يرجى التأكد من البيانات والمحاولة مجدداً.');
+        toast.error('حدث خطأ أثناء حفظ الفستان. يرجى التأكد من البيانات والمحاولة مجدداً.');
       }
     } finally {
       setIsSaving(false);
@@ -400,7 +402,7 @@ export default function DressesPage() {
       fetchDresses();
     } catch (err) {
       console.error('Failed to save best sellers order:', err);
-      alert('تعذر حفظ ترتيب الفساتين الأكثر طلباً.');
+      toast.error('تعذر حفظ ترتيب الفساتين الأكثر طلباً.');
       fetchBestSellers();
     } finally {
       setIsReordering(false);
@@ -662,7 +664,7 @@ export default function DressesPage() {
         await apiClient.delete(`/dresses/${editingDress.id}/images/${item.id}`);
       } catch (err) {
         console.error('Failed to delete media from server:', err);
-        alert('تعذر حذف الوسائط من الخادم. يرجى المحاولة مرة أخرى.');
+        toast.error('تعذر حذف الوسائط من الخادم. يرجى المحاولة مرة أخرى.');
         return;
       }
     } else if (item && !item.isExisting && item.file) {

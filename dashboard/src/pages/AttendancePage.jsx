@@ -13,6 +13,8 @@ import {
   Edit2,
   Trash2
 } from 'lucide-react';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 
 
 
@@ -281,7 +283,7 @@ export default function AttendancePage() {
       setPayrollList(Array.isArray(res) ? res : []);
     } catch (err) {
       console.error('Failed to create loan:', err);
-      alert('حدث خطأ أثناء إضافة السلفة');
+      toast.error('حدث خطأ أثناء إضافة السلفة');
     }
   };
 
@@ -294,7 +296,7 @@ export default function AttendancePage() {
         date: editingLoan.date,
         reason: editingLoan.reason
       });
-      alert('تم تحديث السلفة بنجاح');
+      toast.success('تم تحديث السلفة بنجاح');
       setEditingLoan(null);
       
       const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
@@ -306,15 +308,15 @@ export default function AttendancePage() {
       }
     } catch (err) {
       console.error('Failed to update loan:', err);
-      alert('حدث خطأ أثناء تحديث السلفة');
+      toast.error('حدث خطأ أثناء تحديث السلفة');
     }
   };
 
   const handleDeleteLoan = async (loanId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه السلفة؟')) return;
+    if (!await confirmDialog('هل أنت متأكد من حذف هذه السلفة؟')) return;
     try {
       await apiClient.delete(`/employee-loans/${loanId}`);
-      alert('تم حذف السلفة بنجاح');
+      toast.success('تم حذف السلفة بنجاح');
       
       const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
       const list = Array.isArray(res) ? res : (res.data || []);
@@ -325,12 +327,12 @@ export default function AttendancePage() {
       }
     } catch (err) {
       console.error('Failed to delete loan:', err);
-      alert('حدث خطأ أثناء حذف السلفة');
+      toast.error('حدث خطأ أثناء حذف السلفة');
     }
   };
 
   const handleDeleteAttendance = async (attId) => {
-    if (!window.confirm('هل أنت متأكد من حذف سجل الحضور هذا؟')) return;
+    if (!await confirmDialog('هل أنت متأكد من حذف سجل الحضور هذا؟')) return;
     try {
       await apiClient.delete(`/attendance/${attId}`);
       const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
@@ -342,7 +344,7 @@ export default function AttendancePage() {
       }
     } catch (err) {
       console.error('Failed to delete attendance:', err);
-      alert('حدث خطأ أثناء حذف سجل الحضور');
+      toast.error('حدث خطأ أثناء حذف سجل الحضور');
     }
   };
 

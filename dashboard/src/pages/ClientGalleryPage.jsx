@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { Search, Plus, X, Trash2, Edit3, Image as ImageIcon, Eye, EyeOff, Film, Play, Maximize2 } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 export default function ClientGalleryPage() {
   const [galleryItems, setGalleryItems] = useState([]);
@@ -92,7 +93,7 @@ export default function ClientGalleryPage() {
         await apiClient.postFormData(`/client-gallery/${editingItem.id}`, formData);
       } else {
         if (!imageFile) {
-          alert('يرجى اختيار صورة أو مقطع فيديو');
+          toast.error('يرجى اختيار صورة أو مقطع فيديو');
           return;
         }
         await apiClient.postFormData('/client-gallery', formData);

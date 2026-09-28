@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { LogIn, Lock, Mail, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ToastContainer } from '@/components/ui/Toast';
+import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 
 export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -173,6 +174,7 @@ export default function DashboardLayout() {
         </div>
       </div>
       <ToastContainer />
+      <ConfirmDialogHost />
     </div>
   );
 }

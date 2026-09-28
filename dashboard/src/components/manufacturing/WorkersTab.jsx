@@ -7,6 +7,7 @@ import {
   Modal, Field, SubmitRow, EmptyState, LoadError, PrimaryButton, inputClass, money, todayStr, errorMessage, PAYMENT_METHODS,
 } from './shared';
 import { IconBtn } from './MaterialsTab';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export const PAY_TYPES = { monthly: 'راتب شهري', per_piece: 'بالقطعة', both: 'راتب + بالقطعة' };
 const PAYMENT_TYPES = { salary: 'راتب شهري', piece: 'أجر قطعة', advance: 'سلفة', bonus: 'مكافأة' };
@@ -31,7 +32,7 @@ export default function WorkersTab({ reloadShared }) {
   const afterChange = () => { load(); reloadShared(); };
 
   const handleDelete = async (w) => {
-    if (!window.confirm(`حذف العامل "${w.name}"؟`)) return;
+    if (!await confirmDialog(`حذف العامل "${w.name}"؟`)) return;
     try {
       await apiClient.delete(`/workers/${w.id}`);
       toast.success('تم حذف العامل');
@@ -278,7 +279,7 @@ function WorkerStatement({ workerId, onClose, onChanged }) {
   useEffect(() => { load(); }, [load]);
 
   const deletePayment = async (p) => {
-    if (!window.confirm('حذف هذا الصرف؟ سيُحذف أيضاً من صفحة المالية.')) return;
+    if (!await confirmDialog('حذف هذا الصرف؟ سيُحذف أيضاً من صفحة المالية.')) return;
     try {
       await apiClient.delete(`/workers/${workerId}/payments/${p.id}`);
       toast.success('تم الحذف');

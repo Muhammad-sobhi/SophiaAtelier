@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { CheckCircle2, ShoppingBag, Sparkles, DollarSign, Ruler } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 const DRESS_STAGES = [
   { id: 'ready', label: 'جاهز', icon: CheckCircle2, color: 'emerald' },
@@ -21,7 +22,7 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
       onStageUpdate?.();
     } catch (e) {
       console.error('Dress stage action failed:', e);
-      alert(e?.message || 'فشل تنفيذ الإجراء.');
+      toast.error(e?.message || 'فشل تنفيذ الإجراء.');
     }
   };
 

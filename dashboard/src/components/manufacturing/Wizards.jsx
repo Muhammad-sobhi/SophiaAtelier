@@ -7,6 +7,7 @@ import { Modal, Field, MaterialItemsInput, emptyItem, inputClass, money, qty, to
 import { MaterialForm } from './MaterialsTab';
 import { SupplierForm } from './SuppliersTab';
 import { WorkerForm } from './WorkersTab';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 /**
  * Guided entry: each step picks an existing record or creates it inline, so nothing is
@@ -316,7 +317,7 @@ export function OrderWizard({ order = null, materials, meta, suppliers, workers,
   useEffect(() => { loadUsed(); }, [loadUsed]);
 
   const returnUsed = async (mv) => {
-    if (!window.confirm(`إرجاع ${mv.material?.name} للمخزن وحذفها من الأمر؟`)) return;
+    if (!await confirmDialog(`إرجاع ${mv.material?.name} للمخزن وحذفها من الأمر؟`)) return;
     try {
       await apiClient.delete(`/manufacturing-orders/${order.id}/materials/${mv.id}`);
       toast.success('تم إرجاع الخامة للمخزن');
