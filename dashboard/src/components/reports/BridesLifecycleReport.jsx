@@ -6,22 +6,14 @@ export function BridesLifecycleReport() {
   const [allBrides, setAllBrides] = useState([]);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [visits, setVisits] = useState([]);
-  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([
-      apiClient.get('/clients?per_page=1000'),
-      apiClient.get('/visits?per_page=1000'),
-      apiClient.get('/bookings?per_page=1000'),
-    ])
-      .then(([clientRes, visRes, bookRes]) => {
+    apiClient.get('/reports/brides')
+      .then((res) => {
         if (!isMounted) return;
-        setAllBrides(Array.isArray(clientRes) ? clientRes : clientRes?.data || []);
-        setVisits(Array.isArray(visRes) ? visRes : visRes?.data || []);
-        setBookings(Array.isArray(bookRes) ? bookRes : bookRes?.data || []);
+        setAllBrides(Array.isArray(res) ? res : res?.data || []);
       })
       .catch((err) => console.error('Failed to load brides report:', err))
       .finally(() => { if (isMounted) setLoading(false); });

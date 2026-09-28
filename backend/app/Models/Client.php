@@ -117,6 +117,26 @@ class Client extends Model
         return $booking && $booking->dress ? (float) ($booking->dress->trying_fee ?? 0) : 0;
     }
 
+    /**
+     * Relations read by the appended attributes above, for eager loading a nested client
+     * (e.g. appendedRelations('client')) so they don't run several queries per client.
+     * Pair with hideAppendedRelations() so the serialized output stays unchanged.
+     */
+    public static function appendedRelations(string $path): array
+    {
+        return [
+            "$path.bookings" => fn($q) => $q->latest()->latest('id'),
+            "$path.bookings.dress",
+            "$path.visits" => fn($q) => $q->latest(),
+            "$path.fittings",
+        ];
+    }
+
+    public function hideAppendedRelations(): static
+    {
+        return $this->makeHidden(['bookings', 'visits', 'fittings']);
+    }
+
     public function visits(): HasMany
     {
         return $this->hasMany(Visit::class);

@@ -17,16 +17,14 @@ export function SalesEmployeesReport() {
     let isMounted = true;
     Promise.all([
       apiClient.get('/employees'),
-      apiClient.get('/bookings?per_page=1000'),
-      apiClient.get('/fittings?per_page=1000'),
-      apiClient.get('/visits?per_page=1000'),
+      apiClient.get('/reports/sales-employees'),
     ])
-      .then(([empRes, bookRes, fitRes, visRes]) => {
+      .then(([empRes, reportRes]) => {
         if (!isMounted) return;
         setEmployees(Array.isArray(empRes) ? empRes : empRes?.data || []);
-        setBookings(Array.isArray(bookRes) ? bookRes : bookRes?.data || []);
-        setFittings(Array.isArray(fitRes) ? fitRes : fitRes?.data || []);
-        setVisits(Array.isArray(visRes) ? visRes : visRes?.data || []);
+        setBookings(reportRes?.bookings || []);
+        setFittings(reportRes?.fittings || []);
+        setVisits(reportRes?.visits || []);
       })
       .catch((err) => console.error('Failed to load sales report data:', err))
       .finally(() => { if (isMounted) setLoading(false); });

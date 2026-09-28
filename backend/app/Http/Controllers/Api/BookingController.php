@@ -11,7 +11,10 @@ class BookingController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Booking::whereHas('client')->with(['client', 'dress', 'dress2', 'dress3', 'fittings']);
+        $query = Booking::whereHas('client')->with([
+            'client', 'dress', 'dress2', 'dress3', 'fittings',
+            ...\App\Models\Client::appendedRelations('client'),
+        ]);
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);
@@ -54,10 +57,12 @@ class BookingController extends Controller
         $bookings = $query->latest()->paginate($request->input('per_page', 25));
 
         // Dynamically compute conflict/available dates for each dress option
-        $bookings->getCollection()->transform(function ($booking) {
-            $booking->dress_1_conflict_date = $this->checkDressAvailability($booking->client_id, $booking->dress_id, $booking->event_date, $booking->id);
-            $booking->dress_2_conflict_date = $booking->dress_2_id ? $this->checkDressAvailability($booking->client_id, $booking->dress_2_id, $booking->event_date, $booking->id) : null;
-            $booking->dress_3_conflict_date = $booking->dress_3_id ? $this->checkDressAvailability($booking->client_id, $booking->dress_3_id, $booking->event_date, $booking->id) : null;
+        $conflicts = Booking::conflictDatesFor($bookings->getCollection());
+        $bookings->getCollection()->transform(function ($booking) use ($conflicts) {
+            $booking->client?->hideAppendedRelations();
+            $booking->dress_1_conflict_date = $conflicts[$booking->id][1];
+            $booking->dress_2_conflict_date = $conflicts[$booking->id][2];
+            $booking->dress_3_conflict_date = $conflicts[$booking->id][3];
             return $booking;
         });
 

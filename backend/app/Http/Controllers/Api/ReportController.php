@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Dress;
 use App\Models\Expense;
+use App\Models\Fitting;
 use App\Models\Revenue;
 use App\Models\Visit;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,76 @@ class ReportController extends Controller
         $to = $validated['to'] ?? Carbon::now()->endOfMonth()->toDateString();
 
         return response()->json(\App\Services\VisitReportService::build($from, $to));
+    }
+
+    /**
+     * GET /api/reports/sales-employees
+     * Slim bookings / fittings / visits rows for the sales staff report.
+     * Only the columns the report uses are loaded, and client accessors are disabled,
+     * so the whole report is a handful of queries instead of several per row.
+     */
+    public function salesEmployees(): JsonResponse
+    {
+        $noAppends = fn($client) => $client?->setAppends([]);
+
+        $bookings = Booking::whereHas('client')
+            ->select('id', 'client_id', 'dress_id', 'status', 'sales_name', 'pickup_sales_name', 'return_sales_name',
+                'booking_date', 'event_date', 'total_amount', 'deposit_amount', 'created_at')
+            ->with(['client:id,name,phone,city', 'dress:id,name,code'])
+            ->latest()
+            ->get()
+            ->each(function (Booking $booking) use ($noAppends) {
+                $booking->setAppends([]);
+                $noAppends($booking->client);
+            });
+
+        $fittings = Fitting::select('id', 'booking_id', 'status', 'sales_name', 'sales_associate', 'fitting_date',
+                'alterations_notes', 'additional_notes', 'created_at')
+            ->with(['booking:id,client_id,dress_id,sales_name', 'booking.client:id,name', 'booking.dress:id,name'])
+            ->latest('fitting_date')
+            ->get()
+            ->each(function (Fitting $fitting) use ($noAppends) {
+                $fitting->booking?->setAppends([]);
+                $noAppends($fitting->booking?->client);
+            });
+
+        $visits = Visit::whereHas('client')
+            ->select('id', 'client_id', 'status', 'source', 'time_slot', 'visit_date', 'sales_name', 'created_at')
+            ->with('client:id,name,phone')
+            ->latest('visit_date')
+            ->get()
+            ->each(fn(Visit $visit) => $noAppends($visit->client));
+
+        return response()->json([
+            'bookings' => $bookings,
+            'fittings' => $fittings,
+            'visits' => $visits,
+        ]);
+    }
+
+    /**
+     * GET /api/reports/brides
+     * Registration date, source, city and computed journey stage for every bride.
+     * Stage relations are eager-loaded so StageComputer doesn't query per client.
+     */
+    public function brides(): JsonResponse
+    {
+        $clients = Client::select('id', 'city', 'source', 'journey_mode', 'created_at')
+            ->with([
+                'bookings:id,client_id,status,event_date,pickup_scheduled_on,return_scheduled_on,cancelled_at,updated_at',
+                'visits:id,client_id,created_at',
+            ])
+            ->latest()
+            ->get()
+            ->map(fn(Client $client) => [
+                'id' => $client->id,
+                'created_at' => $client->created_at?->format('Y-m-d'),
+                'source' => $client->source,
+                'city' => $client->city,
+                'current_stage' => \App\Services\StageComputer::compute($client),
+            ]);
+
+        return response()->json($clients);
     }
 
     public function sales(Request $request): JsonResponse

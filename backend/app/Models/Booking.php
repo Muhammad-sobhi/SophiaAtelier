@@ -201,16 +201,6 @@ class Booking extends Model
         $client = \App\Models\Client::find($clientId);
         if (!$client) return null;
 
-        $city = $client->city ?? 'القاهرة';
-        $isCairoOrGiza = self::isCairoCity($city);
-        // 1 day before for Cairo/Giza, 2 days before for other cities
-        $daysBefore = $isCairoOrGiza ? 1 : 2;
-        $daysAfter = 1;
-
-        $proposedWedding = \Carbon\Carbon::parse($eventDate);
-        $proposedStart = $proposedWedding->copy()->subDays($daysBefore)->startOfDay();
-        $proposedEnd = $proposedWedding->copy()->addDays($daysAfter)->endOfDay();
-
         $query = self::with('client')
             ->where(function ($q) use ($dressId) {
                 $q->where('dress_id', $dressId)
@@ -223,7 +213,65 @@ class Booking extends Model
             $query->where('id', '!=', $excludeBookingId);
         }
 
-        $existingBookings = $query->get();
+        return self::findDressConflict($client, $eventDate, $query->get());
+    }
+
+    /**
+     * Same result as checkDressAvailability() for each dress of each booking, but the
+     * candidate bookings for all dresses are loaded in one query instead of two per dress.
+     * Returns [booking_id => [1 => conflict|null, 2 => conflict|null, 3 => conflict|null]].
+     */
+    public static function conflictDatesFor(iterable $bookings): array
+    {
+        $bookings = collect($bookings)->filter()->unique('id');
+        $dressIds = $bookings->flatMap(fn($b) => [$b->dress_id, $b->dress_2_id, $b->dress_3_id])->filter()->unique()->values();
+
+        $candidates = $dressIds->isEmpty() ? collect() : self::with('client')
+            ->where(function ($q) use ($dressIds) {
+                $q->whereIn('dress_id', $dressIds)
+                  ->orWhereIn('dress_2_id', $dressIds)
+                  ->orWhereIn('dress_3_id', $dressIds);
+            })
+            ->whereIn('status', ['confirmed', 'picked_up', 'out', 'returned'])
+            ->orderBy('id')
+            ->get();
+
+        $candidatesByDress = [];
+        foreach ($candidates as $eb) {
+            foreach (array_unique(array_filter([$eb->dress_id, $eb->dress_2_id, $eb->dress_3_id])) as $id) {
+                $candidatesByDress[$id][] = $eb;
+            }
+        }
+
+        $clients = \App\Models\Client::whereIn('id', $bookings->pluck('client_id')->unique())->get()->keyBy('id');
+
+        $result = [];
+        foreach ($bookings as $b) {
+            $client = $clients->get($b->client_id);
+            foreach ([1 => $b->dress_id, 2 => $b->dress_2_id, 3 => $b->dress_3_id] as $slot => $dressId) {
+                if (!$dressId || !$client) {
+                    $result[$b->id][$slot] = null;
+                    continue;
+                }
+                $existing = array_filter($candidatesByDress[$dressId] ?? [], fn($eb) => $eb->id != $b->id);
+                $result[$b->id][$slot] = self::findDressConflict($client, $b->event_date, $existing);
+            }
+        }
+
+        return $result;
+    }
+
+    private static function findDressConflict(\App\Models\Client $client, $eventDate, $existingBookings): ?string
+    {
+        $city = $client->city ?? 'القاهرة';
+        $isCairoOrGiza = self::isCairoCity($city);
+        // 1 day before for Cairo/Giza, 2 days before for other cities
+        $daysBefore = $isCairoOrGiza ? 1 : 2;
+        $daysAfter = 1;
+
+        $proposedWedding = \Carbon\Carbon::parse($eventDate);
+        $proposedStart = $proposedWedding->copy()->subDays($daysBefore)->startOfDay();
+        $proposedEnd = $proposedWedding->copy()->addDays($daysAfter)->endOfDay();
 
         foreach ($existingBookings as $eb) {
             if (!empty($eb->pickup_scheduled_on) && !empty($eb->return_scheduled_on)) {

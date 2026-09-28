@@ -12,13 +12,19 @@ class VisitController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Visit::whereHas('client')->with(['client', 'requestedDresses', 'triedDresses', 'bookedDresses']);
+        $query = Visit::whereHas('client')->with([
+            'client', 'requestedDresses', 'triedDresses', 'bookedDresses',
+            ...\App\Models\Client::appendedRelations('client'),
+        ]);
 
         if ($clientId = $request->input('client_id')) {
             $query->where('client_id', $clientId);
         }
 
-        return response()->json($query->latest('visit_date')->paginate($request->input('per_page', 15)));
+        $visits = $query->latest('visit_date')->paginate($request->input('per_page', 15));
+        $visits->getCollection()->each(fn($visit) => $visit->client?->hideAppendedRelations());
+
+        return response()->json($visits);
     }
 
     public static function normalizeTimeSlot($timeStr)

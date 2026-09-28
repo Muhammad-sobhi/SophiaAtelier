@@ -11,13 +11,19 @@ class FittingController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Fitting::with(['booking.client', 'booking.dress', 'booking.dress2', 'booking.dress3', 'tailor']);
+        $query = Fitting::with([
+            'booking.client', 'booking.dress', 'booking.dress2', 'booking.dress3', 'tailor',
+            ...\App\Models\Client::appendedRelations('booking.client'),
+        ]);
 
         if ($bookingId = $request->input('booking_id')) {
             $query->where('booking_id', $bookingId);
         }
 
-        return response()->json($query->latest('fitting_date')->paginate($request->input('per_page', 50)));
+        $fittings = $query->latest('fitting_date')->paginate($request->input('per_page', 50));
+        $fittings->getCollection()->each(fn($fitting) => $fitting->booking?->client?->hideAppendedRelations());
+
+        return response()->json($fittings);
     }
 
     public function store(Request $request): JsonResponse

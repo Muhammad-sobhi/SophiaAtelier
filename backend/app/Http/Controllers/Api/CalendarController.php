@@ -22,22 +22,29 @@ class CalendarController extends Controller
         // Fetch visits in date range
         $visits = Visit::whereHas('client')->with(['client.bookings.dress', 'client.bookings.dress2', 'client.bookings.dress3'])
             ->whereBetween('visit_date', [$startDate, $endDate])
-            ->get()
-            ->map(function ($visit) {
+            ->get();
+
+        $visitBookings = $visits->mapWithKeys(function ($visit) {
+            $booking = null;
+            if ($visit->client && $visit->client->bookings) {
+                // Try to match the booking_date with the visit_date
+                $booking = $visit->client->bookings->first(function ($b) use ($visit) {
+                    return explode(' ', $b->getRawOriginal('booking_date'))[0] === explode(' ', $visit->getRawOriginal('visit_date'))[0];
+                });
+                // Fallback to the first booking if no date match
+                if (!$booking) {
+                    $booking = $visit->client->bookings->first();
+                }
+            }
+            return [$visit->id => $booking];
+        });
+        $visitConflicts = Booking::conflictDatesFor($visitBookings->values());
+
+        $visits = $visits->map(function ($visit) use ($visitBookings, $visitConflicts) {
                 $clientCity = $visit->client->city ?? $visit->client->address ?? '';
                 $isCairo = Booking::isCairoCity($clientCity);
 
-                $booking = null;
-                if ($visit->client && $visit->client->bookings) {
-                    // Try to match the booking_date with the visit_date
-                    $booking = $visit->client->bookings->first(function ($b) use ($visit) {
-                        return explode(' ', $b->getRawOriginal('booking_date'))[0] === explode(' ', $visit->getRawOriginal('visit_date'))[0];
-                    });
-                    // Fallback to the first booking if no date match
-                    if (!$booking) {
-                        $booking = $visit->client->bookings->first();
-                    }
-                }
+                $booking = $visitBookings[$visit->id];
 
                 return [
                     'id' => 'visit-' . $visit->id,
@@ -56,15 +63,15 @@ class CalendarController extends Controller
                     'dress_2_id' => $booking ? $booking->dress_2_id : null,
                     'dress_3_name' => $booking->dress3->name ?? null,
                     'dress_3_id' => $booking ? $booking->dress_3_id : null,
-                    'dress_1_conflict_date' => $booking ? Booking::checkDressAvailability($booking->client_id, $booking->dress_id, $booking->event_date, $booking->id) : null,
-                    'dress_2_conflict_date' => ($booking && $booking->dress_2_id) ? Booking::checkDressAvailability($booking->client_id, $booking->dress_2_id, $booking->event_date, $booking->id) : null,
-                    'dress_3_conflict_date' => ($booking && $booking->dress_3_id) ? Booking::checkDressAvailability($booking->client_id, $booking->dress_3_id, $booking->event_date, $booking->id) : null,
+                    'dress_1_conflict_date' => $booking ? $visitConflicts[$booking->id][1] : null,
+                    'dress_2_conflict_date' => $booking ? $visitConflicts[$booking->id][2] : null,
+                    'dress_3_conflict_date' => $booking ? $visitConflicts[$booking->id][3] : null,
                     'booking_id' => $booking ? $booking->id : null,
                 ];
             });
 
         // Fetch bookings in date range (based on pickup_scheduled_on, or fallback to event_date)
-        $bookings = Booking::whereHas('client')->with(['client.visits', 'dress', 'dress2', 'dress3'])
+        $bookings = Booking::whereHas('client')->with(['client.visits', 'dress', 'dress2', 'dress3', 'fittings'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->whereBetween('pickup_scheduled_on', [$startDate, $endDate])
                   ->orWhere(function ($sub) use ($startDate, $endDate) {
@@ -72,13 +79,15 @@ class CalendarController extends Controller
                           ->whereBetween('event_date', [$startDate, $endDate]);
                   });
             })
-            ->get()
-            ->map(function ($booking) {
+            ->get();
+        $bookingConflicts = Booking::conflictDatesFor($bookings);
+
+        $bookings = $bookings->map(function ($booking) use ($bookingConflicts) {
                 $clientCity = $booking->client->city ?? $booking->client->address ?? '';
                 $isCairo = Booking::isCairoCity($clientCity);
 
-                $hasFittings = $booking->fittings()->exists();
-                $fittingsCompleted = $hasFittings && !$booking->fittings()->where('fittings.status', '!=', 'completed')->exists();
+                $hasFittings = $booking->fittings->isNotEmpty();
+                $fittingsCompleted = $hasFittings && !$booking->fittings->contains(fn($f) => $f->status !== 'completed');
 
                 $type = 'booking';
                 $eventDateStr = $booking->getRawOriginal('event_date') ? explode(' ', $booking->getRawOriginal('event_date'))[0] : '';
@@ -136,9 +145,9 @@ class CalendarController extends Controller
                     'dress_2_id' => $booking->dress_2_id,
                     'dress_3_name' => $booking->dress3->name ?? null,
                     'dress_3_id' => $booking->dress_3_id,
-                    'dress_1_conflict_date' => Booking::checkDressAvailability($booking->client_id, $booking->dress_id, $booking->event_date, $booking->id),
-                    'dress_2_conflict_date' => $booking->dress_2_id ? Booking::checkDressAvailability($booking->client_id, $booking->dress_2_id, $booking->event_date, $booking->id) : null,
-                    'dress_3_conflict_date' => $booking->dress_3_id ? Booking::checkDressAvailability($booking->client_id, $booking->dress_3_id, $booking->event_date, $booking->id) : null,
+                    'dress_1_conflict_date' => $bookingConflicts[$booking->id][1],
+                    'dress_2_conflict_date' => $bookingConflicts[$booking->id][2],
+                    'dress_3_conflict_date' => $bookingConflicts[$booking->id][3],
                     'total_amount' => (float) $booking->total_amount,
                     'deposit_amount' => (float) $booking->deposit_amount,
                     'trying_fee' => (float) ($booking->dress->trying_fee ?? 0),
