@@ -21,6 +21,6 @@ return [
     ]),
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
-    'max_age' => 0,
+    'max_age' => 7200, // let browsers cache preflight (OPTIONS) results for 2h instead of re-asking before every request
     'supports_credentials' => true,
 ];
