@@ -14,7 +14,7 @@ class MaterialPurchaseController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $purchases = MaterialPurchase::with('supplier:id,name', 'items.material:id,name,unit')
+        $purchases = MaterialPurchase::with('supplier:id,name', 'items.material:id,name,unit', 'payments:id,material_purchase_id,payment_method', 'expense:id,payment_method')
             ->withSum('payments as paid_amount', 'amount')
             ->when($request->input('supplier_id'), fn ($q, $id) => $q->where('supplier_id', $id))
             ->latest('purchase_date')->latest('id')
@@ -25,7 +25,24 @@ class MaterialPurchaseController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        return response()->json($this->manufacturing->createPurchase($this->validated($request), $request->user()?->id), 201);
+    }
+
+    /** The old invoice is undone completely and replaced by the new data */
+    public function update(Request $request, MaterialPurchase $materialPurchase): JsonResponse
+    {
+        return response()->json($this->manufacturing->updatePurchase($materialPurchase, $this->validated($request), $request->user()?->id));
+    }
+
+    public function destroy(MaterialPurchase $materialPurchase): JsonResponse
+    {
+        $this->manufacturing->deletePurchase($materialPurchase);
+        return response()->json(['message' => 'Purchase deleted']);
+    }
+
+    private function validated(Request $request): array
+    {
+        return $request->validate([
             'supplier_id' => 'nullable|exists:suppliers,id',
             'purchase_date' => 'required|date',
             'paid_amount' => 'nullable|numeric|min:0',
@@ -36,13 +53,5 @@ class MaterialPurchaseController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
         ]);
-
-        return response()->json($this->manufacturing->createPurchase($data, $request->user()?->id), 201);
-    }
-
-    public function destroy(MaterialPurchase $materialPurchase): JsonResponse
-    {
-        $this->manufacturing->deletePurchase($materialPurchase->load('items', 'payments'));
-        return response()->json(['message' => 'Purchase deleted']);
     }
 }

@@ -29,7 +29,7 @@ export default function SuppliersTab({ suppliers, totalBalance, reload, initialS
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3">
-          <span className="text-[10px] font-extrabold text-slate-400 block">إجمالي رصيد الموردين (السالب = مديونية عليكِ)</span>
+          <span className="text-[10px] font-extrabold text-slate-400 block">إجمالي رصيد الموردين (السالب = مديونية عليك)</span>
           <span className={`text-lg font-black ${balanceClass(totalBalance)}`} dir="ltr">{formatBalance(totalBalance)}</span>
         </div>
         <PrimaryButton onClick={() => setEditing({})}>مورد جديد</PrimaryButton>
@@ -78,7 +78,7 @@ export default function SuppliersTab({ suppliers, totalBalance, reload, initialS
   );
 }
 
-function SupplierForm({ supplier, onClose, onSaved }) {
+export function SupplierForm({ supplier, onClose, onSaved }) {
   const isNew = !supplier.id;
   const [form, setForm] = useState({
     name: supplier.name || '', phone: supplier.phone || '', address: supplier.address || '', notes: supplier.notes || '',
@@ -90,10 +90,11 @@ function SupplierForm({ supplier, onClose, onSaved }) {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      if (isNew) await apiClient.post('/suppliers', form);
-      else await apiClient.put(`/suppliers/${supplier.id}`, form);
+      const saved = isNew
+        ? await apiClient.post('/suppliers', form)
+        : await apiClient.put(`/suppliers/${supplier.id}`, form);
       toast.success('تم حفظ المورد');
-      onSaved();
+      onSaved(saved);
       onClose();
     } catch (err) {
       toast.error(errorMessage(err));

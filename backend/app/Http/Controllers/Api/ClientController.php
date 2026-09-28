@@ -1433,7 +1433,7 @@ class ClientController extends Controller
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         } catch (\PhpOffice\PhpSpreadsheet\Reader\Exception $e) {
-            return response()->json(['message' => 'تعذر قراءة الملف. تأكدي أنه ملف إكسل (xlsx) صحيح.'], 422);
+            return response()->json(['message' => 'تعذر قراءة الملف. تأكد أنه ملف إكسل (xlsx) صحيح.'], 422);
         }
 
         \App\Services\ActivityLogger::log('استيراد عرائس من إكسل', 'Client', null, [

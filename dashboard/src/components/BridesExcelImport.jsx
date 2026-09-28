@@ -93,7 +93,7 @@ export default function BridesExcelImport({ onImported }) {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-black text-amber-800">
                     <AlertTriangle size={15} />
-                    صفوف لم يتم استيرادها ({result.skipped.length}) — صححيها وأعيدي رفعها وحدها
+                    صفوف لم يتم استيرادها ({result.skipped.length}) — صححها وأعد رفعها وحدها
                   </div>
                   <ul className="divide-y divide-slate-100 border border-slate-200 rounded-2xl text-xs">
                     {result.skipped.map((s) => (

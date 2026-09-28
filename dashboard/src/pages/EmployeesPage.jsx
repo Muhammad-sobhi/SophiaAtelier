@@ -521,7 +521,7 @@ export default function EmployeesPage() {
                   <label className="text-xs font-extrabold text-slate-600">
                     كلمة المرور
                     <span className="text-[9px] font-bold text-slate-400 mr-1">
-                      {editingEmployee ? '(اتركيها فارغة لعدم التغيير)' : '(اختياري)'}
+                      {editingEmployee ? '(اتركها فارغة لعدم التغيير)' : '(اختياري)'}
                     </span>
                   </label>
                   <input

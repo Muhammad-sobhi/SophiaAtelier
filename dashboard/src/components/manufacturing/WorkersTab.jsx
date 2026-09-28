@@ -120,7 +120,7 @@ export default function WorkersTab({ reloadShared }) {
   );
 }
 
-function WorkerForm({ worker, onClose, onSaved }) {
+export function WorkerForm({ worker, onClose, onSaved }) {
   const isNew = !worker.id;
   const [form, setForm] = useState({
     name: worker.name || '',
@@ -144,10 +144,11 @@ function WorkerForm({ worker, onClose, onSaved }) {
       piece_rate: form.pay_type === 'monthly' ? 0 : form.piece_rate || 0,
     };
     try {
-      if (isNew) await apiClient.post('/workers', payload);
-      else await apiClient.put(`/workers/${worker.id}`, payload);
+      const saved = isNew
+        ? await apiClient.post('/workers', payload)
+        : await apiClient.put(`/workers/${worker.id}`, payload);
       toast.success('تم حفظ بيانات العامل');
-      onSaved();
+      onSaved(saved);
       onClose();
     } catch (err) {
       toast.error(errorMessage(err));

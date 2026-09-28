@@ -121,7 +121,7 @@ class BridesExcelService
                     ->setShowDropDown(true)
                     ->setShowErrorMessage(true)
                     ->setErrorTitle('قيمة غير صحيحة')
-                    ->setError('اختاري قيمة من القائمة')
+                    ->setError('اختر قيمة من القائمة')
                     ->setFormula1($listRanges[$listKey]);
                 $sheet->setDataValidation($range, $validation);
             }
@@ -347,7 +347,7 @@ class BridesExcelService
                 return $date->format('Y-m-d');
             }
         }
-        throw new \InvalidArgumentException("تاريخ غير صحيح في عمود {$label}: {$value} (استخدمي يوم/شهر/سنة)");
+        throw new \InvalidArgumentException("تاريخ غير صحيح في عمود {$label}: {$value} (استخدم يوم/شهر/سنة)");
     }
 
     private function parseAmount($value, string $label): float

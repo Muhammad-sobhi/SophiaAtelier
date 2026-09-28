@@ -499,7 +499,7 @@ export default function ReviewsPage() {
                 <label className="text-xs font-extrabold text-slate-700">نص الرأي (اختياري)</label>
                 <textarea
                 rows={4}
-                placeholder="اكتبي نص رأي أو تقييم العميلة هنا..."
+                placeholder="اكتب نص رأي أو تقييم العميلة هنا..."
                 value={formData.review_text}
                 onChange={(e) => setFormData((prev) => ({ ...prev, review_text: e.target.value }))}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition-all resize-none" />

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Factory, RefreshCw } from 'lucide-react';
+import { Factory, RefreshCw, ListOrdered, LayoutList } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import OrdersTab from '@/components/manufacturing/OrdersTab';
 import MaterialsTab from '@/components/manufacturing/MaterialsTab';
@@ -28,6 +28,15 @@ const isAdminUser = () => {
   }
 };
 
+const ENTRY_MODE_KEY = 'manufacturing_entry_mode';
+const readEntryMode = () => {
+  try {
+    return localStorage.getItem(ENTRY_MODE_KEY) === 'form' ? 'form' : 'steps';
+  } catch {
+    return 'steps';
+  }
+};
+
 export default function ManufacturingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = TABS.some((t) => t.id === searchParams.get('tab')) ? searchParams.get('tab') : 'orders';
@@ -41,6 +50,12 @@ export default function ManufacturingPage() {
   const [dresses, setDresses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // New purchases and orders: guided steps or the classic single form (per-user preference)
+  const [entryMode, setEntryMode] = useState(readEntryMode);
+  const changeEntryMode = (mode) => {
+    setEntryMode(mode);
+    try { localStorage.setItem(ENTRY_MODE_KEY, mode); } catch { /* preference only */ }
+  };
 
   const loadShared = useCallback(async () => {
     setError(false);
@@ -80,9 +95,9 @@ export default function ManufacturingPage() {
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="p-4 sm:p-6 md:p-8 space-y-4 pb-12 min-w-0" dir="rtl">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
               <Factory size={18} />
@@ -104,7 +119,25 @@ export default function ManufacturingPage() {
         </button>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1" role="tablist">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-black text-slate-500">طريقة الإدخال:</span>
+        <div className="inline-flex bg-white border border-slate-200 rounded-2xl p-0.5" role="radiogroup" aria-label="طريقة الإدخال">
+          {[['steps', 'خطوات منظمة', ListOrdered], ['form', 'نموذج عادي', LayoutList]].map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={entryMode === id}
+              onClick={() => changeEntryMode(id)}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1 cursor-pointer ${entryMode === id ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <Icon size={12} /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -127,9 +160,22 @@ export default function ManufacturingPage() {
         <p className="text-xs text-slate-400 font-bold text-center py-10">جاري التحميل...</p>
       ) : (
         <>
-          {activeTab === 'orders' && <OrdersTab materials={materials} workers={workers} dresses={dresses} isAdmin={isAdminUser()} reloadShared={loadShared} />}
+          {activeTab === 'orders' && (
+            <OrdersTab
+              materials={materials}
+              meta={materialsMeta}
+              suppliers={suppliers}
+              workers={workers}
+              dresses={dresses}
+              isAdmin={isAdminUser()}
+              stepMode={entryMode === 'steps'}
+              reloadShared={loadShared}
+            />
+          )}
           {activeTab === 'materials' && <MaterialsTab materials={materials} meta={materialsMeta} suppliers={suppliers} reload={loadShared} />}
-          {activeTab === 'purchases' && <PurchasesTab materials={materials} suppliers={suppliers} reloadShared={loadShared} />}
+          {activeTab === 'purchases' && (
+            <PurchasesTab materials={materials} meta={materialsMeta} suppliers={suppliers} stepMode={entryMode === 'steps'} reloadShared={loadShared} />
+          )}
           {activeTab === 'suppliers' && (
             <SuppliersTab suppliers={suppliers} totalBalance={suppliersTotal} reload={loadShared} initialSupplierId={searchParams.get('supplier')} />
           )}

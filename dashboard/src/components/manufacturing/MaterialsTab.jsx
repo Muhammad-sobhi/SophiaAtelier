@@ -54,7 +54,7 @@ export default function MaterialsTab({ materials, meta, suppliers, reload }) {
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-2xl px-3">
           <Search size={14} className="text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحثي باسم الخامة..." className="w-full bg-transparent text-xs font-bold px-2 py-2.5 focus:outline-none" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث باسم الخامة..." className="w-full bg-transparent text-xs font-bold px-2 py-2.5 focus:outline-none" />
         </div>
         <select value={category} onChange={(e) => setCategory(e.target.value)} className="bg-white border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-600" aria-label="تصفية حسب النوع">
           <option value="">كل الأنواع</option>
@@ -64,54 +64,46 @@ export default function MaterialsTab({ materials, meta, suppliers, reload }) {
       </div>
 
       {list.length === 0 ? (
-        <EmptyState>لا توجد خامات. أضيفي الخامات أولاً ثم سجلي فواتير الشراء لتدخل المخزن.</EmptyState>
+        <EmptyState>لا توجد خامات. أضف الخامات أولاً ثم سجّل فواتير الشراء لتدخل المخزن.</EmptyState>
       ) : (
-        <div className="bg-white border border-slate-100 rounded-3xl overflow-x-auto">
-          <table className="w-full text-right text-xs min-w-[640px]">
-            <thead className="bg-slate-50 text-slate-400 font-bold border-b border-slate-100">
-              <tr>
-                <th className="p-3">الخامة</th>
-                <th className="p-3">النوع</th>
-                <th className="p-3">الكمية المتاحة</th>
-                <th className="p-3">متوسط التكلفة</th>
-                <th className="p-3">القيمة</th>
-                <th className="p-3 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {list.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50/60">
-                  <td className="p-3">
-                    <div className="font-black text-slate-800">{m.name}</div>
-                    <div className="text-[10px] text-slate-400 font-bold">
-                      {[m.color, m.supplier?.name].filter(Boolean).join(' · ') || '—'}
-                    </div>
-                  </td>
-                  <td className="p-3 text-slate-600 font-bold">{meta.categories[m.category] || m.category}</td>
-                  <td className="p-3">
-                    <span className={`font-black ${m.is_low_stock ? 'text-amber-700' : 'text-slate-800'}`}>
-                      {qty(m.quantity)} {m.unit_label}
-                    </span>
-                    {m.is_low_stock && (
-                      <span className="mr-1.5 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
-                        <AlertTriangle size={9} /> قارب على النفاد
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-slate-600 font-bold">{money(m.avg_cost)}</td>
-                  <td className="p-3 text-slate-800 font-black">{money(m.quantity * m.avg_cost)}</td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-1">
-                      <IconBtn title="سجل الحركات" onClick={() => setHistory(m)}><History size={13} /></IconBtn>
-                      <IconBtn title="جرد / تسوية الكمية" onClick={() => setAdjusting(m)}><Scale size={13} /></IconBtn>
-                      <IconBtn title="تعديل" onClick={() => setEditing(m)}><Edit3 size={13} /></IconBtn>
-                      <IconBtn title="حذف" danger onClick={() => handleDelete(m)}><Trash2 size={13} /></IconBtn>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+          {list.map((m) => (
+            <article key={m.id} className={`bg-white border rounded-2xl p-3.5 space-y-3 min-w-0 ${m.is_low_stock ? 'border-amber-200' : 'border-slate-100'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h4 className="text-sm font-black text-slate-800 truncate">{m.name}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold truncate">
+                    {[meta.categories[m.category] || m.category, m.color, m.supplier?.name].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+                {m.is_low_stock && (
+                  <span className="flex-shrink-0 inline-flex items-center gap-0.5 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                    <AlertTriangle size={9} /> قارب على النفاد
+                  </span>
+                )}
+              </div>
+              <dl className="grid grid-cols-3 gap-1.5 text-center">
+                <div className="bg-slate-50 rounded-xl p-2 min-w-0">
+                  <dt className="text-[9px] font-bold text-slate-400">المتاح</dt>
+                  <dd className={`text-xs font-black truncate ${m.is_low_stock ? 'text-amber-700' : 'text-slate-800'}`}>{qty(m.quantity)} {m.unit_label}</dd>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-2 min-w-0">
+                  <dt className="text-[9px] font-bold text-slate-400">متوسط التكلفة</dt>
+                  <dd className="text-xs font-black text-slate-800 truncate">{money(m.avg_cost)}</dd>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-2 min-w-0">
+                  <dt className="text-[9px] font-bold text-slate-400">القيمة</dt>
+                  <dd className="text-xs font-black text-slate-800 truncate">{money(m.quantity * m.avg_cost)}</dd>
+                </div>
+              </dl>
+              <div className="flex items-center justify-end gap-1">
+                <IconBtn title="سجل الحركات" onClick={() => setHistory(m)}><History size={13} /></IconBtn>
+                <IconBtn title="جرد / تسوية الكمية" onClick={() => setAdjusting(m)}><Scale size={13} /></IconBtn>
+                <IconBtn title="تعديل" onClick={() => setEditing(m)}><Edit3 size={13} /></IconBtn>
+                <IconBtn title="حذف" danger onClick={() => handleDelete(m)}><Trash2 size={13} /></IconBtn>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
@@ -136,7 +128,7 @@ export function IconBtn({ title, onClick, danger, children }) {
   );
 }
 
-function MaterialForm({ material, meta, suppliers, onClose, onSaved }) {
+export function MaterialForm({ material, meta, suppliers, onClose, onSaved }) {
   const isNew = !material.id;
   const [form, setForm] = useState({
     name: material.name || '',
@@ -155,10 +147,11 @@ function MaterialForm({ material, meta, suppliers, onClose, onSaved }) {
     setIsSubmitting(true);
     try {
       const payload = { ...form, supplier_id: form.supplier_id || null, min_quantity: form.min_quantity || 0 };
-      if (isNew) await apiClient.post('/materials', payload);
-      else await apiClient.put(`/materials/${material.id}`, payload);
+      const saved = isNew
+        ? await apiClient.post('/materials', payload)
+        : await apiClient.put(`/materials/${material.id}`, payload);
       toast.success('تم حفظ الخامة');
-      onSaved();
+      onSaved(saved);
       onClose();
     } catch (err) {
       toast.error(errorMessage(err));

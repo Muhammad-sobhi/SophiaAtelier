@@ -70,22 +70,25 @@ class ManufacturingOrderController extends Controller
         return response()->json($manufacturingOrder->load('worker:id,name'));
     }
 
-    /** Only a planned or cancelled order can be deleted; its materials go back to stock */
+    /** Move an order along its workflow (planned → in progress → waiting for approval) without re-sending the whole form */
+    public function updateStatus(Request $request, ManufacturingOrder $manufacturingOrder): JsonResponse
+    {
+        if ($manufacturingOrder->status === 'approved') {
+            return response()->json(['message' => 'ألغِ الموافقة أولاً لتغيير حالة الأمر'], 422);
+        }
+        $data = $request->validate(['status' => ['required', Rule::in(self::EDITABLE_STATUSES)]]);
+        if ($data['status'] === 'completed' && !$manufacturingOrder->completed_date) {
+            $data['completed_date'] = now()->toDateString();
+        }
+        $manufacturingOrder->update($data);
+
+        return response()->json($manufacturingOrder);
+    }
+
+    /** Any order not approved yet can be deleted; everything it recorded is undone */
     public function destroy(ManufacturingOrder $manufacturingOrder): JsonResponse
     {
-        if (!in_array($manufacturingOrder->status, ['planned', 'cancelled'])) {
-            return response()->json(['message' => 'يمكن حذف أمر التصنيع فقط وهو "مخطط" أو "ملغي"'], 422);
-        }
-        if ($manufacturingOrder->workerPayments()->exists()) {
-            return response()->json(['message' => 'لا يمكن حذف أمر تصنيع مسجل عليه مدفوعات للعامل'], 422);
-        }
-
-        DB::transaction(function () use ($manufacturingOrder) {
-            foreach ($manufacturingOrder->materialMovements as $movement) {
-                $this->manufacturing->deleteMovement($movement);
-            }
-            $manufacturingOrder->delete();
-        });
+        $this->manufacturing->deleteOrder($manufacturingOrder);
 
         return response()->json(['message' => 'Order deleted']);
     }
@@ -132,13 +135,33 @@ class ManufacturingOrderController extends Controller
         if ($manufacturingOrder->status !== 'completed') {
             return response()->json(['message' => 'الموافقة تكون فقط على أمر تصنيع انتهى تصنيعه'], 422);
         }
-        $manufacturingOrder->update([
-            'status' => 'approved',
-            'approved_by' => $request->user()->id,
-            'approved_at' => now(),
-        ]);
+        DB::transaction(function () use ($request, $manufacturingOrder) {
+            $manufacturingOrder->update([
+                'status' => 'approved',
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
+            ]);
+            $this->manufacturing->createDressFromOrder($manufacturingOrder);
+        });
 
-        return response()->json($manufacturingOrder);
+        return response()->json($manufacturingOrder->fresh()->load('dress:id,code,name'));
+    }
+
+    /** Create the dress for an order approved before dresses were created automatically */
+    public function createDress(ManufacturingOrder $manufacturingOrder): JsonResponse
+    {
+        if ($manufacturingOrder->status !== 'approved') {
+            return response()->json(['message' => 'يجب الموافقة على أمر التصنيع قبل إنشاء الفستان'], 422);
+        }
+        $this->manufacturing->createDressFromOrder($manufacturingOrder);
+
+        return response()->json($manufacturingOrder->fresh()->load('dress:id,code,name'), 201);
+    }
+
+    /** Cancel the approval so the order can be edited or deleted again */
+    public function unapprove(ManufacturingOrder $manufacturingOrder): JsonResponse
+    {
+        return response()->json($this->manufacturing->unapproveOrder($manufacturingOrder));
     }
 
     /** Link an approved piece to the dress created for it in the dresses page */
@@ -150,7 +173,7 @@ class ManufacturingOrderController extends Controller
         $data = $request->validate([
             'dress_id' => ['required', 'exists:dresses,id', Rule::unique('manufacturing_orders', 'dress_id')->ignore($manufacturingOrder->id)],
         ]);
-        $manufacturingOrder->update($data);
+        $manufacturingOrder->update($data + ['dress_auto_created' => false]);
 
         return response()->json($manufacturingOrder->load('dress:id,code,name'));
     }

@@ -61,7 +61,7 @@ class ExpenseController extends Controller
     public function update(Request $request, Expense $expense): JsonResponse
     {
         if (\App\Services\ManufacturingService::ownsExpense($expense)) {
-            return response()->json(['message' => 'هذا المصروف مسجل من قسم التصنيع (مورد / عامل / شراء خامات) — عدّليه أو احذفيه من هناك'], 422);
+            return response()->json(['message' => 'هذا المصروف مسجل من قسم التصنيع (مورد / عامل / شراء خامات) — عدّله أو احذفه من هناك'], 422);
         }
         $validated = $request->validate([
             'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,other',
@@ -89,7 +89,7 @@ class ExpenseController extends Controller
     public function destroy(Expense $expense): JsonResponse
     {
         if (\App\Services\ManufacturingService::ownsExpense($expense)) {
-            return response()->json(['message' => 'هذا المصروف مسجل من قسم التصنيع (مورد / عامل / شراء خامات) — عدّليه أو احذفيه من هناك'], 422);
+            return response()->json(['message' => 'هذا المصروف مسجل من قسم التصنيع (مورد / عامل / شراء خامات) — عدّله أو احذفه من هناك'], 422);
         }
         $expense->delete();
 

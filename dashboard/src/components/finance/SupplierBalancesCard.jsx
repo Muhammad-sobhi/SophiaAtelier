@@ -54,7 +54,7 @@ export default function SupplierBalancesCard() {
           </div>
           <div className="text-right">
             <div className="text-xs font-black text-slate-800">حسابات الموردين</div>
-            <div className="text-[10px] font-bold text-slate-400">السالب = مديونية عليكِ · الموجب = مدفوع زيادة</div>
+            <div className="text-[10px] font-bold text-slate-400">السالب = مديونية عليك · الموجب = مدفوع زيادة</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export default function SupplierBalancesCard() {
         <div className="mt-3 border-t border-slate-100 pt-3">
           {suppliers.length === 0 ? (
             <p className="text-xs font-bold text-slate-400 text-center py-3">
-              لا يوجد موردين بعد — أضيفيهم من <Link to="/dashboard/manufacturing?tab=suppliers" className="text-indigo-600 underline">قسم التصنيع</Link>
+              لا يوجد موردين بعد — أضفهم من <Link to="/dashboard/manufacturing?tab=suppliers" className="text-indigo-600 underline">قسم التصنيع</Link>
             </p>
           ) : (
             <ul className="divide-y divide-slate-100">

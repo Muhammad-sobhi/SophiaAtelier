@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Edit3, Trash2, Eye, CheckCircle2, Link2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Edit3, Trash2, Eye, CheckCircle2, Link2, Shirt, Undo2, Play, Send } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { formatDate } from '@/lib/utils';
@@ -9,6 +9,7 @@ import {
   inputClass, money, qty, todayStr, errorMessage,
 } from './shared';
 import { IconBtn } from './MaterialsTab';
+import { OrderWizard } from './Wizards';
 
 export const ORDER_STATUSES = {
   planned: { label: 'مخطط', cls: 'bg-slate-100 text-slate-600' },
@@ -18,7 +19,7 @@ export const ORDER_STATUSES = {
   cancelled: { label: 'ملغي', cls: 'bg-rose-50 text-rose-600' },
 };
 
-export default function OrdersTab({ materials, workers, dresses, isAdmin, reloadShared }) {
+export default function OrdersTab({ materials, meta, suppliers, workers, dresses, isAdmin, stepMode, reloadShared }) {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -42,7 +43,7 @@ export default function OrdersTab({ materials, workers, dresses, isAdmin, reload
   const afterChange = () => { load(); reloadShared(); };
 
   const handleDelete = async (o) => {
-    if (!window.confirm(`حذف أمر التصنيع "${o.title}"؟ الخامات المصروفة له سترجع للمخزن.`)) return;
+    if (!window.confirm(`حذف أمر التصنيع "${o.title}" نهائياً؟\nالخامات المصروفة له سترجع للمخزن، ومدفوعات العامل المسجلة عليه ستُحذف من المالية.`)) return;
     try {
       await apiClient.delete(`/manufacturing-orders/${o.id}`);
       toast.success('تم حذف أمر التصنيع');
@@ -55,7 +56,7 @@ export default function OrdersTab({ materials, workers, dresses, isAdmin, reload
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+        <div className="flex flex-wrap gap-1.5">
           {[['', 'الكل'], ...Object.entries(ORDER_STATUSES).map(([k, v]) => [k, v.label])].map(([k, label]) => (
             <button
               key={k || 'all'}
@@ -75,47 +76,45 @@ export default function OrdersTab({ materials, workers, dresses, isAdmin, reload
       ) : orders.length === 0 ? (
         <EmptyState>لا توجد أوامر تصنيع</EmptyState>
       ) : (
-        <div className="bg-white border border-slate-100 rounded-3xl overflow-x-auto">
-          <table className="w-full text-right text-xs min-w-[720px]">
-            <thead className="bg-slate-50 text-slate-400 font-bold border-b border-slate-100">
-              <tr>
-                <th className="p-3">القطعة</th>
-                <th className="p-3">العامل</th>
-                <th className="p-3">الحالة</th>
-                <th className="p-3">التسليم المتوقع</th>
-                <th className="p-3">تكلفة الخامات</th>
-                <th className="p-3">الأجر</th>
-                <th className="p-3">إجمالي التكلفة</th>
-                <th className="p-3 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {orders.map((o) => {
-                const st = ORDER_STATUSES[o.status] || ORDER_STATUSES.planned;
-                return (
-                  <tr key={o.id} className="hover:bg-slate-50/60">
-                    <td className="p-3">
-                      <div className="font-black text-slate-800">{o.title}</div>
-                      {o.dress && <div className="text-[10px] font-bold text-emerald-700">فستان كود {o.dress.code}</div>}
-                    </td>
-                    <td className="p-3 font-bold text-slate-600">{o.worker?.name || '—'}</td>
-                    <td className="p-3"><span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${st.cls}`}>{st.label}</span></td>
-                    <td className="p-3 font-bold text-slate-600">{o.due_date ? formatDate(o.due_date) : '—'}</td>
-                    <td className="p-3 font-bold text-slate-600">{money(o.materials_cost)}</td>
-                    <td className="p-3 font-bold text-slate-600">{money(o.worker_fee)}</td>
-                    <td className="p-3 font-black text-slate-800">{money(o.total_cost)}</td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <IconBtn title="التفاصيل والخامات" onClick={() => setViewingId(o.id)}><Eye size={13} /></IconBtn>
-                        {o.status !== 'approved' && <IconBtn title="تعديل" onClick={() => setEditing(o)}><Edit3 size={13} /></IconBtn>}
-                        {['planned', 'cancelled'].includes(o.status) && <IconBtn title="حذف" danger onClick={() => handleDelete(o)}><Trash2 size={13} /></IconBtn>}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+          {orders.map((o) => {
+            const st = ORDER_STATUSES[o.status] || ORDER_STATUSES.planned;
+            return (
+              <article key={o.id} className="bg-white border border-slate-100 rounded-2xl p-3.5 space-y-3 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-black text-slate-800 truncate">{o.title}</h4>
+                    <p className="text-[10px] font-bold text-slate-400 truncate">
+                      {o.worker?.name || 'بدون عامل'}{o.due_date ? ` · التسليم ${formatDate(o.due_date)}` : ''}
+                    </p>
+                    {o.dress && <p className="text-[10px] font-bold text-emerald-700 truncate">فستان {o.dress.code ? `كود ${o.dress.code}` : o.dress.name}</p>}
+                  </div>
+                  <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black ${st.cls}`}>{st.label}</span>
+                </div>
+                <dl className="grid grid-cols-3 gap-1.5 text-center">
+                  <div className="bg-slate-50 rounded-xl p-2 min-w-0">
+                    <dt className="text-[9px] font-bold text-slate-400">الخامات</dt>
+                    <dd className="text-xs font-black text-slate-800 truncate">{money(o.materials_cost)}</dd>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-2 min-w-0">
+                    <dt className="text-[9px] font-bold text-slate-400">الأجر</dt>
+                    <dd className="text-xs font-black text-slate-800 truncate">{money(o.worker_fee)}</dd>
+                  </div>
+                  <div className="bg-indigo-50 rounded-xl p-2 min-w-0">
+                    <dt className="text-[9px] font-bold text-indigo-400">الإجمالي</dt>
+                    <dd className="text-xs font-black text-indigo-800 truncate">{money(o.total_cost)}</dd>
+                  </div>
+                </dl>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setViewingId(o.id)} className="flex-1 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer">
+                    <Eye size={12} /> التفاصيل والخامات
+                  </button>
+                  {o.status !== 'approved' && <IconBtn title="تعديل" onClick={() => setEditing(o)}><Edit3 size={13} /></IconBtn>}
+                  {o.status !== 'approved' && <IconBtn title="حذف" danger onClick={() => handleDelete(o)}><Trash2 size={13} /></IconBtn>}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
       {lastPage > 1 && (
@@ -126,7 +125,20 @@ export default function OrdersTab({ materials, workers, dresses, isAdmin, reload
         </div>
       )}
 
-      {editing && <OrderForm order={editing} workers={workers} onClose={() => setEditing(null)} onSaved={afterChange} />}
+      {editing && (stepMode ? (
+        <OrderWizard
+          order={editing.id ? editing : null}
+          materials={materials}
+          meta={meta}
+          suppliers={suppliers}
+          workers={workers}
+          reloadShared={reloadShared}
+          onClose={() => setEditing(null)}
+          onSaved={load}
+        />
+      ) : (
+        <OrderForm order={editing} workers={workers} onClose={() => setEditing(null)} onSaved={afterChange} />
+      ))}
       {viewingId && (
         <OrderDetails
           orderId={viewingId}
@@ -228,6 +240,8 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
   const [useDate, setUseDate] = useState(todayStr());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dressId, setDressId] = useState('');
+  const navigate = useNavigate();
+  const editDress = (id) => navigate(`/dashboard/dresses?edit=${id}`);
 
   const load = useCallback(() => {
     setError(false);
@@ -265,11 +279,48 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
   };
 
   const approve = async () => {
-    if (!window.confirm('الموافقة على القطعة بعد مراجعتها؟ لن يمكن تعديل الأمر بعد الموافقة.')) return;
+    if (!window.confirm('الموافقة على القطعة بعد مراجعتها؟ سيتم إنشاء فستان لها في صفحة الفساتين، ولن يمكن تعديل الأمر بعد الموافقة.')) return;
     try {
-      await apiClient.post(`/manufacturing-orders/${orderId}/approve`, {});
-      toast.success('تمت الموافقة على القطعة');
+      const res = await apiClient.post(`/manufacturing-orders/${orderId}/approve`, {});
+      toast.success('تمت الموافقة وإنشاء الفستان — أكمل بياناته');
+      onChanged();
+      if (res?.dress_id) editDress(res.dress_id);
+      else load();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
+
+  const changeStatus = async (status, confirmText) => {
+    if (confirmText && !window.confirm(confirmText)) return;
+    try {
+      await apiClient.patch(`/manufacturing-orders/${orderId}/status`, { status });
+      toast.success(`تم تغيير الحالة إلى "${ORDER_STATUSES[status].label}"`);
       refresh();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
+
+  const unapprove = async () => {
+    const note = order.dress_auto_created && order.dress ? `\nالفستان "${order.dress.name}" الذي أُنشئ عند الموافقة سيُحذف.` : '';
+    if (!window.confirm(`إلغاء الموافقة ليمكن تعديل الأمر أو حذفه؟${note}`)) return;
+    try {
+      await apiClient.post(`/manufacturing-orders/${orderId}/unapprove`, {});
+      toast.success('تم إلغاء الموافقة');
+      refresh();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
+
+  const createDress = async () => {
+    try {
+      const res = await apiClient.post(`/manufacturing-orders/${orderId}/dress`, {});
+      toast.success('تم إنشاء الفستان — أكمل بياناته');
+      onChanged();
+      if (res?.dress_id) editDress(res.dress_id);
+      else load();
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -295,7 +346,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
   return (
     <Modal title={order.title} onClose={onClose} wide>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold text-slate-600">
           <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${st.cls}`}>{st.label}</span>
           {order.worker && <span>العامل: {order.worker.name}</span>}
           {order.start_date && <span>· البدء {formatDate(order.start_date)}</span>}
@@ -325,7 +376,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
           ) : (
             <ul className="divide-y divide-slate-100 text-xs border border-slate-100 rounded-xl">
               {order.material_movements.map((mv) => (
-                <li key={mv.id} className="px-3 py-2 flex items-center justify-between gap-2">
+                <li key={mv.id} className="px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                   <span className="font-bold text-slate-700">
                     {mv.material?.name} — {qty(-mv.quantity)}
                     <span className="text-slate-400"> · {formatDate(mv.movement_date)}</span>
@@ -344,7 +395,7 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
 
         {canEditMaterials && (
           <form onSubmit={addMaterials} className="space-y-2 bg-indigo-50/40 border border-indigo-100 rounded-2xl p-3">
-            <div className="flex items-end justify-between gap-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
               <h4 className="text-xs font-black text-indigo-900">صرف خامات من المخزن</h4>
               <Field label="التاريخ" className="w-36"><input type="date" required className={inputClass} value={useDate} onChange={(e) => setUseDate(e.target.value)} /></Field>
             </div>
@@ -353,6 +404,56 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
               <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black cursor-pointer disabled:opacity-50">صرف الخامات</button>
             </div>
           </form>
+        )}
+
+        {order.status !== 'approved' && (
+          <div className="space-y-2 bg-slate-50 border border-slate-100 rounded-2xl p-3">
+            <ol className="flex flex-wrap items-center gap-1.5 text-[10px] font-black">
+              {['planned', 'in_progress', 'completed', 'approved'].map((k, i, arr) => {
+                const idx = arr.indexOf(order.status);
+                const done = order.status !== 'cancelled' && i < idx;
+                const current = k === order.status;
+                return (
+                  <li key={k} className="flex items-center gap-1.5">
+                    <span className={`px-2 py-0.5 rounded-lg ${current ? ORDER_STATUSES[k].cls : done ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {done && '✓ '}{ORDER_STATUSES[k].label}
+                    </span>
+                    {i < arr.length - 1 && <span className="text-slate-300">←</span>}
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="flex flex-wrap gap-2">
+              {order.status === 'planned' && (
+                <button type="button" onClick={() => changeStatus('in_progress')} className="flex-1 min-w-[140px] py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Play size={13} /> بدء التصنيع
+                </button>
+              )}
+              {['planned', 'in_progress'].includes(order.status) && (
+                <button
+                  type="button"
+                  onClick={() => changeStatus('completed', 'انتهى تصنيع القطعة؟ سترسل للإدارة للموافقة عليها.')}
+                  className="flex-1 min-w-[140px] py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Send size={13} /> انتهى التصنيع — إرسال للموافقة
+                </button>
+              )}
+              {order.status === 'completed' && (
+                <button type="button" onClick={() => changeStatus('in_progress')} className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                  <Undo2 size={12} /> إرجاع إلى قيد التصنيع
+                </button>
+              )}
+              {order.status === 'cancelled' ? (
+                <button type="button" onClick={() => changeStatus('planned')} className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-[11px] font-black flex items-center gap-1 cursor-pointer">
+                  <Undo2 size={12} /> إعادة تفعيل الأمر
+                </button>
+              ) : (
+                <button type="button" onClick={() => changeStatus('cancelled', 'إلغاء أمر التصنيع؟ يمكنك إعادة تفعيله لاحقاً.')} className="py-2 px-3 bg-white hover:bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-[11px] font-black cursor-pointer">
+                  إلغاء الأمر
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
         {order.status === 'completed' && (
@@ -367,18 +468,26 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
 
         {order.status === 'approved' && (
           order.dress ? (
-            <p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-2.5">
-              مرتبطة بالفستان كود {order.dress.code} — {order.dress.name}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-2.5">
+              <span>مرتبطة بالفستان {order.dress.code ? `كود ${order.dress.code} — ` : ''}{order.dress.name}</span>
+              <button type="button" onClick={() => editDress(order.dress.id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black flex items-center gap-1 cursor-pointer whitespace-nowrap">
+                <Edit3 size={12} /> تعديل بيانات الفستان
+              </button>
+            </div>
           ) : (
             <div className="space-y-2 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3">
+              {isAdmin && (
+                <button type="button" onClick={createDress} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Shirt size={14} /> إنشاء الفستان تلقائياً من بيانات التصنيع
+                </button>
+              )}
               <p className="text-[11px] font-bold text-emerald-800">
-                تمت الموافقة. أضيفي الفستان من <Link to="/dashboard/dresses" className="underline">صفحة الفساتين</Link> ثم اربطيه هنا
+                أو أضف الفستان من <Link to="/dashboard/dresses" className="underline">صفحة الفساتين</Link> ثم اربطه هنا
                 (تكلفة التصنيع {money(order.total_cost)} يمكن استخدامها كسعر شراء الفستان).
               </p>
               <div className="flex gap-2">
-                <select className={inputClass} value={dressId} onChange={(e) => setDressId(e.target.value)} aria-label="اختيار الفستان">
-                  <option value="">اختاري الفستان...</option>
+                <select className={`${inputClass} min-w-0`} value={dressId} onChange={(e) => setDressId(e.target.value)} aria-label="اختيار الفستان">
+                  <option value="">اختر الفستان...</option>
                   {dresses.map((d) => <option key={d.id} value={d.id}>{d.code ? `${d.code} — ` : ''}{d.name}</option>)}
                 </select>
                 <button type="button" onClick={linkDress} disabled={!dressId} className="px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1 cursor-pointer disabled:opacity-50 whitespace-nowrap">
@@ -390,6 +499,12 @@ function OrderDetails({ orderId, materials, dresses, isAdmin, onClose, onChanged
         )}
 
         {order.notes && <p className="text-[11px] font-bold text-slate-500">ملاحظات: {order.notes}</p>}
+
+        {order.status === 'approved' && isAdmin && (
+          <button type="button" onClick={unapprove} className="w-full py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-100 rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer">
+            <Undo2 size={14} /> إلغاء الموافقة (للتعديل أو الحذف)
+          </button>
+        )}
       </div>
     </Modal>
   );

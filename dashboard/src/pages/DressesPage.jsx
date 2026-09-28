@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { autoTranslateText } from '@/lib/auto-translate';
 import { Search, Plus, X, Trash2, Edit3, Sparkles, Ruler, DollarSign, Languages, ChevronRight, ChevronLeft, Calendar, ArrowUp, ArrowDown, GripVertical, Star, Check } from 'lucide-react';
@@ -505,6 +506,17 @@ export default function DressesPage() {
 
     setIsModalOpen(true);
   };
+
+  // Opened from the manufacturing page (?edit=ID) to complete a newly created dress
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editParam = searchParams.get('edit');
+  useEffect(() => {
+    if (!editParam) return;
+    apiClient.get(`/dresses/${editParam}`)
+      .then((dress) => { if (dress?.id) handleEditClick(dress); })
+      .catch(() => {})
+      .finally(() => setSearchParams({}, { replace: true }));
+  }, [editParam]);
 
   const handleDeleteSubmit = async () => {
     if (!deleteConfirm) return;

@@ -16,11 +16,11 @@ export const money = (n) => `${Math.round(parseFloat(n || 0)).toLocaleString()} 
 export const qty = (n) => parseFloat(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 export const inputClass =
-  'w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10';
+  'w-full min-w-0 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10';
 
 export function Field({ label, children, className = '' }) {
   return (
-    <label className={`block ${className}`}>
+    <label className={`block min-w-0 ${className}`}>
       <span className="block text-[10px] font-extrabold text-slate-500 mb-1">{label}</span>
       {children}
     </label>
@@ -88,10 +88,26 @@ export function PrimaryButton({ onClick, children, icon: Icon = Plus }) {
   );
 }
 
-/** Rows of {material_id, quantity[, unit_price]} picked from the materials list */
-export function MaterialItemsInput({ items, setItems, materials, withPrice = false }) {
+/**
+ * Rows of {material_id, quantity[, unit_price]} picked from the materials list.
+ * preferredSupplierId lists that supplier's materials first; onCreateMaterial adds a "new material" button.
+ */
+export function MaterialItemsInput({ items, setItems, materials, withPrice = false, preferredSupplierId = null, onCreateMaterial = null }) {
   const update = (i, patch) => setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const unitOf = (id) => materials.find((m) => String(m.id) === String(id));
+  const pick = (i, id) => {
+    const m = unitOf(id);
+    // Suggest the last known cost when buying
+    const price = withPrice && items[i].unit_price === '' && m && parseFloat(m.avg_cost) > 0 ? String(parseFloat(m.avg_cost)) : items[i].unit_price;
+    update(i, { material_id: id, unit_price: price });
+  };
+  const option = (mat) => (
+    <option key={mat.id} value={mat.id}>
+      {mat.name}{mat.color ? ` (${mat.color})` : ''} — متاح {qty(mat.quantity)}
+    </option>
+  );
+  const own = preferredSupplierId ? materials.filter((m) => String(m.supplier_id) === String(preferredSupplierId)) : [];
+  const others = preferredSupplierId ? materials.filter((m) => String(m.supplier_id) !== String(preferredSupplierId)) : materials;
 
   return (
     <div className="space-y-2">
@@ -100,13 +116,14 @@ export function MaterialItemsInput({ items, setItems, materials, withPrice = fal
         return (
           <div key={i} className="flex flex-wrap sm:flex-nowrap items-end gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
             <Field label="الخامة" className="flex-1 min-w-[160px]">
-              <select className={inputClass} value={it.material_id} required onChange={(e) => update(i, { material_id: e.target.value })}>
-                <option value="">اختاري خامة...</option>
-                {materials.map((mat) => (
-                  <option key={mat.id} value={mat.id}>
-                    {mat.name}{mat.color ? ` (${mat.color})` : ''} — متاح {qty(mat.quantity)}
-                  </option>
-                ))}
+              <select className={inputClass} value={it.material_id} required onChange={(e) => pick(i, e.target.value)}>
+                <option value="">اختر خامة...</option>
+                {own.length > 0 ? (
+                  <>
+                    <optgroup label="خامات هذا المورد">{own.map(option)}</optgroup>
+                    {others.length > 0 && <optgroup label="خامات أخرى">{others.map(option)}</optgroup>}
+                  </>
+                ) : others.map(option)}
               </select>
             </Field>
             <Field label={`الكمية${m ? ` (${m.unit_label})` : ''}`} className="w-24">
@@ -129,13 +146,20 @@ export function MaterialItemsInput({ items, setItems, materials, withPrice = fal
           </div>
         );
       })}
-      <button
-        type="button"
-        onClick={() => setItems([...items, { material_id: '', quantity: '', unit_price: '' }])}
-        className="text-[11px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
-      >
-        <Plus size={12} /> إضافة خامة أخرى
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setItems([...items, { material_id: '', quantity: '', unit_price: '' }])}
+          className="text-[11px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
+        >
+          <Plus size={12} /> إضافة خامة أخرى
+        </button>
+        {onCreateMaterial && (
+          <button type="button" onClick={onCreateMaterial} className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 cursor-pointer">
+            <Plus size={12} /> خامة جديدة غير موجودة في القائمة
+          </button>
+        )}
+      </div>
     </div>
   );
 }

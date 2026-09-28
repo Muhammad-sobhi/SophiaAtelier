@@ -717,7 +717,7 @@ export default function BookingsPage() {
               <CalendarIcon size={20} />
             </div>
             <p className="text-xs font-bold text-slate-500">لا توجد حجوزات لعرضها</p>
-            <p className="text-[10px] text-slate-400">تأكدي من إضافة حجز أو تسجيل فستان محجوز في صفحة الزيارات.</p>
+            <p className="text-[10px] text-slate-400">تأكد من إضافة حجز أو تسجيل فستان محجوز في صفحة الزيارات.</p>
           </div> :
 
         <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.01)] border border-slate-50 overflow-hidden">

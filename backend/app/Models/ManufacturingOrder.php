@@ -18,7 +18,7 @@ class ManufacturingOrder extends Model
 
     protected $fillable = [
         'title', 'worker_id', 'status', 'start_date', 'due_date', 'completed_date',
-        'worker_fee', 'dress_id', 'approved_by', 'approved_at', 'notes',
+        'worker_fee', 'dress_id', 'dress_auto_created', 'approved_by', 'approved_at', 'notes',
     ];
 
     protected function casts(): array
@@ -29,6 +29,7 @@ class ManufacturingOrder extends Model
             'completed_date' => 'date:Y-m-d',
             'worker_fee' => 'decimal:2',
             'approved_at' => 'datetime',
+            'dress_auto_created' => 'boolean',
         ];
     }
 

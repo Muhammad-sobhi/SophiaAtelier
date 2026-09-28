@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Edit3, Trash2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { formatDate } from '@/lib/utils';
@@ -8,13 +8,14 @@ import {
   inputClass, money, qty, todayStr, errorMessage, PAYMENT_METHODS,
 } from './shared';
 import { IconBtn } from './MaterialsTab';
+import { PurchaseWizard } from './Wizards';
 
-export default function PurchasesTab({ materials, suppliers, reloadShared }) {
+export default function PurchasesTab({ materials, meta, suppliers, stepMode, reloadShared }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // {} = new invoice
 
   const load = useCallback(() => {
     setError(false);
@@ -29,7 +30,7 @@ export default function PurchasesTab({ materials, suppliers, reloadShared }) {
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (p) => {
-    if (!window.confirm('حذف فاتورة الشراء؟ سيتم خصم كمياتها من المخزن وحذف دفعاتها من المالية.')) return;
+    if (!window.confirm('حذف فاتورة الشراء نهائياً؟ ستُخصم كمياتها من المخزن ويُعاد حساب متوسط التكلفة، وتُحذف دفعاتها من المالية ومن رصيد المورد.')) return;
     try {
       await apiClient.delete(`/material-purchases/${p.id}`);
       toast.success('تم حذف الفاتورة');
@@ -42,9 +43,9 @@ export default function PurchasesTab({ materials, suppliers, reloadShared }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <p className="text-xs font-bold text-slate-500">فواتير شراء الخامات تزيد المخزن تلقائياً، والمدفوع منها يظهر في صفحة المالية.</p>
-        <PrimaryButton onClick={() => setIsFormOpen(true)}>فاتورة شراء</PrimaryButton>
+        <PrimaryButton onClick={() => setEditing({})}>فاتورة شراء</PrimaryButton>
       </div>
 
       {error ? <LoadError onRetry={load} /> : !rows ? (
@@ -68,13 +69,14 @@ export default function PurchasesTab({ materials, suppliers, reloadShared }) {
                   </div>
                   {p.notes && <div className="text-[10px] text-slate-400 font-bold mt-0.5">{p.notes}</div>}
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 border-t sm:border-0 border-slate-100 pt-2 sm:pt-0">
                   <div className="text-left">
                     <div className="text-sm font-black text-slate-800">{money(p.total_amount)}</div>
                     <div className={`text-[10px] font-black ${remaining > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                       {remaining > 0 ? `آجل ${money(remaining)}` : 'مدفوعة'}
                     </div>
                   </div>
+                  <IconBtn title="تعديل الفاتورة" onClick={() => setEditing(p)}><Edit3 size={13} /></IconBtn>
                   <IconBtn title="حذف الفاتورة" danger onClick={() => handleDelete(p)}><Trash2 size={13} /></IconBtn>
                 </div>
               </div>
@@ -90,25 +92,40 @@ export default function PurchasesTab({ materials, suppliers, reloadShared }) {
         </div>
       )}
 
-      {isFormOpen && (
+      {editing && (stepMode ? (
+        <PurchaseWizard
+          purchase={editing.id ? editing : null}
+          materials={materials}
+          meta={meta}
+          suppliers={suppliers}
+          reloadShared={reloadShared}
+          onClose={() => setEditing(null)}
+          onSaved={load}
+        />
+      ) : (
         <PurchaseForm
+          purchase={editing.id ? editing : null}
           materials={materials}
           suppliers={suppliers}
-          onClose={() => setIsFormOpen(false)}
+          onClose={() => setEditing(null)}
           onSaved={() => { load(); reloadShared(); }}
         />
-      )}
+      ))}
     </div>
   );
 }
 
-function PurchaseForm({ materials, suppliers, onClose, onSaved }) {
-  const [supplierId, setSupplierId] = useState('');
-  const [date, setDate] = useState(todayStr());
-  const [items, setItems] = useState([emptyItem()]);
-  const [paid, setPaid] = useState('');
-  const [method, setMethod] = useState('cash');
-  const [notes, setNotes] = useState('');
+function PurchaseForm({ purchase, materials, suppliers, onClose, onSaved }) {
+  const [supplierId, setSupplierId] = useState(purchase?.supplier_id ? String(purchase.supplier_id) : '');
+  const [date, setDate] = useState(purchase?.purchase_date?.substring(0, 10) || todayStr());
+  const [items, setItems] = useState(
+    purchase?.items?.length
+      ? purchase.items.map((it) => ({ material_id: String(it.material_id), quantity: String(parseFloat(it.quantity)), unit_price: String(parseFloat(it.unit_price)) }))
+      : [emptyItem()]
+  );
+  const [paid, setPaid] = useState(purchase?.supplier_id && parseFloat(purchase.paid_amount) > 0 ? String(parseFloat(purchase.paid_amount)) : '');
+  const [method, setMethod] = useState(purchase?.payments?.[0]?.payment_method || purchase?.expense?.payment_method || 'cash');
+  const [notes, setNotes] = useState(purchase?.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const total = items.reduce((sum, it) => sum + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_price) || 0), 0);
@@ -116,20 +133,22 @@ function PurchaseForm({ materials, suppliers, onClose, onSaved }) {
   const submit = async (e) => {
     e.preventDefault();
     if (supplierId && parseFloat(paid || 0) > total) {
-      toast.error('المدفوع الآن أكبر من إجمالي الفاتورة — سجلي الزيادة كدفعة للمورد');
+      toast.error('المدفوع الآن أكبر من إجمالي الفاتورة — سجّل الزيادة كدفعة للمورد');
       return;
     }
     setIsSubmitting(true);
     try {
-      await apiClient.post('/material-purchases', {
+      const payload = {
         supplier_id: supplierId || null,
         purchase_date: date,
         paid_amount: supplierId ? parseFloat(paid || 0) : null,
         payment_method: method,
         notes: notes || null,
         items,
-      });
-      toast.success('تم تسجيل الفاتورة وإضافة الكميات للمخزن');
+      };
+      if (purchase) await apiClient.put(`/material-purchases/${purchase.id}`, payload);
+      else await apiClient.post('/material-purchases', payload);
+      toast.success(purchase ? 'تم تعديل الفاتورة وتحديث المخزن والمالية' : 'تم تسجيل الفاتورة وإضافة الكميات للمخزن');
       onSaved();
       onClose();
     } catch (err) {
@@ -140,9 +159,9 @@ function PurchaseForm({ materials, suppliers, onClose, onSaved }) {
   };
 
   return (
-    <Modal title="فاتورة شراء خامات" onClose={onClose} wide>
+    <Modal title={purchase ? 'تعديل فاتورة شراء' : 'فاتورة شراء خامات'} onClose={onClose} wide>
       {materials.length === 0 ? (
-        <p className="text-xs font-bold text-slate-500 text-center py-4">أضيفي الخامات أولاً من تبويب "الخامات والمخزن".</p>
+        <p className="text-xs font-bold text-slate-500 text-center py-4">أضف الخامات أولاً من تبويب "الخامات والمخزن".</p>
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

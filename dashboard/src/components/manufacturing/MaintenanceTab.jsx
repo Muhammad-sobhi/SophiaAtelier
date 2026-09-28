@@ -63,7 +63,7 @@ export default function MaintenanceTab({ materials, dresses, reloadShared }) {
         <p className="text-[10px] font-bold text-slate-400">تُخصم الكمية من المخزن فقط — تكلفة الخامة سُجلت في المالية وقت شرائها.</p>
         <Field label="الفستان *">
           <select className={inputClass} required value={dressId} onChange={(e) => setDressId(e.target.value)}>
-            <option value="">اختاري الفستان...</option>
+            <option value="">اختر الفستان...</option>
             {dresses.map((d) => <option key={d.id} value={d.id}>{d.code ? `${d.code} — ` : ''}{d.name}</option>)}
           </select>
         </Field>
