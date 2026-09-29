@@ -1,9 +1,44 @@
 const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location.hostname.includes('sophiadresses.cloud') ? 'https://api.sophiadresses.cloud/api' : 'http://localhost:8000/api');
 
-function clearAuth() {
-  localStorage.removeItem('atelier_auth_token');
+export function clearAuth() {
   localStorage.removeItem('atelier_current_employee');
   window.dispatchEvent(new Event('auth-change'));
+}
+
+// Auth is a Sanctum HttpOnly session cookie. JS never sees it; we only echo the
+// readable XSRF-TOKEN cookie back as a header so Laravel can verify CSRF.
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+function readXsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function ensureCsrfCookie(force = false) {
+  if (!force && readXsrfToken()) return;
+  await fetch(`${API_ORIGIN}/sanctum/csrf-cookie`, { credentials: 'include' });
+}
+
+// Sends a request with the session cookie + CSRF header, retrying once on CSRF mismatch (419)
+async function sendWithSession(url, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  const isUnsafe = UNSAFE_METHODS.includes(method);
+
+  const send = () => {
+    const headers = { ...options.headers };
+    const xsrf = readXsrfToken();
+    if (isUnsafe && xsrf) headers['X-XSRF-TOKEN'] = xsrf;
+    return fetch(url, { ...options, headers, credentials: 'include' });
+  };
+
+  if (isUnsafe) await ensureCsrfCookie();
+  let response = await send();
+  if (response.status === 419 && isUnsafe) {
+    await ensureCsrfCookie(true);
+    response = await send();
+  }
+  return response;
 }
 
 export function getStorageUrl(path) {
@@ -44,27 +79,14 @@ export function getStorageUrl(path) {
 
 class ApiClient {
   getHeaders() {
-    const headers = {
+    return {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     };
-
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('atelier_auth_token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-    }
-    return headers;
   }
 
   getAuthHeader() {
-    const h = { 'Accept': 'application/json' };
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('atelier_auth_token');
-      if (token) h['Authorization'] = `Bearer ${token}`;
-    }
-    return h;
+    return { 'Accept': 'application/json' };
   }
 
   async request(endpoint, options = {}) {
@@ -89,7 +111,7 @@ class ApiClient {
       ...options.headers
     };
 
-    const response = await fetch(url, {
+    const response = await sendWithSession(url, {
       ...options,
       headers
     });
@@ -159,10 +181,10 @@ class ApiClient {
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 
-  /** Download a file endpoint (auth header included) and save it with the given name */
+  /** Download a file endpoint (session cookie included) and save it with the given name */
   async download(endpoint, filename) {
     const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    const response = await fetch(url, { headers: this.getAuthHeader() });
+    const response = await sendWithSession(url, { headers: this.getAuthHeader() });
 
     if (response.status === 401) {
       clearAuth();
@@ -185,7 +207,7 @@ class ApiClient {
 
   async postFormData(endpoint, formData) {
     const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    const response = await fetch(url, {
+    const response = await sendWithSession(url, {
       method: 'POST',
       headers: this.getAuthHeader(),
       body: formData

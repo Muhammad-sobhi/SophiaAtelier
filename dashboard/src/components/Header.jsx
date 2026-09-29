@@ -165,7 +165,7 @@ export function Header({ onMenuClick }) {
 
 
       // If backend is unreachable, still clear local auth
-    }localStorage.removeItem('atelier_current_employee');localStorage.removeItem('atelier_auth_token');window.dispatchEvent(new Event('auth-change'));navigate('/dashboard');};
+    }localStorage.removeItem('atelier_current_employee');window.dispatchEvent(new Event('auth-change'));navigate('/dashboard');};
 
   const filteredNotifications = notifications.filter((notif) => {
     if (!currentUser) return false;

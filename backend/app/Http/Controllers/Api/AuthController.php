@@ -25,11 +25,12 @@ class AuthController extends Controller
         $validated['role'] = 'staff';
 
         $user = User::create($validated);
-        $token = $user->createToken('auth-token')->plainTextToken;
+
+        Auth::guard('web')->login($user);
+        $request->session()->regenerate();
 
         return response()->json([
             'user' => $user,
-            'token' => $token,
         ], 201);
     }
 
@@ -49,7 +50,9 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        // Session cookie is HttpOnly, so the credential is never readable by frontend JS
+        Auth::guard('web')->login($user);
+        $request->session()->regenerate();
 
         $employee = \App\Models\Employee::where('email', $user->email)->first();
         $user->permissions = $employee ? ($employee->permissions ?? []) : [];
@@ -58,7 +61,6 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $user,
-            'token' => $token,
         ]);
     }
 
@@ -67,8 +69,11 @@ class AuthController extends Controller
         $user = $request->user();
         if ($user) {
             \App\Services\ActivityLogger::log('تسجيل خروج من النظام', 'User', $user->id, null, $user->name);
-            $user->currentAccessToken()->delete();
         }
+
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json([
             'message' => 'Logged out successfully',

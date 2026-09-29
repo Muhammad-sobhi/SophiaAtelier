@@ -23,7 +23,6 @@ export default function LoginPage({ onLogin }) {
         password
       });
 
-      localStorage.setItem('atelier_auth_token', res.token);
       const userObj = {
         id: res.user.id,
         name: res.user.name,

@@ -78,7 +78,6 @@ export function Sidebar({ onClose }) {
       // If backend is unreachable, still clear local auth
     }
     localStorage.removeItem('atelier_current_employee');
-    localStorage.removeItem('atelier_auth_token');
     window.dispatchEvent(new Event('auth-change'));
     navigate('/dashboard');
   };

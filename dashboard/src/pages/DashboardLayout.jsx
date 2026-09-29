@@ -18,9 +18,9 @@ export default function DashboardLayout() {
   // Initialize and check login status
   useEffect(() => {
     const checkAuth = () => {
+      // Cached profile is for UI only; the real credential is the HttpOnly session cookie
       const userStr = localStorage.getItem('atelier_current_employee');
-      const token = localStorage.getItem('atelier_auth_token');
-      if (userStr && token) {
+      if (userStr) {
         try {
           setCurrentUser(JSON.parse(userStr));
         } catch (e) {
@@ -33,6 +33,10 @@ export default function DashboardLayout() {
     };
 
     checkAuth();
+    // Confirm the server session is still alive; a 401 clears the cached profile via apiClient
+    if (localStorage.getItem('atelier_current_employee')) {
+      apiClient.get('/auth/me').catch(() => {});
+    }
     window.addEventListener('auth-change', checkAuth);
     return () => {
       window.removeEventListener('auth-change', checkAuth);
@@ -55,7 +59,6 @@ export default function DashboardLayout() {
         password
       });
 
-      localStorage.setItem('atelier_auth_token', res.token);
       const userObj = {
         id: res.user.id,
         name: res.user.name,

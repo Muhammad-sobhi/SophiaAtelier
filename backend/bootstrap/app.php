@@ -12,6 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Dashboard auth uses Sanctum SPA sessions (HttpOnly cookie + CSRF), not bearer tokens in localStorage
+        $middleware->statefulApi();
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
@@ -38,6 +40,13 @@ return Application::configure(basePath: dirname(__DIR__))
                     return response()->json([
                         'message' => 'غير مصرح للوصول',
                     ], 401);
+                }
+
+                // Keep intended HTTP statuses (419 CSRF mismatch, 429 throttle, 403 abort...) instead of masking them as 500
+                if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                    return response()->json([
+                        'message' => $e->getMessage() ?: 'حدث خطأ في الطلب',
+                    ], $e->getStatusCode(), $e->getHeaders());
                 }
 
                 \Illuminate\Support\Facades\Log::error('API Error: ' . $e->getMessage(), [
