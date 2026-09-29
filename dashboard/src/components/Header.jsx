@@ -26,8 +26,7 @@ function mapApiNotification(n) {
     related_type: n.related_type,
     related_id: n.related_id,
     page: n.type === 'new_appointment' && n.related_type === 'visit' ? '/dashboard?tab=brides&stage=visit' :
-    n.type === 'new_appointment' || n.related_type === 'booking' ?
-    `/dashboard/appointments?booking_id=${n.related_id}` :
+    n.type === 'new_appointment' || n.related_type === 'booking' ? '/dashboard?tab=brides' :
     n.related_type === 'visit' ? '/dashboard/visits' :
     n.related_type === 'task' ? '/dashboard/tasks' :
     n.related_type === 'revenue' ? '/dashboard/finance' :

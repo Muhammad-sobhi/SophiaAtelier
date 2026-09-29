@@ -2040,7 +2040,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
             </div>
 
             <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-xs font-bold text-amber-900 leading-relaxed">
-              <p>{conflictWarningMessage || 'هذا الفستان محجوز لعميلة أخرى في هذه الفترة أو قيد الإرجاع والتنظيف.'}</p>
+              <p>{conflictWarningMessage || 'هذا الفستان محجوز لعميلة أخرى في هذه الفترة أو لم يتم إرجاعه بعد.'}</p>
               <div className="text-[11px] text-slate-600 font-normal pt-1 border-t border-amber-200/60">
                 هل ترغب في المتابعة وتأكيد الحجز وتجاوز هذا التعارض على مسؤوليتك؟
               </div>

@@ -134,9 +134,9 @@ export default function CartDrawer() {
   if (!cartOpen) return null;
 
   const rowsById = Object.fromEntries((availability.data?.dresses || []).map((r) => [r.dress_id, r]));
-  const isBlocking = (row) => row && ((row.wedding_date && !row.wedding_date.available) || row.visit_date?.reason_code === 'booked');
+  const isBlocking = (row) => row && ((row.wedding_date && !row.wedding_date.available) || (row.visit_date && !row.visit_date.available));
   const hasBlocking = cart.some((item) => isBlocking(rowsById[item.id]));
-  const hasVisitConflict = cart.some((item) => rowsById[item.id]?.visit_date?.reason_code === 'booked');
+  const hasVisitConflict = cart.some((item) => rowsById[item.id]?.visit_date && !rowsById[item.id].visit_date.available);
   const suggestedDate = availability.data?.suggested_visit_date;
   const totalTryingFee = cart.reduce((sum, item) => sum + parseFloat(rowsById[item.id]?.trying_fee ?? item.trying_fee ?? 0), 0);
 
@@ -145,9 +145,6 @@ export default function CartDrawer() {
     switch (vd.reason_code) {
       case 'booked': return a.tryBooked(vd.available_from);
       case 'overdue': return a.tryOverdue;
-      case 'cleaning':
-      case 'dry_clean': return a.tryCleaning;
-      case 'maintenance': return a.tryMaintenance;
       default: return null;
     }
   };
@@ -299,8 +296,8 @@ export default function CartDrawer() {
                       </p>
 
                       {vd && (
-                        <p className={vd.available ? styles.statusOk : vd.reason_code === 'booked' ? styles.statusBad : styles.statusWarn}>
-                          {vd.available ? '✓' : vd.reason_code === 'booked' ? '✗' : '!'} {a.tryDay}: {vd.available ? a.available : visitText}
+                        <p className={vd.available ? styles.statusOk : styles.statusBad}>
+                          {vd.available ? '✓' : '✗'} {a.tryDay}: {vd.available ? a.available : visitText}
                         </p>
                       )}
                       {wd && (

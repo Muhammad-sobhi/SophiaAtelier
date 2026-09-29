@@ -162,32 +162,11 @@ class Booking extends Model
         static::updated(function ($booking) {
             // Check if status transitioned to returned
             if ($booking->wasChanged('status') && $booking->status === 'returned') {
-                $dressesToClean = [];
-                if ($booking->dress) {
-                    $dressesToClean[] = $booking->dress;
-                }
-                if ($booking->dress2) {
-                    $dressesToClean[] = $booking->dress2;
-                }
-
-                foreach ($dressesToClean as $dressItem) {
-                    $dressName = $dressItem->name ?? 'فستان غير معروف';
-                    
-                    // 1. Create a cleaning task
-                    $task = \App\Models\Task::create([
-                        'booking_id' => $booking->id,
-                        'title' => 'تنظيف فستان: ' . $dressName,
-                        'description' => 'تلقائي: تم إرجاع الفستان من العميل ويجب تنظيفه كأولوية قصوى.',
-                        'type' => 'cleaning',
-                        'status' => 'pending',
-                        'due_date' => now()->addDays(1)->toDateString(),
-                    ]);
-
-                    // 2. Create a notification for this return
+                foreach (array_filter([$booking->dress, $booking->dress2, $booking->dress3]) as $dressItem) {
                     \App\Models\Notification::create([
                         'type' => 'dress_returned',
-                        'title' => 'تم إرجاع فستان: ' . $dressName,
-                        'message' => 'تم استلام الفستان المرتجع بنجاح وإنشاء مهمة تنظيف جديدة بالرقم #' . $task->id,
+                        'title' => 'تم إرجاع فستان: ' . ($dressItem->name ?? 'فستان غير معروف'),
+                        'message' => 'تم استلام الفستان المرتجع وأصبح متاحاً',
                         'related_type' => 'booking',
                         'related_id' => $booking->id
                     ]);

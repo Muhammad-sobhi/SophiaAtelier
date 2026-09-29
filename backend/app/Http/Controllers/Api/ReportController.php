@@ -430,19 +430,16 @@ class ReportController extends Controller
                 'ready' => ($countsByStatus['ready'] ?? 0) + ($countsByStatus['available'] ?? 0),
                 'booked' => $countsByStatus['booked'] ?? 0,
                 'out' => $countsByStatus['out'] ?? 0,
-                'cleaning' => ($countsByStatus['cleaning'] ?? 0) + ($countsByStatus['dry_clean'] ?? 0) + ($countsByStatus['maintenance'] ?? 0),
             ];
         } else {
             $outCount = count($periodOutDressIds);
             $bookedCount = count(array_diff_key($periodBookedDressIds, $periodOutDressIds));
-            $cleaningCount = Dress::whereIn('status', ['cleaning', 'dry_clean', 'maintenance'])->count();
-            $readyCount = max(0, $totalDressesCount - ($bookedCount + $outCount + $cleaningCount));
+            $readyCount = max(0, $totalDressesCount - ($bookedCount + $outCount));
 
             $statusCounts = [
                 'ready' => $readyCount,
                 'booked' => $bookedCount,
                 'out' => $outCount,
-                'cleaning' => $cleaningCount,
             ];
         }
 

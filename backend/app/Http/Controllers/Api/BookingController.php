@@ -440,6 +440,14 @@ class BookingController extends Controller
             : array_filter([$validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null]);
         $dressIds = array_slice(array_values(array_unique(array_map('intval', $dressIds))), 0, 3);
 
+        // Availability is checked on the wedding date too, so both are needed before a visit can be requested
+        if (empty($dressIds) || (empty($validated['wedding_date']) && empty($validated['event_date']))) {
+            return response()->json([
+                'message' => 'يرجى اختيار فستان واحد على الأقل وتحديد تاريخ الزفاف',
+                'code' => 'missing_dresses_or_wedding_date',
+            ], 422);
+        }
+
         // 1. Find or create the client (bride) automatically
         $client = null;
         if (!empty($validated['client_id'])) {
@@ -501,7 +509,7 @@ class BookingController extends Controller
         );
         $blocking = collect($availability['dresses'])->filter(fn($r) =>
             ($r['wedding_date'] && !$r['wedding_date']['available'])
-            || ($r['visit_date'] && ($r['visit_date']['reason_code'] ?? null) === 'booked')
+            || ($r['visit_date'] && !$r['visit_date']['available'])
         );
         if ($blocking->isNotEmpty()) {
             return response()->json([
@@ -515,8 +523,8 @@ class BookingController extends Controller
         $previousVisit = self::previousVisitOfSamePhone($phone ?? $client->phone);
         $isRepeatRequest = $previousVisit !== null;
 
-        // Every dress is free on both dates: no employee review needed
-        $autoConfirm = !$isRepeatRequest && !empty($dressIds) && $timeSlot && $availability['all_available'];
+        // First-time brides are confirmed automatically (unavailable dresses were already refused above)
+        $autoConfirm = !$isRepeatRequest;
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
@@ -548,7 +556,7 @@ class BookingController extends Controller
                 'type' => 'new_appointment',
                 'title' => $isRepeatRequest
                     ? '⚠️ طلب زيارة متكرر — العروس زارت من قبل، راجع قبل التأكيد'
-                    : ($autoConfirm ? 'زيارة مؤكدة تلقائياً من الموقع — أرسل رسالة التأكيد' : 'طلب موعد زيارة جديد من الموقع يحتاج مراجعة'),
+                    : 'زيارة مؤكدة تلقائياً من الموقع — أرسل رسالة التأكيد',
                 'message' => 'العروس: ' . $client->name . ' — موعد الزيارة: ' . $bookingDate . ' ' . ($validated['time_slot'] ?? 'غير محدد'),
                 'related_type' => 'visit',
                 'related_id' => $visit->id

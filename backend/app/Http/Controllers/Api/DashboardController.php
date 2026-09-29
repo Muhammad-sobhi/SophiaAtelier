@@ -25,7 +25,6 @@ class DashboardController extends Controller
             'today_visits' => Visit::whereDate('visit_date', $today)->count(),
             'today_fittings' => Fitting::whereDate('fitting_date', $today)->count(),
             'dresses_out' => Dress::where('status', 'out')->count(),
-            'dresses_in_maintenance' => Dress::where('status', 'maintenance')->count(),
             'total_clients' => Client::count(),
             'total_dresses' => Dress::count(),
             'pending_tasks' => Task::where('status', '!=', 'completed')->count(),
@@ -178,8 +177,6 @@ class DashboardController extends Controller
                 $stage = 'available';
                 if ($dress->status === 'rented' || $dress->status === 'booked') {
                     $stage = 'booked';
-                } elseif ($dress->status === 'maintenance') {
-                    $stage = 'dry_clean'; // maintenance maps to dry_clean stage
                 }
   
                 return [

@@ -5,7 +5,6 @@ import { DirectionProvider } from './providers';
 import DashboardLayout from './pages/DashboardLayout';
 import DashboardHome from './pages/DashboardHome';
 
-const AppointmentsPage = lazy(() => import('./pages/AppointmentsPage'));
 const AttendancePage = lazy(() => import('./pages/AttendancePage'));
 const BookingsPage = lazy(() => import('./pages/BookingsPage'));
 const BridesPage = lazy(() => import('./pages/BridesPage'));
@@ -55,7 +54,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
-            <Route path="appointments" element={<AppointmentsPage />} />
+            <Route path="appointments" element={<Navigate to="/dashboard?tab=brides" replace />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="bookings" element={<BookingsPage />} />
             <Route path="brides" element={<BridesPage />} />

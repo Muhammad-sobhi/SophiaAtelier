@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\CategoryController;
-use App\Http\Controllers\Api\CleaningOrderController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DressController;
 use App\Http\Controllers\Api\DesignerController;
@@ -128,7 +127,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('reviews', ReviewController::class);
     Route::apiResource('revenues', RevenueController::class);
     Route::apiResource('expenses', ExpenseController::class);
-    Route::apiResource('cleaning-orders', CleaningOrderController::class);
     Route::apiResource('faqs', FaqController::class);
 
     // Manufacturing: suppliers, materials stock, purchases, workshop workers and manufacturing orders

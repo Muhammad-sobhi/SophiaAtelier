@@ -8,8 +8,7 @@ import { toast } from '@/components/ui/Toast';
 
 const DRESS_STAGES = [
 { id: 'ready', label: 'جاهز', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-{ id: 'booked', label: 'محجوز', color: 'text-blue-600 bg-blue-50 border-blue-100' },
-{ id: 'dry_clean', label: 'دراي كلين', color: 'text-purple-600 bg-purple-50 border-purple-100' }];
+{ id: 'booked', label: 'محجوز', color: 'text-blue-600 bg-blue-50 border-blue-100' }];
 
 
 export default function DressesPage() {
@@ -607,16 +606,12 @@ export default function DressesPage() {
       case 'booked':
         if (dress.status === 'out') {
           return [
-          { label: 'إرجاع ودراي كلين', action: 'mark_dry_clean', color: 'bg-purple-600 hover:bg-purple-700' }];
+          { label: 'إرجاع الفستان', action: 'mark_ready', color: 'bg-emerald-600 hover:bg-emerald-700' }];
 
         }
         return [
         { label: 'تسليم للعميلة', action: 'mark_out', color: 'bg-amber-600 hover:bg-amber-700' },
         { label: 'إلغاء الحجز', action: 'cancel_booking', color: 'bg-slate-500 hover:bg-slate-600' }];
-
-      case 'dry_clean':
-        return [
-        { label: 'إنهاء التنظيف', action: 'mark_ready', color: 'bg-emerald-600 hover:bg-emerald-700' }];
 
       default:
         return [];

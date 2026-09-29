@@ -722,7 +722,7 @@ export function BrideJourneyPopup({
                   <div className="mt-1 space-y-0.5 text-[9.5px] font-bold text-slate-500 leading-snug">
                     <div>المصدر: {VISIT_SOURCE_LABELS[latestVisit.source] || latestVisit.source || '—'}</div>
                     {latestVisit.confirmed_at && (
-                      <div>{latestVisit.auto_confirmed ? '⚡ تأكيد تلقائي (كل الفساتين متاحة)' : '👤 تأكيد بواسطة الموظف'}</div>
+                      <div>{latestVisit.auto_confirmed ? '⚡ تأكيد تلقائي (أول زيارة)' : '👤 تأكيد بواسطة الموظف'}</div>
                     )}
                     {latestVisit.status === 'confirmed' && (
                       <div className={whatsAppPending ? 'text-lime-700' : 'text-emerald-700'}>

@@ -100,7 +100,7 @@ class DressController extends Controller
             'purchase_date' => 'nullable|date',
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:available,out,maintenance,cleaning',
+            'status' => 'nullable|in:available,out',
             'size' => 'nullable|string|max:50',
             'weight_from' => 'nullable|integer|min:0',
             'weight_to' => 'nullable|integer|min:0',
@@ -222,7 +222,7 @@ class DressController extends Controller
             'purchase_date' => 'nullable|date',
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:available,out,maintenance,cleaning',
+            'status' => 'nullable|in:available,out',
             'size' => 'nullable|string|max:50',
             'weight_from' => 'nullable|integer|min:0',
             'weight_to' => 'nullable|integer|min:0',
@@ -355,7 +355,7 @@ class DressController extends Controller
 
     /**
      * PUT /api/dresses/{dress}/stage-action
-     * Perform a dress lifecycle action: mark_booked, mark_dry_clean, mark_ready, cancel_booking
+     * Perform a dress lifecycle action: mark_booked, mark_out, mark_ready, cancel_booking
      */
     public function stageAction(Request $request, Dress $dress): JsonResponse
     {
@@ -368,10 +368,6 @@ class DressController extends Controller
 
             case 'mark_out':
                 $dress->update(['status' => 'out']);
-                break;
-
-            case 'mark_dry_clean':
-                $dress->update(['status' => 'dry_clean']);
                 break;
 
             case 'mark_ready':
@@ -388,12 +384,8 @@ class DressController extends Controller
 
         // Compute lifecycle stage
         $stage = 'ready';
-        if (in_array($dress->status, ['cleaning', 'dry_clean'])) {
-            $stage = 'dry_clean';
-        } elseif (in_array($dress->status, ['booked', 'out'])) {
+        if (in_array($dress->status, ['booked', 'out'])) {
             $stage = 'booked';
-        } elseif ($dress->status === 'maintenance') {
-            $stage = 'dry_clean';
         }
 
         return response()->json([

@@ -1026,10 +1026,10 @@ class ClientController extends Controller
                         $returnUpdate['return_scheduled_on'] = $request->input('return_scheduled_on');
                     }
                     $booking->update($returnUpdate);
-                    // Mark all dresses for dry clean
-                    if ($booking->dress) $booking->dress->update(['status' => 'cleaning']);
-                    if ($booking->dress2) $booking->dress2->update(['status' => 'cleaning']);
-                    if ($booking->dress3) $booking->dress3->update(['status' => 'cleaning']);
+                    // Returned dresses are available again; cleaning is handled outside the system
+                    if ($booking->dress) $booking->dress->update(['status' => 'available']);
+                    if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
+                    if ($booking->dress3) $booking->dress3->update(['status' => 'available']);
 
                     // Return: write one insurance refund revenue = amount staff entered
                     $damageDeduction = floatval($request->input('damage_deduction', 0));

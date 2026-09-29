@@ -294,12 +294,10 @@ export function FinanceStatsDetailModal({
                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
                               item.status === 'ready' ? 'bg-emerald-50 text-emerald-700' :
                               item.status === 'out' ? 'bg-blue-50 text-blue-700' :
-                              item.status === 'cleaning' ? 'bg-amber-50 text-amber-700' :
                               'bg-slate-100 text-slate-600'
                             }`}>
                               {item.status === 'ready' ? 'جاهز' :
-                               item.status === 'out' ? 'مستلم' :
-                               item.status === 'cleaning' ? 'غسيل وكي' : item.status}
+                               item.status === 'out' ? 'مستلم' : item.status}
                             </span>
                           </td>
                         </tr>

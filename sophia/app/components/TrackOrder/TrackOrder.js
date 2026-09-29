@@ -109,8 +109,6 @@ export default function TrackOrder() {
       case 'out':
         return 3;
       case 'returned':
-      case 'cleaning':
-      case 'dry_clean':
         return 4;
       default:
         return 0;

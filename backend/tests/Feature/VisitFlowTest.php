@@ -15,18 +15,18 @@ class VisitFlowTest extends TestCase
 {
     use DatabaseTransactions;
 
-    private function websiteRequest(array $dressIds, string $visitDate, string $weddingDate): Visit
+    private function websiteRequest(array $dressIds, string $visitDate, string $weddingDate, string $phone = '01099999999'): Visit
     {
-        $this->websitePost($dressIds, $visitDate, $weddingDate)->assertCreated();
+        $this->websitePost($dressIds, $visitDate, $weddingDate, $phone)->assertCreated();
 
         return Visit::latest('id')->first();
     }
 
-    private function websitePost(array $dressIds, string $visitDate, string $weddingDate)
+    private function websitePost(array $dressIds, string $visitDate, string $weddingDate, string $phone = '01099999999')
     {
         return $this->postJson('/api/public/bookings', [
             'client_name' => 'Website Bride',
-            'client_phone' => '01099999999',
+            'client_phone' => $phone,
             'client_city' => 'القاهرة',
             'visit_date' => $visitDate,
             'time_slot' => '02:30 PM',
@@ -69,13 +69,50 @@ class VisitFlowTest extends TestCase
         $this->assertSame('visit', $visit->client->current_stage);
     }
 
-    public function test_website_request_with_dress_in_cleaning_waits_for_employee(): void
+    public function test_repeat_website_request_waits_for_employee(): void
     {
-        $dress = Dress::factory()->create(['status' => 'cleaning']);
-        $visit = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10');
+        $dress = Dress::factory()->create();
+        $first = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10');
 
-        $this->assertSame('pending', $visit->status);
-        $this->assertFalse($visit->auto_confirmed);
+        $response = $this->websitePost([$dress->id], '2026-11-05', '2026-12-10')->assertCreated();
+        $repeat = Visit::latest('id')->first();
+
+        $this->assertSame('confirmed', $first->status);
+        $this->assertFalse($response->json('auto_confirmed'));
+        $this->assertSame('pending', $repeat->status);
+        $this->assertSame($first->id, $repeat->previous_visit_id);
+    }
+
+    public function test_website_request_is_rejected_when_a_dress_is_out_on_her_visit_date(): void
+    {
+        $dress = Dress::factory()->create();
+        $this->bookFor($dress, '2026-10-31', '2026-11-02');
+        $before = Visit::count();
+
+        $this->websitePost([$dress->id], '2026-11-01', '2027-02-10')
+            ->assertStatus(422)->assertJsonPath('code', 'dresses_unavailable');
+        $this->assertSame($before, Visit::count());
+    }
+
+    public function test_website_request_needs_dresses_and_wedding_date(): void
+    {
+        $this->postJson('/api/public/bookings', [
+            'client_name' => 'No Date Bride', 'client_phone' => '01066666666',
+            'visit_date' => '2026-11-01', 'time_slot' => '02:30 PM', 'dress_ids' => [Dress::factory()->create()->id],
+        ])->assertStatus(422)->assertJsonPath('code', 'missing_dresses_or_wedding_date');
+    }
+
+    public function test_returned_dresses_become_available_without_cleaning_task(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $dress = Dress::factory()->create(['status' => 'out']);
+        $booking = $this->bookFor($dress, '2026-11-01', '2026-11-03', 'picked_up');
+
+        $this->putJson("/api/clients/{$booking->client_id}/stage-action", ['action' => 'mark_returned'])->assertOk();
+
+        $this->assertSame('returned', $booking->fresh()->status);
+        $this->assertSame('available', $dress->fresh()->status);
+        $this->assertSame(0, \App\Models\Task::where('booking_id', $booking->id)->count());
     }
 
     public function test_website_request_is_rejected_when_a_dress_is_booked_on_her_dates(): void
@@ -193,7 +230,7 @@ class VisitFlowTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
         $dresses = Dress::factory()->count(2)->create();
         $booked = $this->websiteRequest([$dresses[0]->id], '2031-03-02', '2031-06-01');
-        $noShow = $this->websiteRequest([$dresses[1]->id], '2031-03-03', '2031-06-02');
+        $noShow = $this->websiteRequest([$dresses[1]->id], '2031-03-03', '2031-06-02', '01055555555');
         $this->putJson("/api/clients/{$booked->client_id}/stage-action", [
             'action' => 'confirm_booking', 'dress_id' => $dresses[0]->id, 'event_date' => '2031-06-01', 'total_amount' => 1000,
         ])->assertOk();
@@ -213,8 +250,11 @@ class VisitFlowTest extends TestCase
     public function test_confirm_visit_keeps_requested_date_and_stores_changes(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
-        $dress = Dress::factory()->create(['status' => 'cleaning']);
+        $dress = Dress::factory()->create();
+        // A repeat request stays pending until an employee confirms it
+        $this->websiteRequest([$dress->id], '2026-10-20', '2026-12-10');
         $visit = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10');
+        $this->assertSame('pending', $visit->status);
 
         // Confirming without a date must not move the visit to today
         $this->putJson("/api/clients/{$visit->client_id}/stage-action", ['action' => 'confirm_visit'])->assertOk();
@@ -237,7 +277,7 @@ class VisitFlowTest extends TestCase
         $this->assertSame('17:00', $visit->time_slot);
         $this->assertEquals(0, $visit->trying_fee);
         $this->assertCount(2, $visit->requestedDresses);
-        $this->assertSame(1, Visit::where('client_id', $visit->client_id)->count());
+        $this->assertSame(2, Visit::where('client_id', $visit->client_id)->count(), 'no extra visit is created');
         $this->assertSame(0, Booking::where('client_id', $visit->client_id)->count());
     }
 
@@ -246,7 +286,6 @@ class VisitFlowTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
         $busy = Dress::factory()->create(['status' => 'available']);
         $free = Dress::factory()->create(['status' => 'available']);
-        $cleaning = Dress::factory()->create(['status' => 'cleaning']);
 
         $otherBride = Client::create(['name' => 'Other Bride', 'phone' => '01011111111', 'city' => 'القاهرة']);
         Booking::create([
@@ -264,7 +303,7 @@ class VisitFlowTest extends TestCase
         // The website refuses booked dresses, so the employee registers this visit
         $bride = Client::create(['name' => 'Shop Bride', 'phone' => '01033333333', 'city' => 'القاهرة', 'wedding_date' => '2026-11-03']);
         $visit = Visit::create(['client_id' => $bride->id, 'visit_date' => '2026-11-02', 'status' => 'pending', 'source' => 'walkin']);
-        $visit->requestedDresses()->syncWithPivotValues([$busy->id, $free->id, $cleaning->id], ['type' => 'requested']);
+        $visit->requestedDresses()->syncWithPivotValues([$busy->id, $free->id], ['type' => 'requested']);
 
         $rows = collect($this->getJson("/api/visits/{$visit->id}/availability")->assertOk()->json())->keyBy('dress_id');
 
@@ -275,9 +314,6 @@ class VisitFlowTest extends TestCase
 
         $this->assertTrue($rows[$free->id]['visit_date']['available']);
         $this->assertTrue($rows[$free->id]['wedding_date']['available']);
-
-        $this->assertFalse($rows[$cleaning->id]['visit_date']['available']);
-        $this->assertNull($rows[$cleaning->id]['visit_date']['available_from']);
     }
 
     public function test_booking_three_dresses_closes_the_visit(): void

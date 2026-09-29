@@ -6,7 +6,6 @@ import { toast } from '@/components/ui/Toast';
 const DRESS_STAGES = [
   { id: 'ready', label: 'جاهز', icon: CheckCircle2, color: 'emerald' },
   { id: 'booked', label: 'محجوز', icon: ShoppingBag, color: 'blue' },
-  { id: 'dry_clean', label: 'دراي كلين', icon: Sparkles, color: 'purple' },
 ];
 
 export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
@@ -35,16 +34,12 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
       case 'booked':
         if (dress.status === 'out') {
           return [
-            { label: 'إرجاع ودراي كلين', action: 'mark_dry_clean', color: 'bg-purple-600 hover:bg-purple-700', disabled: false }
+            { label: 'إرجاع الفستان', action: 'mark_ready', color: 'bg-emerald-600 hover:bg-emerald-700', disabled: false }
           ];
         }
         return [
           { label: 'تسليم للعميلة', action: 'mark_out', color: 'bg-amber-600 hover:bg-amber-700', disabled: false },
           { label: 'إلغاء الحجز', action: 'cancel_booking', color: 'bg-slate-500 hover:bg-slate-600', disabled: false }
-        ];
-      case 'dry_clean':
-        return [
-          { label: 'إنهاء التنظيف', action: 'mark_ready', color: 'bg-emerald-600 hover:bg-emerald-700', disabled: false }
         ];
       default:
         return [];
@@ -180,18 +175,16 @@ export function DressLifecycleCard({ dress, onStageUpdate, apiBaseUrl }) {
         })}
       </div>
 
-      {/* Desktop Grid containing 3 Columns */}
-      <div className="hidden md:grid md:grid-cols-3 gap-3 text-right">
+      {/* Desktop Grid containing 2 Columns */}
+      <div className="hidden md:grid md:grid-cols-2 gap-3 text-right">
         {renderColumn('ready', 'جاهز (جاهز للاستخدام)', 'border-emerald-100 bg-emerald-50/40 text-emerald-700')}
         {renderColumn('booked', 'محجوز (محجوز / مستأجر)', 'border-blue-100 bg-blue-50/40 text-blue-700')}
-        {renderColumn('dry_clean', 'دراي كلين (تنظيف / صيانة)', 'border-purple-100 bg-purple-50/40 text-purple-700')}
       </div>
 
       {/* Mobile Single Selected Stage Display */}
       <div className="block md:hidden text-right">
         {selectedMobileStage === 'ready' && renderColumn('ready', 'جاهز (جاهز للاستخدام)', 'border-emerald-100 bg-emerald-50/40 text-emerald-700')}
         {selectedMobileStage === 'booked' && renderColumn('booked', 'محجوز (محجوز / مستأجر)', 'border-blue-100 bg-blue-50/40 text-blue-700')}
-        {selectedMobileStage === 'dry_clean' && renderColumn('dry_clean', 'دراي كلين (تنظيف / صيانة)', 'border-purple-100 bg-purple-50/40 text-purple-700')}
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ class StoreDressRequest extends FormRequest
             'purchase_date' => 'nullable|date',
             'rental_price' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:available,out,maintenance,cleaning',
+            'status' => 'nullable|in:available,out',
             'size' => 'nullable|string|max:50',
             'weight_from' => 'nullable|integer|min:0',
             'weight_to' => 'nullable|integer|min:0',

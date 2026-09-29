@@ -73,13 +73,6 @@ class DressAvailabilityService
         return $conflicts;
     }
 
-    /** Dress statuses meaning the dress is physically unavailable for trying right now */
-    private const UNAVAILABLE_STATUS_LABELS = [
-        'cleaning' => 'في التنظيف',
-        'dry_clean' => 'في الدراي كلين',
-        'maintenance' => 'في الصيانة',
-    ];
-
     /** Availability of each dress requested in a visit (dashboard view, includes other brides' names) */
     public static function forVisit(\App\Models\Visit $visit): array
     {
@@ -269,16 +262,6 @@ class DressAvailabilityService
                 'reason_code' => 'booked',
                 'reason' => 'محجوز لعروس أخرى من ' . $blockedBy['start']->toDateString() . ' إلى ' . $blockedBy['end']->toDateString(),
                 'available_from' => $candidate->toDateString(),
-            ];
-        }
-
-        // Cleaning / maintenance has no expected end date, so the employee checks it
-        if (isset(self::UNAVAILABLE_STATUS_LABELS[$dress->status])) {
-            return [
-                'available' => false,
-                'reason_code' => $dress->status,
-                'reason' => self::UNAVAILABLE_STATUS_LABELS[$dress->status] . ' حالياً',
-                'available_from' => null,
             ];
         }
 

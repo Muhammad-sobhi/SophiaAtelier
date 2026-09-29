@@ -8,7 +8,7 @@ import { apiClient, getStorageUrl } from '@/lib/api-client';
 // Dresses Report Component with 100% Backend-Calculated Metrics (View-Only)
 export function DressesReport() {
   const [reportData, setReportData] = useState({
-    status_counts: { ready: 0, booked: 0, out: 0, cleaning: 0 },
+    status_counts: { ready: 0, booked: 0, out: 0 },
     total_dresses: 0,
     total_bookings: 0,
     total_revenue: 0,
@@ -70,7 +70,7 @@ export function DressesReport() {
 
       const res = await apiClient.get('/reports/dresses', { params });
       setReportData(res || {
-        status_counts: { ready: 0, booked: 0, out: 0, cleaning: 0 },
+        status_counts: { ready: 0, booked: 0, out: 0 },
         total_dresses: 0,
         total_bookings: 0,
         total_revenue: 0,
@@ -92,7 +92,7 @@ export function DressesReport() {
   }, [fetchReport]);
 
   const dressesList = reportData.dresses || [];
-  const statusCounts = reportData.status_counts || { ready: 0, booked: 0, out: 0, cleaning: 0 };
+  const statusCounts = reportData.status_counts || { ready: 0, booked: 0, out: 0 };
 
   // Pagination computation over backend pre-calculated and pre-sorted dresses
   const totalItems = dressesList.length;
@@ -306,7 +306,7 @@ export function DressesReport() {
       </div>
 
       {/* Status Distribution Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-emerald-800 block">جاهز للاستخدام</span>
@@ -337,15 +337,6 @@ export function DressesReport() {
           <span className="text-xl">👗</span>
         </div>
 
-        <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-extrabold text-amber-800 block">دراي كلين وصيانة</span>
-            <span className="font-mono text-base font-black text-amber-950">
-              {loading ? '...' : (statusCounts.cleaning || 0)} فستان
-            </span>
-          </div>
-          <span className="text-xl">🧼</span>
-        </div>
       </div>
 
       {/* Dresses List Table & Mobile Cards (View-Only, Server Data) */}
@@ -407,13 +398,10 @@ export function DressesReport() {
                           <span className={`px-2 py-0.5 rounded-lg text-[9.5px] font-black ${
                             dress.status === 'ready' || dress.status === 'available' ? 'bg-emerald-50 text-emerald-700' :
                             dress.status === 'out' ? 'bg-blue-50 text-blue-700' :
-                            dress.status === 'cleaning' || dress.status === 'dry_clean' || dress.status === 'maintenance' ? 'bg-amber-50 text-amber-700' :
                             'bg-slate-100 text-slate-600'
                           }`}>
                             {dress.status === 'ready' || dress.status === 'available' ? 'جاهز' :
-                             dress.status === 'out' ? 'مستلم' :
-                             dress.status === 'cleaning' || dress.status === 'dry_clean' ? 'دراي كلين' :
-                             dress.status === 'maintenance' ? 'صيانة' : dress.status}
+                             dress.status === 'out' ? 'مستلم' : dress.status}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-700">
@@ -459,13 +447,10 @@ export function DressesReport() {
                       <span className={`px-2 py-0.5 rounded-lg text-[9.5px] font-black flex-shrink-0 ${
                         dress.status === 'ready' || dress.status === 'available' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                         dress.status === 'out' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                        dress.status === 'cleaning' || dress.status === 'dry_clean' || dress.status === 'maintenance' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                         'bg-slate-100 text-slate-600'
                       }`}>
                         {dress.status === 'ready' || dress.status === 'available' ? 'جاهز' :
-                         dress.status === 'out' ? 'مستلم' :
-                         dress.status === 'cleaning' || dress.status === 'dry_clean' ? 'دراي كلين' :
-                         dress.status === 'maintenance' ? 'صيانة' : dress.status}
+                         dress.status === 'out' ? 'مستلم' : dress.status}
                       </span>
                     </div>
 
