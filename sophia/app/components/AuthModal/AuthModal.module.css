@@ -190,3 +190,31 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* Country code + mobile number (numbers always read left-to-right) */
+.phoneRow {
+  display: flex;
+  gap: 8px;
+  direction: ltr;
+}
+.phoneRow .inputWrap {
+  flex: 1;
+  min-width: 0;
+}
+.countrySelect {
+  flex: 0 0 auto;
+  width: 132px;
+  padding: 12px 10px;
+  border: 1px solid #e2ddd5;
+  border-radius: 12px;
+  font-size: 13px;
+  background: #faf8f5;
+  color: inherit;
+  outline: none;
+  text-overflow: ellipsis;
+  transition: border-color 0.2s ease;
+}
+.countrySelect:focus {
+  border-color: #c8a96a;
+  background: #fff;
+}

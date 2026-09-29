@@ -25,6 +25,8 @@ import { MultiPaymentMethodInput } from './MultiPaymentMethodInput';
 import { UnifiedStageModal, calculateScheduledDates } from './bride-journey/UnifiedStageModal';
 import { cleanDate, isCairoCity, todayStr } from '@/lib/utils';
 import { toast } from '@/components/ui/Toast';
+import { PhoneWarning } from '@/components/ui/PhoneWarning';
+import { formatWhatsAppNumber } from '@/lib/whatsapp';
 
 
 
@@ -484,7 +486,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
         console.error('Failed to fetch whatsapp template, using fallback:', err);
       }
 
-      const cleanPhone = activePhone.replace(/[^\d]/g, '');
+      const cleanPhone = formatWhatsAppNumber(activePhone).replace('+', '');
       if (cleanPhone) {
         const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
@@ -628,7 +630,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
           console.error('Failed to fetch whatsapp template:', err);
         }
 
-        const cleanPhone = freshBride.phone.replace(/[^\d]/g, '');
+        const cleanPhone = formatWhatsAppNumber(freshBride.phone).replace('+', '');
         if (cleanPhone) {
           const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
           window.open(whatsappUrl, '_blank');
@@ -658,7 +660,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
           console.error('Failed to fetch whatsapp template, using fallback:', err);
         }
 
-        const cleanPhone = freshBride.phone.replace(/[^\d]/g, '');
+        const cleanPhone = formatWhatsAppNumber(freshBride.phone).replace('+', '');
         const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
         window.open(whatsappUrl, '_blank');
@@ -667,7 +669,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
       if (action === 'mark_returned') {
         const dressName = freshBride.latest_dress_name || freshBride.bookings?.[0]?.dress?.name || '';
         const message = `✨ *فساتين صوفيا | Sophia Dresses* ✨\n\nمرحباً يا جميلتنا *${freshBride.name}* 🤍،\nنشكركِ جداً على اختياركِ لفساتين صوفيا لمشاركتكِ فرحتكِ! 🥰🌸\n\nنود تأكيد استلام فستان زفافكِ *${dressName}* بحالة سليمة وجيدة اليوم، وتم إرجاع مبلغ التأمين بالكامل. 💰✔️\n\nسعدنا جداً بخدمتكِ وكونكِ إحدى جميلات فساتين صوفيا، ويسعدنا جداً مشاركتنا صور زفافكِ الجميلة بالفستان إذا رغبتِ! 📸👰🏻‍♀️🤍\n\nنتمنى لكِ حياة زوجية سعيدة ومليئة بالحب والفرح! ✨🎀`;
-        const cleanPhone = freshBride.phone.replace(/[^\d]/g, '');
+        const cleanPhone = formatWhatsAppNumber(freshBride.phone).replace('+', '');
         const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
       }
@@ -681,7 +683,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
   const handleSendCongratsWhatsApp = async (e) => {
     e?.stopPropagation?.();
-    const phone = (bride.phone || '').replace(/[^\d]/g, '');
+    const phone = formatWhatsAppNumber(bride.phone).replace('+', '');
     if (!phone) {
       toast.error('لا يوجد رقم هاتف مسجل للعروس');
       return;
@@ -753,7 +755,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
 
   const handleSendPickupReminderWhatsApp = async (e) => {
     e?.stopPropagation?.();
-    const phone = (bride.phone || '').replace(/[^\d]/g, '');
+    const phone = formatWhatsAppNumber(bride.phone).replace('+', '');
     if (!phone) {
       toast.error('لا يوجد رقم هاتف مسجل للعروس');
       return;
@@ -1876,6 +1878,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                       placeholder="مثال: 01012345678"
                       className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
+                    <PhoneWarning value={bookingPhone} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف إضافي (اختياري)</label>
@@ -1886,6 +1889,7 @@ export function BrideJourneyCard({ bride, onStageUpdate, avatar, onPickupClick, 
                       placeholder="رقم آخر / مرافق..."
                       className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
+                    <PhoneWarning value={bookingPhone2} />
                   </div>
                 </div>
 

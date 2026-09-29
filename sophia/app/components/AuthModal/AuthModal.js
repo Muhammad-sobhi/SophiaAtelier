@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Phone, Mail, MapPin, LogIn, UserPlus } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { ARAB_COUNTRIES, normalizeMobile } from '../../lib/phone';
 import styles from './AuthModal.module.css';
 
 const EGYPTIAN_CITIES = [
@@ -37,6 +38,7 @@ export default function AuthModal({ isOpen, onClose }) {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState('EG');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('Cairo');
   const [error, setError] = useState('');
@@ -60,15 +62,14 @@ export default function AuthModal({ isOpen, onClose }) {
     setLoading(true);
 
     try {
-      const cleanDigits = phone.replace(/[^\d]/g, '');
-      const validPhonePattern = /^\+?[0-9\s\-()]+$/;
-
-      if (phone.trim()) {
-        if (!validPhonePattern.test(phone.trim()) || cleanDigits.length < 8) {
-          setError(lang === 'ar' ? 'يرجى إدخال رقم هاتف صحيح مكون من 8 أرقام على الأقل' : 'Please enter a valid phone number with at least 8 digits');
-          setLoading(false);
-          return;
-        }
+      // Mobile number of the selected Arab country, sent in international format (+201012345678)
+      const mobile = phone.trim() ? normalizeMobile(phone, phoneCountry) : '';
+      if (phone.trim() && !mobile) {
+        setError(lang === 'ar'
+          ? 'رقم الموبايل غير صحيح. تأكدي من الرقم واختيار الدولة الصحيحة.'
+          : 'Invalid mobile number. Please check the number and the selected country.');
+        setLoading(false);
+        return;
       }
 
       if (email.trim()) {
@@ -91,14 +92,14 @@ export default function AuthModal({ isOpen, onClose }) {
           setLoading(false);
           return;
         }
-        await registerBride({ name: name.trim(), phone: phone.trim(), email: email.trim(), city });
+        await registerBride({ name: name.trim(), phone: mobile, email: email.trim(), city });
       } else {
         if (!phone.trim() && !email.trim()) {
           setError(lang === 'ar' ? 'يرجى إدخال رقم الهاتف أو البريد' : 'Please enter your phone number or email');
           setLoading(false);
           return;
         }
-        await loginBride(phone.trim(), email.trim());
+        await loginBride(mobile, email.trim());
       }
       onClose();
     } catch (err) {
@@ -168,16 +169,33 @@ export default function AuthModal({ isOpen, onClose }) {
           )}
 
           <div className={styles.inputGroup}>
-            <label className={styles.label}>{t.contact.phonePlaceholder}</label>
-            <div className={styles.inputWrap}>
-              <Phone size={16} className={styles.icon} />
-              <input
-                type="tel"
-                placeholder={lang === 'ar' ? 'مثال: 01554159359' : 'e.g. +201554159359'}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={styles.inputWithIcon}
-              />
+            <label className={styles.label} htmlFor="auth-phone">{t.contact.phonePlaceholder}</label>
+            <div className={styles.phoneRow}>
+              <select
+                value={phoneCountry}
+                onChange={(e) => setPhoneCountry(e.target.value)}
+                className={styles.countrySelect}
+                aria-label={lang === 'ar' ? 'الدولة' : 'Country'}
+              >
+                {ARAB_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {lang === 'ar' ? c.ar : c.en} {c.dial}
+                  </option>
+                ))}
+              </select>
+              <div className={styles.inputWrap}>
+                <Phone size={16} className={styles.icon} />
+                <input
+                  id="auth-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder={phoneCountry === 'EG' ? '01012345678' : (lang === 'ar' ? 'رقم الموبايل' : 'Mobile number')}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className={styles.inputWithIcon}
+                />
+              </div>
             </div>
           </div>
 

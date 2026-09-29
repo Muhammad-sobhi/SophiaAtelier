@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ArabMobilePhone;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreClientRequest extends FormRequest
@@ -15,7 +16,10 @@ class StoreClientRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:50',
+            // The bride registering on the website must give a valid mobile; staff only get a warning in the dashboard
+            'phone' => $this->is('api/public/*')
+                ? ['required', 'string', 'max:50', new ArabMobilePhone()]
+                : 'nullable|string|max:50',
             'phone2' => 'nullable|string|max:50',
             'email' => 'nullable|email',
             'address' => 'nullable|string',

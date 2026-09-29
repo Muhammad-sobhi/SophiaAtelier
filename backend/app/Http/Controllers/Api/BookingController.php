@@ -447,7 +447,7 @@ class BookingController extends Controller
         }
         if (!$client && ($phone || $email)) {
             $client = \App\Models\Client::where(function($q) use ($phone, $email) {
-                if ($phone) $q->where('phone', $phone);
+                if ($phone) $q->whereIn('phone', array_filter([$phone, \App\Services\PhoneNumberService::normalizeMobile($phone), \App\Services\PhoneNumberService::localForm($phone)]));
                 if ($email) $q->orWhere('email', $email);
             })->first();
         }
@@ -573,23 +573,22 @@ class BookingController extends Controller
         }
     }
 
-    /** Latest visit of any bride registered with the same phone digits */
+    /** Latest visit of any bride registered with the same phone number (in any stored format) */
     private static function previousVisitOfSamePhone(?string $phone): ?\App\Models\Visit
     {
-        $digits = fn($v) => preg_replace('/\D/', '', (string) $v);
-
-        $phoneDigits = $digits($phone);
-        if (strlen($phoneDigits) < 8 || preg_match('/^0+$/', $phoneDigits)) {
+        $key = \App\Services\PhoneNumberService::matchKey($phone);
+        $digits = preg_replace('/\D/', '', $key);
+        if (strlen($digits) < 8 || preg_match('/^0+$/', $digits)) {
             return null;
         }
 
-        // Narrow by the last 8 digits in SQL (phones are stored in mixed formats), then compare exactly
+        // Narrow by the last 8 digits in SQL (older rows keep mixed formats), then compare the normalized numbers
         $clientIds = \App\Models\Client::whereRaw(
                 "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') LIKE ?",
-                ['%' . substr($phoneDigits, -8)]
+                ['%' . substr($digits, -8)]
             )
             ->get(['id', 'phone'])
-            ->filter(fn($c) => $digits($c->phone) === $phoneDigits)
+            ->filter(fn($c) => \App\Services\PhoneNumberService::matchKey($c->phone) === $key)
             ->pluck('id');
 
         if ($clientIds->isEmpty()) {

@@ -3,6 +3,7 @@ import { Search, Filter, MessageCircle } from 'lucide-react';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates } from '@/lib/utils';
 import { getVisitStatus } from '@/components/bride-journey/visitStatus';
+import { phoneMatchesSearch } from '@/lib/phone';
 
 const RETURN_ARCHIVE_DAYS = 15;
 
@@ -184,7 +185,7 @@ export default function BridesTab({
   const matchesSearch = (b) => {
     if (!brideSearch.trim()) return true;
     const q = brideSearch.toLowerCase().trim();
-    return (b.name || '').toLowerCase().includes(q) || (b.phone || '').includes(q);
+    return (b.name || '').toLowerCase().includes(q) || phoneMatchesSearch(b.phone, q);
   };
 
   // Helper: does a bride match the month filter for a given stage?
@@ -290,7 +291,7 @@ export default function BridesTab({
       if (brideSearch.trim()) {
         const q = brideSearch.toLowerCase().trim();
         const nameMatch = (b.name || '').toLowerCase().includes(q);
-        const phoneMatch = (b.phone || '').includes(q);
+        const phoneMatch = phoneMatchesSearch(b.phone, q);
         if (!nameMatch && !phoneMatch) return false;
       }
 

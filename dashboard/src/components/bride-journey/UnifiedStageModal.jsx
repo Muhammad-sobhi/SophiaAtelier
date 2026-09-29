@@ -12,6 +12,7 @@ import {
   Search, CheckCircle2, AlertTriangle, User, CreditCard, Trash2, Loader2
 } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { PhoneWarning } from '@/components/ui/PhoneWarning';
 
 export const getDressConflict = (dress, targetDate, currentClientId = null, targetCity = 'القاهرة') => {
   if (!dress || !targetDate) return null;
@@ -1319,6 +1320,7 @@ export function UnifiedStageModal({
                       placeholder="مثال: 01012345678"
                       className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
+                    <PhoneWarning value={phone} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-extrabold text-slate-500 block text-right">رقم هاتف إضافي (اختياري)</label>
@@ -1329,6 +1331,7 @@ export function UnifiedStageModal({
                       placeholder="رقم آخر / مرافق..."
                       className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right font-mono"
                     />
+                    <PhoneWarning value={phone2} />
                   </div>
                 </div>
 
@@ -1404,6 +1407,7 @@ export function UnifiedStageModal({
                         onChange={(e) => setPhone(e.target.value)}
                         className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none font-mono text-right"
                       />
+                      <PhoneWarning value={phone} />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1416,6 +1420,7 @@ export function UnifiedStageModal({
                         placeholder="رقم إضافي..."
                         className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none font-mono text-right"
                       />
+                      <PhoneWarning value={phone2} />
                     </div>
                     <div>
                       <label className="text-[10px] font-extrabold text-slate-500 block mb-1">المدينة / المحافظة</label>
@@ -1855,6 +1860,7 @@ export function UnifiedStageModal({
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none font-mono text-right"
                     />
+                    <PhoneWarning value={phone} />
                   </div>
                   <div>
                     <label className="text-[10px] font-extrabold text-slate-500 block mb-1">تاريخ الفرح</label>
@@ -2041,6 +2047,7 @@ export function UnifiedStageModal({
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none font-mono text-right"
                     />
+                    <PhoneWarning value={phone} />
                   </div>
                   <div>
                     <label className="text-[10px] font-extrabold text-slate-500 block mb-1">تاريخ الاستلام الفعلي</label>
@@ -2131,6 +2138,7 @@ export function UnifiedStageModal({
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none font-mono text-right"
                     />
+                    <PhoneWarning value={phone} />
                   </div>
                   <div>
                     <label className="text-[10px] font-extrabold text-slate-500 block mb-1">تاريخ الإرجاع الفعلي</label>

@@ -40,10 +40,12 @@ class ClientController extends Controller
 
         if ($search = trim($request->input('search', ''))) {
             $cleanSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
-            $query->where(function ($q) use ($cleanSearch) {
+            // Phones are stored as +<country><number>: a local number typed with its leading 0 still matches
+            $phoneSearch = preg_match('/^0\d{3,}$/', $search) ? ltrim($search, '0') : $cleanSearch;
+            $query->where(function ($q) use ($cleanSearch, $phoneSearch) {
                 $q->where('name', 'like', "%{$cleanSearch}%")
-                    ->orWhere('phone', 'like', "%{$cleanSearch}%")
-                    ->orWhere('phone2', 'like', "%{$cleanSearch}%")
+                    ->orWhere('phone', 'like', "%{$phoneSearch}%")
+                    ->orWhere('phone2', 'like', "%{$phoneSearch}%")
                     ->orWhere('city', 'like', "%{$cleanSearch}%")
                     ->orWhere('address', 'like', "%{$cleanSearch}%");
             });
@@ -195,6 +197,8 @@ class ClientController extends Controller
                 '+20' . $rawNoZero,
                 '20' . $rawNoZero,
                 '+2' . '0' . $rawNoZero,
+                \App\Services\PhoneNumberService::normalizeMobile($rawPhone),
+                \App\Services\PhoneNumberService::localForm($rawPhone),
             ]));
         }
 

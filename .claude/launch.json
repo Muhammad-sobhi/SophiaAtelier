@@ -12,6 +12,12 @@
       "runtimeExecutable": "env",
       "runtimeArgs": ["VITE_API_URL=http://localhost:8010/api", "npm", "--prefix", "dashboard", "run", "dev", "--", "--port", "5173", "--strictPort"],
       "port": 5173
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NEXT_PUBLIC_API_URL=http://localhost:8010/api", "npm", "--prefix", "sophia", "run", "dev", "--", "--port", "3010"],
+      "port": 3010
     }
   ]
 }

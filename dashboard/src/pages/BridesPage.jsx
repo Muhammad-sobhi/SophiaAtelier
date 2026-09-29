@@ -12,6 +12,7 @@ import BridesExcelImport from '@/components/BridesExcelImport';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates, isCairoCity } from '@/lib/utils';
 import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
+import { PhoneWarning } from '@/components/ui/PhoneWarning';
 
 export { calculateScheduledDates };
 
@@ -1065,6 +1066,7 @@ export default function BridesPage() {
                     dir="ltr"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
+                  <PhoneWarning value={formData.phone} />
                 </div>
                 <div>
                   <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
@@ -1078,6 +1080,7 @@ export default function BridesPage() {
                     dir="ltr"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
+                  <PhoneWarning value={formData.phone2} />
                 </div>
               </div>
 

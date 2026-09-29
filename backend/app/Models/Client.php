@@ -24,6 +24,17 @@ class Client extends Model
         return $date->format('Y-m-d H:i');
     }
 
+    /** Valid Arab mobile numbers are saved in E.164 so every format of the same number matches */
+    public function setPhoneAttribute(?string $value): void
+    {
+        $this->attributes['phone'] = \App\Services\PhoneNumberService::forStorage($value);
+    }
+
+    public function setPhone2Attribute(?string $value): void
+    {
+        $this->attributes['phone2'] = \App\Services\PhoneNumberService::forStorage($value);
+    }
+
     public function getWeddingDateAttribute(): ?string
     {
         if (!empty($this->attributes['wedding_date'])) {

@@ -1,7 +1,8 @@
 import { apiClient } from '@/lib/api-client';
+import { normalizeMobile } from '@/lib/phone';
 
 /**
- * Formats a raw phone number string to the correct +20XXXXXXXXXX format for wa.me links (Egypt).
+ * Formats a raw phone number for wa.me links: any valid Arab mobile number, otherwise read as Egyptian.
  * Examples:
  *   "01006508435"    → "+201006508435"
  *   "201006508435"   → "+201006508435"
@@ -9,6 +10,10 @@ import { apiClient } from '@/lib/api-client';
  *   ""               → ""
  */
 export function formatWhatsAppNumber(raw) {
+  // Valid Arab mobile (any of the 22 countries) → its international number
+  const international = normalizeMobile(raw);
+  if (international) return international;
+
   const digits = (raw || '').replace(/[^\d]/g, '');
   if (!digits) return '';
 

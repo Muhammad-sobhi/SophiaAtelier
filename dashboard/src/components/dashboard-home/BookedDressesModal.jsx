@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 import { cleanDate, formatDate } from '@/lib/utils';
+import { formatWhatsAppNumber } from '@/lib/whatsapp';
+import { phoneMatchesSearch } from '@/lib/phone';
 
 export default function BookedDressesModal({
   isOpen,
@@ -201,15 +203,15 @@ export default function BookedDressesModal({
         }
         if (bookedDressesSearchType === 'phone') {
           return (
-            (bride.phone || '').includes(q) ||
-            (bride.phone2 || '').includes(q)
+            phoneMatchesSearch(bride.phone, q) ||
+            phoneMatchesSearch(bride.phone2, q)
           );
         }
         return (
           (dress.name || '').toLowerCase().includes(q) ||
           (dress.code || '').toString().toLowerCase().includes(q) ||
           (bride.name || '').toLowerCase().includes(q) ||
-          (bride.phone || '').includes(q)
+          phoneMatchesSearch(bride.phone, q)
         );
       }
 
@@ -667,7 +669,7 @@ export default function BookedDressesModal({
                           <div className="flex items-center gap-1">
                             {bride.phone && (
                               <a
-                                href={`https://wa.me/${bride.phone.replace(/[^\d]/g, '')}`}
+                                href={`https://wa.me/${formatWhatsAppNumber(bride.phone).replace('+', '')}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-[9px] font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md transition-colors"
