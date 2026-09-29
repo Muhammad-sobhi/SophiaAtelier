@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class NotificationController extends Controller
 {
@@ -41,11 +42,6 @@ class NotificationController extends Controller
                 // If pickup date is today or tomorrow (or event_date is tomorrow)
                 if ($pickupDateStr === $tomorrowStr || $pickupDateStr === $todayStr || $eventDt->toDateString() === $tomorrowStr) {
                     
-                    // Check if dismissed/deleted by user today
-                    if (\Illuminate\Support\Facades\Cache::get("dismissed_pickup_reminder_{$booking->id}_{$todayStr}")) {
-                        continue;
-                    }
-
                     $exists = Notification::withTrashed()
                         ->where('type', 'pickup_reminder')
                         ->where('related_type', 'booking')
@@ -73,13 +69,20 @@ class NotificationController extends Controller
             \Log::error('Failed to generate pickup reminders: ' . $e->getMessage());
         }
 
-        $query = Notification::query();
+        // Read/deleted state is per employee
+        $query = Notification::query()
+            ->leftJoin('notification_user as nu', function ($join) use ($request) {
+                $join->on('nu.notification_id', '=', 'notifications.id')
+                    ->where('nu.user_id', $request->user()->id);
+            })
+            ->whereNull('nu.deleted_at')
+            ->select('notifications.*', DB::raw('nu.read_at IS NOT NULL as is_read'));
 
         if ($request->input('unread_only')) {
-            $query->where('is_read', false);
+            $query->whereNull('nu.read_at');
         }
 
-        return response()->json($query->latest()->paginate($request->input('per_page', 20)));
+        return response()->json($query->latest('notifications.created_at')->paginate($request->input('per_page', 20)));
     }
 
     public function show(Notification $notification)
@@ -87,57 +90,67 @@ class NotificationController extends Controller
         return response()->json($notification);
     }
 
-    public function destroy(Notification $notification): JsonResponse
+    public function destroy(Request $request, Notification $notification): JsonResponse
     {
-        $todayStr = now()->toDateString();
-        if ($notification->type === 'pickup_reminder' || $notification->related_type === 'booking') {
-            if ($notification->related_id) {
-                \Illuminate\Support\Facades\Cache::put(
-                    "dismissed_pickup_reminder_{$notification->related_id}_{$todayStr}",
-                    true,
-                    now()->addDays(2)
-                );
-            }
-        }
-
-        $notification->delete();
+        $this->setUserState($request, [$notification->id], 'deleted_at');
 
         return response()->json(['message' => 'Notification deleted']);
     }
 
-    public function markAsRead($id): JsonResponse
+    public function markAsRead(Request $request, $id): JsonResponse
     {
         $notification = Notification::findOrFail($id);
-        $notification->update(['is_read' => true]);
+        $this->setUserState($request, [$notification->id], 'read_at');
 
-        return response()->json($notification);
+        return response()->json(['message' => 'Notification marked as read']);
     }
 
-    public function markAllAsRead(): JsonResponse
+    /** Marks the notifications the employee can see (ids) as read; all of them when ids is omitted */
+    public function markAllAsRead(Request $request): JsonResponse
     {
-        Notification::where('is_read', false)->update(['is_read' => true]);
+        $this->setUserState($request, $this->targetIds($request), 'read_at');
 
         return response()->json(['message' => 'All notifications marked as read']);
     }
 
-    public function deleteAll(): JsonResponse
+    /** Hides the notifications the employee can see (ids) for this employee only */
+    public function deleteAll(Request $request): JsonResponse
     {
-        $todayStr = now()->toDateString();
-        $notifications = Notification::all();
-        foreach ($notifications as $notification) {
-            if ($notification->type === 'pickup_reminder' || $notification->related_type === 'booking') {
-                if ($notification->related_id) {
-                    \Illuminate\Support\Facades\Cache::put(
-                        "dismissed_pickup_reminder_{$notification->related_id}_{$todayStr}",
-                        true,
-                        now()->addDays(2)
-                    );
-                }
-            }
-        }
-
-        Notification::query()->delete();
+        $this->setUserState($request, $this->targetIds($request), 'deleted_at');
 
         return response()->json(['message' => 'All notifications deleted']);
+    }
+
+    private function targetIds(Request $request): array
+    {
+        $validated = $request->validate([
+            'ids' => 'nullable|array|max:500',
+            'ids.*' => 'integer',
+        ]);
+
+        $query = Notification::query();
+        if (isset($validated['ids'])) {
+            $query->whereIn('id', $validated['ids']);
+        }
+
+        return $query->pluck('id')->all();
+    }
+
+    private function setUserState(Request $request, array $notificationIds, string $column): void
+    {
+        if (empty($notificationIds)) {
+            return;
+        }
+
+        $now = now();
+        $rows = array_map(fn($id) => [
+            'notification_id' => $id,
+            'user_id' => $request->user()->id,
+            $column => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $notificationIds);
+
+        DB::table('notification_user')->upsert($rows, ['notification_id', 'user_id'], [$column, 'updated_at']);
     }
 }

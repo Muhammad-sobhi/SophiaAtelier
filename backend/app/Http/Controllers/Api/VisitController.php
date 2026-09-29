@@ -50,7 +50,7 @@ class VisitController extends Controller
         }
 
         $slots = Visit::whereDate('visit_date', $date)
-            ->whereNotNull('time_slot')
+            ->whereNotNull('time_slot')->where('status', '!=', 'declined')
             ->select('time_slot', \DB::raw('count(*) as count'))
             ->groupBy('time_slot')
             ->get();
@@ -88,7 +88,7 @@ class VisitController extends Controller
 
             // Check limit
             $existingCount = Visit::whereDate('visit_date', $validated['visit_date'])
-                ->where('time_slot', $normalized)
+                ->where('status', '!=', 'declined')->where('time_slot', $normalized)
                 ->count();
 
             if ($existingCount >= 4) {
@@ -141,7 +141,7 @@ class VisitController extends Controller
             // Check limit excluding current visit
             $visitDate = $validated['visit_date'] ?? $visit->visit_date;
             $existingCount = Visit::whereDate('visit_date', $visitDate)
-                ->where('time_slot', $normalized)
+                ->where('status', '!=', 'declined')->where('time_slot', $normalized)
                 ->where('id', '!=', $visit->id)
                 ->count();
 

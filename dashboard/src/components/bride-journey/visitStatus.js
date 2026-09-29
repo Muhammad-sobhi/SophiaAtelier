@@ -6,6 +6,7 @@ export const VISIT_STATUS = {
   done: { label: 'لم تختر فستاناً', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200', dotColor: 'bg-slate-400' },
   no_show: { label: 'لم تحضر', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200', dotColor: 'bg-rose-500' },
   booked: { label: 'تم الحجز', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200', dotColor: 'bg-indigo-500' },
+  declined: { label: 'تم رفض الطلب', badgeClass: 'bg-slate-100 text-slate-500 border-slate-200', dotColor: 'bg-slate-400' },
 };
 
 export const OPEN_VISIT_STATUSES = ['pending', 'confirmed', 'arrived'];
@@ -26,8 +27,20 @@ export function needsWhatsApp(visit) {
   return visit?.status === 'confirmed' && !visit.confirmation_sent_at;
 }
 
+// Website request from a phone number that already had a visit: the employee decides
+export const REPEAT_REQUEST_STATUS = {
+  label: '⚠️ طلب متكرر — زارت من قبل',
+  badgeClass: 'bg-rose-50 text-rose-700 border-rose-300',
+  dotColor: 'bg-rose-500',
+};
+
+export function isPendingRepeatRequest(visit) {
+  return visit?.status === 'pending' && Boolean(visit.previous_visit_id);
+}
+
 export function getVisitStatus(bride) {
   const visit = getLatestVisit(bride);
+  if (isPendingRepeatRequest(visit)) return REPEAT_REQUEST_STATUS;
   if (needsWhatsApp(visit)) return WHATSAPP_PENDING_STATUS;
   return VISIT_STATUS[visit?.status] || VISIT_STATUS.pending;
 }

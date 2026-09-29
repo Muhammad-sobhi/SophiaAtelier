@@ -10,8 +10,8 @@ class Visit extends Model
 {
     use HasFactory;
 
-    /** pending = request awaiting staff confirmation; confirmed = date/time agreed with the bride */
-    public const STATUSES = ['pending', 'confirmed', 'arrived', 'done', 'booked', 'no_show'];
+    /** pending = request awaiting staff confirmation; confirmed = date/time agreed with the bride; declined = request refused by staff */
+    public const STATUSES = ['pending', 'confirmed', 'arrived', 'done', 'booked', 'no_show', 'declined'];
 
     /** Visits that are still open (the bride has not come yet or is being served) */
     public const OPEN_STATUSES = ['pending', 'confirmed', 'arrived'];
@@ -21,7 +21,7 @@ class Visit extends Model
 
     protected $fillable = [
         'client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'trying_fee', 'sales_name',
-        'confirmed_at', 'confirmed_by', 'auto_confirmed', 'confirmation_sent_at',
+        'confirmed_at', 'confirmed_by', 'auto_confirmed', 'confirmation_sent_at', 'previous_visit_id',
     ];
 
     protected function casts(): array
@@ -59,6 +59,12 @@ class Visit extends Model
             'confirmed_by' => $this->confirmed_by ?? $userId,
             'auto_confirmed' => $this->confirmed_at ? $this->auto_confirmed : $userId === null,
         ])->save();
+    }
+
+    /** Set on a repeated website request: latest earlier visit with the same phone number */
+    public function previousVisit(): BelongsTo
+    {
+        return $this->belongsTo(Visit::class, 'previous_visit_id');
     }
 
     public function confirmedBy(): BelongsTo

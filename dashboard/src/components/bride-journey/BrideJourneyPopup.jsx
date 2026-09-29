@@ -8,7 +8,7 @@ import { UnifiedStageModal } from './UnifiedStageModal';
 import { ReturnDressModal } from './ReturnDressModal';
 import { BookingPaymentsModal } from './BookingPaymentsModal';
 import { CancelBookingModal, CANCELLATION_REASONS } from './CancelBookingModal';
-import { OPEN_VISIT_STATUSES, getLatestVisit, getVisitDresses, getVisitStatus, needsWhatsApp } from './visitStatus';
+import { OPEN_VISIT_STATUSES, VISIT_STATUS, getLatestVisit, getVisitDresses, getVisitStatus, isPendingRepeatRequest, needsWhatsApp } from './visitStatus';
 import { DressAvailability } from './DressAvailability';
 import { buildVisitConfirmationUrl, formatVisitTime } from '@/lib/whatsapp';
 import {
@@ -139,6 +139,8 @@ export function BrideJourneyPopup({
   const visitStatusKey = latestVisit?.status || 'pending';
   const visitStatusCfg = getVisitStatus(bride);
   const whatsAppPending = needsWhatsApp(latestVisit);
+  const isRepeatRequest = isPendingRepeatRequest(latestVisit);
+  const previousVisit = latestVisit?.previous_visit;
   const isVisitOpen = Boolean(latestVisit) && OPEN_VISIT_STATUSES.includes(visitStatusKey);
   const dresses = stage === 'visit' ? getVisitDresses(bride) : [dress, dress2, booking?.dress3].filter(Boolean);
 
@@ -195,13 +197,14 @@ export function BrideJourneyPopup({
   };
 
   const closeVisit = async (visitStatus) => {
-    const confirmText = visitStatus === 'no_show'
-      ? 'تسجيل أن العروس لم تحضر الزيارة؟'
-      : 'تسجيل أن العروس جربت الفساتين ولم تختر فستاناً؟';
+    const confirmText = {
+      no_show: 'تسجيل أن العروس لم تحضر الزيارة؟',
+      declined: 'رفض طلب الزيارة؟ لن تظهر الزيارة ضمن المواعيد وسيتم تحرير الوقت.',
+    }[visitStatus] || 'تسجيل أن العروس جربت الفساتين ولم تختر فستاناً؟';
     if (!await confirmDialog(confirmText)) return;
     handleQuickAction('close_visit', {
       visit_status: visitStatus,
-      ...(visitStatus === 'no_show' ? { tried_dresses: [] } : {}),
+      ...(visitStatus === 'no_show' || visitStatus === 'declined' ? { tried_dresses: [] } : {}),
     });
   };
 
@@ -274,13 +277,20 @@ export function BrideJourneyPopup({
         // 1. Request not reviewed yet -> review date/time/dresses, confirm, then send WhatsApp
         if (!latestVisit || visitStatusKey === 'pending') {
           return (
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => openFormForStage('visit')} disabled={loading} className={`${common} bg-emerald-600 hover:bg-emerald-700 text-white`}>
-                <CheckCircle2 size={13} /> مراجعة وتأكيد الزيارة
-              </button>
-              <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
-                <Heart size={13} /> حجز فستان
-              </button>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => openFormForStage('visit')} disabled={loading} className={`${common} bg-emerald-600 hover:bg-emerald-700 text-white`}>
+                  <CheckCircle2 size={13} /> مراجعة وتأكيد الزيارة
+                </button>
+                <button onClick={() => openFormForStage('booking')} className={`${common} bg-amber-600 hover:bg-amber-700 text-white`}>
+                  <Heart size={13} /> حجز فستان
+                </button>
+              </div>
+              {isRepeatRequest && (
+                <button onClick={() => closeVisit('declined')} disabled={loading} className={`${common} w-full bg-white hover:bg-rose-50 text-rose-600 border border-rose-200`}>
+                  <Ban size={13} /> رفض الطلب
+                </button>
+              )}
             </div>
           );
         }
@@ -667,6 +677,32 @@ export function BrideJourneyPopup({
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {isRepeatRequest && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 space-y-1">
+                <div className="text-[11px] font-black text-rose-700 flex items-center gap-1">
+                  <AlertTriangle size={13} /> طلب زيارة متكرر — العروس زارت من قبل
+                </div>
+                {previousVisit ? (
+                  <div className="text-[10px] font-bold text-slate-600 space-y-0.5 leading-snug">
+                    <div>
+                      الزيارة السابقة: {formatDate(previousVisit.visit_date)}
+                      {previousVisit.time_slot && ` — ${formatVisitTime(previousVisit.time_slot)}`}
+                      {' · '}{VISIT_STATUS[previousVisit.status]?.label || previousVisit.status}
+                    </div>
+                    {previousVisit.tried_dresses?.length > 0 && (
+                      <div>جربت: {previousVisit.tried_dresses.map((d) => d.code || d.name).join('، ')}</div>
+                    )}
+                    {previousVisit.client && previousVisit.client.id !== bride.id && (
+                      <div>مسجلة سابقاً كعروس أخرى: {previousVisit.client.name} — {previousVisit.client.phone}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[10px] font-bold text-slate-500">تم حذف بيانات الزيارة السابقة.</div>
+                )}
+                <div className="text-[10px] font-bold text-rose-600">راجع بياناتها ثم أكد الزيارة أو ارفض الطلب.</div>
               </div>
             )}
 

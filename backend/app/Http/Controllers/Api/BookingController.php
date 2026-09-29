@@ -480,7 +480,7 @@ class BookingController extends Controller
             
             // Check visit limit of 4 per 30 mins
             $existingCount = \App\Models\Visit::whereDate('visit_date', $bookingDate)
-                ->where('time_slot', $timeSlot)
+                ->where('status', '!=', 'declined')->where('time_slot', $timeSlot)
                 ->count();
 
             if ($existingCount >= 4) {
@@ -510,8 +510,13 @@ class BookingController extends Controller
                 'availability' => \App\Services\DressAvailabilityService::publicView($availability),
             ], 422);
         }
+        // Same phone number already had a visit before, even under another registration or name:
+        // never auto-confirm, the employee reviews her previous visit and decides
+        $previousVisit = self::previousVisitOfSamePhone($phone ?? $client->phone);
+        $isRepeatRequest = $previousVisit !== null;
+
         // Every dress is free on both dates: no employee review needed
-        $autoConfirm = !empty($dressIds) && $timeSlot && $availability['all_available'];
+        $autoConfirm = !$isRepeatRequest && !empty($dressIds) && $timeSlot && $availability['all_available'];
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
@@ -529,6 +534,7 @@ class BookingController extends Controller
                 'visit_date' => $bookingDate,
                 'status' => 'pending', // Waiting for staff confirmation
                 'source' => 'website',
+                'previous_visit_id' => $previousVisit?->id,
                 'notes' => $visitNotes,
                 'time_slot' => $timeSlot,
                 'trying_fee' => \App\Models\Dress::whereIn('id', $dressIds)->sum('trying_fee'),
@@ -540,7 +546,9 @@ class BookingController extends Controller
 
             \App\Models\Notification::create([
                 'type' => 'new_appointment',
-                'title' => $autoConfirm ? 'زيارة مؤكدة تلقائياً من الموقع — أرسل رسالة التأكيد' : 'طلب موعد زيارة جديد من الموقع يحتاج مراجعة',
+                'title' => $isRepeatRequest
+                    ? '⚠️ طلب زيارة متكرر — العروس زارت من قبل، راجع قبل التأكيد'
+                    : ($autoConfirm ? 'زيارة مؤكدة تلقائياً من الموقع — أرسل رسالة التأكيد' : 'طلب موعد زيارة جديد من الموقع يحتاج مراجعة'),
                 'message' => 'العروس: ' . $client->name . ' — موعد الزيارة: ' . $bookingDate . ' ' . ($validated['time_slot'] ?? 'غير محدد'),
                 'related_type' => 'visit',
                 'related_id' => $visit->id
@@ -563,5 +571,31 @@ class BookingController extends Controller
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
+    }
+
+    /** Latest visit of any bride registered with the same phone digits */
+    private static function previousVisitOfSamePhone(?string $phone): ?\App\Models\Visit
+    {
+        $digits = fn($v) => preg_replace('/\D/', '', (string) $v);
+
+        $phoneDigits = $digits($phone);
+        if (strlen($phoneDigits) < 8 || preg_match('/^0+$/', $phoneDigits)) {
+            return null;
+        }
+
+        // Narrow by the last 8 digits in SQL (phones are stored in mixed formats), then compare exactly
+        $clientIds = \App\Models\Client::whereRaw(
+                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') LIKE ?",
+                ['%' . substr($phoneDigits, -8)]
+            )
+            ->get(['id', 'phone'])
+            ->filter(fn($c) => $digits($c->phone) === $phoneDigits)
+            ->pluck('id');
+
+        if ($clientIds->isEmpty()) {
+            return null;
+        }
+
+        return \App\Models\Visit::whereIn('client_id', $clientIds)->latest('visit_date')->latest('id')->first();
     }
 }

@@ -6,6 +6,7 @@ import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { isCairoCity } from '@/lib/utils';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 
 const typeStyles = {
   info: { icon: Bell, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -72,6 +73,8 @@ export function Header({ onMenuClick }) {
 
   useEffect(() => {
     function handleClickOutside(event) {
+      // Clicks in a confirm dialog (e.g. deleting a notification) keep the menus open
+      if (document.querySelector('[role="alertdialog"]')) return;
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
       }
@@ -175,32 +178,36 @@ export function Header({ onMenuClick }) {
 
   const unreadCount = filteredNotifications.filter((n) => !n.read).length;
 
+  // Bulk actions only touch the notifications this employee can see
   const markAllRead = async () => {
+    const ids = filteredNotifications.filter((n) => !n.read).map((n) => n.id);
     try {
-      await apiClient.post('/notifications/read-all', {});
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      await apiClient.post('/notifications/read-all', { ids });
+      setNotifications((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, read: true } : n));
     } catch {
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      toast.error('تعذر تعليم التنبيهات كمقروءة، حاول مرة أخرى');
     }
   };
 
   const deleteNotification = async (e, id) => {
     e.stopPropagation();
+    if (!await confirmDialog('حذف هذا التنبيه؟')) return;
     try {
       await apiClient.delete(`/notifications/${id}`);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
     } catch {
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      toast.error('تعذر حذف التنبيه، حاول مرة أخرى');
     }
   };
 
   const deleteAllNotifications = async () => {
     if (!await confirmDialog('هل أنت تأكد من حذف جميع التنبيهات؟')) return;
+    const ids = filteredNotifications.map((n) => n.id);
     try {
-      await apiClient.delete('/notifications/delete-all');
-      setNotifications([]);
+      await apiClient.delete('/notifications/delete-all', { body: JSON.stringify({ ids }) });
+      setNotifications((prev) => prev.filter((n) => !ids.includes(n.id)));
     } catch {
-      setNotifications([]);
+      toast.error('تعذر حذف التنبيهات، حاول مرة أخرى');
     }
   };
 
@@ -282,14 +289,12 @@ export function Header({ onMenuClick }) {
     }
   };
 
-  const toggleNotifStatus = async (id) => {
-    const notif = notifications.find((n) => n.id === id);
-    if (!notif) return;
+  const markNotifRead = async (id) => {
     try {
       await apiClient.post(`/notifications/${id}/read`, {});
-      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: !n.read } : n));
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     } catch {
-      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: !n.read } : n));
+      // Opening the notification still works; it stays unread and can be retried
     }
   };
 
@@ -322,7 +327,7 @@ export function Header({ onMenuClick }) {
             </button>
 
             {isNotifOpen && (
-              <div className="absolute left-0 mt-2.5 w-84 bg-white rounded-3xl border border-slate-100 shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
+              <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:top-auto sm:left-0 mt-2.5 sm:w-84 bg-white rounded-3xl border border-slate-100 shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50 bg-slate-50/50">
                   <span className="text-xs font-extrabold text-slate-800">
                     التنبيهات ({unreadCount})
@@ -358,7 +363,7 @@ export function Header({ onMenuClick }) {
                           key={notif.id}
                           onClick={async () => {
                             if (!notif.read) {
-                              await toggleNotifStatus(notif.id);
+                              await markNotifRead(notif.id);
                             }
                             if (notif.page) {
                               navigate(notif.page);

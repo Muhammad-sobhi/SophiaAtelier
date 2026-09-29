@@ -22,6 +22,9 @@ class ClientController extends Controller
             'visits.requestedDresses.images',
             'visits.triedDresses',
             'visits.bookedDresses',
+            'visits.previousVisit:id,client_id,visit_date,time_slot,status,source',
+            'visits.previousVisit.client:id,name,phone',
+            'visits.previousVisit.triedDresses',
             'bookings' => function ($q) {
                 $q->latest()->latest('id');
             },
@@ -231,6 +234,9 @@ class ClientController extends Controller
             'visits.requestedDresses.images',
             'visits.triedDresses',
             'visits.bookedDresses',
+            'visits.previousVisit:id,client_id,visit_date,time_slot,status,source',
+            'visits.previousVisit.client:id,name,phone',
+            'visits.previousVisit.triedDresses',
             'bookings' => function ($q) {
                 $q->latest()->latest('id'); },
             'bookings.dress.accessories',
@@ -265,7 +271,7 @@ class ClientController extends Controller
             $normalizedTimeSlot = \App\Http\Controllers\Api\VisitController::normalizeTimeSlot($validated['visit_time']);
             
             $existingCount = \App\Models\Visit::whereDate('visit_date', $validated['visit_date'])
-                ->where('time_slot', $normalizedTimeSlot)
+                ->where('status', '!=', 'declined')->where('time_slot', $normalizedTimeSlot)
                 ->count();
                 
             if ($existingCount >= 4) {
@@ -344,7 +350,7 @@ class ClientController extends Controller
             $normalizedTimeSlot = \App\Http\Controllers\Api\VisitController::normalizeTimeSlot($validated['visit_time']);
             
             $visitQuery = \App\Models\Visit::whereDate('visit_date', $validated['visit_date'])
-                ->where('time_slot', $normalizedTimeSlot);
+                ->where('status', '!=', 'declined')->where('time_slot', $normalizedTimeSlot);
             
             $existingVisit = $client->visits()->whereDate('visit_date', $validated['visit_date'])->first();
             if ($existingVisit) {
@@ -566,7 +572,7 @@ class ClientController extends Controller
             'deposit_refund_receipt' => 'nullable',
             'refund_date' => 'nullable|date',
             'payment_date' => 'nullable|date',
-            'visit_status' => 'required_if:action,close_visit|nullable|string|in:arrived,done,no_show',
+            'visit_status' => 'required_if:action,close_visit|nullable|string|in:arrived,done,no_show,declined',
             'visit_source' => 'nullable|string|in:' . implode(',', Visit::SOURCES),
             'tried_dresses' => 'nullable|array|max:3',
             'tried_dresses.*' => 'integer|exists:dresses,id',
@@ -622,7 +628,7 @@ class ClientController extends Controller
                 break;
 
             case 'close_visit':
-                // After the try-on: she arrived, left without choosing (done), or did not show up
+                // After the try-on: she arrived, left without choosing (done), or did not show up; or the request was declined
                 $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
                 if (!$visit) {
                     return response()->json(['message' => 'لا توجد زيارة مفتوحة لهذه العروس'], 422);

@@ -191,10 +191,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee-loans', [EmployeeLoanController::class, 'index']);
     Route::get('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'show']);
 
-    Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
-    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    // Static paths before the resource so "delete-all" is not captured as {notification}
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/delete-all', [NotificationController::class, 'deleteAll']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
 
     Route::apiResource('contact-messages', \App\Http\Controllers\Api\ContactMessageController::class)->only(['index', 'destroy']);
     Route::post('/contact-messages/{id}/read', [\App\Http\Controllers\Api\ContactMessageController::class, 'markAsRead']);
