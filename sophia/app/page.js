@@ -2,7 +2,6 @@
 
 import Navbar from './components/Navbar/Navbar';
 import Hero from './components/Hero/Hero';
-import Categories from './components/Categories/Categories';
 import Collections from './components/Collections/Collections';
 import BestSellers from './components/BestSellers/BestSellers';
 import NewCollection from './components/NewCollection/NewCollection';
@@ -42,7 +41,6 @@ export default function Home() {
         isWishlisted={isWishlisted}
       />
       <NewCollection />
-      <Categories />
       <DreamDress />
       <ClientGallery />
       <Reviews />

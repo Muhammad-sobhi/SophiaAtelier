@@ -246,6 +246,11 @@
     opacity: 0.9;
   }
 
+  /* Controls are always visible on touch; keep the badge clear of them */
+  .badge {
+    top: 58px;
+  }
+
   .overlayControls {
     opacity: 1;
     transform: none;
@@ -254,6 +259,53 @@
   .overlayPriceTag {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Compact card for the 2-column phone grid */
+@media (max-width: 480px) {
+  .overlayControls {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .overlayBtn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .quickViewOverlayBtn {
+    padding: 6px 10px;
+    font-size: 8.5px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .badge {
+    top: 46px;
+    left: 8px;
+    padding: 4px 9px;
+    font-size: 8px;
+  }
+
+  .info {
+    padding: 12px 8px;
+  }
+
+  .meta {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+
+  .collection,
+  .category {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .name {
+    font-size: 16px;
   }
 }
 

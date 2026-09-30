@@ -353,6 +353,15 @@
     gap: 32px;
   }
 
+  .luxuryMapCard {
+    max-width: none;
+  }
+
+  /* Leave room for the floating wedding-date pill and scroll-to-top button */
+  .bottomInner {
+    padding-bottom: 72px;
+  }
+
   .bottomInner {
     flex-direction: column;
     align-items: center;

@@ -1,5 +1,6 @@
 .section {
     position: relative;
+    overflow: hidden;
     height: 65vh;
     min-height: 525px;
 
@@ -10,7 +11,8 @@
 
 .bgWrap {
     position: absolute;
-    inset: 0;
+    /* Extra height so the parallax shift never exposes the section background */
+    inset: -40% 0;
     z-index: 0;
     transform: scale(1.12)
 }
@@ -69,4 +71,26 @@
 .cta:hover {
     background: var(--color-accent);
     color: white
+}
+
+@media (max-width: 768px) {
+    .section {
+        height: 60vh;
+        min-height: 460px;
+        padding-top: 56px
+    }
+
+    .overlay {
+        padding-right: var(--container-padding)
+    }
+
+    .heading {
+        font-size: clamp(36px, 11vw, 52px);
+        letter-spacing: 2px
+    }
+}
+
+:global([dir="rtl"]) .overlay {
+    padding-left: var(--container-padding);
+    padding-right: var(--container-padding)
 }

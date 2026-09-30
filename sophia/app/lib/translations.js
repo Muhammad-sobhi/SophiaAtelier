@@ -218,7 +218,7 @@ export const translations = {
     },
     newCollection: {
       eyebrow: 'NEW COLLECTION',
-      title: 'ÉTERNELLE 2026',
+      title: 'COLLECTION 2026',
       cta: 'DISCOVER NOW',
     },
     realBrides: {
@@ -456,7 +456,7 @@ export const translations = {
     },
     newCollection: {
       eyebrow: 'التشكيلة الجديدة',
-      title: 'إيتيرنيل 2026',
+      title: 'مجموعة 2026',
       cta: 'استكشفي الآن',
     },
     realBrides: {

@@ -71,7 +71,7 @@ export default function Hero() {
               <span>{t.hero.explore}</span>
               <ArrowRight size={16} strokeWidth={1.5} />
             </Link>
-            <Link href="/#appointment" className={styles.cta} style={{ background: 'transparent', border: '1px solid #c8a96a', color: '#1a1a1a' }}>
+            <Link href="/#appointment" className={`${styles.cta} ${styles.ctaOutline}`}>
               <span>{t.hero.howToBook}</span>
             </Link>
           </div>

@@ -43,7 +43,7 @@ export default function DreamDress() {
       {/* Background Bride Photo extending across left and center */}
       <div className={styles.bgWrap}>
         <Image
-          src="/images/dreemdress.png"
+          src="/images/dreemdress.jpg"
           alt="Luxury bridal salon"
           fill
           priority

@@ -17,7 +17,6 @@ export default function Footer() {
     { label: t.nav.home, href: '/' },
     { label: t.nav.collections, href: '/collections' },
     { label: t.bestSellers.title, href: '/#bestsellers' },
-    { label: t.categories.title, href: '/#categories' },
   ];
 
   const pageLinks = [
