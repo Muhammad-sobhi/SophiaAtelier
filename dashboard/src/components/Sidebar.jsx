@@ -1,46 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Users,
-  Gem,
-  Ruler,
-  CheckSquare,
-  DollarSign,
-  UserCheck,
-  BarChart3,
-  LogOut,
-  X,
-  MessageSquare,
-  Mail,
-  Clock,
-  Star,
-  HelpCircle,
-  Layers,
-  ShieldCheck,
-  Factory,
-  Image as ImageIcon } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
-
-const menuItems = [
-{ icon: LayoutDashboard, label: 'لوحة التحكم', path: '/dashboard' },
-{ icon: Users, label: 'العرائس', path: '/dashboard/brides' },
-{ icon: Gem, label: 'الفساتين', path: '/dashboard/dresses' },
-{ icon: Layers, label: 'التشكيلات', path: '/dashboard/collections' },
-{ icon: ImageIcon, label: 'معرض العملاء', path: '/dashboard/client-gallery' },
-{ icon: Ruler, label: 'القياسات', path: '/dashboard/fittings' },
-{ icon: CheckSquare, label: 'المهام', path: '/dashboard/tasks' },
-{ icon: DollarSign, label: 'المالية', path: '/dashboard/finance' },
-{ icon: Factory, label: 'التصنيع', path: '/dashboard/manufacturing' },
-{ icon: UserCheck, label: 'الموظفين', path: '/dashboard/employees' },
-{ icon: Clock, label: 'الحضور والرواتب', path: '/dashboard/attendance' },
-{ icon: BarChart3, label: 'التقارير', path: '/dashboard/reports' },
-{ icon: ShieldCheck, label: 'سجل النشاطات', path: '/dashboard/logs', adminOnly: true },
-{ icon: MessageSquare, label: 'قوالب الرسائل', path: '/dashboard/whatsapp-templates' },
-{ icon: Mail, label: 'رسائل تواصل معنا', path: '/dashboard/contact-messages' },
-{ icon: Star, label: 'آراء العملاء', path: '/dashboard/reviews' },
-{ icon: HelpCircle, label: 'الأسئلة الشائعة', path: '/dashboard/faqs' }];
-
+import { getAllowedMenuItems, isMenuItemActive } from '@/lib/nav-items';
 
 export function Sidebar({ onClose }) {
   const location = useLocation();
@@ -80,21 +42,7 @@ export function Sidebar({ onClose }) {
     navigate('/dashboard');
   };
 
-  // Filter menu items by permissions
-  const filteredMenuItems = menuItems.filter((item) => {
-    if (!currentUser) return false;
-    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'owner';
-    if (item.adminOnly) {
-      return isAdmin;
-    }
-    if (isAdmin || currentUser.permissions?.includes('*')) {
-      return true;
-    }
-    if (item.path === '/dashboard' || item.path === '/dashboard/faqs') {
-      return true;
-    }
-    return currentUser.permissions?.includes(item.path);
-  });
+  const filteredMenuItems = getAllowedMenuItems(currentUser);
 
   return (
     <div className="w-64 bg-white flex flex-col h-full border-l border-slate-100 text-right overflow-hidden select-none" dir="rtl">
@@ -124,7 +72,7 @@ export function Sidebar({ onClose }) {
         <ul className="space-y-1">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.path || item.path !== '/dashboard' && pathname.startsWith(item.path);
+            const isActive = isMenuItemActive(item, pathname);
             return (
               <li key={item.path}>
                 <Link

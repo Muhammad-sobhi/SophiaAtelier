@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
+import { MobileTabBar } from '@/components/MobileTabBar';
 import { LogIn, Lock, Mail, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ToastContainer } from '@/components/ui/Toast';
 import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 
 export default function DashboardLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -155,25 +155,19 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-[#dbe2ff] flex items-center justify-center p-0 md:p-6 font-sans">
-      <div className="w-full max-w-[1440px] h-screen md:h-[92vh] min-h-0 md:min-h-[760px] bg-white rounded-none md:rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(79,70,229,0.15)] flex overflow-hidden border-none md:border md:border-white/60">
-        
-        {/* Responsive Sidebar Drawer */}
-        <div className={`
-          fixed inset-y-0 right-0 z-50 transform md:relative md:translate-x-0 transition-transform duration-300 ease-in-out flex-shrink-0
-          ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
-        `}>
-          <div 
-            onClick={() => setIsSidebarOpen(false)}
-            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs md:hidden z-[-1] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
-          />
-          <Sidebar onClose={() => setIsSidebarOpen(false)} />
+      <div className="w-full max-w-[1440px] h-dvh md:h-[92vh] min-h-0 md:min-h-[760px] bg-white rounded-none md:rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(79,70,229,0.15)] flex overflow-hidden border-none md:border md:border-white/60">
+
+        {/* Desktop sidebar; on mobile the bottom tab bar + "More" page replace it */}
+        <div className="hidden md:block flex-shrink-0">
+          <Sidebar />
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden">
-          <Header onMenuClick={() => setIsSidebarOpen(true)} />
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
+          <Header />
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
             <Outlet />
           </div>
+          <MobileTabBar currentUser={currentUser} />
         </div>
       </div>
       <ToastContainer />

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2, Settings, LogOut } from 'lucide-react';
+import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2, Settings, LogOut, Sun, Moon } from 'lucide-react';
+import { setTheme, useTheme } from '@/lib/app-preferences';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
@@ -37,6 +38,7 @@ function mapApiNotification(n) {
 
 export function Header({ onMenuClick }) {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [currentUser, setCurrentUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -452,6 +454,14 @@ export function Header({ onMenuClick }) {
                       <span>إعدادات الحساب</span>
                     </button>
                   )}
+
+                  <button
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                    <span>{theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+                  </button>
 
                   <button
                     onClick={() => {
