@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class ProfileController extends Controller
 {
@@ -34,6 +37,10 @@ class ProfileController extends Controller
 
         $user->update($validated);
 
+        if (isset($validated['password'])) {
+            $this->logoutOtherDevices($request);
+        }
+
         // Also update the related employee record if it exists
         $employee = \App\Models\Employee::where('email', $user->getOriginal('email'))->first();
         if ($employee) {
@@ -52,5 +59,30 @@ class ProfileController extends Controller
         $user->permissions = $employee ? ($employee->permissions ?? []) : [];
         
         return response()->json($user);
+    }
+
+    /**
+     * Revoke every session and API token of the user except the current request's session.
+     */
+    private function logoutOtherDevices(Request $request): void
+    {
+        $user = $request->user();
+        $session = $request->hasSession() ? $request->session() : null;
+
+        DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $user->id)
+            ->when($session, fn ($query) => $query->where('id', '!=', $session->getId()))
+            ->delete();
+
+        $currentToken = $user->currentAccessToken();
+        $user->tokens()
+            ->when($currentToken instanceof PersonalAccessToken, fn ($query) => $query->whereKeyNot($currentToken->getKey()))
+            ->delete();
+
+        $user->setRememberToken(Str::random(60));
+        $user->save();
+
+        // Issue a fresh session id so the old one can't be reused
+        $session?->regenerate(true);
     }
 }
