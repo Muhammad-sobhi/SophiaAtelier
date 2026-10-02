@@ -339,7 +339,6 @@ export default function TasksPage() {
               className="w-full pl-4 pr-10 py-2 bg-white border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-700 shadow-sm" />
             
           </div>
-          {isAdmin &&
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-600/10 active:scale-95 whitespace-nowrap">
@@ -347,7 +346,6 @@ export default function TasksPage() {
               <Plus size={14} />
               <span>إضافة مهمة</span>
             </button>
-          }
         </div>
       </div>
 

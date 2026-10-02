@@ -122,6 +122,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('availability', [\App\Http\Controllers\Api\AvailabilityController::class, 'check']);
     Route::apiResource('visits', VisitController::class);
     Route::apiResource('bookings', BookingController::class);
+    Route::post('fittings/{fitting}/measurement-image', [FittingController::class, 'uploadMeasurementImage']);
+    Route::delete('fittings/{fitting}/measurement-image', [FittingController::class, 'deleteMeasurementImage']);
     Route::apiResource('fittings', FittingController::class);
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('reviews', ReviewController::class);

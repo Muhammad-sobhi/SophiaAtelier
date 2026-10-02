@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Fitting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FittingController extends Controller
 {
@@ -72,8 +73,39 @@ class FittingController extends Controller
         return response()->json($fitting->load(['booking.client', 'booking.dress', 'booking.dress2', 'booking.dress3', 'tailor']));
     }
 
+    // Original photo of the handwritten measurement sheet, kept as the bride's reference record
+    public function uploadMeasurementImage(Request $request, Fitting $fitting): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:10240',
+        ]);
+
+        $oldPath = $fitting->measurement_image_path;
+        $fitting->update([
+            'measurement_image_path' => $request->file('image')->store('fittings', 'public'),
+        ]);
+        if ($oldPath) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json($fitting->load(['booking.client', 'booking.dress', 'booking.dress2', 'booking.dress3', 'tailor']));
+    }
+
+    public function deleteMeasurementImage(Fitting $fitting): JsonResponse
+    {
+        if ($fitting->measurement_image_path) {
+            Storage::disk('public')->delete($fitting->measurement_image_path);
+            $fitting->update(['measurement_image_path' => null]);
+        }
+
+        return response()->json($fitting->load(['booking.client', 'booking.dress', 'booking.dress2', 'booking.dress3', 'tailor']));
+    }
+
     public function destroy(Fitting $fitting): JsonResponse
     {
+        if ($fitting->measurement_image_path) {
+            Storage::disk('public')->delete($fitting->measurement_image_path);
+        }
         $fitting->delete();
 
         return response()->json(['message' => 'Fitting deleted']);

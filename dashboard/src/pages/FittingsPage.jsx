@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getStorageUrl } from '@/lib/api-client';
 import {
   Ruler,
   Scissors,
@@ -12,7 +12,8 @@ import {
   Printer,
   Trash2,
   Check,
-  AlertCircle
+  AlertCircle,
+  Camera
 } from 'lucide-react';
 
 
@@ -108,6 +109,14 @@ const alterationLabels = {
   other: 'أخرى'
 };
 
+// Items added by staff are stored in the same alterations map under a "custom:<label>" key
+const CUSTOM_ALTERATION_PREFIX = 'custom:';
+const getAlterationLabel = (key) => alterationLabels[key] || key.replace(CUSTOM_ALTERATION_PREFIX, '');
+
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[ch]);
+
 const formatFittingDate = (dateStr) => {
   if (!dateStr) return '—';
   try {
@@ -148,6 +157,8 @@ export default function FittingsPage() {
 
   const [newMeasurements, setNewMeasurements] = useState({ ...defaultMeasurements });
   const [newAlterations, setNewAlterations] = useState({ ...defaultAlterations });
+  const [newAlterationLabel, setNewAlterationLabel] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchFittings = () => {
     apiClient.get('/fittings').then((res) => {
@@ -173,6 +184,7 @@ export default function FittingsPage() {
         salesNotes: f.alterations_notes || '',
         additionalNotes: f.additional_notes || '',
         measurements: f.measurements || { ...defaultMeasurements },
+        measurementImage: f.measurement_image_path || null,
         alterations: f.alterations || { ...defaultAlterations }
       }));
       setFittingsList(mapped);
@@ -229,6 +241,71 @@ export default function FittingsPage() {
       });
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const saveAlterations = async (updatedAlterations) => {
+    const updatedFitting = { ...selectedFitting, alterations: updatedAlterations };
+    setSelectedFitting(updatedFitting);
+    setFittingsList((prev) => prev.map((f) => f.id === selectedFitting.id ? updatedFitting : f));
+    try {
+      await apiClient.put(`/fittings/${selectedFitting.id}`, { alterations: updatedAlterations });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddAlteration = () => {
+    const label = newAlterationLabel.trim();
+    if (!selectedFitting || !label) return;
+    const key = `${CUSTOM_ALTERATION_PREFIX}${label}`;
+    setNewAlterationLabel('');
+    if (key in selectedFitting.alterations) return;
+    saveAlterations({ ...selectedFitting.alterations, [key]: true });
+  };
+
+  const handleRemoveAlteration = (key) => {
+    if (!selectedFitting) return;
+    const { [key]: _removed, ...rest } = selectedFitting.alterations;
+    saveAlterations(rest);
+  };
+
+  const applyMeasurementImage = (fittingId, path) => {
+    setSelectedFitting((prev) => prev?.id === fittingId ? { ...prev, measurementImage: path } : prev);
+    setFittingsList((prev) => prev.map((f) => f.id === fittingId ? { ...f, measurementImage: path } : f));
+  };
+
+  const handleMeasurementImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!selectedFitting || !file) return;
+    const fittingId = selectedFitting.id;
+    const formData = new FormData();
+    formData.append('image', file);
+    setUploadingImage(true);
+    try {
+      const res = await apiClient.postFormData(`/fittings/${fittingId}/measurement-image`, formData);
+      applyMeasurementImage(fittingId, res.measurement_image_path || null);
+    } catch (err) {
+      setAlertMessage({
+        isOpen: true,
+        title: 'فشل رفع الصورة',
+        message: err?.message || 'تعذر رفع صورة المقاسات.',
+        type: 'error'
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleMeasurementImageDelete = async () => {
+    if (!selectedFitting?.measurementImage) return;
+    const fittingId = selectedFitting.id;
+    try {
+      await apiClient.delete(`/fittings/${fittingId}/measurement-image`);
+      applyMeasurementImage(fittingId, null);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -352,7 +429,8 @@ export default function FittingsPage() {
 
     const activeAlterations = Object.keys(selectedFitting.alterations).
     filter((key) => selectedFitting.alterations[key]).
-    map((key) => alterationLabels[key]);
+    map((key) => escapeHtml(getAlterationLabel(key)));
+    const measurementImageUrl = selectedFitting.measurementImage ? getStorageUrl(selectedFitting.measurementImage) : null;
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -411,6 +489,11 @@ export default function FittingsPage() {
               <td>الوزن التقريبي: ${selectedFitting.measurements.weight} كجم</td>
             </tr>
           </table>
+
+          ${measurementImageUrl ? `
+          <div class="section-title">صورة ورقة المقاسات الأصلية</div>
+          <img src="${escapeHtml(measurementImageUrl)}" style="max-width:100%; max-height:500px; margin-top:8px;" />
+          ` : ''}
 
           <div class="section-title">التعديلات المطلوبة للبدء فوراً</div>
           <ul>
@@ -543,15 +626,45 @@ export default function FittingsPage() {
                     key={field}
                     className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
                     
-                        <span className="text-xs font-bold text-slate-700">{alterationLabels[field]}</span>
-                        <input
-                      type="checkbox"
-                      checked={selectedFitting.alterations[field]}
-                      onChange={() => handleAlterationToggle(field)}
-                      className="w-4 h-4 text-indigo-600 border-slate-300 rounded-sm focus:ring-indigo-500/20" />
-                    
+                        <span className="text-xs font-bold text-slate-700">{getAlterationLabel(field)}</span>
+                        <div className="flex items-center gap-2">
+                          {field.startsWith(CUSTOM_ALTERATION_PREFIX) &&
+                      <button
+                        type="button"
+                        onClick={(e) => {e.preventDefault();handleRemoveAlteration(field);}}
+                        className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="حذف البند">
+                        
+                              <X size={12} />
+                            </button>
+                      }
+                          <input
+                        type="checkbox"
+                        checked={selectedFitting.alterations[field]}
+                        onChange={() => handleAlterationToggle(field)}
+                        className="w-4 h-4 text-indigo-600 border-slate-300 rounded-sm focus:ring-indigo-500/20" />
+                        </div>
                       </label>
                   )}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-3">
+                    <input
+                    type="text"
+                    value={newAlterationLabel}
+                    onChange={(e) => setNewAlterationLabel(e.target.value)}
+                    onKeyDown={(e) => {if (e.key === 'Enter') {e.preventDefault();handleAddAlteration();}}}
+                    placeholder="إضافة بند جديد للفستان..."
+                    maxLength={100}
+                    className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                    <button
+                    type="button"
+                    onClick={handleAddAlteration}
+                    disabled={!newAlterationLabel.trim()}
+                    className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="إضافة بند">
+                      <Plus size={14} />
+                    </button>
                   </div>
                 </div>
 
@@ -633,6 +746,43 @@ export default function FittingsPage() {
                 <div className="text-[10px] text-slate-400 font-bold bg-slate-50 p-2.5 rounded-xl border border-slate-100/50 flex items-start gap-1.5">
                   <Info size={12} className="text-indigo-600 mt-0.5 flex-shrink-0" />
                   <span>تحديث وحفظ التعديلات في الجدول مباشر وتلقائي.</span>
+                </div>
+
+                {/* Original measurement sheet photo */}
+                <div className="space-y-2 border-t border-slate-100 pt-4">
+                  <h4 className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <Camera size={13} className="text-indigo-600" />
+                    <span>صورة ورقة المقاسات</span>
+                  </h4>
+                  {selectedFitting.measurementImage ?
+                <div className="space-y-2">
+                      <a href={getStorageUrl(selectedFitting.measurementImage)} target="_blank" rel="noreferrer" title="فتح الصورة بالحجم الكامل">
+                        <img
+                      src={getStorageUrl(selectedFitting.measurementImage)}
+                      alt="صورة المقاسات"
+                      className="w-full max-h-64 object-contain rounded-2xl border border-slate-100 bg-slate-50" />
+                      </a>
+                      <div className="flex items-center gap-2">
+                        <label className={`flex-1 text-center px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[11px] font-bold transition-colors ${uploadingImage ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
+                          {uploadingImage ? 'جاري الرفع...' : 'تغيير الصورة'}
+                          <input type="file" accept="image/*" className="hidden" onChange={handleMeasurementImageUpload} disabled={uploadingImage} />
+                        </label>
+                        <button
+                      type="button"
+                      onClick={handleMeasurementImageDelete}
+                      className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer"
+                      title="حذف الصورة">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div> :
+
+                <label className={`flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-slate-200 hover:border-indigo-300 rounded-2xl text-[11px] font-bold text-slate-400 hover:text-indigo-600 transition-colors ${uploadingImage ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
+                      <Camera size={18} />
+                      <span>{uploadingImage ? 'جاري الرفع...' : 'إرفاق صورة المقاسات'}</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleMeasurementImageUpload} disabled={uploadingImage} />
+                    </label>
+                }
                 </div>
               </div>
 

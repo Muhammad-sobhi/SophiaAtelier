@@ -14,6 +14,7 @@ class Fitting extends Model
         'booking_id', 
         'fitting_date', 
         'measurements', 
+        'measurement_image_path',
         'alterations',
         'sales_associate', 
         'sales_name',

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Search, Filter, MessageCircle } from 'lucide-react';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates } from '@/lib/utils';
@@ -6,6 +6,23 @@ import { getVisitStatus } from '@/components/bride-journey/visitStatus';
 import { phoneMatchesSearch } from '@/lib/phone';
 
 const RETURN_ARCHIVE_DAYS = 15;
+
+// Where the bride came from (visit source); unknown values fall back to the raw value
+const VISIT_SOURCES = {
+  website: { label: 'الموقع', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' },
+  instagram: { label: 'انستجرام', badgeClass: 'bg-pink-50 text-pink-700 border-pink-200' },
+  whatsapp: { label: 'واتساب', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  walkin: { label: 'في المحل', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  phone: { label: 'تليفون', badgeClass: 'bg-violet-50 text-violet-700 border-violet-200' },
+  referral: { label: 'ترشيح', badgeClass: 'bg-teal-50 text-teal-700 border-teal-200' },
+};
+const INSTAGRAM_ALIASES = ['instagram', 'انستجرام', 'انستقرام'];
+
+// Latest visit's source, falling back to the client's own source
+const getVisitSource = (b) => {
+  const src = b.visits?.[0]?.source || b.source || '';
+  return INSTAGRAM_ALIASES.includes(src) ? 'instagram' : src;
+};
 
 export default function BridesTab({
   brides,
@@ -23,6 +40,9 @@ export default function BridesTab({
   STAGES,
   STAGE_MAP,
 }) {
+  // Nested filter inside the visit stage: only brides from one source
+  const [sourceFilter, setSourceFilter] = useState('all');
+
   // availableMonths, helpers, and stage counts are defined below after matchesStage
 
   // Returns the stage-relevant date used for month filtering & sorting
@@ -300,6 +320,11 @@ export default function BridesTab({
         return false;
       }
 
+      // 4. Source filter (visit stage only)
+      if (stageFilter === 'visit' && sourceFilter !== 'all' && getVisitSource(b) !== sourceFilter) {
+        return false;
+      }
+
       return true;
     });
 
@@ -311,7 +336,19 @@ export default function BridesTab({
     });
 
     return list;
-  }, [brides, stageFilter, brideSearch, monthFilter, dateBasis]);
+  }, [brides, stageFilter, brideSearch, monthFilter, dateBasis, sourceFilter]);
+
+  // Source pill counts for the visit stage — reflect active search + month filters
+  const visitSourceCounts = useMemo(() => {
+    const counts = {};
+    if (stageFilter !== 'visit') return counts;
+    brides.forEach((b) => {
+      if (!matchesStage(b, 'visit') || !matchesSearch(b) || !matchesMonthForStage(b, 'visit', monthFilter)) return;
+      const src = getVisitSource(b);
+      if (src) counts[src] = (counts[src] || 0) + 1;
+    });
+    return counts;
+  }, [brides, stageFilter, brideSearch, monthFilter]);
 
   return (
     <div className="space-y-2.5 sm:space-y-3 animate-fade-in flex flex-col h-[460px] md:h-[490px]">
@@ -345,6 +382,34 @@ export default function BridesTab({
           );
         })}
       </div>
+
+      {/* Visit Source Sub-filter (visit stage only) */}
+      {stageFilter === 'visit' && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-shrink-0 touch-pan-x">
+          {[
+            { id: 'all', label: 'كل المصادر', count: Object.values(visitSourceCounts).reduce((a, n) => a + n, 0) },
+            ...Object.entries(VISIT_SOURCES).map(([id, cfg]) => ({ id, label: cfg.label, count: visitSourceCounts[id] || 0 })),
+          ].map((src) => {
+            const isActive = sourceFilter === src.id;
+            return (
+              <button
+                key={src.id}
+                onClick={() => setSourceFilter(src.id)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[10.5px] sm:text-[11px] font-extrabold transition-all cursor-pointer flex items-center gap-1.5 border min-h-[30px] ${
+                  isActive
+                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'
+                }`}
+              >
+                <span>{src.label}</span>
+                <span className={`text-[9px] px-1.5 rounded-md ${isActive ? 'bg-white/25' : 'bg-slate-100 text-slate-700 font-mono'}`}>
+                  {src.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Filters Bar: Search & Monthly Filter */}
       <div className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 shadow-2xs flex-shrink-0">
@@ -401,6 +466,7 @@ export default function BridesTab({
                 setDateBasis('all');
                 setBrideSearch('');
                 setStageFilter('all');
+                setSourceFilter('all');
               }}
               className="text-[10px] sm:text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline px-2 py-1 cursor-pointer whitespace-nowrap min-h-[36px] flex items-center"
             >
@@ -444,6 +510,19 @@ export default function BridesTab({
                       <h4 className="text-xs sm:text-sm font-black text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
                         {bride.name}
                       </h4>
+                      {activeStageKey === 'visit' && (() => {
+                        const src = getVisitSource(bride);
+                        if (!src) return null;
+                        const cfg = VISIT_SOURCES[src];
+                        return (
+                          <span
+                            className={`flex-shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold border ${cfg?.badgeClass || 'bg-slate-50 text-slate-600 border-slate-200'}`}
+                            title="مصدر العروسة"
+                          >
+                            {cfg?.label || src}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Phone with WhatsApp Link */}
