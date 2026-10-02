@@ -14,7 +14,7 @@ import { buildVisitConfirmationUrl, formatVisitTime } from '@/lib/whatsapp';
 import {
   X, Phone, MapPin, Calendar, Heart, Ruler, Package, RotateCcw,
   Clock, Sparkles, Banknote, Edit3, MessageCircle, CheckCircle2, Loader2, Trash2, AlertTriangle, Ban,
-  UserX, XCircle, CalendarPlus
+  UserX, XCircle, CalendarPlus, FileText
 } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
@@ -70,6 +70,7 @@ export function BrideJourneyPopup({
   const [isDeleting, setIsDeleting] = useState(false);
   const [availability, setAvailability] = useState({ loading: false, error: false, byDress: {} });
   const [triedDressIds, setTriedDressIds] = useState([]);
+  const [uploadingBill, setUploadingBill] = useState(false);
 
   // Keep local state synced if parent passes a newer bride object
   useEffect(() => {
@@ -159,6 +160,44 @@ export function BrideJourneyPopup({
   const paidInsurance = insuranceRevenues.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
   const currentStageIndex = STAGES.findIndex((s) => s.id === stage);
+  // The shop bill (one image for all of the booking's payments) is attached in the booking and pickup stages
+  const canEditBill = stage === 'booking' || stage === 'picked_up';
+
+  const handleBillUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!booking || !file) return;
+    const formData = new FormData();
+    formData.append('image', file);
+    setUploadingBill(true);
+    try {
+      await apiClient.postFormData(`/bookings/${booking.id}/bill-image`, formData);
+      const fresh = await reloadBride();
+      await onUpdate?.(fresh);
+      toast.success('تم إرفاق الفاتورة ✨');
+    } catch (err) {
+      console.error(err);
+      toast.error('تعذر رفع صورة الفاتورة');
+    } finally {
+      setUploadingBill(false);
+    }
+  };
+
+  const handleBillDelete = async () => {
+    if (!booking?.bill_image_path) return;
+    if (!await confirmDialog('هل تريد حذف صورة الفاتورة المرفقة؟', { title: 'حذف الفاتورة', confirmLabel: 'حذف', danger: true })) return;
+    setUploadingBill(true);
+    try {
+      await apiClient.delete(`/bookings/${booking.id}/bill-image`);
+      const fresh = await reloadBride();
+      await onUpdate?.(fresh);
+    } catch (err) {
+      console.error(err);
+      toast.error('تعذر حذف صورة الفاتورة');
+    } finally {
+      setUploadingBill(false);
+    }
+  };
 
   const handleQuickAction = async (action, payload = {}) => {
     setLoading(true);
@@ -786,6 +825,50 @@ export function BrideJourneyPopup({
                     )}
                   </div>
                 </div>
+
+                {/* Shop bill: one image covering all of the bride's payments */}
+                {(canEditBill || booking.bill_image_path) && (
+                  <div className="bg-white rounded-xl p-2 border border-emerald-100/60">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-black text-slate-700 flex items-center gap-1">
+                        <FileText size={12} className="text-emerald-600" /> فاتورة المحل
+                      </span>
+                      {booking.bill_image_path && canEditBill && (
+                        <div className="flex items-center gap-1">
+                          <label className={`text-[9.5px] font-black text-emerald-800 bg-emerald-100/90 hover:bg-emerald-200 px-2 py-0.5 rounded-lg transition-all ${uploadingBill ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
+                            {uploadingBill ? 'جاري الرفع...' : 'تغيير'}
+                            <input type="file" accept="image/*" className="hidden" onChange={handleBillUpload} disabled={uploadingBill} />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleBillDelete}
+                            disabled={uploadingBill}
+                            className="p-1 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                            title="حذف الفاتورة"
+                            aria-label="حذف الفاتورة"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {booking.bill_image_path ? (
+                      <a href={getStorageUrl(booking.bill_image_path)} target="_blank" rel="noreferrer" title="فتح الفاتورة بالحجم الكامل">
+                        <img
+                          src={getStorageUrl(booking.bill_image_path)}
+                          alt="فاتورة المحل"
+                          className="w-full max-h-40 object-contain rounded-lg border border-slate-100 bg-slate-50"
+                        />
+                      </a>
+                    ) : (
+                      <label className={`flex items-center justify-center gap-1.5 p-2.5 border-2 border-dashed border-emerald-200 hover:border-emerald-400 rounded-lg text-[10px] font-bold text-slate-500 hover:text-emerald-700 transition-colors ${uploadingBill ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
+                        <FileText size={13} />
+                        <span>{uploadingBill ? 'جاري الرفع...' : 'إرفاق صورة الفاتورة 📎'}</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={handleBillUpload} disabled={uploadingBill} />
+                      </label>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

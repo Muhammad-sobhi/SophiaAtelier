@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class BookingController extends Controller
 {
@@ -396,8 +397,39 @@ class BookingController extends Controller
         return response()->json($loaded);
     }
 
+    /** Shop bill covering all of the booking's payments (one image per booking, replaced on re-upload) */
+    public function uploadBillImage(Request $request, Booking $booking): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:10240',
+        ]);
+
+        $oldPath = $booking->bill_image_path;
+        $booking->update([
+            'bill_image_path' => $request->file('image')->store('bills', 'public'),
+        ]);
+        if ($oldPath) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json(['bill_image_path' => $booking->bill_image_path]);
+    }
+
+    public function deleteBillImage(Booking $booking): JsonResponse
+    {
+        if ($booking->bill_image_path) {
+            Storage::disk('public')->delete($booking->bill_image_path);
+            $booking->update(['bill_image_path' => null]);
+        }
+
+        return response()->json(['bill_image_path' => null]);
+    }
+
     public function destroy(Booking $booking): JsonResponse
     {
+        if ($booking->bill_image_path) {
+            Storage::disk('public')->delete($booking->bill_image_path);
+        }
         $booking->delete();
 
         return response()->json(['message' => 'Booking deleted']);

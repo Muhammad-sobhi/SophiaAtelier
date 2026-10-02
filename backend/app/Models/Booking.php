@@ -15,7 +15,7 @@ class Booking extends Model
         'client_id', 'dress_id', 'dress_2_id', 'dress_3_id', 'booking_date', 'event_date',
         'pickup_scheduled_on', 'return_scheduled_on',
         'status', 'total_amount', 'deposit_amount', 'insurance_amount', 'notes',
-        'receipt_path', 'payment_method', 'sales_name', 'is_override',
+        'receipt_path', 'bill_image_path', 'payment_method', 'sales_name', 'is_override',
         'cancelled_at', 'cancelled_by', 'cancelled_by_name', 'cancelled_stage',
         'cancellation_reason', 'cancellation_note',
     ];

@@ -482,9 +482,10 @@ class ClientController extends Controller
             $bookingIds = $client->bookings()->pluck('id')->toArray();
 
             if (!empty($bookingIds)) {
-                // Delete booking receipt images from storage
-                $receipts = \App\Models\Booking::whereIn('id', $bookingIds)
-                    ->pluck('receipt_path')
+                // Delete booking receipt and bill images from storage
+                $bookingFiles = \App\Models\Booking::whereIn('id', $bookingIds)->get(['receipt_path', 'bill_image_path']);
+                $receipts = $bookingFiles->pluck('receipt_path')
+                    ->merge($bookingFiles->pluck('bill_image_path'))
                     ->filter();
                 foreach ($receipts as $receipt) {
                     \Illuminate\Support\Facades\Storage::disk('public')->delete($receipt);
