@@ -35,6 +35,18 @@ function shopNow() {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
 }
 
+/** Visits are allowed at most 3 months (by day) before the wedding; a shorter month clamps to its last day (same as the API) */
+const MAX_MONTHS_BEFORE_WEDDING = 3;
+function earliestVisitDate(weddingDate) {
+  const m = String(weddingDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const total = Number(m[1]) * 12 + (Number(m[2]) - 1) - MAX_MONTHS_BEFORE_WEDDING;
+  const year = Math.floor(total / 12);
+  const month = (total % 12) + 1;
+  const day = Math.min(Number(m[3]), new Date(Date.UTC(year, month, 0)).getUTCDate());
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 function readVisitDate(today) {
   try {
     const saved = localStorage.getItem('sophia_visit_date');
@@ -138,6 +150,8 @@ export default function CartDrawer() {
   const hasBlocking = cart.some((item) => isBlocking(rowsById[item.id]));
   const hasVisitConflict = cart.some((item) => rowsById[item.id]?.visit_date && !rowsById[item.id].visit_date.available);
   const suggestedDate = availability.data?.suggested_visit_date;
+  const earliestVisit = earliestVisitDate(weddingDate);
+  const visitTooEarly = Boolean(visitDate && earliestVisit && visitDate < earliestVisit);
   const totalTryingFee = cart.reduce((sum, item) => sum + parseFloat(rowsById[item.id]?.trying_fee ?? item.trying_fee ?? 0), 0);
 
   const visitStatusText = (vd) => {
@@ -175,6 +189,10 @@ export default function CartDrawer() {
       focusWeddingDate();
       return;
     }
+    if (visitTooEarly) {
+      setError(a.visitTooEarly(earliestVisit));
+      return;
+    }
     if (hasBlocking) {
       setError(a.fixToContinue);
       return;
@@ -210,6 +228,8 @@ export default function CartDrawer() {
         if (data.code === 'dresses_unavailable' && data.availability) {
           setAvailability({ loading: false, error: false, data: data.availability });
           setError(a.fixToContinue);
+        } else if (data.code === 'visit_too_early' && data.earliest_visit_date) {
+          setError(a.visitTooEarly(data.earliest_visit_date));
         } else if (data.code === 'slot_full') {
           setSlotsVersion((v) => v + 1);
           setError(a.slotFull);
@@ -379,6 +399,15 @@ export default function CartDrawer() {
                   />
                 </div>
 
+                {visitTooEarly && (
+                  <div role="alert" style={{ padding: '10px', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '10px', fontSize: '11px', color: '#e11d48', fontWeight: '600', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span>{a.visitTooEarly(earliestVisit)}</span>
+                    <button type="button" className={styles.suggestBtn} onClick={() => setVisitDate(earliestVisit)}>
+                      <Calendar size={14} /> {a.useEarliestVisitDate(earliestVisit)}
+                    </button>
+                  </div>
+                )}
+
                 {totalTryingFee > 0 && (
                   <div className={styles.totalRow}>
                     <span>{t.cart.tryingFee}</span>
@@ -412,7 +441,7 @@ export default function CartDrawer() {
               <button
                 className={styles.checkoutBtn}
                 onClick={handleBookVisit}
-                disabled={loading || availableSlots.length === 0 || hasBlocking || availability.loading}
+                disabled={loading || availableSlots.length === 0 || hasBlocking || visitTooEarly || availability.loading}
               >
                 {loading ? (isAr ? 'جاري الإرسال...' : 'BOOKING VISIT...') : (isAr ? 'احجزي موعد تجربة الفساتين' : 'BOOK A VISIT FOR MY DRESSES')}
               </button>

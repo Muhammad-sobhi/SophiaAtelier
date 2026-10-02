@@ -89,7 +89,7 @@ class VisitFlowTest extends TestCase
         $this->bookFor($dress, '2026-10-31', '2026-11-02');
         $before = Visit::count();
 
-        $this->websitePost([$dress->id], '2026-11-01', '2027-02-10')
+        $this->websitePost([$dress->id], '2026-11-01', '2027-01-10')
             ->assertStatus(422)->assertJsonPath('code', 'dresses_unavailable');
         $this->assertSame($before, Visit::count());
     }

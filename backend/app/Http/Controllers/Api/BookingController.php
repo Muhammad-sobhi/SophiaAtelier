@@ -243,6 +243,14 @@ class BookingController extends Controller
         $status = $request->input('status', $booking->status);
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
 
+        // A new wedding date must keep the bride's open visit at most 3 months before it
+        if (isset($validated['event_date'])
+            && \Carbon\Carbon::parse($validated['event_date'])->toDateString() !== $booking->event_date?->toDateString()) {
+            $openVisit = \App\Models\Visit::where('client_id', $clientId)
+                ->whereIn('status', \App\Models\Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+            \App\Models\Visit::assertVisitWindow($openVisit?->visit_date, $validated['event_date'], 'event_date');
+        }
+
         if (($status === 'confirmed' || $status === 'picked_up') && !$forceOverride) {
             $conflict1 = Booking::checkDressAvailability(
                 $clientId,
@@ -445,6 +453,14 @@ class BookingController extends Controller
             return response()->json([
                 'message' => 'يرجى اختيار فستان واحد على الأقل وتحديد تاريخ الزفاف',
                 'code' => 'missing_dresses_or_wedding_date',
+            ], 422);
+        }
+
+        if ($windowError = \App\Models\Visit::visitWindowError($bookingDate, $eventDate)) {
+            return response()->json([
+                'message' => $windowError['message'],
+                'code' => 'visit_too_early',
+                'earliest_visit_date' => $windowError['earliest_visit_date'],
             ], 422);
         }
 

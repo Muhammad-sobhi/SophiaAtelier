@@ -269,6 +269,13 @@ class ClientController extends Controller
             $validated['city'] = $validated['address'];
         }
 
+        $dressIds = array_values(array_unique(array_filter([
+            $validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
+        ])));
+
+        // A visit (dated today when only dresses are sent) may be at most 3 months before the wedding
+        Visit::assertVisitWindow($validated['visit_date'] ?? ($dressIds ? now()->toDateString() : null), $validated['wedding_date'] ?? null);
+
         // Check visit time slot limit before creating anything
         $normalizedTimeSlot = null;
         if (!empty($validated['visit_time']) && !empty($validated['visit_date'])) {
@@ -297,10 +304,6 @@ class ClientController extends Controller
                 $validated['return_scheduled_on'] = $scheduled['return_date'];
             }
         }
-
-        $dressIds = array_values(array_unique(array_filter([
-            $validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
-        ])));
 
         if (!empty($validated['visit_date']) || $dressIds) {
             $validated['visit_date'] = $validated['visit_date'] ?? now()->toDateString();
@@ -346,6 +349,19 @@ class ClientController extends Controller
 
         if (array_key_exists('address', $validated) && empty($validated['city'])) {
             $validated['city'] = $validated['address'];
+        }
+
+        // A new visit date, or a new wedding date, must keep the visit at most 3 months before the wedding.
+        // Unchanged dates are not re-checked so other bride details can still be edited.
+        $weddingDate = array_key_exists('wedding_date', $validated) ? $validated['wedding_date'] : $client->wedding_date;
+        $weddingChanged = !empty($validated['wedding_date'])
+            && \Carbon\Carbon::parse($validated['wedding_date'])->toDateString() !== $client->wedding_date;
+        $newVisitDate = !empty($validated['visit_date'])
+            && !$client->visits()->whereDate('visit_date', $validated['visit_date'])->exists();
+        if ($weddingChanged || $newVisitDate) {
+            $visitDate = $validated['visit_date']
+                ?? $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first()?->visit_date;
+            Visit::assertVisitWindow($visitDate, $weddingDate, $newVisitDate ? 'visit_date' : 'wedding_date');
         }
 
         // Check visit time slot limit before updating anything
@@ -588,6 +604,10 @@ class ClientController extends Controller
                 // Confirm the bride's open visit request (or register a walk-in visit) without
                 // overwriting the date/time she asked for unless the employee changed them
                 $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+                Visit::assertVisitWindow(
+                    $request->input('visit_date') ?: ($visit?->visit_date ?? now()->toDateString()),
+                    $request->input('event_date') ?: $client->wedding_date
+                );
                 $visitTime = $request->filled('visit_time') ? VisitController::normalizeTimeSlot($request->input('visit_time')) : null;
 
                 $visitData = array_filter([

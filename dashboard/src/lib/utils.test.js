@@ -1,7 +1,7 @@
 // Run with: npm test  (uses Node's built-in test runner, in Egypt's timezone to catch day-shift bugs)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateScheduledDates, isCairoCity } from './utils.js';
+import { calculateScheduledDates, isCairoCity, earliestVisitDate, visitWindowError } from './utils.js';
 
 test('Cairo: pickup 1 day before, return 1 day after', () => {
   assert.deepEqual(calculateScheduledDates('2026-09-23', 'القاهرة'), { pickupDate: '2026-09-22', returnDate: '2026-09-24' });
@@ -27,4 +27,14 @@ test('Cairo city detection', () => {
   for (const city of ['طنطا', 'دمياط الجديدة', 'المنيا الجديدة', 'الإسكندرية', 'المنصورة', 'Alexandria']) {
     assert.equal(isCairoCity(city), false, city);
   }
+});
+
+test('visit at most 3 months before the wedding, counted by day', () => {
+  assert.equal(earliestVisitDate('2027-01-15'), '2026-10-15');
+  assert.equal(earliestVisitDate('2027-05-31 00:00:00'), '2027-02-28');
+  assert.equal(earliestVisitDate('2028-05-31'), '2028-02-29');
+  assert.equal(visitWindowError('2026-10-15', '2027-01-15'), '');
+  assert.match(visitWindowError('2026-10-14', '2027-01-15'), /15\/10\/2026/);
+  assert.equal(visitWindowError('', '2027-01-15'), '');
+  assert.equal(visitWindowError('2026-10-14', ''), '');
 });

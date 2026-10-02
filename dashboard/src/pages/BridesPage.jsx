@@ -10,7 +10,7 @@ import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import BridesExcelImport from '@/components/BridesExcelImport';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
-import { cleanDate, calculateScheduledDates, isCairoCity } from '@/lib/utils';
+import { cleanDate, calculateScheduledDates, isCairoCity, todayStr, visitWindowError } from '@/lib/utils';
 import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
 import { PhoneWarning } from '@/components/ui/PhoneWarning';
 
@@ -92,6 +92,8 @@ export default function BridesPage() {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBride, setEditingBride] = useState(null);
+  // Dates the edit form opened with: unchanged dates are not re-checked against the 3-month visit rule
+  const [initialDates, setInitialDates] = useState({ visit_date: '', wedding_date: '' });
   const [viewingBride, setViewingBride] = useState(null);
   const [deletingBride, setDeletingBride] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -325,6 +327,7 @@ export default function BridesPage() {
       dress_2_search: '',
       dress_3_search: '',
     });
+    setInitialDates({ visit_date: cleanDate(bride.latest_visit_date || b?.visit_date), wedding_date: cleanDate(wDate) });
   };
 
   const handleWeddingDateChange = (newDate) => {
@@ -420,10 +423,21 @@ export default function BridesPage() {
     return getDressConflict(brideDress3Obj, formData.wedding_date, editingBride?.id, formData.city);
   }, [brideDress3Obj, formData.wedding_date, editingBride?.id, formData.city]);
 
+  // A new bride with dresses but no visit date gets a visit today (same as the backend)
+  const visitWindowWarning = editingBride
+    ? ((cleanDate(formData.visit_date) !== initialDates.visit_date || cleanDate(formData.wedding_date) !== initialDates.wedding_date)
+      ? visitWindowError(formData.visit_date || initialDates.visit_date, formData.wedding_date)
+      : '')
+    : visitWindowError(formData.visit_date || (formData.dress_id ? todayStr() : ''), formData.wedding_date);
+
   const handleSaveBride = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       toast.error('يرجى إدخال اسم العروس');
+      return;
+    }
+    if (visitWindowWarning) {
+      toast.error(visitWindowWarning);
       return;
     }
 
@@ -1165,6 +1179,12 @@ export default function BridesPage() {
                   />
                 </div>
               </div>
+
+              {visitWindowWarning && (
+                <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700">
+                  {visitWindowWarning}
+                </div>
+              )}
 
               {/* Trying Fee & Sales Name */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

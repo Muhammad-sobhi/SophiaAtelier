@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
-import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates } from '@/lib/utils';
+import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates, visitWindowError } from '@/lib/utils';
 import { formatVisitTime } from '@/lib/whatsapp';
 import { OPEN_VISIT_STATUSES, getLatestVisit, getVisitDresses } from './visitStatus';
 import { DressAvailability } from './DressAvailability';
@@ -547,6 +547,8 @@ export function UnifiedStageModal({
   const calculatedDeduction = returnRefundMode === 'deduction' ? Math.min(totalHeldInsurance, Math.max(0, parseFloat(damageDeduction || 0))) : 0;
   const netRefundAmount = Math.max(0, totalHeldInsurance - calculatedDeduction);
 
+  const visitTooEarly = visitWindowError(visitDate, weddingDate);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -562,17 +564,10 @@ export function UnifiedStageModal({
           toast.error('يرجى تحديد تاريخ الزيارة');
           return;
         }
-
-        // Bride details only; the dresses to try are stored on the visit (no booking before she chooses)
-        await apiClient.put(`/clients/${bride.id}`, {
-          name: name.trim(),
-          phone: phone.trim(),
-          phone2: phone2.trim() || null,
-          city: city.trim(),
-          source: source,
-          wedding_date: weddingDate || null,
-          notes: notes.trim() || null,
-        });
+        if (visitTooEarly) {
+          toast.error(visitTooEarly);
+          return;
+        }
 
         await apiClient.put(`/clients/${bride.id}/stage-action`, {
           action: 'confirm_visit',
@@ -586,6 +581,18 @@ export function UnifiedStageModal({
           dress_2_id: d2,
           dress_3_id: d3,
           event_date: weddingDate || null,
+        });
+
+        // Bride details only; the dresses to try are stored on the visit (no booking before she chooses).
+        // Saved after the visit so a new visit date and wedding date are checked together.
+        await apiClient.put(`/clients/${bride.id}`, {
+          name: name.trim(),
+          phone: phone.trim(),
+          phone2: phone2.trim() || null,
+          city: city.trim(),
+          source: source,
+          wedding_date: weddingDate || null,
+          notes: notes.trim() || null,
         });
       } else if (stage === 'booking') {
         const validPayments = bookingPayments.filter(p => parseFloat(p.amount) > 0);
@@ -1478,6 +1485,12 @@ export function UnifiedStageModal({
                     />
                   </div>
                 </div>
+
+                {visitTooEarly && (
+                  <div role="alert" className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[11px] font-bold text-rose-700">
+                    {visitTooEarly}
+                  </div>
+                )}
 
                 {/* Visit Stage: Interested Dresses Selection (Up to 3 Dresses) */}
                 <div className="bg-rose-50/30 p-3 rounded-2xl border border-rose-100 space-y-3">

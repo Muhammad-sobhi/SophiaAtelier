@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\Visit;
 use App\Services\DressAvailabilityService;
 use Illuminate\Http\JsonResponse;
@@ -82,6 +83,8 @@ class VisitController extends Controller
             'booked_dresses.*' => 'exists:dresses,id',
         ]);
 
+        Visit::assertVisitWindow($validated['visit_date'], Client::find($validated['client_id'])?->wedding_date);
+
         if (!empty($validated['time_slot'])) {
             $normalized = self::normalizeTimeSlot($validated['time_slot']);
             $validated['time_slot'] = $normalized;
@@ -133,6 +136,17 @@ class VisitController extends Controller
             'booked_dresses' => 'nullable|array',
             'booked_dresses.*' => 'exists:dresses,id',
         ]);
+
+        // Only a new date (or bride) is checked, so status updates on existing visits keep working
+        $dateChanged = isset($validated['visit_date'])
+            && \Carbon\Carbon::parse($validated['visit_date'])->toDateString() !== $visit->visit_date?->toDateString();
+        $clientChanged = isset($validated['client_id']) && (int) $validated['client_id'] !== $visit->client_id;
+        if ($dateChanged || $clientChanged) {
+            Visit::assertVisitWindow(
+                $validated['visit_date'] ?? $visit->visit_date,
+                Client::find($validated['client_id'] ?? $visit->client_id)?->wedding_date
+            );
+        }
 
         if (!empty($validated['time_slot'])) {
             $normalized = self::normalizeTimeSlot($validated['time_slot']);

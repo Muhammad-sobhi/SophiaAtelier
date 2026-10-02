@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api-client';
+import { toast } from '@/components/ui/Toast';
 import { Search, SlidersHorizontal, Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Sparkles, Trash2, Edit3 } from 'lucide-react';
 
 
@@ -172,6 +173,8 @@ export default function VisitsPage() {
       setEditingVisit(null);
     } catch (err) {
       console.error('Failed to update visit:', err);
+      toast.error(err?.message || 'حدث خطأ أثناء حفظ الزيارة');
+      return;
     }
 
     // Reset Form
@@ -411,6 +414,8 @@ export default function VisitsPage() {
       }).catch(() => {});
     } catch (err) {
       console.error('Failed to add visit:', err);
+      toast.error(err?.message || 'حدث خطأ أثناء إضافة الزيارة');
+      return;
     }
 
     setIsModalOpen(false);

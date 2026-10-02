@@ -19,6 +19,9 @@ class Visit extends Model
     /** Where the request came from: the website, or registered by staff (in the shop / by phone / chat) */
     public const SOURCES = ['website', 'walkin', 'phone', 'whatsapp', 'instagram', 'referral'];
 
+    /** A visit may be at most this many months before the wedding */
+    public const MAX_MONTHS_BEFORE_WEDDING = 3;
+
     protected $fillable = [
         'client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'trying_fee', 'sales_name',
         'confirmed_at', 'confirmed_by', 'auto_confirmed', 'confirmation_sent_at', 'previous_visit_id',
@@ -48,6 +51,36 @@ class Visit extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Null when the visit date is allowed for the wedding date (or either is missing), otherwise
+     * ['earliest_visit_date' => Y-m-d, 'message' => Arabic error]. Counted by day; a shorter month clamps to its last day.
+     */
+    public static function visitWindowError($visitDate, $weddingDate): ?array
+    {
+        if (empty($visitDate) || empty($weddingDate)) {
+            return null;
+        }
+
+        $earliest = \Carbon\Carbon::parse($weddingDate)->startOfDay()->subMonthsNoOverflow(self::MAX_MONTHS_BEFORE_WEDDING);
+        if (\Carbon\Carbon::parse($visitDate)->startOfDay()->gte($earliest)) {
+            return null;
+        }
+
+        return [
+            'earliest_visit_date' => $earliest->toDateString(),
+            'message' => 'لا يمكن حجز موعد زيارة قبل الفرح بأكثر من ' . self::MAX_MONTHS_BEFORE_WEDDING
+                . ' شهور. أقرب تاريخ مسموح للزيارة: ' . $earliest->toDateString(),
+        ];
+    }
+
+    /** Throws a 422 validation error on the given field when the visit is too far before the wedding */
+    public static function assertVisitWindow($visitDate, $weddingDate, string $field = 'visit_date'): void
+    {
+        if ($error = self::visitWindowError($visitDate, $weddingDate)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([$field => [$error['message']]]);
+        }
     }
 
     /** Confirm the visit; without a user it was confirmed automatically (all dresses available) */

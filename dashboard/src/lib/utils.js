@@ -68,3 +68,25 @@ export function calculateScheduledDates(weddingDate, city) {
     return { pickupDate: '', returnDate: '' };
   }
 }
+// A visit may be at most this many months before the wedding.
+// Keep in sync with Visit::MAX_MONTHS_BEFORE_WEDDING in the backend.
+export const MAX_MONTHS_BEFORE_WEDDING = 3;
+
+/** Earliest allowed visit date for a wedding (by day; a shorter month clamps to its last day, like the backend) */
+export function earliestVisitDate(weddingDate) {
+  const [year, month, day] = cleanDate(weddingDate).split('-').map(Number);
+  if (!year || !month || !day) return '';
+  const total = year * 12 + (month - 1) - MAX_MONTHS_BEFORE_WEDDING;
+  const y = Math.floor(total / 12);
+  const m = (total % 12) + 1;
+  const d = Math.min(day, new Date(Date.UTC(y, m, 0)).getUTCDate());
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** Arabic error when the visit is more than 3 months before the wedding, otherwise '' */
+export function visitWindowError(visitDate, weddingDate) {
+  const visit = cleanDate(visitDate);
+  const earliest = earliestVisitDate(weddingDate);
+  if (!visit || !earliest || visit >= earliest) return '';
+  return `لا يمكن حجز موعد زيارة قبل الفرح بأكثر من ${MAX_MONTHS_BEFORE_WEDDING} شهور. أقرب تاريخ مسموح للزيارة: ${formatDate(earliest)}`;
+}

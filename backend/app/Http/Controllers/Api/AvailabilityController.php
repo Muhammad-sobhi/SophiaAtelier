@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Dress;
+use App\Models\Visit;
 use App\Services\DressAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,9 @@ class AvailabilityController extends Controller
             DressAvailabilityService::recordDemandMisses($client->id, $validated['wedding_date'], $result['dresses']);
         }
 
-        return response()->json(DressAvailabilityService::publicView($result));
+        return response()->json(DressAvailabilityService::publicView($result) + [
+            'visit_window_error' => Visit::visitWindowError($validated['visit_date'] ?? null, $validated['wedding_date'] ?? null),
+        ]);
     }
 
     /** Dashboard: same check with full details, e.g. while an employee registers a visit in the shop */
@@ -70,6 +73,8 @@ class AvailabilityController extends Controller
             $validated['wedding_date'] ?? null,
             $validated['city'] ?? null,
             $validated['client_id'] ?? null
-        ));
+        ) + [
+            'visit_window_error' => Visit::visitWindowError($validated['visit_date'] ?? null, $validated['wedding_date'] ?? null),
+        ]);
     }
 }
