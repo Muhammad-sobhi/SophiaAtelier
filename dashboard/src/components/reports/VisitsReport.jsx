@@ -323,6 +323,10 @@ export function VisitsReport() {
             {/* 9. Trying fees */}
             <Section title="رسوم التجربة" hint="المستحق من الزيارات التي حضرت">
               <p className="text-lg font-black text-slate-800 font-mono">{money(fees.total_due)}</p>
+              <div className="mt-1 flex items-center gap-3 text-[11px] font-bold">
+                <span className="text-emerald-700">المحصّل: <span className="font-mono">{money(fees.total_collected)}</span></span>
+                <span className="text-amber-700">المتبقي: <span className="font-mono">{money(fees.total_remaining)}</span></span>
+              </div>
               <div className="mt-2 space-y-1 text-[11px] font-bold text-slate-500">
                 <div>زيارات مدفوعة: {fees.paid_visits ?? 0} — نسبة الحجز {fees.paid_booking_rate ?? 0}%</div>
                 <div>زيارات مجانية: {fees.free_visits ?? 0} — نسبة الحجز {fees.free_booking_rate ?? 0}%</div>

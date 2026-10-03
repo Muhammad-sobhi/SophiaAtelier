@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Dress;
+use App\Models\Revenue;
 use App\Models\User;
 use App\Models\Visit;
 use Carbon\Carbon;
@@ -188,9 +189,13 @@ class VisitReportService
         $attended = $visits->whereIn('status', self::ATTENDED);
         $paid = $attended->filter(fn($v) => (float) $v->trying_fee > 0);
         $free = $attended->filter(fn($v) => (float) $v->trying_fee <= 0);
+        $totalDue = (float) $attended->sum('trying_fee');
+        $collected = (float) Revenue::whereIn('visit_id', $attended->pluck('id'))->where('type', 'fitting_fee')->sum('amount');
 
         return [
-            'total_due' => (float) $attended->sum('trying_fee'),
+            'total_due' => $totalDue,
+            'total_collected' => $collected,
+            'total_remaining' => max(0, $totalDue - $collected),
             'paid_visits' => $paid->count(),
             'free_visits' => $free->count(),
             'paid_booking_rate' => self::rate($paid->where('status', 'booked')->count(), $paid->count()),

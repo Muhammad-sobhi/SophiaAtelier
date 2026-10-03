@@ -11,7 +11,7 @@ class RevenueController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Revenue::with('booking:id,client_id', 'booking.client:id,name');
+        $query = Revenue::with('booking:id,client_id', 'booking.client:id,name', 'visit:id,client_id', 'visit.client:id,name');
 
         if ($type = $request->input('type')) {
             $query->where('type', $type);
@@ -28,18 +28,27 @@ class RevenueController extends Controller
         $page = $query->latest('payment_date')->latest('id')->paginate(min((int) $request->input('per_page', 50), 100));
 
         // Only the client's id and name are returned; skip Client's computed attributes (each one runs queries).
-        $page->getCollection()->each(fn ($revenue) => $revenue->booking?->client?->setAppends([]));
+        $page->getCollection()->each(function ($revenue) {
+            $revenue->booking?->client?->setAppends([]);
+            $revenue->visit?->client?->setAppends([]);
+        });
 
         return response()->json($page);
     }
 
     public function store(Request $request): JsonResponse
     {
+        $links = $request->validate([
+            'booking_id' => 'nullable|exists:bookings,id',
+            'visit_id' => 'nullable|exists:visits,id',
+        ]);
+
         $payments = $request->input('payments');
         if (is_array($payments) && count($payments) > 0) {
             $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
             $created = [];
-            $bookingId = $request->input('booking_id');
+            $bookingId = $links['booking_id'] ?? null;
+            $visitId = $links['visit_id'] ?? null;
             $rawType = $request->input('type', 'deposit');
             $type = in_array($rawType, ['deposit', 'balance', 'fitting_fee', 'insurance', 'other']) ? $rawType : 'other';
             $paymentDate = $request->input('payment_date', now()->toDateString());
@@ -55,6 +64,7 @@ class RevenueController extends Controller
                 if ($amt > 0) {
                     $created[] = Revenue::create([
                         'booking_id' => $bookingId,
+                        'visit_id' => $visitId,
                         'type' => $type,
                         'amount' => $amt,
                         'payment_method' => $method,
@@ -70,6 +80,7 @@ class RevenueController extends Controller
 
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
+            'visit_id' => 'nullable|exists:visits,id',
             'type' => 'nullable|string|max:50',
             'amount' => 'required|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',

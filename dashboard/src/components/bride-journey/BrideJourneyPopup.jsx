@@ -7,6 +7,8 @@ import { StageBadge } from './StageBadge';
 import { UnifiedStageModal } from './UnifiedStageModal';
 import { ReturnDressModal } from './ReturnDressModal';
 import { BookingPaymentsModal } from './BookingPaymentsModal';
+import { VisitFeePaymentModal } from './VisitFeePaymentModal';
+import { PAYMENT_METHODS } from '@/components/MultiPaymentMethodInput';
 import { CancelBookingModal, CANCELLATION_REASONS } from './CancelBookingModal';
 import { OPEN_VISIT_STATUSES, VISIT_STATUS, getLatestVisit, getVisitDresses, getVisitStatus, isPendingRepeatRequest, needsWhatsApp } from './visitStatus';
 import { DressAvailability } from './DressAvailability';
@@ -65,6 +67,7 @@ export function BrideJourneyPopup({
   const [stageModal, setStageModal] = useState({ isOpen: false, stage: null });
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
+  const [isVisitFeeModalOpen, setIsVisitFeeModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -140,6 +143,10 @@ export function BrideJourneyPopup({
   const visitStatusKey = latestVisit?.status || 'pending';
   const visitStatusCfg = getVisitStatus(bride);
   const whatsAppPending = needsWhatsApp(latestVisit);
+  const visitFeePayments = (latestVisit?.revenues || []).filter((r) => r.type === 'fitting_fee');
+  const visitFeeDue = parseFloat(latestVisit?.trying_fee || 0);
+  const visitFeePaid = visitFeePayments.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+  const visitFeeRemaining = Math.max(0, visitFeeDue - visitFeePaid);
   const isRepeatRequest = isPendingRepeatRequest(latestVisit);
   const previousVisit = latestVisit?.previous_visit;
   const isVisitOpen = Boolean(latestVisit) && OPEN_VISIT_STATUSES.includes(visitStatusKey);
@@ -196,6 +203,26 @@ export function BrideJourneyPopup({
       toast.error('تعذر حذف صورة الفاتورة');
     } finally {
       setUploadingBill(false);
+    }
+  };
+
+  const refreshAfterPayment = async () => {
+    setLoading(true);
+    try {
+      const fresh = await reloadBride();
+      await onUpdate?.(fresh);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteVisitFee = async (revenue) => {
+    if (!await confirmDialog(`هل تريد حذف دفعة رسوم التجربة (${formatMoney(revenue.amount)} ج.م)؟`, { title: 'حذف الدفعة', confirmLabel: 'حذف', danger: true })) return;
+    try {
+      await apiClient.delete(`/revenues/${revenue.id}`);
+      await refreshAfterPayment();
+    } catch (err) {
+      toast.error(err?.message || 'حدث خطأ أثناء حذف الدفعة');
     }
   };
 
@@ -872,15 +899,59 @@ export function BrideJourneyPopup({
               </div>
             )}
 
-            {/* Trying fee card if in visit stage */}
+            {/* Trying fee card if in visit stage: due, paid and the payments recorded at the visit */}
             {stage === 'visit' && latestVisit && (
-              <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-2.5 flex items-center justify-between text-xs">
-                <span className="font-bold text-purple-900 flex items-center gap-1.5">
-                  <Banknote size={14} className="text-purple-600" /> رسوم تجربة الفساتين:
-                </span>
-                <span className="font-black text-purple-700 font-mono">
-                  {parseFloat(latestVisit.trying_fee || 0).toLocaleString()} ج.م
-                </span>
+              <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-2.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-purple-900 flex items-center gap-1.5">
+                    <Banknote size={14} className="text-purple-600" /> رسوم تجربة الفساتين:
+                  </span>
+                  <span className="font-black text-purple-700 font-mono">
+                    {formatMoney(visitFeeDue)} ج.م
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[10.5px] font-bold text-slate-600">
+                    المدفوع: <span className="font-mono text-emerald-700">{formatMoney(visitFeePaid)} ج.م</span>
+                    {visitFeeDue > 0 && (
+                      visitFeeRemaining > 0
+                        ? <> · المتبقي: <span className="font-mono text-amber-700">{formatMoney(visitFeeRemaining)} ج.م</span></>
+                        : <span className="text-emerald-700"> · تم السداد ✓</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsVisitFeeModalOpen(true)}
+                    className="text-[10px] font-black text-purple-800 bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded-lg transition-all cursor-pointer active:scale-95"
+                  >
+                    + تسجيل دفع الرسوم
+                  </button>
+                </div>
+                {visitFeePayments.length > 0 && (
+                  <div className="space-y-1 pt-1 border-t border-purple-100">
+                    {visitFeePayments.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between gap-2 bg-white/70 rounded-lg px-2 py-1 text-[10.5px] font-bold text-slate-600">
+                        <span className="truncate">
+                          {formatDate(r.payment_date)} · {PAYMENT_METHODS.find((m) => m.id === r.payment_method)?.label || r.payment_method || 'نقدي'}
+                        </span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          {r.receipt_url && (
+                            <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">الإيصال</a>
+                          )}
+                          <span className="font-mono font-black text-slate-800">{formatMoney(r.amount)} ج.م</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVisitFee(r)}
+                            className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                            title="حذف الدفعة"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1002,6 +1073,18 @@ export function BrideJourneyPopup({
               setLoading(false);
             }
           }}
+        />
+      )}
+
+      {/* Visit trying fee payment */}
+      {isVisitFeeModalOpen && (
+        <VisitFeePaymentModal
+          isOpen={isVisitFeeModalOpen}
+          onClose={() => setIsVisitFeeModalOpen(false)}
+          bride={bride}
+          visit={latestVisit}
+          remaining={visitFeeRemaining}
+          onSuccess={refreshAfterPayment}
         />
       )}
 

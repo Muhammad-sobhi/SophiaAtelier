@@ -10,7 +10,7 @@ class Revenue extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['booking_id', 'type', 'amount', 'payment_method', 'payment_date', 'notes', 'receipt_path'];
+    protected $fillable = ['booking_id', 'visit_id', 'type', 'amount', 'payment_method', 'payment_date', 'notes', 'receipt_path'];
 
     protected $appends = ['receipt_url'];
 
@@ -46,5 +46,10 @@ class Revenue extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function visit(): BelongsTo
+    {
+        return $this->belongsTo(Visit::class);
     }
 }

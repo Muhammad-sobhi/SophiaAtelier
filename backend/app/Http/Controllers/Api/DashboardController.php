@@ -87,6 +87,7 @@ class DashboardController extends Controller
                 'visits' => function ($q) {
                     $q->latest('visit_date')->limit(1);
                 },
+                'visits.revenues',
                 'bookings' => function ($q) {
                     $q->with([
                         'dress.accessories',

@@ -159,6 +159,18 @@ class Booking extends Model
 
     protected static function booted()
     {
+        // Trying fees paid at the bride's visits before she booked belong to this booking
+        static::created(function ($booking) {
+            Revenue::whereNull('booking_id')
+                ->whereIn('visit_id', Visit::where('client_id', $booking->client_id)->select('id'))
+                ->update(['booking_id' => $booking->id]);
+        });
+
+        // Keep visit trying fees when a booking is deleted (revenues cascade with their booking)
+        static::deleting(function ($booking) {
+            $booking->revenues()->whereNotNull('visit_id')->update(['booking_id' => null]);
+        });
+
         static::updated(function ($booking) {
             // Check if status transitioned to returned
             if ($booking->wasChanged('status') && $booking->status === 'returned') {
