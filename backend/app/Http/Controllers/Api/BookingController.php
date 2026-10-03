@@ -244,7 +244,7 @@ class BookingController extends Controller
         $status = $request->input('status', $booking->status);
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
 
-        // A new wedding date must keep the bride's open visit at most 3 months before it
+        // A new wedding date must keep the bride's open visit at most 4 months before it
         if (isset($validated['event_date'])
             && \Carbon\Carbon::parse($validated['event_date'])->toDateString() !== $booking->event_date?->toDateString()) {
             $openVisit = \App\Models\Visit::where('client_id', $clientId)

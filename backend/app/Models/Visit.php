@@ -20,7 +20,7 @@ class Visit extends Model
     public const SOURCES = ['website', 'walkin', 'phone', 'whatsapp', 'instagram', 'referral'];
 
     /** A visit may be at most this many months before the wedding */
-    public const MAX_MONTHS_BEFORE_WEDDING = 3;
+    public const MAX_MONTHS_BEFORE_WEDDING = 4;
 
     protected $fillable = [
         'client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'trying_fee', 'sales_name',

@@ -29,12 +29,12 @@ test('Cairo city detection', () => {
   }
 });
 
-test('visit at most 3 months before the wedding, counted by day', () => {
-  assert.equal(earliestVisitDate('2027-01-15'), '2026-10-15');
-  assert.equal(earliestVisitDate('2027-05-31 00:00:00'), '2027-02-28');
-  assert.equal(earliestVisitDate('2028-05-31'), '2028-02-29');
-  assert.equal(visitWindowError('2026-10-15', '2027-01-15'), '');
-  assert.match(visitWindowError('2026-10-14', '2027-01-15'), /15\/10\/2026/);
-  assert.equal(visitWindowError('', '2027-01-15'), '');
-  assert.equal(visitWindowError('2026-10-14', ''), '');
+test('visit at most 4 months before the wedding, counted by day', () => {
+  assert.equal(earliestVisitDate('2027-01-30'), '2026-09-30');
+  assert.equal(earliestVisitDate('2027-06-30 00:00:00'), '2027-02-28');
+  assert.equal(earliestVisitDate('2028-06-30'), '2028-02-29');
+  assert.equal(visitWindowError('2026-09-30', '2027-01-30'), '');
+  assert.match(visitWindowError('2026-09-29', '2027-01-30'), /30\/09\/2026/);
+  assert.equal(visitWindowError('', '2027-01-30'), '');
+  assert.equal(visitWindowError('2026-09-29', ''), '');
 });

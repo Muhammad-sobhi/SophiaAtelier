@@ -11,7 +11,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
-/** A visit may be at most 3 months (counted by day) before the wedding */
+/** A visit may be at most 4 months (counted by day) before the wedding */
 class VisitWindowTest extends TestCase
 {
     use DatabaseTransactions;
@@ -31,34 +31,34 @@ class VisitWindowTest extends TestCase
 
     public function test_window_is_counted_by_day_and_clamps_short_months(): void
     {
-        $this->assertNull(Visit::visitWindowError('2026-10-15', '2027-01-15'));
-        $this->assertSame('2026-10-15', Visit::visitWindowError('2026-10-14', '2027-01-15')['earliest_visit_date']);
-        $this->assertSame('2027-02-28', Visit::visitWindowError('2027-02-27', '2027-05-31')['earliest_visit_date']);
-        $this->assertNull(Visit::visitWindowError('2027-02-28', '2027-05-31'));
-        $this->assertNull(Visit::visitWindowError(null, '2027-05-31'));
+        $this->assertNull(Visit::visitWindowError('2026-09-30', '2027-01-30'));
+        $this->assertSame('2026-09-30', Visit::visitWindowError('2026-09-29', '2027-01-30')['earliest_visit_date']);
+        $this->assertSame('2027-02-28', Visit::visitWindowError('2027-02-27', '2027-06-30')['earliest_visit_date']);
+        $this->assertNull(Visit::visitWindowError('2027-02-28', '2027-06-30'));
+        $this->assertNull(Visit::visitWindowError(null, '2027-06-30'));
     }
 
-    public function test_website_rejects_visit_more_than_three_months_before_wedding(): void
+    public function test_website_rejects_visit_more_than_four_months_before_wedding(): void
     {
         $dress = Dress::factory()->create();
         $before = Visit::count();
 
-        $this->websitePost($dress->id, '2026-12-14', '2027-03-15')
+        $this->websitePost($dress->id, '2026-11-14', '2027-03-15')
             ->assertStatus(422)
             ->assertJsonPath('code', 'visit_too_early')
-            ->assertJsonPath('earliest_visit_date', '2026-12-15');
+            ->assertJsonPath('earliest_visit_date', '2026-11-15');
         $this->assertSame($before, Visit::count());
 
-        $this->websitePost($dress->id, '2026-12-15', '2027-03-15')->assertCreated();
+        $this->websitePost($dress->id, '2026-11-15', '2027-03-15')->assertCreated();
     }
 
     public function test_public_availability_reports_the_window(): void
     {
         $dress = Dress::factory()->create(['is_website_visible' => true]);
 
-        $this->postJson('/api/public/availability', ['dress_ids' => [$dress->id], 'visit_date' => '2026-12-14', 'wedding_date' => '2027-03-15'])
-            ->assertOk()->assertJsonPath('visit_window_error.earliest_visit_date', '2026-12-15');
-        $this->postJson('/api/public/availability', ['dress_ids' => [$dress->id], 'visit_date' => '2026-12-15', 'wedding_date' => '2027-03-15'])
+        $this->postJson('/api/public/availability', ['dress_ids' => [$dress->id], 'visit_date' => '2026-11-14', 'wedding_date' => '2027-03-15'])
+            ->assertOk()->assertJsonPath('visit_window_error.earliest_visit_date', '2026-11-15');
+        $this->postJson('/api/public/availability', ['dress_ids' => [$dress->id], 'visit_date' => '2026-11-15', 'wedding_date' => '2027-03-15'])
             ->assertOk()->assertJsonPath('visit_window_error', null);
     }
 
@@ -69,19 +69,19 @@ class VisitWindowTest extends TestCase
 
         $this->postJson('/api/clients', [
             'name' => 'Early Bride', 'phone' => '01077777771', 'source' => 'walkin',
-            'visit_date' => '2026-12-14', 'wedding_date' => '2027-03-15', 'dress_id' => $dress->id,
+            'visit_date' => '2026-11-14', 'wedding_date' => '2027-03-15', 'dress_id' => $dress->id,
         ])->assertStatus(422)->assertJsonValidationErrors('visit_date');
         $this->assertNull(Client::where('phone', '01077777771')->first());
 
         $client = Client::create(['name' => 'Bride', 'phone' => '01077777772', 'city' => 'القاهرة', 'wedding_date' => '2027-03-15']);
-        $this->postJson('/api/visits', ['client_id' => $client->id, 'visit_date' => '2026-12-14'])
+        $this->postJson('/api/visits', ['client_id' => $client->id, 'visit_date' => '2026-11-14'])
             ->assertStatus(422)->assertJsonValidationErrors('visit_date');
-        $visit = $this->postJson('/api/visits', ['client_id' => $client->id, 'visit_date' => '2026-12-20'])->assertCreated()->json();
+        $visit = $this->postJson('/api/visits', ['client_id' => $client->id, 'visit_date' => '2026-11-20'])->assertCreated()->json();
 
-        $this->putJson("/api/visits/{$visit['id']}", ['visit_date' => '2026-12-01'])->assertStatus(422);
-        $this->putJson("/api/clients/{$client->id}/stage-action", ['action' => 'confirm_visit', 'visit_date' => '2026-12-01'])
+        $this->putJson("/api/visits/{$visit['id']}", ['visit_date' => '2026-11-01'])->assertStatus(422);
+        $this->putJson("/api/clients/{$client->id}/stage-action", ['action' => 'confirm_visit', 'visit_date' => '2026-11-01'])
             ->assertStatus(422)->assertJsonValidationErrors('visit_date');
-        $this->putJson("/api/clients/{$client->id}/stage-action", ['action' => 'confirm_visit', 'visit_date' => '2026-12-16'])->assertOk();
+        $this->putJson("/api/clients/{$client->id}/stage-action", ['action' => 'confirm_visit', 'visit_date' => '2026-11-16'])->assertOk();
     }
 
     public function test_moving_the_wedding_date_away_from_an_open_visit_is_rejected(): void

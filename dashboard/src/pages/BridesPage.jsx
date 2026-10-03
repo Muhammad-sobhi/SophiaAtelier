@@ -92,7 +92,7 @@ export default function BridesPage() {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBride, setEditingBride] = useState(null);
-  // Dates the edit form opened with: unchanged dates are not re-checked against the 3-month visit rule
+  // Dates the edit form opened with: unchanged dates are not re-checked against the 4-month visit rule
   const [initialDates, setInitialDates] = useState({ visit_date: '', wedding_date: '' });
   const [viewingBride, setViewingBride] = useState(null);
   const [deletingBride, setDeletingBride] = useState(null);

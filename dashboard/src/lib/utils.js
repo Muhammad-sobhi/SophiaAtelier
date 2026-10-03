@@ -70,7 +70,7 @@ export function calculateScheduledDates(weddingDate, city) {
 }
 // A visit may be at most this many months before the wedding.
 // Keep in sync with Visit::MAX_MONTHS_BEFORE_WEDDING in the backend.
-export const MAX_MONTHS_BEFORE_WEDDING = 3;
+export const MAX_MONTHS_BEFORE_WEDDING = 4;
 
 /** Earliest allowed visit date for a wedding (by day; a shorter month clamps to its last day, like the backend) */
 export function earliestVisitDate(weddingDate) {
@@ -83,7 +83,7 @@ export function earliestVisitDate(weddingDate) {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-/** Arabic error when the visit is more than 3 months before the wedding, otherwise '' */
+/** Arabic error when the visit is more than 4 months before the wedding, otherwise '' */
 export function visitWindowError(visitDate, weddingDate) {
   const visit = cleanDate(visitDate);
   const earliest = earliestVisitDate(weddingDate);

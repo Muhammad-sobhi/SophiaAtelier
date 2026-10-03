@@ -35,8 +35,8 @@ function shopNow() {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
 }
 
-/** Visits are allowed at most 3 months (by day) before the wedding; a shorter month clamps to its last day (same as the API) */
-const MAX_MONTHS_BEFORE_WEDDING = 3;
+/** Visits are allowed at most 4 months (by day) before the wedding; a shorter month clamps to its last day (same as the API) */
+const MAX_MONTHS_BEFORE_WEDDING = 4;
 function earliestVisitDate(weddingDate) {
   const m = String(weddingDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;

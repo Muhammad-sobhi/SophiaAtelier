@@ -273,7 +273,7 @@ class ClientController extends Controller
             $validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
         ])));
 
-        // A visit (dated today when only dresses are sent) may be at most 3 months before the wedding
+        // A visit (dated today when only dresses are sent) may be at most 4 months before the wedding
         Visit::assertVisitWindow($validated['visit_date'] ?? ($dressIds ? now()->toDateString() : null), $validated['wedding_date'] ?? null);
 
         // Check visit time slot limit before creating anything
@@ -351,7 +351,7 @@ class ClientController extends Controller
             $validated['city'] = $validated['address'];
         }
 
-        // A new visit date, or a new wedding date, must keep the visit at most 3 months before the wedding.
+        // A new visit date, or a new wedding date, must keep the visit at most 4 months before the wedding.
         // Unchanged dates are not re-checked so other bride details can still be edited.
         $weddingDate = array_key_exists('wedding_date', $validated) ? $validated['wedding_date'] : $client->wedding_date;
         $weddingChanged = !empty($validated['wedding_date'])
