@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useScrollAnimation } from '../ScrollAnimations/useScrollAnimation';
 import { useStore } from '../../context/StoreContext';
+import { useContactNumber } from '../../lib/useContactNumber';
 import styles from './TrackOrder.module.css';
 
 /* ── BRIDE JOURNEY STAGES ── */
@@ -33,6 +34,7 @@ const BRIDE_JOURNEY_STAGES = [
 
 export default function TrackOrder() {
   const { brideUser, logoutBride, setAuthModalOpen, t, lang } = useStore();
+  const contact = useContactNumber();
   const [clientData, setClientData] = useState(null);
 
   const progressRef = useScrollAnimation();
@@ -544,10 +546,10 @@ export default function TrackOrder() {
               Have questions about your fitting or alterations? Connect directly with our atelier.
             </p>
             <div className={styles.conciergeButtons}>
-              <a href="https://wa.me/201554159359" target="_blank" rel="noopener noreferrer" className={styles.conciergeBtnPrimary} style={{ textDecoration: 'none' }}>
+              <a href={contact.whatsappHref} target="_blank" rel="noopener noreferrer" className={styles.conciergeBtnPrimary} style={{ textDecoration: 'none' }}>
                 <MessageCircle size={15} /> WHATSAPP STYLIST
               </a>
-              <a href="tel:+201554159359" className={styles.conciergeBtnOutline} style={{ textDecoration: 'none' }}>
+              <a href={contact.telHref} className={styles.conciergeBtnOutline} style={{ textDecoration: 'none' }}>
                 <Phone size={15} /> CALL BOUTIQUE
               </a>
             </div>

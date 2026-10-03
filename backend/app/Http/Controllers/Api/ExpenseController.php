@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\EmployeeSalaryPayment;
 use App\Models\Expense;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,9 @@ class ExpenseController extends Controller
         if (\App\Services\ManufacturingService::ownsExpense($expense)) {
             return response()->json(['message' => 'هذا المصروف مسجل من قسم التصنيع (مورد / عامل / شراء خامات) — عدّله أو احذفه من هناك'], 422);
         }
+        if (EmployeeSalaryPayment::where('expense_id', $expense->id)->exists()) {
+            return response()->json(['message' => 'هذا المصروف مسجل من صرف الرواتب — عدّله أو ألغِه من صفحة الحضور والرواتب'], 422);
+        }
         $validated = $request->validate([
             'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,other',
             'amount' => 'sometimes|required|numeric|min:0',
@@ -90,6 +94,9 @@ class ExpenseController extends Controller
     {
         if (\App\Services\ManufacturingService::ownsExpense($expense)) {
             return response()->json(['message' => 'هذا المصروف مسجل من قسم التصنيع (مورد / عامل / شراء خامات) — عدّله أو احذفه من هناك'], 422);
+        }
+        if (EmployeeSalaryPayment::where('expense_id', $expense->id)->exists()) {
+            return response()->json(['message' => 'هذا المصروف مسجل من صرف الرواتب — عدّله أو ألغِه من صفحة الحضور والرواتب'], 422);
         }
         $expense->delete();
 

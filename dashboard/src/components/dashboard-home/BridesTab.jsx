@@ -135,6 +135,15 @@ export default function BridesTab({
     return { label: `الإرجاع بعد ${diffDays} يوم`, badgeClass: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-500' };
   };
 
+  // Pickup-stage badge: "تم الاستلام" only after the dress was handed to the bride
+  // (booking status picked_up/out), otherwise "لم تستلم".
+  const getPickupBadge = (b) => {
+    const isDelivered = b.bookings?.some((bk) => bk.status === 'picked_up' || bk.status === 'out');
+    return isDelivered
+      ? { label: 'تم الاستلام', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', dotColor: 'bg-emerald-500' }
+      : { label: 'لم تستلم', badgeClass: 'bg-orange-50 text-orange-700 border-orange-200', dotColor: 'bg-orange-500' };
+  };
+
   // Stage match helper:
   // 1. Bookings > 15 days away stay in 'booking'
   // 2. Bookings <= 15 days appear in 'picked_up'
@@ -178,14 +187,16 @@ export default function BridesTab({
       return targetStage === 'archive' ? isArchivedReturn(b) : !isArchivedReturn(b);
     }
 
-    // If already returned or delivered, she is not in visit/booking/pickup
-    if (isDelivered || isReturned) {
-      return false;
+    // 3. Pickup stage: booked AND pickup date is within 15 days (or today/past).
+    //    Brides who already received the dress stay here (badge "تم الاستلام") until it is returned.
+    if (targetStage === 'picked_up' || targetStage === 'pickup') {
+      if (isDelivered) return true;
+      return !isReturned && raw === 'picked_up';
     }
 
-    // 3. Pickup stage: booked AND pickup date is within 15 days (or today/past)
-    if (targetStage === 'picked_up' || targetStage === 'pickup') {
-      return raw === 'picked_up';
+    // If already returned or delivered, she is not in visit/booking
+    if (isDelivered || isReturned) {
+      return false;
     }
 
     // 4. Booking stage: booked AND pickup date is > 15 days away
@@ -491,6 +502,7 @@ export default function BridesTab({
               const stageCfg =
                 activeStageKey === 'returned' ? getReturnBadge(bride) || baseStageCfg :
                 activeStageKey === 'visit' ? getVisitStatus(bride) :
+                activeStageKey === 'picked_up' ? getPickupBadge(bride) :
                 baseStageCfg;
               const displayDate = bride.bookings?.[0]?.event_date || bride.wedding_date || bride.relevant_date || bride.latest_visit_date || '';
 
@@ -545,7 +557,7 @@ export default function BridesTab({
 
                   {/* Bottom row: Stage Badge & Date (return date for return stage, else wedding date) */}
                   <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-extrabold border ${stageCfg.badgeClass}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-extrabold border whitespace-nowrap flex-shrink-0 ${stageCfg.badgeClass}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${stageCfg.dotColor}`} />
                       <span>{stageCfg.label}</span>
                     </span>

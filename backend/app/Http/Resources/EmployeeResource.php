@@ -24,13 +24,14 @@ class EmployeeResource extends JsonResource
         ];
 
         if ($isAdmin) {
-            $data['salary'] = $this->salary;
+            $data['daily_rate'] = $this->daily_rate;
             $data['pay_cycle'] = $this->pay_cycle;
             $data['pay_cycle_days'] = $this->pay_cycle_days;
             $data['notes'] = $this->notes;
             $data['address'] = $this->address;
             $data['id_number'] = $this->id_number;
             $data['id_image'] = $this->id_image;
+            $data['id_image_back'] = $this->id_image_back;
             $data['permissions'] = $this->permissions;
             // password is cast and hidden, usually not returned anyway
         }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { MobileTabBar } from '@/components/MobileTabBar';
@@ -7,8 +7,19 @@ import { LogIn, Lock, Mail, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ToastContainer } from '@/components/ui/Toast';
 import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
+import { canAccessPath } from '@/lib/nav-items';
+
+// Cached UI profile built from the API user (admins get full access)
+const toCachedUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role || 'staff',
+  permissions: user.role === 'admin' ? ['*'] : ['/dashboard', ...(user.permissions || [])]
+});
 
 export default function DashboardLayout() {
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +46,14 @@ export default function DashboardLayout() {
     checkAuth();
     // Confirm the server session is still alive; a 401 clears the cached profile via apiClient
     if (localStorage.getItem('atelier_current_employee')) {
-      apiClient.get('/auth/me').catch(() => {});
+      // Refresh the cached profile so permission changes apply without logging in again
+      apiClient.get('/auth/me').then((user) => {
+        const fresh = JSON.stringify(toCachedUser(user));
+        if (fresh !== localStorage.getItem('atelier_current_employee')) {
+          localStorage.setItem('atelier_current_employee', fresh);
+          window.dispatchEvent(new Event('auth-change'));
+        }
+      }).catch(() => {});
     }
     window.addEventListener('auth-change', checkAuth);
     return () => {
@@ -59,13 +77,7 @@ export default function DashboardLayout() {
         password
       });
 
-      const userObj = {
-        id: res.user.id,
-        name: res.user.name,
-        email: res.user.email,
-        role: res.user.role || 'staff',
-        permissions: res.user.role === 'admin' ? ['*'] : ['/dashboard', ...(res.user.permissions || [])]
-      };
+      const userObj = toCachedUser(res.user);
       localStorage.setItem('atelier_current_employee', JSON.stringify(userObj));
       setCurrentUser(userObj);
       window.dispatchEvent(new Event('auth-change'));
@@ -165,7 +177,7 @@ export default function DashboardLayout() {
         <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
           <Header />
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
-            <Outlet />
+            {canAccessPath(currentUser, location.pathname) ? <Outlet /> : <Navigate to="/dashboard" replace />}
           </div>
           <MobileTabBar currentUser={currentUser} />
         </div>

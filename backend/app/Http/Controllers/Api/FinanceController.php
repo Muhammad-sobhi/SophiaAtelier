@@ -19,7 +19,7 @@ class FinanceController extends Controller
     private const REVENUE_TABS = ['transfers' => ['transfer_in', 'capital_deposit']];
     private const REVENUE_DEFAULT_TAB = 'shop';
     private const EXPENSE_TABS = [
-        'operational' => ['salary', 'purchase'],
+        'operational' => ['salary', 'loan', 'purchase'],
         'utilities' => ['cleaning', 'maintenance'],
         'transfers' => ['transfer_out', 'owner_withdrawal'],
         'manufacturing' => ManufacturingService::EXPENSE_CATEGORIES,

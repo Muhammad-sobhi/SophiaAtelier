@@ -11,17 +11,17 @@ class Employee extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'phone', 'email', 'role', 'salary', 'pay_cycle', 'pay_cycle_days',
-        'hire_date', 'notes', 'password', 'address', 'id_number', 'id_image', 'permissions'
+        'name', 'phone', 'email', 'role', 'daily_rate', 'pay_cycle', 'pay_cycle_days',
+        'hire_date', 'notes', 'password', 'address', 'id_number', 'id_image', 'id_image_back', 'permissions'
     ];
 
-    protected $hidden = ['password', 'id_number', 'id_image'];
+    protected $hidden = ['password', 'id_number', 'id_image', 'id_image_back'];
 
     protected function casts(): array
     {
         return [
             'password' => 'hashed',
-            'salary' => 'decimal:2',
+            'daily_rate' => 'decimal:2',
             'hire_date' => 'date',
             'permissions' => 'array',
         ];

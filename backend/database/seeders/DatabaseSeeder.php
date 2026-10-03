@@ -96,11 +96,11 @@ class DatabaseSeeder extends Seeder
 
         // Employees
         Employee::insert([
-            ['name' => 'Fatima Al-Rashid', 'phone' => '+966511111111', 'email' => 'fatima@atelier.test', 'position' => 'Senior Sales Associate', 'salary' => 8000, 'hire_date' => now()->subYears(2)->toDateString(), 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Layla Mansour', 'phone' => '+966522222222', 'email' => 'layla@atelier.test', 'position' => 'Seamstress', 'salary' => 6500, 'hire_date' => now()->subYear()->toDateString(), 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Sara Nasser', 'phone' => '+966533333333', 'email' => 'sara@atelier.test', 'position' => 'Seamstress', 'salary' => 6500, 'hire_date' => now()->subYear()->toDateString(), 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Nora Al-Otaibi', 'phone' => '+966544444444', 'email' => 'nora@atelier.test', 'position' => 'Dress Cleaner', 'salary' => 5000, 'hire_date' => now()->subMonths(8)->toDateString(), 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Hana Youssef', 'phone' => '+966555555555', 'email' => 'hana@atelier.test', 'position' => 'Sales Associate', 'salary' => 6000, 'hire_date' => now()->subMonths(6)->toDateString(), 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Fatima Al-Rashid', 'phone' => '+966511111111', 'email' => 'fatima@atelier.test', 'position' => 'Senior Sales Associate', 'daily_rate' => 270, 'hire_date' => now()->subYears(2)->toDateString(), 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Layla Mansour', 'phone' => '+966522222222', 'email' => 'layla@atelier.test', 'position' => 'Seamstress', 'daily_rate' => 220, 'hire_date' => now()->subYear()->toDateString(), 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Sara Nasser', 'phone' => '+966533333333', 'email' => 'sara@atelier.test', 'position' => 'Seamstress', 'daily_rate' => 220, 'hire_date' => now()->subYear()->toDateString(), 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Nora Al-Otaibi', 'phone' => '+966544444444', 'email' => 'nora@atelier.test', 'position' => 'Dress Cleaner', 'daily_rate' => 170, 'hire_date' => now()->subMonths(8)->toDateString(), 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Hana Youssef', 'phone' => '+966555555555', 'email' => 'hana@atelier.test', 'position' => 'Sales Associate', 'daily_rate' => 200, 'hire_date' => now()->subMonths(6)->toDateString(), 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         // Revenues

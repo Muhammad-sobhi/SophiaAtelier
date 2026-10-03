@@ -15,6 +15,7 @@ import {
   Layers,
   ShieldCheck,
   Factory,
+  Settings,
   Image as ImageIcon } from 'lucide-react';
 
 export const menuItems = [
@@ -34,8 +35,32 @@ export const menuItems = [
 { icon: MessageSquare, label: 'قوالب الرسائل', shortLabel: 'القوالب', path: '/dashboard/whatsapp-templates' },
 { icon: Mail, label: 'رسائل تواصل معنا', shortLabel: 'الرسائل', path: '/dashboard/contact-messages' },
 { icon: Star, label: 'آراء العملاء', shortLabel: 'الآراء', path: '/dashboard/reviews' },
-{ icon: HelpCircle, label: 'الأسئلة الشائعة', shortLabel: 'الأسئلة', path: '/dashboard/faqs' }];
+{ icon: HelpCircle, label: 'الأسئلة الشائعة', shortLabel: 'الأسئلة', path: '/dashboard/faqs' },
+{ icon: Settings, label: 'إعدادات النظام', shortLabel: 'الإعدادات', path: '/dashboard/settings', adminOnly: true }];
 
+
+// Pages an employee can be granted in the employees page (the dashboard home is always allowed).
+// Visits and bookings have their own pages outside the menu.
+export const PERMISSION_PAGES = [
+...menuItems.filter((item) => item.path !== '/dashboard' && !item.adminOnly).map(({ path, label }) => ({ path, label })),
+{ path: '/dashboard/visits', label: 'الزيارات' },
+{ path: '/dashboard/bookings', label: 'الحجوزات' }];
+
+
+// Actions beyond page access; the API enforces them too (admins always have them)
+export const PERMISSION_ACTIONS = [
+{ key: 'payroll.manage', label: 'صرف الرواتب وتسجيل السلف', hint: 'من صفحة الحضور والرواتب، ويُسجَّل الصرف في المالية' }];
+
+
+const isFullAccess = (user) => user.role === 'admin' || user.role === 'owner' || user.permissions?.includes('*');
+
+// Whether the user may open the given dashboard path (paths that are not grantable pages are open to all)
+export function canAccessPath(currentUser, pathname) {
+  if (!currentUser) return false;
+  const page = PERMISSION_PAGES.find((p) => pathname === p.path || pathname.startsWith(`${p.path}/`));
+  if (!page || isFullAccess(currentUser) || page.path === '/dashboard/faqs') return true;
+  return Boolean(currentUser.permissions?.includes(page.path));
+}
 
 // Menu items the given user is allowed to open
 export function getAllowedMenuItems(currentUser) {

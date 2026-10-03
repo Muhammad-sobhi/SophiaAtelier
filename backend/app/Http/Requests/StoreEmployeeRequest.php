@@ -18,7 +18,7 @@ class StoreEmployeeRequest extends FormRequest
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email',
             'role' => 'nullable|string|max:255',
-            'salary' => 'nullable|numeric|min:0',
+            'daily_rate' => 'nullable|numeric|min:0', // pay per day; cycle salary = daily_rate x cycle days
             'pay_cycle' => 'nullable|in:monthly,weekly,custom',
             'pay_cycle_days' => 'nullable|integer|min:1|max:365',
             'hire_date' => 'nullable|date',
@@ -27,7 +27,9 @@ class StoreEmployeeRequest extends FormRequest
             'address' => 'nullable|string',
             'id_number' => 'nullable|string',
             'id_image' => 'nullable|string',
+            'id_image_back' => 'nullable|string',
             'permissions' => 'nullable|array',
+            'permissions.*' => 'string|max:100',
         ];
     }
 }

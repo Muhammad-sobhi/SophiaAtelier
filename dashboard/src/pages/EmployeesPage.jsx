@@ -1,40 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api-client';
-import { Plus, Phone, DollarSign, Mail, Lock, MapPin, CreditCard, Image, X, Trash2, Eye, EyeOff, Edit3 } from 'lucide-react';
+import { Plus, Phone, DollarSign, Mail, Lock, MapPin, CreditCard, Image, X, Trash2, Eye, EyeOff, Edit3, RefreshCw } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
+import { PERMISSION_PAGES, PERMISSION_ACTIONS } from '@/lib/nav-items';
+import { cycleDays, cycleLabel, formatMoney, MONTH_DAYS } from '@/lib/payroll';
 
+const permissionLabel = (key) =>
+PERMISSION_PAGES.find((p) => p.path === key)?.label || PERMISSION_ACTIONS.find((a) => a.key === key)?.label || key;
 
+// ID photos are stored as data URLs: downscale phone photos so the request stays small
+const readIdImage = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = reject;
+  reader.onload = () => {
+    const img = new window.Image();
+    img.onerror = reject;
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
 
-
-
-
-
-
-
-
-
-
-
-
-
-const AVAILABLE_PAGES = [
-{ path: '/dashboard/brides', label: 'العرائس' },
-{ path: '/dashboard/dresses', label: 'الفساتين' },
-{ path: '/dashboard/collections', label: 'التشكيلات' },
-{ path: '/dashboard/client-gallery', label: 'معرض العملاء' },
-{ path: '/dashboard/visits', label: 'الزيارات' },
-{ path: '/dashboard/bookings', label: 'الحجوزات' },
-{ path: '/dashboard/fittings', label: 'القياسات' },
-{ path: '/dashboard/tasks', label: 'المهام' },
-{ path: '/dashboard/finance', label: 'المالية' },
-{ path: '/dashboard/manufacturing', label: 'التصنيع' },
-{ path: '/dashboard/employees', label: 'الموظفين' },
-{ path: '/dashboard/attendance', label: 'الحضور والرواتب' },
-{ path: '/dashboard/reports', label: 'التقارير' },
-{ path: '/dashboard/whatsapp-templates', label: 'قوالب الرسائل' },
-{ path: '/dashboard/contact-messages', label: 'رسائل تواصل معنا' },
-{ path: '/dashboard/reviews', label: 'آراء العملاء' },
-{ path: '/dashboard/faqs', label: 'الأسئلة الشائعة' }];
+const ID_SIDES = [
+{ key: 'front', label: 'الوجه الأمامي' },
+{ key: 'back', label: 'الوجه الخلفي' }];
 
 
 export default function EmployeesPage() {
@@ -47,7 +44,8 @@ export default function EmployeesPage() {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [phone, setPhone] = useState('');
-  const [salary, setSalary] = useState('');
+  const [dailyRate, setDailyRate] = useState('');
+  const [hireDate, setHireDate] = useState('');
   const [payCycle, setPayCycle] = useState('monthly');
   const [payCycleDays, setPayCycleDays] = useState('');
   const [email, setEmail] = useState('');
@@ -55,6 +53,8 @@ export default function EmployeesPage() {
   const [address, setAddress] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [idImage, setIdImage] = useState('');
+  const [idImageBack, setIdImageBack] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [permissions, setPermissions] = useState([]);
 
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -76,16 +76,19 @@ export default function EmployeesPage() {
       }
     };
     checkRole();
+  }, []);
 
-    // Load employees from API
-    apiClient.get('/employees').then((res) => {
+  // The API is the source of truth: reload after every change
+  const loadEmployees = useCallback(() => {
+    return apiClient.get('/employees').then((res) => {
       const data = Array.isArray(res) ? res : res.data || [];
       setEmployeesList(data.map((emp) => ({
         id: emp.id,
         name: emp.name || '',
         role: emp.role || emp.position || 'موظف',
         phone: emp.phone || '',
-        salary: emp.salary ? `${parseFloat(emp.salary).toLocaleString()} ج.م` : '0 ج.م',
+        dailyRate: parseFloat(emp.daily_rate) || 0,
+        hireDate: emp.hire_date ? String(emp.hire_date).slice(0, 10) : '',
         payCycle: emp.pay_cycle || 'monthly',
         payCycleDays: emp.pay_cycle_days || '',
         email: emp.email || '',
@@ -93,24 +96,33 @@ export default function EmployeesPage() {
         address: emp.address || '',
         idNumber: emp.id_number || '',
         idImage: emp.id_image || '',
+        idImageBack: emp.id_image_back || '',
         permissions: emp.permissions || ['/dashboard']
       })));
-    }).catch((err) => console.error('Failed to load employees:', err));
+    }).catch((err) => {
+      console.error('Failed to load employees:', err);
+      toast.error('تعذر تحميل بيانات الموظفين');
+    });
   }, []);
 
-  const saveEmployees = (updated) => {
-    setEmployeesList(updated);
-    // Mutations go through API
-  };
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
 
-  const handleImageUpload = (e) => {
+  const idImageSetters = { front: setIdImage, back: setIdImageBack };
+
+  const handleImageUpload = async (e, side) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setIdImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('يرجى اختيار ملف صورة');
+      return;
+    }
+    try {
+      idImageSetters[side](await readIdImage(file));
+    } catch {
+      toast.error('تعذر قراءة الصورة');
     }
   };
 
@@ -119,7 +131,8 @@ export default function EmployeesPage() {
     setName(emp.name);
     setRole(emp.role || '');
     setPhone(emp.phone);
-    setSalary(emp.salary.replace(' ج.م', '').replace(/,/g, ''));
+    setDailyRate(emp.dailyRate ? String(emp.dailyRate) : '');
+    setHireDate(emp.hireDate || '');
     setPayCycle(emp.payCycle || 'monthly');
     setPayCycleDays(emp.payCycleDays || '');
     setEmail(emp.email);
@@ -127,6 +140,7 @@ export default function EmployeesPage() {
     setAddress(emp.address || '');
     setIdNumber(emp.idNumber || '');
     setIdImage(emp.idImage || '');
+    setIdImageBack(emp.idImageBack || '');
     setPermissions(emp.permissions.filter((p) => p !== '/dashboard'));
     setIsModalOpen(true);
   };
@@ -136,7 +150,8 @@ export default function EmployeesPage() {
     setName('');
     setRole('');
     setPhone('');
-    setSalary('');
+    setDailyRate('');
+    setHireDate('');
     setPayCycle('monthly');
     setPayCycleDays('');
     setEmail('');
@@ -144,6 +159,7 @@ export default function EmployeesPage() {
     setAddress('');
     setIdNumber('');
     setIdImage('');
+    setIdImageBack('');
     setPermissions([]);
     setIsModalOpen(true);
   };
@@ -158,90 +174,42 @@ export default function EmployeesPage() {
 
   const handleAddEmployeeSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSaving) return;
 
+    const payload = {
+      name,
+      role: role || 'موظف',
+      phone,
+      daily_rate: parseFloat(dailyRate) || 0,
+      hire_date: hireDate || null,
+      pay_cycle: payCycle,
+      pay_cycle_days: payCycle === 'custom' ? parseInt(payCycleDays) || null : null,
+      email,
+      password: password || undefined,
+      address,
+      id_number: idNumber,
+      id_image: idImage,
+      id_image_back: idImageBack,
+      permissions: ['/dashboard', ...permissions]
+    };
+
+    setIsSaving(true);
     try {
       if (editingEmployee) {
-        await apiClient.put(`/employees/${editingEmployee.id}`, {
-          name,
-          role: role || 'موظف',
-          phone,
-          salary: parseFloat(salary.replace(/,/g, '')) || 0,
-          pay_cycle: payCycle,
-          pay_cycle_days: payCycle === 'custom' ? parseInt(payCycleDays) || null : null,
-          email,
-          password: password || undefined,
-          address,
-          id_number: idNumber,
-          id_image: idImage,
-          permissions: ['/dashboard', ...permissions]
-        });
-        setEmployeesList((prev) => prev.map((emp) => emp.id === editingEmployee.id ? {
-          ...emp,
-          name,
-          role: role || 'موظف',
-          phone,
-          salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
-          payCycle,
-          payCycleDays: payCycle === 'custom' ? parseInt(payCycleDays) || '' : '',
-          email,
-          password: password || emp.password,
-          address,
-          idNumber,
-          idImage,
-          permissions: ['/dashboard', ...permissions]
-        } : emp));
+        await apiClient.put(`/employees/${editingEmployee.id}`, payload);
       } else {
-        const res = await apiClient.post('/employees', {
-          name,
-          role: role || 'موظف',
-          phone,
-          salary: parseFloat(salary.replace(/,/g, '')) || 0,
-          pay_cycle: payCycle,
-          pay_cycle_days: payCycle === 'custom' ? parseInt(payCycleDays) || null : null,
-          email,
-          password,
-          address,
-          id_number: idNumber,
-          id_image: idImage,
-          permissions: ['/dashboard', ...permissions]
-        });
-        const newEmp = {
-          id: res.data?.id || Date.now(),
-          name,
-          role: role || 'موظف',
-          position: role || 'موظف',
-          phone,
-          salary: salary ? `${parseFloat(salary.replace(/,/g, '')).toLocaleString()} ج.م` : '0 ج.م',
-          payCycle,
-          payCycleDays: payCycle === 'custom' ? parseInt(payCycleDays) || '' : '',
-          email,
-          password,
-          address,
-          idNumber,
-          idImage,
-          permissions: ['/dashboard', ...permissions]
-        };
-        setEmployeesList((prev) => [...prev, newEmp]);
+        await apiClient.post('/employees', payload);
       }
+      await loadEmployees();
+      toast.success(editingEmployee ? 'تم حفظ التعديلات' : 'تمت إضافة الموظف');
+      setIsModalOpen(false);
+      setEditingEmployee(null);
     } catch (err) {
       console.error('Failed to save employee:', err);
+      toast.error(err.message || 'تعذر حفظ بيانات الموظف');
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsModalOpen(false);
-    setName('');
-    setRole('');
-    setPhone('');
-    setSalary('');
-    setPayCycle('monthly');
-    setPayCycleDays('');
-    setEmail('');
-    setPassword('');
-    setAddress('');
-    setIdNumber('');
-    setIdImage('');
-    setPermissions([]);
-    setEditingEmployee(null);
   };
 
   const handleDeleteEmployee = async (id) => {
@@ -251,6 +219,7 @@ export default function EmployeesPage() {
         setEmployeesList((prev) => prev.filter((emp) => emp.id !== id));
       } catch (err) {
         console.error('Failed to delete employee:', err);
+        toast.error(err.message || 'تعذر حذف الموظف');
       }
     }
   };
@@ -362,12 +331,14 @@ export default function EmployeesPage() {
                     </div>
                 }
 
-                  <div className="flex items-center gap-2 text-xs text-emerald-600 font-extrabold">
-                    <DollarSign size={13} className="text-emerald-400" />
-                    <span>الراتب: {emp.salary}</span>
-                    <span className="text-[9px] text-slate-400 font-bold">
-                      ({emp.payCycle === 'monthly' ? 'شهري' : emp.payCycle === 'weekly' ? 'أسبوعي' : `كل ${emp.payCycleDays} يوم`})
-                    </span>
+                  <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2 space-y-0.5">
+                    <div className="flex items-center gap-2 text-xs text-emerald-700 font-extrabold">
+                      <DollarSign size={13} className="text-emerald-500" />
+                      <span>الراتب {cycleLabel(emp.payCycle, emp.payCycleDays)}: {formatMoney(emp.dailyRate * cycleDays(emp.payCycle, emp.payCycleDays))}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-500 font-bold pr-5">
+                      الأجر اليومي {formatMoney(emp.dailyRate)} × {cycleDays(emp.payCycle, emp.payCycleDays)} يوم
+                    </p>
                   </div>
                 </div>
 
@@ -376,7 +347,7 @@ export default function EmployeesPage() {
                   <span className="text-[9px] font-extrabold text-slate-400 block mb-1.5">الصفحات المسموح بها:</span>
                   <div className="flex flex-wrap gap-1">
                     {emp.permissions.filter((p) => p !== '/dashboard').map((path) => {
-                    const pageLabel = AVAILABLE_PAGES.find((ap) => ap.path === path)?.label || path;
+                    const pageLabel = permissionLabel(path);
                     return (
                       <span key={path} className="text-[8px] font-bold bg-slate-100/80 text-slate-600 px-2 py-1 rounded-md border border-slate-150/40">
                           {pageLabel}
@@ -388,16 +359,20 @@ export default function EmployeesPage() {
               </div>
 
               {/* ID Image Preview */}
-              {emp.idImage &&
-            <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
-                  <span className="text-[9px] font-extrabold text-slate-400">صورة الهوية الوطنية</span>
-                  <button
-                onClick={() => setSelectedIdImage(emp.idImage)}
-                className="flex items-center gap-1.5 text-[9px] text-indigo-600 hover:text-indigo-700 font-bold border border-indigo-150/40 hover:bg-indigo-50/30 px-2.5 py-1 rounded-xl transition-all cursor-pointer">
-                
-                    <Image size={10} />
-                    <span>عرض الصورة</span>
-                  </button>
+              {(emp.idImage || emp.idImageBack) &&
+            <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between gap-2">
+                  <span className="text-[9px] font-extrabold text-slate-400 whitespace-nowrap">صورة الهوية</span>
+                  <div className="flex items-center gap-1.5">
+                    {[{ src: emp.idImage, label: 'الأمامي' }, { src: emp.idImageBack, label: 'الخلفي' }].filter((side) => side.src).map((side) =>
+                <button
+                  key={side.label}
+                  onClick={() => setSelectedIdImage({ src: side.src, label: side.label })}
+                  className="flex items-center gap-1.5 text-[9px] text-indigo-600 hover:text-indigo-700 font-bold border border-indigo-150/40 hover:bg-indigo-50/30 px-2.5 py-1 rounded-xl transition-all cursor-pointer">
+                        <Image size={10} />
+                        <span>{side.label}</span>
+                      </button>
+                )}
+                  </div>
                 </div>
             }
             </div>
@@ -464,12 +439,15 @@ export default function EmployeesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">الراتب</label>
+                  <label className="text-xs font-extrabold text-slate-600">الأجر اليومي (ج.م)</label>
                   <input
-                  type="text"
-                  placeholder="مثال: 6,000 ج.م"
-                  value={salary}
-                  onChange={(e) => setSalary(e.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="مثال: 200"
+                  value={dailyRate}
+                  onChange={(e) => setDailyRate(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 
                 </div>
@@ -496,12 +474,50 @@ export default function EmployeesPage() {
                     min="1"
                     max="30"
                     placeholder="مثال: 3 أو 5"
+                    required
                     value={payCycleDays}
                     onChange={(e) => setPayCycleDays(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                   </div>
                 )}
               </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-600">
+                  تاريخ التعيين
+                  <span className="text-[9px] font-bold text-slate-400 mr-1">
+                    {payCycle === 'custom' ? '(تبدأ منه أول دورة صرف)' : '(اختياري)'}
+                  </span>
+                </label>
+                <input
+                type="date"
+                required={payCycle === 'custom'}
+                value={hireDate}
+                onChange={(e) => setHireDate(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+              </div>
+
+              {/* Live salary preview for the chosen cycle */}
+              {(() => {
+              const rate = parseFloat(dailyRate) || 0;
+              const days = cycleDays(payCycle, payCycleDays);
+              return (
+                <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3.5 space-y-1" aria-live="polite">
+                    <div className="flex items-center justify-between text-xs font-extrabold text-emerald-700">
+                      <span>الراتب {cycleLabel(payCycle, payCycleDays)}</span>
+                      <span className="text-sm">{formatMoney(rate * days)}</span>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-500">
+                      {formatMoney(rate)} × {days} يوم
+                      {payCycle === 'monthly' && ' (الشهر يُحسب 30 يوماً دائماً)'}
+                      {payCycle === 'weekly' && ' — الأسبوع من السبت إلى الجمعة'}
+                    </p>
+                    {payCycle !== 'monthly' && rate > 0 &&
+                  <p className="text-[10px] font-bold text-slate-400">ما يعادل شهرياً: {formatMoney(rate * MONTH_DAYS)}</p>
+                  }
+                  </div>);
+
+            })()}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -559,36 +575,49 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
-              {/* Upload ID Image */}
+              {/* Upload ID Images (front + back) */}
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600 block">رفع صورة الهوية الوطنية (اختياري)</label>
-                <div className="flex items-center gap-3">
-                  <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="id-image-uploader" />
-                
-                  <label
-                  htmlFor="id-image-uploader"
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 border-dashed rounded-2xl text-xs font-bold text-slate-500 cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-all flex items-center gap-2">
-                  
-                    <Image size={14} />
-                    <span>اختر ملف صورة</span>
-                  </label>
-                  {idImage &&
-                <div className="relative w-12 h-12 border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                      <img src={idImage} alt="National ID" className="w-full h-full object-cover" />
-                      <button
-                    type="button"
-                    onClick={() => setIdImage('')}
-                    className="absolute inset-0 bg-black/40 flex items-center justify-center text-white cursor-pointer">
-                    
-                        <X size={10} />
-                      </button>
-                    </div>
-                }
+                <span className="text-xs font-extrabold text-slate-600 block">صور الهوية الوطنية (اختياري)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  {ID_SIDES.map((side) => {
+                  const src = side.key === 'front' ? idImage : idImageBack;
+                  const inputId = `id-image-${side.key}`;
+                  return (
+                    <div key={side.key} className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 block">{side.label}</span>
+                        <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, side.key)}
+                        className="hidden"
+                        id={inputId} />
+                        {src ?
+                      <div className="relative h-24 border border-slate-200 rounded-2xl overflow-hidden bg-slate-50">
+                            <img src={src} alt={`National ID - ${side.label}`} className="w-full h-full object-contain" />
+                            <div className="absolute top-1 left-1 flex gap-1">
+                              <label htmlFor={inputId} className="p-1 bg-white/90 hover:bg-white rounded-lg text-slate-600 shadow-xs cursor-pointer" title="تغيير الصورة">
+                                <Edit3 size={11} />
+                              </label>
+                              <button
+                            type="button"
+                            onClick={() => idImageSetters[side.key]('')}
+                            className="p-1 bg-white/90 hover:bg-white rounded-lg text-rose-600 shadow-xs cursor-pointer"
+                            title="حذف الصورة">
+                                <X size={11} />
+                              </button>
+                            </div>
+                          </div> :
+
+                      <label
+                        htmlFor={inputId}
+                        className="h-24 bg-slate-50 border border-slate-200 border-dashed rounded-2xl text-[11px] font-bold text-slate-500 cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-all flex flex-col items-center justify-center gap-1.5">
+                            <Image size={16} />
+                            <span>اختر صورة {side.label}</span>
+                          </label>
+                      }
+                      </div>);
+
+                })}
                 </div>
               </div>
 
@@ -596,7 +625,7 @@ export default function EmployeesPage() {
               <div className="space-y-2 pt-2">
                 <label className="text-xs font-extrabold text-slate-600 block">صلاحيات رؤية صفحات النظام</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-50/50 p-4.5 rounded-2xl border border-slate-100">
-                  {AVAILABLE_PAGES.map((page) =>
+                  {PERMISSION_PAGES.map((page) =>
                 <label key={page.path} className="flex items-center gap-2.5 text-xs font-semibold text-slate-700 cursor-pointer">
                       <input
                     type="checkbox"
@@ -608,14 +637,32 @@ export default function EmployeesPage() {
                     </label>
                 )}
                 </div>
+
+                <label className="text-xs font-extrabold text-slate-600 block pt-2">صلاحيات إضافية</label>
+                <div className="space-y-2 bg-slate-50/50 p-4.5 rounded-2xl border border-slate-100">
+                  {PERMISSION_ACTIONS.map((action) =>
+                <label key={action.key} className="flex items-start gap-2.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                    type="checkbox"
+                    checked={permissions.includes(action.key)}
+                    onChange={() => togglePermission(action.key)}
+                    className="w-4 h-4 mt-0.5 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer accent-indigo-600 transition-all" />
+                      <span>
+                        {action.label}
+                        <span className="block text-[10px] text-slate-400 font-bold">{action.hint}</span>
+                      </span>
+                    </label>
+                )}
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
                 <button
                 type="submit"
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-sm">
-                
+                disabled={isSaving}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-sm disabled:opacity-60 flex items-center justify-center gap-1.5">
+                  {isSaving && <RefreshCw size={12} className="animate-spin" />}
                   {editingEmployee ? 'حفظ التعديلات' : 'إضافة للفريق'}
                 </button>
                 <button
@@ -641,9 +688,9 @@ export default function EmployeesPage() {
             
               <X size={16} />
             </button>
-            <h4 className="text-xs font-extrabold text-slate-800 text-right pr-6">عرض صورة الهوية الوطنية</h4>
+            <h4 className="text-xs font-extrabold text-slate-800 text-right pr-6">صورة الهوية الوطنية — الوجه {selectedIdImage.label}</h4>
             <div className="border border-slate-100 rounded-2xl overflow-hidden mt-2 max-h-[60vh]">
-              <img src={selectedIdImage} alt="National ID card" className="w-full h-full object-contain" />
+              <img src={selectedIdImage.src} alt={`National ID - ${selectedIdImage.label}`} className="w-full h-full object-contain" />
             </div>
           </div>
         </div>

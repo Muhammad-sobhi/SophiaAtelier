@@ -40,6 +40,7 @@ Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
 Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionController::class, 'publicIndex']);
 Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryController::class, 'publicIndex']);
 Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
+Route::get('/public/settings', [\App\Http\Controllers\Api\SettingController::class, 'publicIndex']);
 Route::get('/public/best-sellers', [DressController::class, 'bestSellers']);
 Route::get('/public/system-status', function () {
     return response()->json([
@@ -186,6 +187,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Payroll summary (for attendance/payroll tab)
     Route::get('/payroll/summary', [PayrollController::class, 'summary']);
     Route::post('/payroll/deduct-loans', [PayrollController::class, 'deductLoans']);
+    Route::middleware('permission:payroll.manage')->group(function () {
+        Route::post('/payroll/payments', [PayrollController::class, 'pay']);
+        Route::delete('/payroll/payments/{payment}', [PayrollController::class, 'destroyPayment']);
+        Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
+        Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
+        Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
+    });
 
     Route::apiResource('leave-requests', LeaveRequestController::class);
 
@@ -225,4 +233,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::get('/dashboard/executive', [DashboardController::class, 'executive']);
+
+    // System settings
+    Route::get('/settings', [\App\Http\Controllers\Api\SettingController::class, 'index']);
+    Route::put('/settings', [\App\Http\Controllers\Api\SettingController::class, 'update']);
 });

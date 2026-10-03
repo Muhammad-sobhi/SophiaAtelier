@@ -73,6 +73,7 @@ const categoryLabels = {
   'balance': 'باقي مستحقات الحجز',
   'fitting_fee': 'رسوم تجربة (قياس)',
   'salary': 'رواتب موظفين',
+  'loan': 'سلف موظفين',
   'cleaning': 'مصاريف تنظيف',
   'purchase': 'مشتريات فساتين وخامات',
   'maintenance': 'مصاريف صيانة',
@@ -124,7 +125,7 @@ const mapTransaction = (row) => {
 
   let mappedCat = 'other';
   let txType = 'مصروف';
-  if (row.category === 'salary' || row.category === 'purchase') mappedCat = 'operational';
+  if (row.category === 'salary' || row.category === 'loan' || row.category === 'purchase') mappedCat = 'operational';
   else if (row.category === 'cleaning' || row.category === 'maintenance') mappedCat = 'utilities';
   else if (MANUFACTURING_CATEGORIES.includes(row.category)) mappedCat = 'manufacturing';
   else if (row.category === 'transfer_out') {
@@ -475,7 +476,7 @@ export default function FinancePage() {
       loadData();
     } catch (e) {
       console.error('Failed to delete transaction:', e);
-      toast.error('فشل حذف المعاملة');
+      toast.error(e.data?.message || 'فشل حذف المعاملة');
     }
   };
 
@@ -544,6 +545,7 @@ export default function FinancePage() {
       setNewReceiptImage(null);
     } catch (e) {
       console.error('Failed to add transaction:', e);
+      toast.error(e.data?.message || 'فشل حفظ المعاملة');
     }
   };
 

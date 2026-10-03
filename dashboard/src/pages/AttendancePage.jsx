@@ -11,10 +11,27 @@ import {
   Banknote,
   X,
   Edit2,
-  Trash2
+  Trash2,
+  Wallet,
+  CheckCircle2
 } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
+import PaySalaryModal from '@/components/payroll/PaySalaryModal';
+import { PAYMENT_METHODS } from '@/components/manufacturing/shared';
+import { cycleLabel, periodLabel } from '@/lib/payroll';
+
+// Salary payment status of a payroll row (paid_amount vs net_salary for the month)
+const PAYMENT_STATUS = {
+  paid: { label: 'تم الصرف', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  partial: { label: 'صرف جزئي', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  unpaid: { label: 'لم يُصرف', className: 'bg-slate-100 text-slate-600 border-slate-200' }
+};
+const paymentMethodLabel = (id) => PAYMENT_METHODS.find((m) => m.id === id)?.label || id;
+
+// A payroll row is one pay period of one employee (a month, a Saturday-Friday week, or a custom block of days)
+const sameRow = (a, b) => a.employee_id === b.employee_id && a.period_key === b.period_key;
+
 
 
 
@@ -74,6 +91,7 @@ export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState('attendance');
   const [employees, setEmployees] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canManagePayroll, setCanManagePayroll] = useState(false);
 
   // Attendance Tab State
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -95,6 +113,7 @@ export default function AttendancePage() {
   const [payrollYear, setPayrollYear] = useState(new Date().getFullYear());
   const [payrollList, setPayrollList] = useState([]);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+  const [payingRow, setPayingRow] = useState(null);
 
   // Loan Modal State
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
@@ -112,7 +131,9 @@ export default function AttendancePage() {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        setIsAdmin(user.role === 'admin' || user.permissions?.includes('*'));
+        const admin = user.role === 'admin' || user.permissions?.includes('*');
+        setIsAdmin(admin);
+        setCanManagePayroll(admin || user.permissions?.includes('payroll.manage'));
       } catch (e) {}
     }
 
@@ -303,7 +324,7 @@ export default function AttendancePage() {
       const list = Array.isArray(res) ? res : (res.data || []);
       setPayrollList(list);
       if (selectedPayslip) {
-        const updated = list.find(p => p.employee_id === selectedPayslip.employee_id);
+        const updated = list.find(p => sameRow(p, selectedPayslip));
         setSelectedPayslip(updated || null);
       }
     } catch (err) {
@@ -322,7 +343,7 @@ export default function AttendancePage() {
       const list = Array.isArray(res) ? res : (res.data || []);
       setPayrollList(list);
       if (selectedPayslip) {
-        const updated = list.find(p => p.employee_id === selectedPayslip.employee_id);
+        const updated = list.find(p => sameRow(p, selectedPayslip));
         setSelectedPayslip(updated || null);
       }
     } catch (err) {
@@ -339,7 +360,7 @@ export default function AttendancePage() {
       const list = Array.isArray(res) ? res : (res.data || []);
       setPayrollList(list);
       if (selectedPayslip) {
-        const updated = list.find(p => p.employee_id === selectedPayslip.employee_id);
+        const updated = list.find(p => sameRow(p, selectedPayslip));
         setSelectedPayslip(updated || null);
       }
     } catch (err) {
@@ -348,7 +369,27 @@ export default function AttendancePage() {
     }
   };
 
+  const applyPayrollRow = (row) => {
+    if (!row) return;
+    setPayrollList((prev) => prev.map((p) => sameRow(p, row) ? row : p));
+    setSelectedPayslip((prev) => prev && sameRow(prev, row) ? row : prev);
+  };
+
+  const handleUndoSalaryPayment = async (payment) => {
+    if (!await confirmDialog(`إلغاء صرف ${payment.amount.toLocaleString()} ج.م؟ سيُحذف أيضاً من صفحة المالية.`)) return;
+    try {
+      const row = await apiClient.delete(`/payroll/payments/${payment.id}`);
+      applyPayrollRow(row);
+      toast.success('تم إلغاء الصرف');
+    } catch (err) {
+      console.error('Failed to undo salary payment:', err);
+      toast.error(err.message || 'تعذر إلغاء الصرف');
+    }
+  };
+
   const totalMonthlyPayroll = payrollList.reduce((acc, curr) => acc + curr.net_salary, 0);
+  const totalPaidAll = payrollList.reduce((acc, curr) => acc + (curr.paid_amount || 0), 0);
+  const totalRemainingAll = payrollList.reduce((acc, curr) => acc + (curr.remaining_amount || 0), 0);
   const totalDeductionsAll = payrollList.reduce((acc, curr) => acc + curr.total_deductions, 0);
   const totalLoansAll = payrollList.reduce((acc, curr) => acc + (curr.loan_deduction || 0), 0);
 
@@ -629,6 +670,10 @@ export default function AttendancePage() {
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase">إجمالي رواتب الشهر المستحقة</p>
                 <h3 className="text-xl font-extrabold text-slate-800 mt-1">{totalMonthlyPayroll.toLocaleString()} ج.م</h3>
+                <p className="text-[10px] font-bold mt-0.5 flex flex-wrap gap-x-2">
+                  <span className="text-emerald-600 whitespace-nowrap">تم صرف: {totalPaidAll.toLocaleString()} ج.م</span>
+                  <span className="text-amber-600 whitespace-nowrap">متبقي: {totalRemainingAll.toLocaleString()} ج.م</span>
+                </p>
               </div>
               <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
                 <DollarSign size={20} />
@@ -679,6 +724,7 @@ export default function AttendancePage() {
           </div>
 
           {/* Loan Button */}
+          {canManagePayroll &&
           <div className="flex items-center justify-end flex-shrink-0">
             <button
               onClick={() => setIsLoanModalOpen(true)}
@@ -687,42 +733,56 @@ export default function AttendancePage() {
               <span>تسجيل سلفة / إقراض موظف</span>
             </button>
           </div>
+          }
 
           {/* Payroll List */}
           <div className="flex-1 bg-white rounded-3xl p-6 border border-slate-100/70 shadow-xs overflow-y-auto scrollbar-thin">
             <div className="space-y-3">
+              {payrollList.length === 0 && (
+                <p className="text-center py-10 text-xs font-bold text-slate-400">لا توجد فترات رواتب تنتهي في هذا الشهر</p>
+              )}
               {payrollList.map((pay) =>
             <div
-              key={pay.employee_id}
-              className="flex flex-col lg:flex-row items-center justify-between p-5 bg-slate-50/70 border border-slate-100 rounded-2xl gap-4 hover:border-indigo-200 transition-all">
+              key={`${pay.employee_id}-${pay.period_key}`}
+              className="flex flex-col xl:flex-row items-center justify-between p-5 bg-slate-50/70 border border-slate-100 rounded-2xl gap-4 hover:border-indigo-200 transition-all">
               
-                  <div className="flex items-center gap-3 w-full lg:w-1/4">
+                  <div className="flex items-center gap-3 w-full xl:w-1/4">
                     <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-2xl flex items-center justify-center font-extrabold text-sm shadow-md shadow-indigo-100">
                       {pay.employee_name.charAt(0)}
                     </div>
                     <div>
                       <h4 className="font-extrabold text-xs text-slate-800">{pay.employee_name}</h4>
+                      <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                        {periodLabel(pay)}
+                        {!pay.period_finished && <span className="text-sky-600 mr-1">(جارية)</span>}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-bold inline-block">
                           {pay.position}
                         </span>
                         <span className="text-[8px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
-                          {pay.pay_cycle === 'monthly' ? 'شهري' : pay.pay_cycle === 'weekly' ? 'أسبوعي' : `كل ${pay.pay_cycle_days} يوم`}
+                          {cycleLabel(pay.pay_cycle, pay.pay_cycle_days)}
                         </span>
+                        {(() => {
+                          const st = PAYMENT_STATUS[pay.payment_status] || PAYMENT_STATUS.unpaid;
+                          return (
+                            <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-extrabold border ${st.className}`}>
+                              {st.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
 
                   {/* Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold text-slate-600 w-full lg:w-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold text-slate-600 w-full xl:w-auto">
                     <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">الراتب (الشهري):</span>
-                      <span className="font-extrabold text-slate-800">{pay.base_salary.toLocaleString()} ج.م</span>
-                      {pay.pay_cycle !== 'monthly' && (
-                        <span className="text-[8px] text-indigo-600 font-bold block">
-                          راتب الدورة ({pay.pay_cycle === 'weekly' ? '7 أيام' : `${pay.pay_cycle_days} أيام`}): {pay.cycle_salary.toLocaleString()} ج.م
-                        </span>
-                      )}
+                      <span className="text-[9px] text-slate-400 block font-bold">راتب الدورة:</span>
+                      <span className="font-extrabold text-slate-800">{pay.cycle_salary.toLocaleString()} ج.م</span>
+                      <span className="text-[8px] text-indigo-600 font-bold block">
+                        {pay.daily_rate.toLocaleString()} ج.م × {pay.pay_cycle_days} يوم
+                      </span>
                     </div>
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold">أيام الحضور / ساعات:</span>
@@ -741,16 +801,34 @@ export default function AttendancePage() {
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold">الصافي المستحِق:</span>
                       <span className="font-extrabold text-emerald-600 text-sm">{pay.net_salary.toLocaleString()} ج.م</span>
+                      {pay.paid_amount > 0 && pay.remaining_amount > 0 && (
+                        <span className="text-[8px] text-amber-600 font-bold block">متبقي: {pay.remaining_amount.toLocaleString()} ج.م</span>
+                      )}
                     </div>
                   </div>
 
-                  <button
-                onClick={() => setSelectedPayslip(pay)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all cursor-pointer">
-                
-                    <FileText size={14} />
-                    <span>كشف حساب الراتب</span>
-                  </button>
+                  <div className="flex items-center gap-2 w-full xl:w-auto xl:flex-shrink-0">
+                    {canManagePayroll && pay.remaining_amount > 0 && (
+                      <button
+                    onClick={() => setPayingRow(pay)}
+                    className="flex-1 xl:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs">
+                        <Wallet size={14} />
+                        <span>{pay.paid_amount > 0 ? 'صرف المتبقي' : 'صرف الراتب'}</span>
+                      </button>
+                    )}
+                    {pay.payment_status === 'paid' && (
+                      <span className="flex-1 xl:flex-none flex items-center justify-center gap-1 px-3 py-2 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold">
+                        <CheckCircle2 size={14} />
+                        <span>تم الصرف</span>
+                      </span>
+                    )}
+                    <button
+                  onClick={() => setSelectedPayslip(pay)}
+                  className="flex-1 xl:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all cursor-pointer">
+                      <FileText size={14} />
+                      <span>كشف حساب الراتب</span>
+                    </button>
+                  </div>
                 </div>
             )}
             </div>
@@ -858,9 +936,9 @@ export default function AttendancePage() {
               <div>
                 <h3 className="font-extrabold text-sm text-slate-800">كشف حساب مفصل للراتب</h3>
                 <p className="text-[10px] text-slate-400 font-bold">
-                  {selectedPayslip.employee_name} — شهر {selectedPayslip.month} / {selectedPayslip.year}
+                  {selectedPayslip.employee_name} — {periodLabel(selectedPayslip)}
                   <span className="mr-2 text-indigo-500">
-                    ({selectedPayslip.pay_cycle === 'monthly' ? 'شهري' : selectedPayslip.pay_cycle === 'weekly' ? 'أسبوعي' : `كل ${selectedPayslip.pay_cycle_days} يوم`})
+                    ({cycleLabel(selectedPayslip.pay_cycle, selectedPayslip.pay_cycle_days)})
                   </span>
                 </p>
               </div>
@@ -874,15 +952,9 @@ export default function AttendancePage() {
             <div className="space-y-3 text-xs">
               <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1.5 border border-slate-100">
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold">الراتب الشهري الأساسي:</span>
-                  <span className="font-extrabold text-slate-800">{selectedPayslip.base_salary.toLocaleString()} ج.م</span>
+                  <span className="text-slate-500 font-bold">راتب الدورة ({selectedPayslip.daily_rate.toLocaleString()} × {selectedPayslip.pay_cycle_days} يوم):</span>
+                  <span className="font-extrabold text-slate-800">{selectedPayslip.cycle_salary.toLocaleString()} ج.م</span>
                 </div>
-                {selectedPayslip.pay_cycle !== 'monthly' && (
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-indigo-500 font-bold">مستحق الدورة ({selectedPayslip.pay_cycle === 'weekly' ? 'أسبوعي / 7 أيام' : `كل ${selectedPayslip.pay_cycle_days} أيام`}):</span>
-                    <span className="font-bold text-indigo-600">{selectedPayslip.cycle_salary?.toLocaleString()} ج.م</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-[11px]">
                   <span className="text-slate-400">أجر اليوم:</span>
                   <span className="font-bold text-slate-600">{selectedPayslip.daily_rate} ج.م</span>
@@ -950,7 +1022,7 @@ export default function AttendancePage() {
                     <div key={idx} className="flex justify-between items-center text-[11px]">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-amber-600">سلفة بتاريخ {loan.date}{loan.reason ? ` (${loan.reason})` : ''}:</span>
-                        {isAdmin && (
+                        {canManagePayroll && (
                           <div className="flex items-center gap-1.5">
                             <button onClick={() => setEditingLoan(loan)} className="text-blue-500 hover:text-blue-700 p-0.5 rounded" title="تعديل"><Edit2 size={13} /></button>
                             <button onClick={() => handleDeleteLoan(loan.id)} className="text-red-500 hover:text-red-700 p-0.5 rounded" title="حذف"><Trash2 size={13} /></button>
@@ -967,19 +1039,61 @@ export default function AttendancePage() {
                 </div>
               )}
 
-              <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between">
+              {/* Salary payments for this month */}
+              <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-2xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="font-extrabold text-slate-700 text-[11px]">مدفوعات الراتب لهذا الشهر:</p>
+                  {(() => {
+                    const st = PAYMENT_STATUS[selectedPayslip.payment_status] || PAYMENT_STATUS.unpaid;
+                    return <span className={`text-[9px] px-2 py-0.5 rounded-md font-extrabold border ${st.className}`}>{st.label}</span>;
+                  })()}
+                </div>
+                {selectedPayslip.payments?.length > 0 ? (
+                  selectedPayslip.payments.map((p) => (
+                    <div key={p.id} className="flex justify-between items-center text-[11px]">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">
+                          {p.payment_date} — {paymentMethodLabel(p.payment_method)}{p.notes ? ` (${p.notes})` : ''}
+                        </span>
+                        {canManagePayroll && (
+                          <button onClick={() => handleUndoSalaryPayment(p)} className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer" title="إلغاء الصرف"><Trash2 size={11} /></button>
+                        )}
+                      </div>
+                      <span className="font-bold text-emerald-700 flex-shrink-0">{p.amount.toLocaleString()} ج.م</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-[11px] text-slate-400 font-bold">لم يتم صرف أي مبلغ بعد</p>
+                )}
+                <div className="flex justify-between text-[11px] border-t border-slate-200 pt-1 mt-1">
+                  <span className="font-bold text-slate-600">تم صرف {selectedPayslip.paid_amount.toLocaleString()} ج.م</span>
+                  <span className="font-extrabold text-amber-700">المتبقي: {selectedPayslip.remaining_amount.toLocaleString()} ج.م</span>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
                 <div>
                   <p className="text-[10px] text-emerald-600 font-bold uppercase">الصافي الواجب صرفه للموظف</p>
                   <h4 className="text-lg font-extrabold text-emerald-700 mt-0.5">
                     {selectedPayslip.net_salary.toLocaleString()} ج.م
                   </h4>
                 </div>
+                <div className="flex items-center gap-2">
+                {canManagePayroll && selectedPayslip.remaining_amount > 0 && (
+                  <button
+                  onClick={() => setPayingRow(selectedPayslip)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer">
+                    <Wallet size={14} />
+                    <span>صرف</span>
+                  </button>
+                )}
                 <button
                 onClick={() => window.print()}
                 className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer">
                   <Printer size={14} />
                   <span>طباعة الكشف</span>
                 </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1142,6 +1256,10 @@ export default function AttendancePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {payingRow && (
+        <PaySalaryModal pay={payingRow} onClose={() => setPayingRow(null)} onPaid={applyPayrollRow} />
       )}
 
     </div>

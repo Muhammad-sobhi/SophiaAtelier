@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Phone, MapPin, ExternalLink } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { useContactNumber } from '../../lib/useContactNumber';
 import styles from './Footer.module.css';
 
 const EXACT_MAP_URL = "https://maps.app.goo.gl/RUyaQk3v1rZR4gVC6";
@@ -12,6 +13,7 @@ const EMBED_MAP_SRC = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d345
 export default function Footer() {
   const { t, lang } = useStore();
   const isAr = lang === 'ar';
+  const contact = useContactNumber();
 
   const navigateLinks = [
     { label: t.nav.home, href: '/' },
@@ -93,8 +95,8 @@ export default function Footer() {
           <div className={styles.infoBlock}>
             <div className={styles.infoRow}>
               <Phone size={16} className={styles.goldIcon} />
-              <a href="tel:+201554159359" className={styles.phoneLink}>
-                +20 155 415 9359
+              <a href={contact.telHref} className={styles.phoneLink} dir="ltr">
+                {contact.display}
               </a>
             </div>
 

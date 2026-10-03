@@ -175,6 +175,18 @@ export async function fetchPublicFaqs() {
  * Without dress_ids it checks the whole catalog (wedding date only).
  * Returns { dresses: [...], suggested_visit_date, all_available } or throws.
  */
+let publicSettingsPromise = null;
+
+// Site-wide settings (e.g. the atelier WhatsApp number); fetched once per page load
+export function fetchPublicSettings() {
+  if (!publicSettingsPromise) {
+    publicSettingsPromise = fetchWithTimeout(`${API_BASE}/public/settings`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : {}))
+      .catch(() => ({}));
+  }
+  return publicSettingsPromise;
+}
+
 export async function checkAvailability({ dress_ids, visit_date, wedding_date, city, client_id } = {}) {
   const res = await fetchWithTimeout(`${API_BASE}/public/availability`, {
     method: 'POST',

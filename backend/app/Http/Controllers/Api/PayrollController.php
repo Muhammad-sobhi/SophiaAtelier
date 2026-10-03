@@ -3,190 +3,39 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\EmployeeLoan;
-use App\Models\LeaveRequest;
-use Carbon\Carbon;
+use App\Models\EmployeeSalaryPayment;
+use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PayrollController extends Controller
 {
+    public function __construct(private PayrollService $payroll)
+    {
+    }
+
+    /**
+     * Pay periods ending in the given month, one row per employee period (see PayrollService).
+     * GET /api/payroll/summary?year=&month=
+     */
     public function summary(Request $request): JsonResponse
     {
-        $year = (int) $request->input('year', date('Y'));
-        $month = (int) $request->input('month', date('m'));
+        $validated = $request->validate([
+            'year' => 'nullable|integer|min:2000|max:2100',
+            'month' => 'nullable|integer|min:1|max:12',
+        ]);
+        $year = (int) ($validated['year'] ?? date('Y'));
+        $month = (int) ($validated['month'] ?? date('m'));
 
-        $startDate = Carbon::createFromDate($year, $month, 1)->startOfDay();
-        $endDate = $startDate->copy()->endOfMonth()->endOfDay();
-        $daysInMonth = $startDate->daysInMonth;
-
-        $employees = Employee::all();
         $report = [];
-
-        foreach ($employees as $employee) {
-            $baseSalary = (float) $employee->salary;
-            $payCycle = $employee->pay_cycle ?? 'monthly';
-            $payCycleDays = (int) ($employee->pay_cycle_days ?? 0);
-
-            // The entered salary is the employee's standard monthly salary (e.g. 8000).
-            // Daily rate is calculated from monthly salary / daysInMonth.
-            $dailyRate = $daysInMonth > 0 ? $baseSalary / $daysInMonth : 0;
-            $hourlyRate = $dailyRate > 0 ? $dailyRate / 8 : 0;
-
-            // Monthly salary stays as entered base salary
-            $monthlySalary = $baseSalary;
-
-            // Cycle salary is the amount per cycle (e.g. 3 days salary = dailyRate * 3)
-            $cycleDays = $payCycle === 'weekly' ? 7 : ($payCycle === 'custom' && $payCycleDays > 0 ? $payCycleDays : $daysInMonth);
-            $cycleSalary = round($dailyRate * $cycleDays, 2);
-
-            // Fetch attendance logs for this month
-            $attendances = Attendance::where('employee_id', $employee->id)
-                ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                ->get();
-
-            // Fetch approved leaves overlapping with this month
-            $approvedLeaves = LeaveRequest::where('employee_id', $employee->id)
-                ->where('status', 'approved')
-                ->where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                        ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                        ->orWhere(function ($q2) use ($startDate, $endDate) {
-                            $q2->where('start_date', '<=', $startDate->format('Y-m-d'))
-                                ->where('end_date', '>=', $endDate->format('Y-m-d'));
-                        });
-                })->get();
-
-            // Fetch approved, undeducted loans for this employee
-            $monthKey = sprintf('%04d-%02d', $year, $month);
-            $pendingLoans = EmployeeLoan::where('employee_id', $employee->id)
-                ->where('status', 'approved')
-                ->where('deducted_from_salary', false)
-                ->whereMonth('date', $month)
-                ->whereYear('date', $year)
-                ->get();
-
-            $presentDays = 0;
-            $absentDays = 0;
-            $absentRecords = [];
-            $totalWorkedHours = 0.0;
-            $totalLateMinutes = 0;
-            $totalOvertimeHours = 0.0;
-            $shortageHours = 0.0;
-            $shortageRecords = [];
-
-            foreach ($attendances as $att) {
-                if (in_array($att->status, ['present', 'late', 'half_day'])) {
-                    $presentDays++;
-                    $worked = (float) ($att->worked_hours ?? 0);
-                    $totalWorkedHours += $worked;
-                    $totalLateMinutes += (int) ($att->late_minutes ?? 0);
-                    $totalOvertimeHours += (float) ($att->overtime_hours ?? 0);
-
-                    // Standard shift is 8 hours
-                    if ($worked > 0 && $worked < 8.0) {
-                        $shortage = round(8.0 - $worked, 2);
-                        $shortageHours += $shortage;
-                        $shortageRecords[] = [
-                            'id' => $att->id,
-                            'date' => $att->date->format('Y-m-d'),
-                            'worked_hours' => $worked,
-                            'shortage_hours' => $shortage,
-                        ];
-                    }
-                } elseif ($att->status === 'absent') {
-                    $absentDays++;
-                    $absentRecords[] = [
-                        'id' => $att->id,
-                        'date' => $att->date->format('Y-m-d'),
-                        'status' => $att->status,
-                    ];
+        foreach (Employee::orderBy('name')->get() as $employee) {
+            foreach ($this->payroll->periodsForMonth($employee, $year, $month) as $period) {
+                if ($row = $this->payroll->compute($employee, $period)) {
+                    $report[] = $row;
                 }
             }
-
-            // Calculate leave days count
-            $paidLeaveDays = 0;
-            $unpaidLeaveDays = 0;
-
-            foreach ($approvedLeaves as $leave) {
-                $ls = Carbon::parse($leave->start_date);
-                $le = Carbon::parse($leave->end_date);
-                $leaveStart = $ls->lt($startDate) ? $startDate->copy() : $ls;
-                $leaveStart = $leaveStart->gt($endDate) ? $endDate->copy() : $leaveStart;
-                $leaveEnd = $le->gt($endDate) ? $endDate->copy() : $le;
-                $leaveEnd = $leaveEnd->lt($startDate) ? $startDate->copy() : $leaveEnd;
-                $count = $leaveStart->diffInDays($leaveEnd) + 1;
-
-                if (in_array($leave->type, ['paid_leave', 'sick_leave', 'official_holiday'])) {
-                    $paidLeaveDays += $count;
-                } else {
-                    $unpaidLeaveDays += $count;
-                }
-            }
-
-            // Calculate loan deductions
-            $loanDeduction = 0;
-            $loanDetails = [];
-            foreach ($pendingLoans as $loan) {
-                $loanDeduction += (float) $loan->amount;
-                $loanDetails[] = [
-                    'id' => $loan->id,
-                    'amount' => (float) $loan->amount,
-                    'date' => $loan->date->format('Y-m-d'),
-                    'reason' => $loan->reason,
-                ];
-            }
-
-            $unexcusedAbsenceDeduction = round($absentDays * $dailyRate, 2);
-            $unpaidLeaveDeduction = round($unpaidLeaveDays * $dailyRate, 2);
-            $shortageDeduction = round($shortageHours * $hourlyRate, 2);
-            $totalDeductions = round($unexcusedAbsenceDeduction + $unpaidLeaveDeduction + $shortageDeduction + $loanDeduction, 2);
-
-            $overtimePay = round($totalOvertimeHours * $hourlyRate * 1.25, 2);
-            $netSalary = round(max(0, $monthlySalary - $totalDeductions + $overtimePay), 2);
-
-            // Skip if employee has absolutely no activity for this month
-            $hasActivity = $presentDays > 0 || $absentDays > 0 || $paidLeaveDays > 0 || $unpaidLeaveDays > 0 || $pendingLoans->count() > 0 || $totalOvertimeHours > 0 || $shortageHours > 0;
-
-            if (!$hasActivity) {
-                continue;
-            }
-
-            $report[] = [
-                'employee_id' => $employee->id,
-                'employee_name' => $employee->name,
-                'position' => $employee->position ?? 'موظف',
-                'month' => $month,
-                'year' => $year,
-                'days_in_month' => $daysInMonth,
-                'pay_cycle' => $payCycle,
-                'pay_cycle_days' => $payCycleDays ?: null,
-                'base_salary' => $baseSalary,
-                'monthly_salary' => $monthlySalary,
-                'cycle_salary' => $cycleSalary,
-                'daily_rate' => round($dailyRate, 2),
-                'hourly_rate' => round($hourlyRate, 2),
-                'present_days' => $presentDays,
-                'absent_days' => $absentDays,
-                'paid_leave_days' => $paidLeaveDays,
-                'unpaid_leave_days' => $unpaidLeaveDays,
-                'total_worked_hours' => round($totalWorkedHours, 2),
-                'total_late_minutes' => $totalLateMinutes,
-                'shortage_hours' => round($shortageHours, 2),
-                'total_overtime_hours' => round($totalOvertimeHours, 2),
-                'unexcused_absence_deduction' => $unexcusedAbsenceDeduction,
-                'absent_records' => $absentRecords,
-                'unpaid_leave_deduction' => $unpaidLeaveDeduction,
-                'shortage_deduction' => $shortageDeduction,
-                'shortage_records' => $shortageRecords,
-                'loan_deduction' => round($loanDeduction, 2),
-                'loan_details' => $loanDetails,
-                'total_deductions' => $totalDeductions,
-                'overtime_pay' => $overtimePay,
-                'net_salary' => $netSalary,
-            ];
         }
 
         return response()->json($report);
@@ -215,5 +64,34 @@ class PayrollController extends Controller
             'message' => 'Loans marked as deducted',
             'count' => $updated,
         ]);
+    }
+
+    /**
+     * Pay an employee's salary (fully or partially) for one pay period.
+     * POST /api/payroll/payments
+     */
+    public function pay(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'period_start' => 'required|date',
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'required|string|max:50',
+            'payment_date' => 'required|date',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $row = $this->payroll->pay((int) $validated['employee_id'], $validated['period_start'], $validated, $request->user()?->id);
+
+        return response()->json($row, 201);
+    }
+
+    /**
+     * Undo a salary payment.
+     * DELETE /api/payroll/payments/{payment}
+     */
+    public function destroyPayment(EmployeeSalaryPayment $payment): JsonResponse
+    {
+        return response()->json($this->payroll->undo($payment));
     }
 }

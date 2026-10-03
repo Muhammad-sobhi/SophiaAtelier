@@ -30,4 +30,18 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * Admins can do everything; other users need the permission key on their employee record
+     * (the employee with the same email, as in AuthController).
+     */
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->role === 'admin') {
+            return true;
+        }
+        $permissions = Employee::where('email', $this->email)->first()?->permissions ?? [];
+
+        return in_array('*', $permissions, true) || in_array($permission, $permissions, true);
+    }
 }

@@ -5,17 +5,19 @@ import Image from 'next/image';
 import { Phone, Mail, MapPin, Clock, Calendar, Sparkles, Award, CheckCircle } from 'lucide-react';
 import { useScrollAnimation } from '../ScrollAnimations/useScrollAnimation';
 import { useStore } from '../../context/StoreContext';
+import { useContactNumber } from '../../lib/useContactNumber';
 import styles from './ContactSection.module.css';
 
 export default function ContactSection() {
   const { t } = useStore();
   const ref = useScrollAnimation();
+  const contact = useContactNumber();
 
   const contactInfo = [
     {
       icon: Phone,
       title: t.contact.phone,
-      content: '+20 155 415 9359',
+      content: contact.display,
     },
     {
       icon: Mail,
