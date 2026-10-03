@@ -208,6 +208,12 @@ class BridesExcelService
         $result = ['created' => 0, 'updated_clients' => 0, 'skipped' => []];
         $dressesByCode = Dress::whereNotNull('code')->get(['id', 'code', 'status'])
             ->keyBy(fn ($d) => mb_strtolower(trim($d->code)));
+        // Excel turns a typed code like 09 into the number 9, so all-digit codes are also matched
+        // without their leading zeros (only when that match is unique)
+        $dressesByNumber = $dressesByCode->filter(fn ($d, $code) => ctype_digit($code))
+            ->groupBy(fn ($d, $code) => ltrim($code, '0') ?: '0')
+            ->filter(fn ($group) => $group->count() === 1)
+            ->map->first();
 
         foreach ($rows as $i => $values) {
             $rowNumber = $i + 2;
@@ -220,7 +226,7 @@ class BridesExcelService
             }
 
             try {
-                $row = $this->parseRow($raw, $dressesByCode);
+                $row = $this->parseRow($raw, $dressesByCode, $dressesByNumber);
                 $isNewClient = DB::transaction(fn () => $this->importRow($row));
                 $result['created']++;
                 if (!$isNewClient) {
@@ -234,7 +240,7 @@ class BridesExcelService
         return $result;
     }
 
-    private function parseRow(array $raw, $dressesByCode): array
+    private function parseRow(array $raw, $dressesByCode, $dressesByNumber): array
     {
         $text = fn ($k) => ($v = trim((string) ($raw[$k] ?? ''))) === '' ? null : $v;
 
@@ -275,6 +281,9 @@ class BridesExcelService
         foreach (['dress_code' => 'dress_id', 'dress_2_code' => 'dress_2_id', 'dress_3_code' => 'dress_3_id'] as $codeKey => $idKey) {
             $code = $text($codeKey);
             $dress = $code ? $dressesByCode->get(mb_strtolower($code)) : null;
+            if ($code && !$dress && ctype_digit($code)) {
+                $dress = $dressesByNumber->get(ltrim($code, '0') ?: '0');
+            }
             if ($code && !$dress) {
                 throw new \InvalidArgumentException("كود الفستان {$code} غير موجود");
             }
