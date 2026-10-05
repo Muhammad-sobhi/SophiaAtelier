@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2, Settings, LogOut, Sun, Moon } from 'lucide-react';
+import { Search, Bell, Clock, Check, AlertCircle, Menu, Trash2, Settings, LogOut, Sun, Moon, Store } from 'lucide-react';
 import { setTheme, useTheme } from '@/lib/app-preferences';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { isCairoCity } from '@/lib/utils';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { canAccessPath } from '@/lib/nav-items';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 
@@ -314,6 +315,16 @@ export function Header({ onMenuClick }) {
         </div>
 
         <div className="flex items-center gap-4">
+          {canAccessPath(currentUser, '/dashboard/shop') && (
+          <button
+            onClick={() => navigate('/dashboard/shop')}
+            title="عرض المحل كلعبة ثلاثية الأبعاد"
+            className="h-10 px-3 rounded-2xl border border-amber-200 bg-amber-50 hover:bg-amber-100 flex items-center gap-1.5 text-amber-800 text-xs font-extrabold transition-all cursor-pointer active:scale-95"
+          >
+            <Store size={17} />
+            <span className="hidden sm:inline">المحل 3D</span>
+          </button>
+          )}
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setIsNotifOpen(!isNotifOpen)}

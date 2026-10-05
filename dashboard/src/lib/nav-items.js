@@ -44,7 +44,8 @@ export const menuItems = [
 export const PERMISSION_PAGES = [
 ...menuItems.filter((item) => item.path !== '/dashboard' && !item.adminOnly).map(({ path, label }) => ({ path, label })),
 { path: '/dashboard/visits', label: 'الزيارات' },
-{ path: '/dashboard/bookings', label: 'الحجوزات' }];
+{ path: '/dashboard/bookings', label: 'الحجوزات' },
+{ path: '/dashboard/shop', label: 'المحل 3D (اللعبة)' }];
 
 
 // Actions beyond page access; the API enforces them too (admins always have them)
