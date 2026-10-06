@@ -73,6 +73,7 @@ export default function CartDrawer() {
   const [visitTime, setVisitTime] = useState(VISIT_TIME_SLOTS[0]);
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [fullyBookedSlots, setFullyBookedSlots] = useState([]);
+  const [closedDays, setClosedDays] = useState([]);
   const [slotsVersion, setSlotsVersion] = useState(0);
   const [availability, setAvailability] = useState({ loading: false, error: false, data: null });
   const weddingInputRef = useRef(null);
@@ -107,6 +108,16 @@ export default function CartDrawer() {
       .catch(() => setFullyBookedSlots([]));
   }, [cartOpen, visitDate, slotsVersion]);
 
+  // Days the admin closed for visits (refreshed each time the bag opens)
+  useEffect(() => {
+    if (!cartOpen) return;
+    fetch(`${API_BASE}/public/closed-days`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setClosedDays(Array.isArray(data) ? data : []))
+      .catch(() => setClosedDays([]));
+  }, [cartOpen]);
+
+  const closedDay = closedDays.find((d) => d.date === visitDate);
   const now = shopNow();
   const availableSlots = VISIT_TIME_SLOTS.filter((slot) => {
     const time = to24h(slot);
@@ -189,6 +200,10 @@ export default function CartDrawer() {
       focusWeddingDate();
       return;
     }
+    if (closedDay) {
+      setError(a.dayClosed(closedDay.date, closedDay.reason));
+      return;
+    }
     if (visitTooEarly) {
       setError(a.visitTooEarly(earliestVisit));
       return;
@@ -230,6 +245,9 @@ export default function CartDrawer() {
           setError(a.fixToContinue);
         } else if (data.code === 'visit_too_early' && data.earliest_visit_date) {
           setError(a.visitTooEarly(data.earliest_visit_date));
+        } else if (data.code === 'day_closed') {
+          setClosedDays((prev) => (prev.some((d) => d.date === visitDate) ? prev : [...prev, { date: visitDate, reason: null }]));
+          setError(a.dayClosed(visitDate));
         } else if (data.code === 'slot_full') {
           setSlotsVersion((v) => v + 1);
           setError(a.slotFull);
@@ -363,6 +381,11 @@ export default function CartDrawer() {
                     onChange={(e) => setVisitDate(e.target.value)}
                     style={inputStyle}
                   />
+                  {closedDay && (
+                    <div role="alert" style={{ padding: '10px', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '10px', fontSize: '11px', color: '#e11d48', fontWeight: '600' }}>
+                      {a.dayClosed(closedDay.date, closedDay.reason)}
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. VISIT TIME SLOT (01:00 PM to 08:30 PM, 30 Mins Each, Max 4 Visits Limit) */}
@@ -441,7 +464,7 @@ export default function CartDrawer() {
               <button
                 className={styles.checkoutBtn}
                 onClick={handleBookVisit}
-                disabled={loading || availableSlots.length === 0 || hasBlocking || visitTooEarly || availability.loading}
+                disabled={loading || Boolean(closedDay) || availableSlots.length === 0 || hasBlocking || visitTooEarly || availability.loading}
               >
                 {loading ? (isAr ? 'جاري الإرسال...' : 'BOOKING VISIT...') : (isAr ? 'احجزي موعد تجربة الفساتين' : 'BOOK A VISIT FOR MY DRESSES')}
               </button>

@@ -41,6 +41,7 @@ Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionControlle
 Route::get('/public/client-gallery', [\App\Http\Controllers\Api\ClientGalleryController::class, 'publicIndex']);
 Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
 Route::get('/public/settings', [\App\Http\Controllers\Api\SettingController::class, 'publicIndex']);
+Route::get('/public/closed-days', [\App\Http\Controllers\Api\ClosedDayController::class, 'publicIndex']);
 Route::get('/public/best-sellers', [DressController::class, 'bestSellers']);
 Route::get('/public/system-status', function () {
     return response()->json([
@@ -237,4 +238,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     // System settings
     Route::get('/settings', [\App\Http\Controllers\Api\SettingController::class, 'index']);
     Route::put('/settings', [\App\Http\Controllers\Api\SettingController::class, 'update']);
+    Route::get('/closed-days', [\App\Http\Controllers\Api\ClosedDayController::class, 'index']);
+    Route::post('/closed-days', [\App\Http\Controllers\Api\ClosedDayController::class, 'store']);
+    Route::delete('/closed-days/{closedDay}', [\App\Http\Controllers\Api\ClosedDayController::class, 'destroy']);
 });

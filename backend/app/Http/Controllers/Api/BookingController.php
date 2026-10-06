@@ -488,6 +488,14 @@ class BookingController extends Controller
             ], 422);
         }
 
+        // Days closed by the admin do not take website visits (staff can still register one)
+        if (\App\Models\ClosedDay::isClosed($bookingDate)) {
+            return response()->json([
+                'message' => \App\Models\ClosedDay::closedMessage($bookingDate),
+                'code' => 'day_closed',
+            ], 422);
+        }
+
         if ($windowError = \App\Models\Visit::visitWindowError($bookingDate, $eventDate)) {
             return response()->json([
                 'message' => $windowError['message'],

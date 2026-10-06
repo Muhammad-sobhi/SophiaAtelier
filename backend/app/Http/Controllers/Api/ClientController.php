@@ -278,6 +278,14 @@ class ClientController extends Controller
         // A visit (dated today when only dresses are sent) may be at most 4 months before the wedding
         Visit::assertVisitWindow($validated['visit_date'] ?? ($dressIds ? now()->toDateString() : null), $validated['wedding_date'] ?? null);
 
+        // The public registration may not request a visit on a day closed by the admin
+        if ($request->is('api/public/*') && \App\Models\ClosedDay::isClosed($validated['visit_date'] ?? null)) {
+            return response()->json([
+                'message' => \App\Models\ClosedDay::closedMessage($validated['visit_date']),
+                'code' => 'day_closed',
+            ], 422);
+        }
+
         // Check visit time slot limit before creating anything
         $normalizedTimeSlot = null;
         if (!empty($validated['visit_time']) && !empty($validated['visit_date'])) {
