@@ -117,6 +117,7 @@ const mapTransaction = (row) => {
       paymentMethod: (row.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
       clientName: row.client_name,
       receiptImage: row.receipt_url,
+      billImage: row.bill_image_url,
       rawDate: row.payment_date ? row.payment_date.split('T')[0] : '',
       backendCategory: row.type,
       payments: row.payments || []
@@ -950,6 +951,20 @@ export default function FinancePage() {
                           <span>إيصال</span>
                         </button>
                       )}
+                      {t.billImage && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewReceiptUrl(t.billImage);
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-[9px] font-extrabold transition-all cursor-pointer flex-shrink-0"
+                          title="معاينة الفاتورة الإجمالية للحجز"
+                        >
+                          <FileText size={10} className="text-amber-600" />
+                          <span>فاتورة</span>
+                        </button>
+                      )}
                       <div className="min-w-0">
                         <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
                         {t.clientName && <span className="text-[10px] font-extrabold text-indigo-600 block truncate">العروس: {t.clientName}</span>}
@@ -1009,6 +1024,20 @@ export default function FinancePage() {
                             >
                               <Paperclip size={10} className="text-indigo-600" />
                               <span>إيصال</span>
+                            </button>
+                          )}
+                          {t.billImage && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewReceiptUrl(t.billImage);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-[9px] font-extrabold transition-all cursor-pointer shadow-2xs flex-shrink-0"
+                              title="معاينة الفاتورة الإجمالية للحجز"
+                            >
+                              <FileText size={10} className="text-amber-600" />
+                              <span>فاتورة</span>
                             </button>
                           )}
                           <div className="min-w-0">
@@ -1185,6 +1214,25 @@ export default function FinancePage() {
                   </div>
               }
               </div>
+              {selectedTx.billImage &&
+              <div className="space-y-2">
+                  <span className="text-xs font-extrabold text-slate-600 block">الفاتورة الإجمالية للحجز</span>
+                  <div className="border border-slate-100 rounded-3xl overflow-hidden shadow-sm max-h-[300px] flex items-center justify-center bg-slate-50 relative">
+                    <a href={selectedTx.billImage} target="_blank" rel="noreferrer" title="فتح الفاتورة بالحجم الكامل">
+                      <img
+                    src={selectedTx.billImage}
+                    alt="الفاتورة الإجمالية للحجز"
+                    className="w-full h-full object-contain max-h-[280px]" />
+                    </a>
+                    <a
+                  href={selectedTx.billImage}
+                  download={`booking-bill-${selectedTx.id}.png`}
+                  className="absolute bottom-3 right-3 bg-black/70 hover:bg-black/90 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all">
+                      <FileText size={12} /> تحميل الفاتورة
+                    </a>
+                  </div>
+                </div>
+              }
             </div>
 
             <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">

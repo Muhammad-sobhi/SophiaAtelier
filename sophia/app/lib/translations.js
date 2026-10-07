@@ -238,6 +238,73 @@ export const translations = {
       title: 'Common Questions, Beautifully Answered',
       subtitle: 'Everything you need to know about our gowns, services, and your experience.',
     },
+    // How to Book guide page
+    howToBook: {
+      breadcrumb: 'How to Book',
+      eyebrow: 'STEP-BY-STEP GUIDE',
+      title: 'How to Book Your Fitting Visit',
+      subtitle: 'From choosing your dresses to receiving your confirmation — a simple visual guide to booking your visit at Sophia Atelier.',
+      stepLabel: 'STEP',
+      optional: 'OPTIONAL',
+      tip: 'Tip',
+      viewDesktop: 'Desktop',
+      viewMobile: 'Mobile',
+      viewToggleLabel: 'Screenshots view',
+      zoomHint: 'Tap the image to enlarge',
+      close: 'Close',
+      steps: [
+        {
+          title: 'Browse the Collection',
+          desc: 'Open the Collections page and explore our bridal gowns. Use the category and collection filters to find your style faster.',
+          tip: 'Added your wedding date already? Each dress shows whether it is available on your day.',
+        },
+        {
+          title: 'Open the Dress Details',
+          desc: 'Tap any dress to open its details: photos, fabric, color, suitable weight and the fitting & trying fee.',
+        },
+        {
+          title: 'Save It to Your Wishlist',
+          optional: true,
+          desc: 'Love a dress but not sure yet? Tap “Add to Wishlist” to keep it, then move your favorites to the bag anytime.',
+        },
+        {
+          title: 'Add Dresses to Your Bag',
+          desc: 'Tap “Book a Fitting Appointment” to add the dress to your selection bag. Repeat for every dress you want to try.',
+          tip: 'You can try up to 3 dresses in one visit.',
+        },
+        {
+          title: 'Create Your Account or Sign In',
+          desc: 'When you tap the booking button for the first time, we ask for your name, mobile number and city. Already registered? Just sign in with your phone or email.',
+          tip: 'Your account lets you follow your visit and dress journey from “My Bridal Journey”.',
+        },
+        {
+          title: 'Choose Your Visit Date & Time',
+          desc: 'In the bag, pick the day you would like to visit the atelier and a time between 1:00 PM and 8:30 PM.',
+          tip: 'Closed days and fully booked times are not shown, so every option you see is available.',
+        },
+        {
+          title: 'Enter Your Wedding Date',
+          desc: 'Add your wedding / event date. We instantly check every dress in your bag for your visit day and your wedding day.',
+          tip: 'A ✓ means the dress is available. If one is booked, you can change the date or choose another dress. Visits can be booked up to 4 months before the wedding.',
+        },
+        {
+          title: 'Accept the Visit Rules & Book',
+          desc: 'Read the boutique visit rules, tick the agreement box, then tap “Book a Visit for My Dresses”.',
+          tip: 'Ladies only: up to two companions with the bride, no children, and entry is by order of arrival.',
+        },
+        {
+          title: 'Your Visit Is Booked!',
+          desc: 'You will see a confirmation message right away, and our team will send you the visit details on WhatsApp.',
+          tip: 'If you have visited us before, your request is sent for review and our team will contact you on WhatsApp to confirm it.',
+        },
+      ],
+      ctaTitle: 'Ready to Find Your Dream Dress?',
+      ctaDesc: 'Start browsing our collection and book your fitting visit in just a few minutes.',
+      ctaBtn: 'START BROWSING COLLECTIONS',
+      helpText: 'Need help?',
+      faqLink: 'Read the FAQ',
+      contactLink: 'Contact us',
+    },
   },
 
   ar: {
@@ -478,6 +545,73 @@ export const translations = {
       eyebrow: 'الأسئلة الشائعة',
       title: 'أسئلة شائعة، بإجابات واضحة',
       subtitle: 'كل ما تحتاجين معرفته عن فساتيننا، خدماتنا، وتجربتك معنا.',
+    },
+    // How to Book guide page
+    howToBook: {
+      breadcrumb: 'كيفية الحجز',
+      eyebrow: 'دليل الحجز خطوة بخطوة',
+      title: 'كيف تحجزين موعد تجربة الفساتين',
+      subtitle: 'من اختيار فساتينكِ حتى وصول رسالة التأكيد — دليل مصوّر وبسيط لحجز زيارتكِ في أتيليه صوفيا.',
+      stepLabel: 'الخطوة',
+      optional: 'اختياري',
+      tip: 'نصيحة',
+      viewDesktop: 'كمبيوتر',
+      viewMobile: 'موبايل',
+      viewToggleLabel: 'طريقة عرض الصور',
+      zoomHint: 'اضغطي على الصورة لتكبيرها',
+      close: 'إغلاق',
+      steps: [
+        {
+          title: 'تصفحي التشكيلة',
+          desc: 'افتحي صفحة التشكيلات وتصفحي فساتين الزفاف. استخدمي فلاتر القسم والتشكيلة للوصول لستايلكِ بسرعة.',
+          tip: 'لو أضفتِ تاريخ زفافكِ، سيظهر على كل فستان إن كان متاحاً يوم زفافكِ.',
+        },
+        {
+          title: 'افتحي تفاصيل الفستان',
+          desc: 'اضغطي على أي فستان لعرض تفاصيله: الصور، القماش، اللون، الوزن المناسب ورسوم التجربة والقياس.',
+        },
+        {
+          title: 'أضيفيه إلى المفضلة',
+          optional: true,
+          desc: 'أعجبكِ فستان ولم تقرري بعد؟ اضغطي «إضافة إلى المفضلة» لحفظه، ويمكنكِ نقل المفضلة إلى الحقيبة في أي وقت.',
+        },
+        {
+          title: 'أضيفي الفساتين إلى الحقيبة',
+          desc: 'اضغطي «حجز موعد تجربة الفستان» لإضافة الفستان إلى حقيبة الاختيارات، وكرري ذلك مع كل فستان تودين تجربته.',
+          tip: 'يمكنكِ تجربة 3 فساتين كحد أقصى في الزيارة الواحدة.',
+        },
+        {
+          title: 'أنشئي حسابكِ أو سجلي الدخول',
+          desc: 'عند الضغط على زر الحجز لأول مرة، سنطلب اسمكِ ورقم الموبايل والمحافظة. لديكِ حساب بالفعل؟ سجلي الدخول برقم الهاتف أو البريد.',
+          tip: 'حسابكِ يتيح لكِ متابعة زيارتكِ ورحلة فستانكِ من «رحلة حجز فستاني».',
+        },
+        {
+          title: 'اختاري تاريخ ووقت الزيارة',
+          desc: 'داخل الحقيبة، اختاري اليوم الذي تودين زيارة الأتيليه فيه ووقتاً بين 1:00 م و 8:30 م.',
+          tip: 'أيام الإجازة والمواعيد المحجوزة بالكامل لا تظهر، فكل المواعيد التي ترينها متاحة.',
+        },
+        {
+          title: 'أدخلي تاريخ زفافكِ',
+          desc: 'أضيفي تاريخ الزفاف أو المناسبة، وسنتحقق فوراً من إتاحة كل فستان في الحقيبة يوم الزيارة ويوم الزفاف.',
+          tip: 'علامة ✓ تعني أن الفستان متاح. لو كان أحدها محجوزاً يمكنكِ تغيير التاريخ أو اختيار فستان آخر. يمكن حجز الزيارة قبل الفرح بـ 4 شهور كحد أقصى.',
+        },
+        {
+          title: 'وافقي على قواعد الزيارة واحجزي',
+          desc: 'اقرئي شروط وقواعد الزيارة، ضعي علامة الموافقة، ثم اضغطي «احجزي موعد تجربة الفساتين».',
+          tip: 'للسيدات فقط: مسموح بمرافقتين مع العروسة، ممنوع اصطحاب الأطفال، والدخول بأولوية الحضور.',
+        },
+        {
+          title: 'تم حجز زيارتكِ!',
+          desc: 'ستظهر لكِ رسالة التأكيد فوراً، وسيرسل لكِ فريقنا تفاصيل الزيارة عبر واتساب.',
+          tip: 'لو سبق لكِ زيارتنا، يُرسل طلبكِ للمراجعة وسيتواصل معكِ فريقنا عبر واتساب لتأكيد الموعد.',
+        },
+      ],
+      ctaTitle: 'جاهزة لاختيار فستان أحلامكِ؟',
+      ctaDesc: 'ابدئي تصفح التشكيلة واحجزي موعد التجربة في دقائق.',
+      ctaBtn: 'ابدئي تصفح التشكيلات',
+      helpText: 'تحتاجين مساعدة؟',
+      faqLink: 'الأسئلة الشائعة',
+      contactLink: 'تواصلي معنا',
     },
   },
 };

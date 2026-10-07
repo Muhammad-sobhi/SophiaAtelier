@@ -26,15 +26,16 @@ use App\Http\Controllers\Api\FaqController;
 use Illuminate\Support\Facades\Route;
 
 // Rate-limited login route
-Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1,login')->name('login');
 
-// Public routes (rate-limited)
-Route::post('/public/register-client', [ClientController::class, 'store'])->middleware('throttle:5,1');
-Route::post('/public/find-client', [ClientController::class, 'findClient'])->middleware('throttle:10,1');
-Route::post('/public/bookings', [BookingController::class, 'publicStore'])->middleware('throttle:5,1');
-Route::post('/public/contact-messages', [\App\Http\Controllers\Api\ContactMessageController::class, 'publicStore'])->middleware('throttle:5,1');
+// Public routes (rate-limited). The third throttle argument gives each route its own
+// counter; without it every throttled guest route shares one per-IP counter.
+Route::post('/public/register-client', [ClientController::class, 'store'])->middleware('throttle:5,1,register-client');
+Route::post('/public/find-client', [ClientController::class, 'findClient'])->middleware('throttle:10,1,find-client');
+Route::post('/public/bookings', [BookingController::class, 'publicStore'])->middleware('throttle:5,1,bookings');
+Route::post('/public/contact-messages', [\App\Http\Controllers\Api\ContactMessageController::class, 'publicStore'])->middleware('throttle:5,1,contact-messages');
 Route::get('/public/fully-booked-slots', [VisitController::class, 'getFullyBookedSlots']);
-Route::post('/public/availability', [\App\Http\Controllers\Api\AvailabilityController::class, 'publicCheck'])->middleware('throttle:60,1');
+Route::post('/public/availability', [\App\Http\Controllers\Api\AvailabilityController::class, 'publicCheck'])->middleware('throttle:60,1,availability');
 Route::get('/public/reviews', [ReviewController::class, 'publicIndex']);
 Route::get('/public/categories', [CategoryController::class, 'publicIndex']);
 Route::get('/public/collections', [\App\Http\Controllers\Api\CollectionController::class, 'publicIndex']);

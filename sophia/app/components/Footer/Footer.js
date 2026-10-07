@@ -24,7 +24,7 @@ export default function Footer() {
   const pageLinks = [
     { label: t.nav.about, href: '/about' },
     { label: t.nav.contact, href: '/contact' },
-    { label: t.nav.howToBook, href: '/#appointment' },
+    { label: t.nav.howToBook, href: '/how-to-book' },
     { label: t.nav.myJourney, href: '/track' },
   ];
 

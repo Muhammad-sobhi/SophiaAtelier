@@ -16,7 +16,7 @@ export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, ca
   const navLinks = [
     { label: t.nav.home, href: '/' },
     { label: t.nav.collections, href: '/collections' },
-    { label: t.nav.howToBook, href: '/#appointment' },
+    { label: t.nav.howToBook, href: '/how-to-book' },
     { label: t.nav.about, href: '/about' },
     { label: t.nav.contact, href: '/contact' },
   ];
