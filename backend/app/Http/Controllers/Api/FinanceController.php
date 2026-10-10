@@ -97,7 +97,7 @@ class FinanceController extends Controller
 
         // Hydrate only the rows of the current page.
         $rows = collect($page->items());
-        $revenueModels = Revenue::with('booking:id,client_id,bill_image_path', 'booking.client:id,name', 'visit:id,client_id', 'visit.client:id,name')
+        $revenueModels = Revenue::with('booking:id,client_id,dress_id,dress_2_id,dress_3_id,bill_image_path', 'booking.client:id,name', 'booking.dress:id,name', 'booking.dress2:id,name', 'booking.dress3:id,name', 'visit:id,client_id', 'visit.client:id,name')
             ->whereIn('id', $rows->where('kind', 'revenue')->pluck('id'))
             ->get()->keyBy('id');
         $expenseModels = Expense::whereIn('id', $rows->where('kind', 'expense')->pluck('id'))
@@ -110,6 +110,9 @@ class FinanceController extends Controller
                 return array_merge($revenue->withoutRelations()->toArray(), [
                     'kind' => 'revenue',
                     'client_name' => $revenue->booking?->client?->name ?? $revenue->visit?->client?->name,
+                    'dress_names' => $revenue->booking
+                        ? collect([$revenue->booking->dress, $revenue->booking->dress2, $revenue->booking->dress3])->filter()->pluck('name')->values()
+                        : [],
                     // The booking's overall shop bill (covers all of its payments)
                     'bill_image_url' => $revenue->booking?->bill_image_path ? url('storage/' . $revenue->booking->bill_image_path) : null,
                 ]);

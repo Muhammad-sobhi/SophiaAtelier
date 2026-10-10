@@ -116,6 +116,7 @@ const mapTransaction = (row) => {
       isRevenue: true,
       paymentMethod: (row.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
       clientName: row.client_name,
+      dressNames: (row.dress_names || []).join('، '),
       receiptImage: row.receipt_url,
       billImage: row.bill_image_url,
       rawDate: row.payment_date ? row.payment_date.split('T')[0] : '',
@@ -968,6 +969,7 @@ export default function FinancePage() {
                       <div className="min-w-0">
                         <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{t.desc}</span>
                         {t.clientName && <span className="text-[10px] font-extrabold text-indigo-600 block truncate">العروس: {t.clientName}</span>}
+                        {t.dressNames && <span className="text-[10px] font-bold text-slate-500 block truncate">الفستان: {t.dressNames}</span>}
                       </div>
                     </div>
                     <span className={`text-xs font-extrabold whitespace-nowrap ${t.isRevenue && t.rawAmount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -1043,6 +1045,7 @@ export default function FinancePage() {
                           <div className="min-w-0">
                             <span className="truncate block">{t.desc}</span>
                             {t.clientName && <span className="text-[10px] font-extrabold text-indigo-600 block truncate">العروس: {t.clientName}</span>}
+                            {t.dressNames && <span className="text-[10px] font-bold text-slate-500 block truncate">الفستان: {t.dressNames}</span>}
                           </div>
                         </div>
                       </td>
@@ -1153,6 +1156,12 @@ export default function FinancePage() {
                   <div className="col-span-2">
                     <span className="text-[10px] font-extrabold text-slate-400 block">العروس</span>
                     <span className="text-xs font-bold text-indigo-700 mt-1 block">{selectedTx.clientName}</span>
+                  </div>
+                )}
+                {selectedTx.dressNames && (
+                  <div className="col-span-2">
+                    <span className="text-[10px] font-extrabold text-slate-400 block">الفستان</span>
+                    <span className="text-xs font-bold text-slate-700 mt-1 block">{selectedTx.dressNames}</span>
                   </div>
                 )}
                 <div>
