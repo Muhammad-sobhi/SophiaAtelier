@@ -335,6 +335,84 @@ class ReportController extends Controller
         ]);
     }
 
+    /** Bookings made in a month (by booking date), grouped per day with paid/remaining rent */
+    public function bookingsReport(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'month' => 'nullable|date_format:Y-m',
+            'certainty' => 'nullable|in:all,sure,unsure',
+        ]);
+
+        $start = Carbon::createFromFormat('Y-m', $validated['month'] ?? now()->format('Y-m'))->startOfMonth();
+        $from = $start->toDateString();
+        $to = $start->copy()->endOfMonth()->toDateString();
+        $certainty = $validated['certainty'] ?? 'all';
+
+        // Bookings without a booking_date fall back to their creation date (same as the dresses report)
+        $bookings = Booking::where('status', '!=', 'cancelled')
+            ->where(function ($q) use ($from, $to) {
+                $q->whereBetween('booking_date', [$from, $to])
+                  ->orWhere(function ($sub) use ($from, $to) {
+                      $sub->whereNull('booking_date')->whereDate('created_at', '>=', $from)->whereDate('created_at', '<=', $to);
+                  });
+            })
+            ->with([
+                'client:id,name,phone',
+                'dress:id,name,code', 'dress2:id,name,code', 'dress3:id,name,code',
+                'revenues' => fn($q) => $q->select('id', 'booking_id', 'type', 'amount')->whereIn('type', ['deposit', 'balance']),
+            ])
+            ->orderByDesc('booking_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $rows = $bookings->map(function (Booking $booking) {
+            $total = round((float) $booking->total_amount, 2);
+            $paid = round((float) $booking->revenues->sum('amount'), 2);
+
+            return [
+                'booking_id' => $booking->id,
+                'client_id' => $booking->client_id,
+                'client_name' => $booking->client?->name,
+                'client_phone' => $booking->client?->phone,
+                'dresses' => collect([$booking->dress, $booking->dress2, $booking->dress3])
+                    ->filter()->map(fn($d) => ['name' => $d->name, 'code' => $d->code])->values(),
+                'booking_date' => ($booking->booking_date ?? $booking->created_at)->format('Y-m-d'),
+                'event_date' => $booking->event_date?->format('Y-m-d'),
+                'status' => $booking->status,
+                'is_sure' => $paid > 0,
+                'total_amount' => $total,
+                'paid' => $paid,
+                'remaining' => max(0, round($total - $paid, 2)),
+            ];
+        });
+
+        $sureCount = $rows->where('is_sure', true)->count();
+        if ($certainty !== 'all') {
+            $rows = $rows->where('is_sure', $certainty === 'sure')->values();
+        }
+
+        $totals = fn($group) => [
+            'count' => $group->count(),
+            'total_amount' => round($group->sum('total_amount'), 2),
+            'paid' => round($group->sum('paid'), 2),
+            'remaining' => round($group->sum('remaining'), 2),
+        ];
+
+        $days = $rows->groupBy('booking_date')
+            ->sortKeysDesc()
+            ->map(fn($group, $date) => ['date' => $date] + $totals($group) + ['bookings' => $group->values()])
+            ->values();
+
+        return response()->json([
+            'month' => $start->format('Y-m'),
+            'summary' => $totals($rows) + [
+                'sure_count' => $sureCount,
+                'unsure_count' => $bookings->count() - $sureCount,
+            ],
+            'days' => $days,
+        ]);
+    }
+
     public function dressesReport(Request $request): JsonResponse
     {
         $fromDate = $request->filled('from_date') ? $request->input('from_date') : null;

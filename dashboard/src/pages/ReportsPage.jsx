@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Users, Sparkles, Heart, FileSpreadsheet, RefreshCw, Ban, CalendarCheck } from 'lucide-react';
+import { Users, Sparkles, Heart, FileSpreadsheet, RefreshCw, Ban, CalendarCheck, ClipboardList } from 'lucide-react';
 import { SalesEmployeesReport } from '@/components/reports/SalesEmployeesReport';
 import { DressesReport } from '@/components/reports/DressesReport';
 import { BridesLifecycleReport } from '@/components/reports/BridesLifecycleReport';
 import { CancellationsReport } from '@/components/reports/CancellationsReport';
 import { VisitsReport } from '@/components/reports/VisitsReport';
+import { BookingsReport } from '@/components/reports/BookingsReport';
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('sales'); // 'sales' | 'visits' | 'dresses' | 'brides' | 'cancellations'
+  const [activeTab, setActiveTab] = useState('sales'); // 'sales' | 'visits' | 'bookings' | 'dresses' | 'brides' | 'cancellations'
   const [refreshKey, setRefreshKey] = useState(0);
 
   const tabs = [
@@ -24,6 +25,13 @@ export default function ReportsPage() {
       description: 'قمع الزيارات والمصادر وعدم الحضور والفساتين المطلوبة والطلب الضائع',
       icon: CalendarCheck,
       badge: 'الزيارات'
+    },
+    {
+      id: 'bookings',
+      label: 'تقرير الحجوزات',
+      description: 'الحجوزات اليومية والشهرية مع العربون والمتبقي لكل حجز',
+      icon: ClipboardList,
+      badge: 'الحجوزات'
     },
     {
       id: 'dresses',
@@ -85,7 +93,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Modern Navigation Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -134,6 +142,7 @@ export default function ReportsPage() {
       <div key={`${activeTab}-${refreshKey}`} className="transition-all duration-300">
         {activeTab === 'sales' && <SalesEmployeesReport />}
         {activeTab === 'visits' && <VisitsReport />}
+        {activeTab === 'bookings' && <BookingsReport />}
         {activeTab === 'dresses' && <DressesReport />}
         {activeTab === 'brides' && <BridesLifecycleReport />}
         {activeTab === 'cancellations' && <CancellationsReport />}
