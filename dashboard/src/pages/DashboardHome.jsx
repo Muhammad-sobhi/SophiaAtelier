@@ -29,6 +29,16 @@ const STAGE_MAP = {
 };
 STAGE_MAP.archive = STAGE_MAP.completed;
 
+const mapBride = (c) => ({
+  ...c,
+  current_stage: c.current_stage || c.stage || 'visit',
+  wedding_date: (c.wedding_date || c.bookings?.[0]?.event_date) ? String(c.wedding_date || c.bookings?.[0]?.event_date).substring(0, 10) : '',
+  latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
+  latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
+  pickup_scheduled_on: c.bookings?.[0]?.pickup_scheduled_on || c.pickup_scheduled_on || '',
+  return_scheduled_on: c.bookings?.[0]?.return_scheduled_on || c.return_scheduled_on || '',
+});
+
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -75,15 +85,7 @@ export default function DashboardPage() {
     try {
       const res = await apiClient.get('/clients?per_page=1000');
       const list = Array.isArray(res) ? res : res.data || [];
-      const mapped = list.map((c) => ({
-        ...c,
-        current_stage: c.current_stage || c.stage || 'visit',
-        wedding_date: (c.wedding_date || c.bookings?.[0]?.event_date) ? String(c.wedding_date || c.bookings?.[0]?.event_date).substring(0, 10) : '',
-        latest_visit_date: (c.latest_visit_date || c.visits?.[0]?.visit_date) ? String(c.latest_visit_date || c.visits?.[0]?.visit_date).substring(0, 10) : '',
-        latest_dress_name: c.latest_dress_name || c.bookings?.[0]?.dress?.name || '',
-        pickup_scheduled_on: c.bookings?.[0]?.pickup_scheduled_on || c.pickup_scheduled_on || '',
-        return_scheduled_on: c.bookings?.[0]?.return_scheduled_on || c.return_scheduled_on || '',
-      }));
+      const mapped = list.map(mapBride);
       setBrides(mapped);
 
       // Check if URL has bride_id query parameter
@@ -126,6 +128,20 @@ export default function DashboardPage() {
 
   const openBrideModal = (bride) => {
     setActiveBrideForModal(bride);
+  };
+
+  // Calendar events carry only the client id; brides beyond the loaded list are fetched on demand
+  const openBrideById = async (clientId) => {
+    const found = brides.find((b) => b.id === clientId);
+    if (found) {
+      setActiveBrideForModal(found);
+      return;
+    }
+    try {
+      setActiveBrideForModal(mapBride(await apiClient.get(`/clients/${clientId}`)));
+    } catch (e) {
+      console.error('Failed to load bride for calendar event:', e);
+    }
   };
 
   const closeBrideModal = () => {
@@ -240,9 +256,7 @@ export default function DashboardPage() {
           <CalendarTab
             calDate={calDate}
             setCalDate={setCalDate}
-            brides={brides}
-            dresses={dresses}
-            openBrideModal={openBrideModal}
+            onOpenClient={openBrideById}
           />
         )}
       </div>

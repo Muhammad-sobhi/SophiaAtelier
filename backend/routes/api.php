@@ -100,8 +100,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/brides-summary', [DashboardController::class, 'bridesSummary']);
     Route::get('/dashboard/dresses-summary', [DashboardController::class, 'dressesSummary']);
 
-    // Calendar — merged visits + bookings
+    // Calendar — visits, bookings, fittings, pickups and returns as dated events
     Route::get('/calendar/events', [CalendarController::class, 'events']);
+    Route::get('/calendar/months', [CalendarController::class, 'months']);
 
     Route::get('/clients/export-csv', [ClientController::class, 'exportCsv']);
     Route::get('/clients/excel-template', [ClientController::class, 'excelTemplate']);
