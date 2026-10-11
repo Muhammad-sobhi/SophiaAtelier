@@ -15,7 +15,7 @@ class BookingsReportTest extends TestCase
 {
     use DatabaseTransactions;
 
-    private function makeBooking(string $bookingDate, array $payments = [], string $status = 'confirmed', ?Dress $dress2 = null): Booking
+    private function makeBooking(string $bookingDate, array $payments = [], string $status = 'confirmed', ?Dress $dress2 = null, string $eventDate = '2099-06-20'): Booking
     {
         $client = Client::create(['name' => 'Bride ' . uniqid(), 'phone' => '01000000000', 'city' => 'القاهرة']);
         $booking = Booking::create([
@@ -23,7 +23,7 @@ class BookingsReportTest extends TestCase
             'dress_id' => Dress::factory()->create()->id,
             'dress_2_id' => $dress2?->id,
             'booking_date' => $bookingDate,
-            'event_date' => '2099-06-20',
+            'event_date' => $eventDate,
             'status' => $status,
             'total_amount' => 10000,
         ]);
@@ -81,5 +81,28 @@ class BookingsReportTest extends TestCase
             ->assertJsonPath('days.0.bookings.0.is_sure', false);
 
         $this->getJson('/api/reports/bookings?month=bad')->assertStatus(422);
+    }
+
+    public function test_wedding_date_mode_groups_by_event_day_in_upcoming_order()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+
+        $this->makeBooking('2099-01-05', ['deposit' => 2000], 'confirmed', null, '2099-07-20');
+        $this->makeBooking('2099-02-10', [], 'confirmed', null, '2099-07-03');
+        $this->makeBooking('2099-02-11', ['deposit' => 5000], 'cancelled', null, '2099-07-03');
+        $this->makeBooking('2099-02-12', [], 'confirmed', null, '2099-08-01');
+
+        $res = $this->getJson('/api/reports/bookings?month=2099-07&date_by=event')->assertOk()
+            ->assertJsonPath('date_by', 'event')
+            ->assertJsonPath('summary.count', 2)
+            ->assertJsonPath('summary.sure_count', 1);
+        $this->assertSame(['2099-07-03', '2099-07-20'], array_column($res->json('days'), 'date'));
+        $this->assertSame('2099-02-10', $res->json('days.0.bookings.0.booking_date'));
+
+        // Booking-date mode remains the default
+        $this->getJson('/api/reports/bookings?month=2099-07')->assertOk()
+            ->assertJsonPath('date_by', 'booking')
+            ->assertJsonPath('summary.count', 0);
+        $this->getJson('/api/reports/bookings?month=2099-07&date_by=bad')->assertStatus(422);
     }
 }

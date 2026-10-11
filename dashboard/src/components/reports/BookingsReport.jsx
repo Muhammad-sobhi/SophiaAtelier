@@ -14,6 +14,11 @@ const CERTAINTY_FILTERS = [
   { id: 'unsure', label: 'غير مؤكد' },
 ];
 
+const DATE_BY_OPTIONS = [
+  { id: 'booking', label: 'تاريخ الحجز' },
+  { id: 'event', label: 'تاريخ الفرح' },
+];
+
 const shiftMonth = (month, offset) => {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(y, m - 1 + offset, 1);
@@ -43,12 +48,13 @@ function CertaintyBadge({ sure }) {
   );
 }
 
-// Bookings made per day in a month (by booking date), with paid / remaining rent
+// Bookings per day in a month (by booking date or wedding date), with paid / remaining rent
 export function BookingsReport() {
   const currentMonth = todayStr().slice(0, 7);
   const today = todayStr();
   const [month, setMonth] = useState(currentMonth);
   const [certainty, setCertainty] = useState('all');
+  const [dateBy, setDateBy] = useState('booking');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,7 +64,7 @@ export function BookingsReport() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get('/reports/bookings', { params: { month, certainty } });
+      const res = await apiClient.get('/reports/bookings', { params: { month, certainty, date_by: dateBy } });
       setData(res);
     } catch (err) {
       console.error('Failed to load bookings report:', err);
@@ -66,7 +72,7 @@ export function BookingsReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, certainty]);
+  }, [month, certainty, dateBy]);
 
   useEffect(() => {
     fetchReport();
@@ -107,11 +113,29 @@ export function BookingsReport() {
           </div>
           <div>
             <h3 className="text-sm font-black text-slate-800">تقرير الحجوزات</h3>
-            <p className="text-[10px] font-bold text-slate-400">الحجوزات حسب تاريخ الحجز مع المدفوع والمتبقي</p>
+            <p className="text-[10px] font-bold text-slate-400">
+              {dateBy === 'event' ? 'الأفراح المحجوزة حسب تاريخ الفرح' : 'الحجوزات حسب تاريخ الحجز'} مع المدفوع والمتبقي
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex p-1 bg-slate-100 rounded-xl" role="group" aria-label="عرض حسب">
+            {DATE_BY_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setDateBy(o.id)}
+                aria-pressed={dateBy === o.id}
+                className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  dateBy === o.id ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
             <button
               type="button"
@@ -199,7 +223,7 @@ export function BookingsReport() {
           <div className={`space-y-2.5 transition-opacity ${loading ? 'opacity-50' : ''}`}>
             {days.length === 0 ? (
               <div className="bg-white border border-slate-100 rounded-2xl py-12 text-center text-slate-400 font-bold text-xs">
-                لا توجد حجوزات في هذا الشهر
+                {dateBy === 'event' ? 'لا توجد أفراح محجوزة في هذا الشهر' : 'لا توجد حجوزات في هذا الشهر'}
               </div>
             ) : (
               days.map((day) => {

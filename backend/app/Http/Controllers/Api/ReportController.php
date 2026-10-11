@@ -335,27 +335,30 @@ class ReportController extends Controller
         ]);
     }
 
-    /** Bookings made in a month (by booking date), grouped per day with paid/remaining rent */
+    /** Bookings in a month by booking date (default) or wedding date, grouped per day with paid/remaining rent */
     public function bookingsReport(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'month' => 'nullable|date_format:Y-m',
             'certainty' => 'nullable|in:all,sure,unsure',
+            'date_by' => 'nullable|in:booking,event',
         ]);
 
         $start = Carbon::createFromFormat('Y-m', $validated['month'] ?? now()->format('Y-m'))->startOfMonth();
         $from = $start->toDateString();
         $to = $start->copy()->endOfMonth()->toDateString();
         $certainty = $validated['certainty'] ?? 'all';
+        $byEvent = ($validated['date_by'] ?? 'booking') === 'event';
 
-        // Bookings without a booking_date fall back to their creation date (same as the dresses report)
+        // By booking date, bookings without a booking_date fall back to their creation date (same as the dresses report)
         $bookings = Booking::where('status', '!=', 'cancelled')
-            ->where(function ($q) use ($from, $to) {
+            ->when($byEvent, fn($q) => $q->whereBetween('event_date', [$from, $to]))
+            ->when(!$byEvent, fn($q) => $q->where(function ($q) use ($from, $to) {
                 $q->whereBetween('booking_date', [$from, $to])
                   ->orWhere(function ($sub) use ($from, $to) {
                       $sub->whereNull('booking_date')->whereDate('created_at', '>=', $from)->whereDate('created_at', '<=', $to);
                   });
-            })
+            }))
             ->with([
                 'client:id,name,phone',
                 'dress:id,name,code', 'dress2:id,name,code', 'dress3:id,name,code',
@@ -398,13 +401,15 @@ class ReportController extends Controller
             'remaining' => round($group->sum('remaining'), 2),
         ];
 
-        $days = $rows->groupBy('booking_date')
-            ->sortKeysDesc()
+        // Booking days: latest first. Wedding days: upcoming order (earliest first).
+        $days = $rows->groupBy($byEvent ? 'event_date' : 'booking_date');
+        $days = ($byEvent ? $days->sortKeys() : $days->sortKeysDesc())
             ->map(fn($group, $date) => ['date' => $date] + $totals($group) + ['bookings' => $group->values()])
             ->values();
 
         return response()->json([
             'month' => $start->format('Y-m'),
+            'date_by' => $byEvent ? 'event' : 'booking',
             'summary' => $totals($rows) + [
                 'sure_count' => $sureCount,
                 'unsure_count' => $bookings->count() - $sureCount,
