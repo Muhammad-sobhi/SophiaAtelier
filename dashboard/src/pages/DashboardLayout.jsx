@@ -167,7 +167,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-[#dbe2ff] flex items-center justify-center p-0 md:p-6 font-sans">
-      <div className="w-full max-w-[1440px] h-dvh md:h-[92vh] min-h-0 md:min-h-[760px] bg-white rounded-none md:rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(79,70,229,0.15)] flex overflow-hidden border-none md:border md:border-white/60">
+      <div className="w-full max-w-[1440px] h-dvh md:h-[calc(100dvh-3rem)] min-h-0 bg-white rounded-none md:rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(79,70,229,0.15)] flex overflow-hidden border-none md:border md:border-white/60">
 
         {/* Desktop sidebar; on mobile the bottom tab bar + "More" page replace it */}
         <div className="hidden md:block flex-shrink-0">
