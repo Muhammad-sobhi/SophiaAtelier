@@ -8,12 +8,6 @@ import { formatDate, todayStr } from '@/lib/utils';
 
 const money = (n) => `${(Number(n) || 0).toLocaleString()} ج.م`;
 
-const CERTAINTY_FILTERS = [
-  { id: 'all', label: 'الكل' },
-  { id: 'sure', label: 'مؤكد' },
-  { id: 'unsure', label: 'غير مؤكد' },
-];
-
 const DATE_BY_OPTIONS = [
   { id: 'booking', label: 'تاريخ الحجز' },
   { id: 'event', label: 'تاريخ الفرح' },
@@ -38,22 +32,11 @@ const dayLabel = (date) => {
 const dressNames = (dresses) =>
   dresses?.length ? dresses.map((d) => (d.code ? `${d.name} (${d.code})` : d.name)).join('، ') : '—';
 
-function CertaintyBadge({ sure }) {
-  return (
-    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border whitespace-nowrap ${
-      sure ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-    }`}>
-      {sure ? 'مؤكد' : 'غير مؤكد'}
-    </span>
-  );
-}
-
 // Bookings per day in a month (by booking date or wedding date), with paid / remaining rent
 export function BookingsReport() {
   const currentMonth = todayStr().slice(0, 7);
   const today = todayStr();
   const [month, setMonth] = useState(currentMonth);
-  const [certainty, setCertainty] = useState('all');
   const [dateBy, setDateBy] = useState('booking');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +47,7 @@ export function BookingsReport() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get('/reports/bookings', { params: { month, certainty, date_by: dateBy } });
+      const res = await apiClient.get('/reports/bookings', { params: { month, date_by: dateBy } });
       setData(res);
     } catch (err) {
       console.error('Failed to load bookings report:', err);
@@ -72,7 +55,7 @@ export function BookingsReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, certainty, dateBy]);
+  }, [month, dateBy]);
 
   useEffect(() => {
     fetchReport();
@@ -91,13 +74,7 @@ export function BookingsReport() {
   const days = data?.days || [];
 
   const cards = [
-    {
-      label: 'عدد الحجوزات',
-      value: summary.count ?? 0,
-      hint: `مؤكد ${summary.sure_count ?? 0} · غير مؤكد ${summary.unsure_count ?? 0}`,
-      icon: ClipboardList,
-      tone: 'text-indigo-600 bg-indigo-50',
-    },
+    { label: 'عدد الحجوزات', value: summary.count ?? 0, icon: ClipboardList, tone: 'text-indigo-600 bg-indigo-50' },
     { label: 'إجمالي قيمة الحجوزات', value: money(summary.total_amount), icon: Wallet, tone: 'text-slate-700 bg-slate-100' },
     { label: 'إجمالي المدفوع', value: money(summary.paid), icon: Banknote, tone: 'text-emerald-600 bg-emerald-50' },
     { label: 'إجمالي المتبقي', value: money(summary.remaining), icon: Hourglass, tone: 'text-amber-600 bg-amber-50' },
@@ -105,7 +82,7 @@ export function BookingsReport() {
 
   return (
     <div className="space-y-4 animate-fade-in text-right" dir="rtl">
-      {/* Filter bar: month navigator + certainty filter */}
+      {/* Filter bar: date mode + month navigator */}
       <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-150 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-200">
@@ -166,21 +143,6 @@ export function BookingsReport() {
             </button>
           )}
 
-          <div className="flex p-1 bg-slate-100 rounded-xl">
-            {CERTAINTY_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setCertainty(f.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                  certainty === f.id ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
           <button
             type="button"
             onClick={fetchReport}
@@ -213,7 +175,6 @@ export function BookingsReport() {
                   </div>
                   <p className="text-[11px] font-bold text-slate-400">{c.label}</p>
                   <p className="text-base font-black text-slate-800 font-mono">{c.value}</p>
-                  {c.hint && <p className="text-[10px] font-bold text-slate-400 mt-0.5">{c.hint}</p>}
                 </div>
               );
             })}
@@ -268,7 +229,6 @@ export function BookingsReport() {
                                 <th className="py-2.5 px-3">قيمة الحجز</th>
                                 <th className="py-2.5 px-3">المدفوع</th>
                                 <th className="py-2.5 px-3">المتبقي</th>
-                                <th className="py-2.5 px-3 text-center">الحالة</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
@@ -284,7 +244,6 @@ export function BookingsReport() {
                                   <td className="py-2.5 px-3 font-mono">{money(b.total_amount)}</td>
                                   <td className="py-2.5 px-3 font-mono font-black text-emerald-700">{money(b.paid)}</td>
                                   <td className="py-2.5 px-3 font-mono font-black text-amber-700">{money(b.remaining)}</td>
-                                  <td className="py-2.5 px-3 text-center"><CertaintyBadge sure={b.is_sure} /></td>
                                 </tr>
                               ))}
                             </tbody>
@@ -300,7 +259,6 @@ export function BookingsReport() {
                                   <div className="font-black text-slate-800 text-sm truncate">{b.client_name || '—'}</div>
                                   <div className="text-[11px] font-bold text-slate-500 mt-0.5">👗 {dressNames(b.dresses)}</div>
                                 </div>
-                                <CertaintyBadge sure={b.is_sure} />
                               </div>
                               <div className="grid grid-cols-2 gap-1.5 text-center">
                                 <div className="bg-white border border-slate-150 rounded-xl py-1.5 px-1">

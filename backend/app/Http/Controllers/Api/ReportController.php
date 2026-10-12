@@ -340,14 +340,12 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'month' => 'nullable|date_format:Y-m',
-            'certainty' => 'nullable|in:all,sure,unsure',
             'date_by' => 'nullable|in:booking,event',
         ]);
 
         $start = Carbon::createFromFormat('Y-m', $validated['month'] ?? now()->format('Y-m'))->startOfMonth();
         $from = $start->toDateString();
         $to = $start->copy()->endOfMonth()->toDateString();
-        $certainty = $validated['certainty'] ?? 'all';
         $byEvent = ($validated['date_by'] ?? 'booking') === 'event';
 
         // By booking date, bookings without a booking_date fall back to their creation date (same as the dresses report)
@@ -382,17 +380,11 @@ class ReportController extends Controller
                 'booking_date' => ($booking->booking_date ?? $booking->created_at)->format('Y-m-d'),
                 'event_date' => $booking->event_date?->format('Y-m-d'),
                 'status' => $booking->status,
-                'is_sure' => $paid > 0,
                 'total_amount' => $total,
                 'paid' => $paid,
                 'remaining' => max(0, round($total - $paid, 2)),
             ];
         });
-
-        $sureCount = $rows->where('is_sure', true)->count();
-        if ($certainty !== 'all') {
-            $rows = $rows->where('is_sure', $certainty === 'sure')->values();
-        }
 
         $totals = fn($group) => [
             'count' => $group->count(),
@@ -410,10 +402,7 @@ class ReportController extends Controller
         return response()->json([
             'month' => $start->format('Y-m'),
             'date_by' => $byEvent ? 'event' : 'booking',
-            'summary' => $totals($rows) + [
-                'sure_count' => $sureCount,
-                'unsure_count' => $bookings->count() - $sureCount,
-            ],
+            'summary' => $totals($rows),
             'days' => $days,
         ]);
     }

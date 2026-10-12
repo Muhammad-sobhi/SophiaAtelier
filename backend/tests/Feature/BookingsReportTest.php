@@ -46,9 +46,7 @@ class BookingsReportTest extends TestCase
 
         $res = $this->getJson('/api/reports/bookings?month=2099-03')->assertOk();
 
-        $res->assertJsonPath('summary.count', 3)
-            ->assertJsonPath('summary.sure_count', 2)
-            ->assertJsonPath('summary.unsure_count', 1);
+        $res->assertJsonPath('summary.count', 3);
         $this->assertEquals(30000, $res->json('summary.total_amount'));
         $this->assertEquals(7000, $res->json('summary.paid'));
         $this->assertEquals(23000, $res->json('summary.remaining'));
@@ -60,25 +58,13 @@ class BookingsReportTest extends TestCase
         $this->assertEquals(17000, $days[1]['remaining']);
 
         $paidBooking = collect($days[1]['bookings'])->firstWhere('paid', 3000);
-        $this->assertTrue($paidBooking['is_sure']);
         $this->assertCount(2, $paidBooking['dresses']);
         $this->assertSame('2099-06-20', $paidBooking['event_date']);
     }
 
-    public function test_certainty_filter_returns_only_sure_or_unsure_bookings()
+    public function test_invalid_month_is_rejected()
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
-
-        $this->makeBooking('2099-03-05', ['deposit' => 2000]);
-        $this->makeBooking('2099-03-06');
-
-        $this->getJson('/api/reports/bookings?month=2099-03&certainty=sure')->assertOk()
-            ->assertJsonPath('summary.count', 1)
-            ->assertJsonPath('days.0.bookings.0.is_sure', true);
-
-        $this->getJson('/api/reports/bookings?month=2099-03&certainty=unsure')->assertOk()
-            ->assertJsonPath('summary.count', 1)
-            ->assertJsonPath('days.0.bookings.0.is_sure', false);
 
         $this->getJson('/api/reports/bookings?month=bad')->assertStatus(422);
     }
@@ -94,8 +80,7 @@ class BookingsReportTest extends TestCase
 
         $res = $this->getJson('/api/reports/bookings?month=2099-07&date_by=event')->assertOk()
             ->assertJsonPath('date_by', 'event')
-            ->assertJsonPath('summary.count', 2)
-            ->assertJsonPath('summary.sure_count', 1);
+            ->assertJsonPath('summary.count', 2);
         $this->assertSame(['2099-07-03', '2099-07-20'], array_column($res->json('days'), 'date'));
         $this->assertSame('2099-02-10', $res->json('days.0.bookings.0.booking_date'));
 
