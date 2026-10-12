@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Layers,
   ShieldCheck,
+  ShieldAlert,
   Factory,
   Settings,
   Image as ImageIcon } from 'lucide-react';
@@ -32,6 +33,7 @@ export const menuItems = [
 { icon: Clock, label: 'الحضور والرواتب', shortLabel: 'الحضور', path: '/dashboard/attendance' },
 { icon: BarChart3, label: 'التقارير', path: '/dashboard/reports' },
 { icon: ShieldCheck, label: 'سجل النشاطات', shortLabel: 'السجل', path: '/dashboard/logs', adminOnly: true },
+{ icon: ShieldAlert, label: 'فحص البيانات', shortLabel: 'الفحص', path: '/dashboard/data-health', adminOnly: true },
 { icon: MessageSquare, label: 'قوالب الرسائل', shortLabel: 'القوالب', path: '/dashboard/whatsapp-templates' },
 { icon: Mail, label: 'رسائل تواصل معنا', shortLabel: 'الرسائل', path: '/dashboard/contact-messages' },
 { icon: Star, label: 'آراء العملاء', shortLabel: 'الآراء', path: '/dashboard/reviews' },

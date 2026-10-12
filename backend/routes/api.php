@@ -231,6 +231,12 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/finance/withdraw', [FinanceController::class, 'withdraw']);
 
     Route::get('/activity-logs', [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
+
+    // Data health: problems that make the reports wrong, with merge / close fixes
+    Route::get('/data-health', [\App\Http\Controllers\Api\DataHealthController::class, 'index']);
+    Route::post('/data-health/merge-clients', [\App\Http\Controllers\Api\DataHealthController::class, 'mergeClients']);
+    Route::post('/data-health/close-visits', [\App\Http\Controllers\Api\DataHealthController::class, 'closeVisits']);
+    Route::get('/data-health/{check}', [\App\Http\Controllers\Api\DataHealthController::class, 'show']);
     Route::post('/manufacturing-orders/{manufacturingOrder}/approve', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'approve']);
     Route::post('/manufacturing-orders/{manufacturingOrder}/dress', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'createDress']);
     Route::post('/manufacturing-orders/{manufacturingOrder}/unapprove', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'unapprove']);

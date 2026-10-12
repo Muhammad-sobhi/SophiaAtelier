@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Revenue;
+use App\Services\DataAuditService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -51,7 +52,7 @@ class FixDuplicates extends Command
                 $client = $booking?->client;
                 $booking?->delete();
                 if ($client && $row['client_removed'] && !$client->bookings()->exists() && !$client->visits()->exists()) {
-                    $client->delete();
+                    $client->forceDelete(); // same as deleting a bride from the dashboard
                 }
             }
         });
@@ -63,13 +64,8 @@ class FixDuplicates extends Command
     /** Later copies of a booking with the same bride name, phone, wedding date and dresses */
     private function duplicateBookings(): array
     {
-        $rows = DB::table('bookings AS b')->join('clients AS c', 'c.id', '=', 'b.client_id')
-            ->where('b.status', '!=', 'cancelled')
-            ->orderBy('b.id')
-            ->get(['b.id', 'b.client_id', 'c.name', 'c.phone', 'b.event_date', 'b.dress_id', 'b.dress_2_id', 'b.dress_3_id', 'b.total_amount']);
-
         $result = [];
-        foreach ($rows->groupBy(fn($b) => implode('|', [trim($b->name), $b->phone, substr($b->event_date, 0, 10), $b->dress_id, $b->dress_2_id, $b->dress_3_id])) as $group) {
+        foreach (app(DataAuditService::class)->duplicateBookingGroups() as $group) {
             $keep = $group->first();
             foreach ($group->slice(1) as $copy) {
                 $clientRemoved = $copy->client_id !== $keep->client_id

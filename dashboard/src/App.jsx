@@ -24,6 +24,7 @@ const VisitsPage = lazy(() => import('./pages/VisitsPage'));
 const WhatsappTemplatesPage = lazy(() => import('./pages/WhatsappTemplatesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LogsPage = lazy(() => import('./pages/LogsPage'));
+const DataHealthPage = lazy(() => import('./pages/DataHealthPage'));
 const ManufacturingPage = lazy(() => import('./pages/ManufacturingPage'));
 const MorePage = lazy(() => import('./pages/MorePage'));
 const ShopGamePage = lazy(() => import('./pages/ShopGamePage'));
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="visits" element={<VisitsPage />} />
             <Route path="whatsapp-templates" element={<WhatsappTemplatesPage />} />
             <Route path="logs" element={<AdminRoute><LogsPage /></AdminRoute>} />
+            <Route path="data-health" element={<AdminRoute><DataHealthPage /></AdminRoute>} />
             <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
           </Route>
         </Routes>
