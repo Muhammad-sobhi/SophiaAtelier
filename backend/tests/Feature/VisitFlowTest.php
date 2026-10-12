@@ -316,6 +316,29 @@ class VisitFlowTest extends TestCase
         $this->assertTrue($rows[$free->id]['wedding_date']['available']);
     }
 
+    public function test_confirm_booking_keeps_booking_date_and_dates_deposit_on_it(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $dress = Dress::factory()->create();
+        $bride = Client::create(['name' => 'Late Entry', 'phone' => '01044444444', 'city' => 'القاهرة']);
+        $url = "/api/clients/{$bride->id}/stage-action";
+        $base = ['action' => 'confirm_booking', 'dress_id' => $dress->id, 'total_amount' => 9000];
+
+        // Recording an older booking: the employee sets the real booking date
+        $this->putJson($url, $base + ['event_date' => '2026-08-20', 'booking_date' => '2026-06-01', 'deposit_amount' => 2000])->assertOk();
+        $booking = $bride->bookings()->first();
+        $this->assertSame('2026-06-01', $booking->booking_date->toDateString());
+        $this->assertSame('2026-06-01', $booking->revenues()->where('type', 'deposit')->first()->payment_date->toDateString());
+
+        // Editing without a booking date keeps the original one
+        $this->putJson($url, $base + ['event_date' => '2026-08-21', 'deposit_amount' => 2000])->assertOk();
+        $this->assertSame('2026-06-01', $booking->fresh()->booking_date->toDateString());
+
+        // A booking date after the wedding is refused
+        $this->putJson($url, $base + ['event_date' => '2026-08-21', 'booking_date' => '2026-09-01'])->assertStatus(422);
+        $this->assertSame('2026-06-01', $booking->fresh()->booking_date->toDateString());
+    }
+
     public function test_booking_three_dresses_closes_the_visit(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

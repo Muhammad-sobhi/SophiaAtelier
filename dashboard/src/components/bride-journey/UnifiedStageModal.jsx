@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
-import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates, visitWindowError } from '@/lib/utils';
+import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates, visitWindowError, todayStr } from '@/lib/utils';
 import { formatVisitTime } from '@/lib/whatsapp';
 import { OPEN_VISIT_STATUSES, getLatestVisit, getVisitDresses } from './visitStatus';
 import { DressAvailability } from './DressAvailability';
@@ -181,6 +181,7 @@ export function UnifiedStageModal({
   const [bookingDress3Search, setBookingDress3Search] = useState('');
   const [bookingDress1Details, setBookingDress1Details] = useState(null);
   const [bookingDress2Details, setBookingDress2Details] = useState(null);
+  const [bookingDate, setBookingDate] = useState(cleanDate(booking?.booking_date || todayStr()));
   const [bookingEventDate, setBookingEventDate] = useState(cleanDate(booking?.event_date || bride.wedding_date || new Date().toISOString()));
 
   // Scheduled pickup & return dates (auto-calculated default based on city, fully editable)
@@ -600,8 +601,15 @@ export function UnifiedStageModal({
           ? validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
           : parseFloat(bookingDepositAmount || '0');
 
+        const effectiveEventDate = cleanDate(bookingEventDate || weddingDate);
+        if (bookingDate && effectiveEventDate && bookingDate > effectiveEventDate) {
+          toast.error('تاريخ الحجز لا يمكن أن يكون بعد تاريخ الفرح');
+          return;
+        }
+
         await apiClient.put(`/clients/${bride.id}/stage-action`, {
           action: 'confirm_booking',
+          booking_date: bookingDate || null,
           phone: phone.trim(),
           phone2: phone2.trim() || null,
           dress_id: parseInt(bookingDressId),
@@ -862,6 +870,19 @@ export function UnifiedStageModal({
                         ? 'border-rose-300 bg-rose-50/60 text-rose-900 ring-2 ring-rose-200/50'
                         : 'bg-white border-slate-200 focus:border-rose-500'
                       }`}
+                  />
+                </div>
+
+                {/* Booking date: today for a new booking, editable when recording an older one */}
+                <div className="bg-slate-50/60 p-2.5 sm:p-3 rounded-2xl border border-slate-200 space-y-1.5">
+                  <label className="text-xs font-black text-slate-800 block text-right">🗓️ تاريخ الحجز (يوم دفع العربون):</label>
+                  <input
+                    type="date"
+                    required
+                    value={cleanDate(bookingDate)}
+                    max={todayStr()}
+                    onChange={(e) => setBookingDate(cleanDate(e.target.value))}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-rose-500 text-right"
                   />
                 </div>
 

@@ -371,7 +371,6 @@ export default function BookingsPage() {
       await apiClient.put(`/bookings/${editingBooking.id}`, {
         client_id: clientId,
         dress_ids: dressIds,
-        booking_date: new Date().toISOString().split('T')[0],
         event_date: newWeddingDate,
         status: mappedStatus,
         total_amount: amountNum,

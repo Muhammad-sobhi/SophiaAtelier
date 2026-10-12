@@ -575,6 +575,7 @@ class ClientController extends Controller
             'visit_date' => 'nullable|date',
             'visit_time' => 'nullable|string|max:50',
             'event_date' => 'nullable|date',
+            'booking_date' => 'nullable|date|before_or_equal:today',
             'pickup_scheduled_on' => 'nullable|date',
             'return_scheduled_on' => 'nullable|date',
             'pickup_date' => 'nullable|date',
@@ -800,7 +801,12 @@ class ClientController extends Controller
                 $booking->dress_3_id = $dress3Id;
                 $booking->sales_name = $request->input('sales_name');
                 $booking->is_override = $forceOverride;
-                $booking->booking_date = now()->toDateString();
+                // Editing keeps the original booking date unless the employee sets one (e.g. recording an older booking)
+                $bookingDate = $request->input('booking_date') ?: ($booking->booking_date?->toDateString() ?? now()->toDateString());
+                if ($eventDate && $bookingDate > \Carbon\Carbon::parse($eventDate)->toDateString()) {
+                    return response()->json(['message' => 'تاريخ الحجز لا يمكن أن يكون بعد تاريخ الفرح'], 422);
+                }
+                $booking->booking_date = $bookingDate;
                 $booking->event_date = $eventDate;
 
                 // Handle pickup and return dates
@@ -874,7 +880,7 @@ class ClientController extends Controller
                                 'type' => 'deposit',
                                 'amount' => $pAmt,
                                 'payment_method' => $pMethod,
-                                'payment_date' => now()->toDateString(),
+                                'payment_date' => $bookingDate,
                                 'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
                                 'receipt_path' => $rowReceipt,
                             ]);
@@ -893,7 +899,7 @@ class ClientController extends Controller
                             'type' => 'deposit',
                             'amount' => $deposit,
                             'payment_method' => $request->input('payment_method', 'cash'),
-                            'payment_date' => now()->toDateString(),
+                            'payment_date' => $bookingDate,
                             'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
                             'receipt_path' => $receiptPath,
                         ]);
