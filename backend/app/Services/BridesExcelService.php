@@ -304,8 +304,21 @@ class BridesExcelService
     /** @return bool true when a new client was created */
     private function importRow(array $row): bool
     {
-        $client = Client::where('phone', $row['phone'])->first();
+        // Phones are stored normalized (+20…), so look them up the same way. Old records may share one phone
+        // (e.g. the shop's number), so a bride is matched by phone and name, never by phone alone.
+        $phone = PhoneNumberService::forStorage($row['phone']);
+        $client = Client::where('phone', $phone)->where('name', $row['name'])->first();
         $isNew = !$client;
+
+        // Re-importing the same file must not book the same dress for the same wedding twice
+        $duplicate = Booking::whereIn('client_id', Client::where('phone', $phone)->select('id'))
+            ->whereDate('event_date', $row['wedding_date'])
+            ->where('dress_id', $row['dress_id'])
+            ->where('status', '!=', 'cancelled')
+            ->exists();
+        if ($duplicate) {
+            throw new \InvalidArgumentException('هذا الحجز مسجل بالفعل لنفس العروس');
+        }
         $clientData = array_filter([
             'name' => $row['name'],
             'phone' => $row['phone'],
@@ -318,14 +331,6 @@ class BridesExcelService
         ], fn ($v) => $v !== null);
 
         if ($client) {
-            $duplicate = $client->bookings()
-                ->whereDate('event_date', $row['wedding_date'])
-                ->where('dress_id', $row['dress_id'])
-                ->where('status', '!=', 'cancelled')
-                ->exists();
-            if ($duplicate) {
-                throw new \InvalidArgumentException('هذا الحجز مسجل بالفعل لنفس العروس');
-            }
             $client->update($clientData);
         } else {
             $client = Client::create($clientData + ['journey_mode' => 'live']);
