@@ -32,49 +32,49 @@ class DataAuditService
 
         return [
             'booking_after_wedding' => ['bookings', 'booking', 'حجوزات تاريخ الحجز بعد تاريخ الفرح',
-                'افتح العروسة وعدّل "تاريخ الحجز" للتاريخ الحقيقي من تعديل الحجز.',
+                'افتح كرت العروسة وعدّل "تاريخ الحجز" للتاريخ الحقيقي من تعديل الحجز.',
                 $bookingIds(fn() => $notCancelled()->whereColumn('booking_date', '>', 'event_date'))],
-            'booking_no_date' => ['bookings', 'booking', 'حجوزات بدون تاريخ حجز', 'افتح العروسة وحدد تاريخ الحجز.',
+            'booking_no_date' => ['bookings', 'booking', 'حجوزات بدون تاريخ حجز', 'افتح كرت العروسة وحدد تاريخ الحجز.',
                 $bookingIds(fn() => $notCancelled()->whereNull('booking_date'))],
-            'booking_no_event' => ['bookings', 'booking', 'حجوزات بدون تاريخ فرح', 'افتح العروسة وحدد تاريخ الفرح.',
+            'booking_no_event' => ['bookings', 'booking', 'حجوزات بدون تاريخ فرح', 'افتح كرت العروسة وحدد تاريخ الفرح.',
                 $bookingIds(fn() => $notCancelled()->whereNull('event_date'))],
-            'booking_future_date' => ['bookings', 'booking', 'حجوزات تاريخ الحجز في المستقبل', 'افتح العروسة وصحح تاريخ الحجز.',
+            'booking_future_date' => ['bookings', 'booking', 'حجوزات تاريخ الحجز في المستقبل', 'افتح كرت العروسة وصحح تاريخ الحجز.',
                 $bookingIds(fn() => $notCancelled()->where('booking_date', '>', $today))],
             'booking_zero_total' => ['bookings', 'booking', 'حجوزات قيمتها صفر',
-                'لو حجز حقيقي: افتح العروسة واكتب قيمة الإيجار. لو مش حجز حقيقي: احذفه.',
+                'لو حجز حقيقي: افتح كرت العروسة واكتب قيمة الإيجار. لو مش حجز حقيقي: احذفه.',
                 $bookingIds(fn() => $notCancelled()->where('total_amount', '<=', 0))],
             'booking_overpaid' => ['bookings', 'booking', 'حجوزات المدفوع (عربون + باقي) أكبر من قيمة الحجز',
                 'راجع الدفعات: غالباً دفعة متسجلة مرتين أو تأمين متسجل كباقي. احذف الدفعة الغلط أو صحح قيمة الحجز.',
                 $bookingIds(fn() => $notCancelled()->joinSub($paidRent(), 'p', 'p.booking_id', '=', 'bookings.id')
                     ->whereColumn('p.paid', '>', 'bookings.total_amount'))],
             'booking_unpaid_after_pickup' => ['bookings', 'booking', 'حجوزات اتسلمت أو رجعت وعليها باقي فلوس',
-                'لو العروسة دفعت: سجل الدفعة من كارت العروسة. لو فيه خصم: صحح قيمة الحجز.',
+                'لو العروسة دفعت: سجل الدفعة من كرت العروسة. لو فيه خصم: صحح قيمة الحجز.',
                 $bookingIds(fn() => DB::table('bookings')->whereIn('status', ['picked_up', 'returned'])->where('total_amount', '>', 0)
                     ->leftJoinSub($paidRent(), 'p', 'p.booking_id', '=', 'bookings.id')
                     ->whereRaw('COALESCE(p.paid, 0) < bookings.total_amount'))],
             'booking_bad_schedule' => ['bookings', 'booking', 'حجوزات ميعاد الاستلام بعد الفرح أو الإرجاع قبل الفرح',
-                'افتح العروسة وصحح مواعيد الاستلام والإرجاع.',
+                'افتح كرت العروسة وصحح مواعيد الاستلام والإرجاع.',
                 $bookingIds(fn() => $notCancelled()->where(fn($q) => $q->whereColumn('pickup_scheduled_on', '>', 'event_date')
                     ->orWhereColumn('return_scheduled_on', '<', 'event_date')))],
             'booking_stale_open' => ['bookings', 'booking', 'حجوزات فاتت (الإرجاع المفروض عدى) ولسه معلّقة أو مؤكدة',
-                'افتح العروسة وكمّل المراحل (استلام / إرجاع) أو ألغِ الحجز.',
+                'افتح كرت العروسة وكمّل المراحل (استلام / إرجاع) أو ألغِ الحجز.',
                 $bookingIds(fn() => DB::table('bookings')->whereIn('status', ['pending', 'confirmed'])->where('return_scheduled_on', '<', $today))],
             'booking_cancelled_no_date' => ['bookings', 'booking', 'حجوزات ملغية بدون تاريخ إلغاء', 'مش بتظهر في تقرير الإلغاءات بالفترة. للمراجعة فقط.',
                 $bookingIds(fn() => DB::table('bookings')->where('status', 'cancelled')->whereNull('cancelled_at'))],
             'booking_no_client' => ['bookings', 'booking', 'حجوزات بدون عروسة (أو عروستها اتمسحت)', 'الحجز ملوش عروسة: احذفه.',
                 $bookingIds(fn() => DB::table('bookings')->whereNotIn('client_id', $aliveClients()))],
-            'booking_no_dress' => ['bookings', 'booking', 'حجوزات بدون فستان أو فستانها اتمسح', 'افتح العروسة واختار الفستان الصح.',
+            'booking_no_dress' => ['bookings', 'booking', 'حجوزات بدون فستان أو فستانها اتمسح', 'افتح كرت العروسة واختار الفستان الصح.',
                 $bookingIds(fn() => $notCancelled()->where(fn($q) => $q->whereNull('dress_id')
                     ->orWhereNotIn('dress_id', DB::table('dresses')->whereNull('deleted_at')->select('id'))))],
-            'client_many_active' => ['brides', 'client', 'عرايس عليهم أكتر من حجز شغال', 'افتح العروسة: لو حجز متكرر احذفه، لو اتلغى سجّل الإلغاء.',
+            'client_many_active' => ['brides', 'client', 'عرايس عليهم أكتر من حجز شغال', 'افتح كرت العروسة: لو حجز متكرر احذفه، لو اتلغى سجّل الإلغاء.',
                 fn() => DB::table('bookings')->whereIn('status', self::ACTIVE)->whereIn('client_id', $aliveClients())
                     ->groupBy('client_id')->havingRaw('COUNT(*) > 1')->pluck('client_id')],
             'dress_overlap' => ['bookings', 'booking', 'فستان محجوز لعروستين في نفس الفترة', 'غيّر الفستان أو المواعيد لواحدة منهم.',
                 fn() => $this->overlappingDressBookings()],
 
-            'revenue_no_date' => ['payments', 'revenue', 'دفعات بدون تاريخ دفع', 'الدفعة مش هتظهر في المالية بالتاريخ. صححها من كارت العروسة.',
+            'revenue_no_date' => ['payments', 'revenue', 'دفعات بدون تاريخ دفع', 'الدفعة مش هتظهر في المالية بالتاريخ. صححها من كرت العروسة.',
                 $ids(fn() => DB::table('revenues')->whereNull('payment_date'))],
-            'revenue_future' => ['payments', 'revenue', 'دفعات تاريخها في المستقبل', 'صحح تاريخ الدفعة من كارت العروسة.',
+            'revenue_future' => ['payments', 'revenue', 'دفعات تاريخها في المستقبل', 'صحح تاريخ الدفعة من كرت العروسة.',
                 $ids(fn() => DB::table('revenues')->where('payment_date', '>', $today))],
             'revenue_non_positive' => ['payments', 'revenue', 'دفعات واردة بقيمة صفر أو سالبة', 'احذف الدفعة لو مالهاش لازمة.',
                 $ids(fn() => DB::table('revenues')->whereIn('type', self::INCOMING)->where('amount', '<=', 0))],
@@ -94,13 +94,13 @@ class DataAuditService
                     ->on('r2.id', '!=', 'r.id'))
                     ->distinct()->orderBy('r.id')->pluck('r.id')],
 
-            'visit_no_date' => ['visits', 'visit', 'زيارات بدون تاريخ', 'افتح العروسة وحدد تاريخ الزيارة أو احذفها.',
+            'visit_no_date' => ['visits', 'visit', 'زيارات بدون تاريخ', 'افتح كرت العروسة وحدد تاريخ الزيارة أو احذفها.',
                 $ids(fn() => DB::table('visits')->whereNull('visit_date'))],
             'visit_stale_open' => ['visits', 'visit', 'زيارات عدى ميعادها ولسه مفتوحة (معلّقة/مؤكدة/وصلت)',
                 'اقفل كل زيارة: "حضرت" لو جت، "ماجتش" لو ماجتش. بتأثر على نسبة الحضور في تقرير الزيارات.',
                 fn() => DB::table('visits')->whereIn('status', ['pending', 'confirmed', 'arrived'])->where('visit_date', '<', $today)
                     ->orderBy('visit_date')->pluck('id')],
-            'visit_booked_no_booking' => ['visits', 'visit', 'زيارات حالتها "حجزت" والعروسة مالهاش حجز', 'افتح العروسة: سجّل الحجز أو غيّر حالة الزيارة.',
+            'visit_booked_no_booking' => ['visits', 'visit', 'زيارات حالتها "حجزت" والعروسة مالهاش حجز', 'افتح كرت العروسة: سجّل الحجز أو غيّر حالة الزيارة.',
                 $ids(fn() => DB::table('visits')->where('status', 'booked')->whereNotIn('client_id', DB::table('bookings')->select('client_id')))],
             'visit_no_client' => ['visits', 'visit', 'زيارات بدون عروسة (أو عروستها اتمسحت)', 'احذف الزيارة.',
                 $ids(fn() => DB::table('visits')->whereNotIn('client_id', $aliveClients()))],
@@ -110,7 +110,7 @@ class DataAuditService
                 fn() => DB::table('clients AS c')
                     ->join('clients AS c2', fn($j) => $j->on('c2.phone', '=', 'c.phone')->on('c2.id', '!=', 'c.id')->whereNull('c2.deleted_at'))
                     ->whereNull('c.deleted_at')->where('c.phone', '!=', '')->distinct()->orderBy('c.id')->pluck('c.id')],
-            'client_wedding_mismatch' => ['brides', 'client', 'عرايس تاريخ فرحهم مختلف عن تاريخ الفرح في حجزهم الشغال', 'افتح العروسة وصحح تاريخ الفرح.',
+            'client_wedding_mismatch' => ['brides', 'client', 'عرايس تاريخ فرحهم مختلف عن تاريخ الفرح في حجزهم الشغال', 'افتح كرت العروسة وصحح تاريخ الفرح.',
                 fn() => DB::table('clients')->join('bookings', 'bookings.client_id', '=', 'clients.id')
                     ->whereNull('clients.deleted_at')->whereIn('bookings.status', self::ACTIVE)->whereNotNull('clients.wedding_date')
                     ->whereRaw('DATE(clients.wedding_date) != DATE(bookings.event_date)')

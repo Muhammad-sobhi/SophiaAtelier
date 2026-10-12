@@ -86,7 +86,7 @@ function BookingTable({ rows, busy, onOpen, onDelete }) {
             <Td className="font-mono text-[10.5px] text-slate-400">{r.created}</Td>
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
-                {r.client_id && <ActionButton icon={ExternalLink} label="فتح العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
+                {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الحجز" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
             </Td>
@@ -117,7 +117,7 @@ function RevenueTable({ rows, busy, onOpen, onDelete }) {
             <Td className="whitespace-normal text-[11px] text-slate-500 min-w-[180px] max-w-[260px]">{r.notes || '—'}</Td>
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
-                {r.client_id && <ActionButton icon={ExternalLink} label="فتح العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
+                {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الدفعة" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
             </Td>
@@ -174,7 +174,7 @@ function VisitTable({ rows, busy, closable, selected, setSelected, onOpen, onClo
                     <ActionButton icon={CalendarX} label="ماجتش" tone="amber" onClick={() => onClose([r.id], 'no_show')} disabled={busy} />
                   </>
                 )}
-                {r.client_id && <ActionButton icon={ExternalLink} label="فتح العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
+                {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 {!closable && <ActionButton icon={Trash2} label="حذف الزيارة" tone="rose" onClick={() => onDelete(r)} disabled={busy} />}
               </div>
             </Td>
@@ -232,7 +232,7 @@ function DuplicateClients({ rows, busy, onOpen, onMerge, onDelete }) {
                     <Td className="font-mono text-[10.5px] text-slate-400">{c.created}</Td>
                     <Td className={STICKY}>
                       <div className="flex gap-1.5 justify-end">
-                        <ActionButton icon={ExternalLink} label="فتح" tone="indigo" onClick={() => onOpen(c.id)} disabled={busy} />
+                        <ActionButton icon={ExternalLink} label="فتح الكرت" tone="indigo" onClick={() => onOpen(c.id)} disabled={busy} />
                         {c.id !== keepId && c.bookings_count === 0 && c.visits_count === 0 && (
                           <ActionButton icon={Trash2} label="حذف (فاضي)" tone="rose" onClick={() => onDelete(c)} disabled={busy} />
                         )}
@@ -276,7 +276,7 @@ function ClientTable({ rows, busy, onOpen }) {
             <Td className="font-mono">{c.bookings_count} ({c.active_bookings} شغال)</Td>
             <Td className="font-mono">{c.visits_count}</Td>
             <Td className="font-mono text-[10.5px] text-slate-400">{c.created}</Td>
-            <Td className={STICKY}><div className="flex justify-end"><ActionButton icon={ExternalLink} label="فتح العروسة" tone="indigo" onClick={() => onOpen(c.id)} disabled={busy} /></div></Td>
+            <Td className={STICKY}><div className="flex justify-end"><ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(c.id)} disabled={busy} /></div></Td>
           </tr>
         ))}
       </tbody>
@@ -330,7 +330,7 @@ function CheckDetails({ checkKey, onChanged }) {
     try {
       setBride(await apiClient.get(`/clients/${clientId}`));
     } catch (err) {
-      toast.error(err.message || 'تعذر فتح العروسة');
+      toast.error(err.message || 'تعذر فتح كرت العروسة');
     } finally {
       setBusy(false);
     }
