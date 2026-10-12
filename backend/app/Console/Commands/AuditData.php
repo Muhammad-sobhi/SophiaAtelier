@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  */
 class AuditData extends Command
 {
-    protected $signature = 'data:audit {--limit=30 : Max ids shown per check}';
+    protected $signature = 'data:audit {--limit=30 : Max ids shown per check} {--show= : Check number to print in detail}';
     protected $description = 'Read-only check of bookings, payments, visits and brides for data that makes reports wrong';
 
     private const ACTIVE = ['pending', 'confirmed', 'picked_up'];
@@ -21,6 +21,7 @@ class AuditData extends Command
     private const REFUNDS = ['insurance_refund', 'deposit_refund'];
 
     private array $rows = [];
+    private array $found = [];
 
     public function handle(): int
     {
@@ -65,9 +66,12 @@ class AuditData extends Command
             DB::table('revenues')->join('bookings', 'bookings.id', '=', 'revenues.booking_id')
                 ->where('revenues.type', 'deposit')->whereColumn('revenues.payment_date', '<', 'bookings.booking_date')
                 ->select('revenues.id'), 'revenue');
-        $this->check('دفعات مكررة (نفس الحجز والنوع والمبلغ واليوم)',
-            DB::table('revenues')->whereNotNull('booking_id')
-                ->selectRaw('MIN(id) AS id')->groupBy('booking_id', 'type', 'amount', 'payment_date')->havingRaw('COUNT(*) > 1'), 'revenue');
+        $this->check('دفعات مكررة (نفس الحجز والنوع والمبلغ واليوم وطريقة الدفع)',
+            DB::table('revenues AS r')->join('revenues AS r2', fn($j) => $j->on('r2.booking_id', '=', 'r.booking_id')
+                ->on('r2.type', '=', 'r.type')->on('r2.amount', '=', 'r.amount')
+                ->on('r2.payment_date', '=', 'r.payment_date')->on('r2.payment_method', '=', 'r.payment_method')
+                ->on('r2.id', '!=', 'r.id'))
+                ->select('r.id')->distinct()->orderBy('r.id'), 'revenue');
 
         // ---------- Visits ----------
         $this->check('زيارات بدون تاريخ', DB::table('visits')->whereNull('visit_date'), 'visit');
@@ -79,8 +83,9 @@ class AuditData extends Command
         $this->check('زيارات بدون عروسة', DB::table('visits')->whereNotIn('client_id', DB::table('clients')->select('id')), 'visit');
 
         // ---------- Brides ----------
-        $this->check('عرايس رقم التليفون مكرر', DB::table('clients')->whereNotNull('phone')->where('phone', '!=', '')
-            ->selectRaw('MIN(id) AS id')->groupBy('phone')->havingRaw('COUNT(*) > 1'), 'client');
+        $this->check('عرايس رقم التليفون مكرر', DB::table('clients AS c')
+            ->join('clients AS c2', fn($j) => $j->on('c2.phone', '=', 'c.phone')->on('c2.id', '!=', 'c.id'))
+            ->where('c.phone', '!=', '')->select('c.id')->distinct()->orderBy('c.id'), 'client');
         $this->check('عرايس تاريخ فرحهم مختلف عن تاريخ الفرح في حجزهم الشغال',
             DB::table('clients')->join('bookings', 'bookings.client_id', '=', 'clients.id')
                 ->whereIn('bookings.status', self::ACTIVE)->whereNotNull('clients.wedding_date')
@@ -90,6 +95,10 @@ class AuditData extends Command
         $this->table(['#', 'الفحص', 'النوع', 'العدد', 'الأرقام (ids)'], $this->rows);
         $problems = collect($this->rows)->where(3, '>', 0)->count();
         $this->info($problems ? "{$problems} فحص فيهم مشاكل من " . count($this->rows) : 'كل الفحوصات سليمة');
+
+        if ($show = (int) $this->option('show')) {
+            $this->details($show);
+        }
 
         return self::SUCCESS;
     }
@@ -118,7 +127,7 @@ class AuditData extends Command
             }
         }
 
-        $this->addRow('فستان محجوز لعروستين في نفس الفترة', 'booking pairs', collect($pairs));
+        $this->addRow('فستان محجوز لعروستين في نفس الفترة', 'booking', collect($pairs)->flatMap(fn($p) => explode('+', $p))->unique()->values(), collect($pairs));
     }
 
     private function check(string $label, $query, string $entity = 'booking'): void
@@ -127,13 +136,68 @@ class AuditData extends Command
         $this->addRow($label, $entity, $ids);
     }
 
-    private function addRow(string $label, string $entity, Collection $ids): void
+    /** $display: what the summary lists when it differs from the detail ids (e.g. booking pairs) */
+    private function addRow(string $label, string $entity, Collection $ids, ?Collection $display = null): void
     {
+        $display ??= $ids;
         $limit = (int) $this->option('limit');
-        $shown = $ids->take($limit)->implode(',');
-        if ($ids->count() > $limit) {
+        $shown = $display->take($limit)->implode(',');
+        if ($display->count() > $limit) {
             $shown .= ' …';
         }
-        $this->rows[] = [count($this->rows) + 1, $label, $entity, $ids->count(), $shown ?: '—'];
+        $this->found[count($this->rows) + 1] = [$label, $entity, $ids];
+        $this->rows[] = [count($this->rows) + 1, $label, $entity, $display->count(), $shown ?: '—'];
+    }
+
+    /** Every row of one check, with the fields needed to judge and fix it */
+    private function details(int $number): void
+    {
+        if (!isset($this->found[$number])) {
+            $this->error("مفيش فحص رقم {$number}");
+            return;
+        }
+        [$label, $entity, $ids] = $this->found[$number];
+        $this->line('');
+        $this->info("#{$number} {$label} ({$ids->count()})");
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        if ($entity === 'booking') {
+            $paid = fn(array $types) => DB::table('revenues')->selectRaw('COALESCE(SUM(amount), 0)')
+                ->whereColumn('booking_id', 'b.id')->whereIn('type', $types);
+            $rows = DB::table('bookings AS b')->leftJoin('clients AS c', 'c.id', '=', 'b.client_id')
+                ->whereIn('b.id', $ids)->orderBy('b.id')
+                ->select('b.id', 'c.name', 'b.status', 'b.booking_date', 'b.event_date', 'b.pickup_scheduled_on', 'b.return_scheduled_on', 'b.total_amount')
+                ->selectSub($paid(self::RENT), 'paid_rent')
+                ->selectSub($paid(['insurance', 'security_deposit']), 'insurance')
+                ->selectRaw('DATE(b.created_at) AS created')
+                ->get();
+            $headers = ['id', 'العروسة', 'الحالة', 'الحجز', 'الفرح', 'الاستلام', 'الإرجاع', 'القيمة', 'مدفوع إيجار', 'تأمين', 'اتسجل'];
+        } elseif ($entity === 'revenue') {
+            $rows = DB::table('revenues AS r')->leftJoin('bookings AS b', 'b.id', '=', 'r.booking_id')
+                ->leftJoin('clients AS c', 'c.id', '=', 'b.client_id')
+                ->whereIn('r.id', $ids)->orderBy('r.booking_id')->orderBy('r.type')->orderBy('r.id')
+                ->selectRaw("r.id, r.booking_id, c.name, r.type, r.amount, r.payment_method, r.payment_date, DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i:%s') AS created, LEFT(r.notes, 45) AS notes")
+                ->get();
+            $headers = ['id', 'الحجز', 'العروسة', 'النوع', 'المبلغ', 'الطريقة', 'تاريخ الدفع', 'اتسجل', 'ملاحظات'];
+        } elseif ($entity === 'visit') {
+            $rows = DB::table('visits AS v')->leftJoin('clients AS c', 'c.id', '=', 'v.client_id')
+                ->whereIn('v.id', $ids)->orderBy('v.visit_date')
+                ->select('v.id', 'c.name', 'c.phone', 'v.status', 'v.visit_date', 'v.source')
+                ->selectRaw('DATE(v.created_at) AS created')
+                ->get();
+            $headers = ['id', 'العروسة', 'التليفون', 'الحالة', 'الزيارة', 'المصدر', 'اتسجلت'];
+        } else {
+            $rows = DB::table('clients AS c')->whereIn('c.id', $ids)->orderBy('c.phone')->orderBy('c.id')
+                ->select('c.id', 'c.name', 'c.phone', 'c.wedding_date')
+                ->selectSub(DB::table('bookings')->selectRaw('COUNT(*)')->whereColumn('client_id', 'c.id'), 'bookings')
+                ->selectSub(DB::table('visits')->selectRaw('COUNT(*)')->whereColumn('client_id', 'c.id'), 'visits')
+                ->selectRaw('DATE(c.created_at) AS created')
+                ->get();
+            $headers = ['id', 'الاسم', 'التليفون', 'الفرح', 'حجوزات', 'زيارات', 'اتسجلت'];
+        }
+
+        $this->table($headers, $rows->map(fn($r) => (array) $r)->all());
     }
 }
