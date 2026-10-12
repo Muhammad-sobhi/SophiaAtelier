@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
+import { SalesCombobox } from '@/components/common/SalesCombobox';
 import {
   Ruler,
   Scissors,
@@ -150,7 +151,7 @@ export default function FittingsPage() {
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newTime, setNewTime] = useState('05:00 م');
   const [newType, setNewType] = useState('بروفة أولى');
-  const [newSalesperson, setNewSalesperson] = useState('منة سامي');
+  const [newSalesperson, setNewSalesperson] = useState('');
   const [newTailorId, setNewTailorId] = useState('');
   const [newSalesNotes, setNewSalesNotes] = useState('');
   const [modalTab, setModalTab] = useState('measurements');
@@ -982,16 +983,13 @@ export default function FittingsPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">السيلز المسؤولة</label>
-                  <input
-                  type="text"
-                  required
+                <SalesCombobox
                   value={newSalesperson}
-                  onChange={(e) => setNewSalesperson(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
-                </div>
+                  onChange={setNewSalesperson}
+                  employees={employeesList}
+                  label="السيلز المسؤولة"
+                  required
+                />
 
                 <div className="space-y-1">
                   <label className="text-xs font-extrabold text-slate-600">ملاحظات مسؤولة المبيعات</label>

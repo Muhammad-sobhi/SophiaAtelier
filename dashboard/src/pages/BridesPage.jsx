@@ -13,6 +13,7 @@ import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates, isCairoCity, todayStr, visitWindowError } from '@/lib/utils';
 import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
 import { PhoneWarning } from '@/components/ui/PhoneWarning';
+import { SalesCombobox } from '@/components/common/SalesCombobox';
 
 export { calculateScheduledDates };
 
@@ -1200,18 +1201,11 @@ export default function BridesPage() {
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
-                <div>
-                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
-                    اسم مسؤولة المبيعات (Sales)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.sales_name}
-                    onChange={(e) => setFormData({ ...formData, sales_name: e.target.value })}
-                    placeholder="مثال: ياسمين..."
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  />
-                </div>
+                <SalesCombobox
+                  value={formData.sales_name}
+                  onChange={(val) => setFormData({ ...formData, sales_name: val })}
+                  label="اسم مسؤولة المبيعات (Sales)"
+                />
               </div>
 
               {/* Scheduled Pickup and Return Dates (Auto calculated from Wedding Date, but Editable) */}

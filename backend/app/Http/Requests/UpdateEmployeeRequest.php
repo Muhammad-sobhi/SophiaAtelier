@@ -30,6 +30,8 @@ class UpdateEmployeeRequest extends FormRequest
             'id_image_back' => 'nullable|string',
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|max:100',
+            'sales_aliases' => 'nullable|array|max:20',
+            'sales_aliases.*' => 'string|max:255',
         ];
     }
 }

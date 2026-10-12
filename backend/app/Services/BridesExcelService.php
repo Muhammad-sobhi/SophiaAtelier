@@ -81,6 +81,8 @@ class BridesExcelService
     /** Name prefix of the sample row: shows staff how to fill each column, skipped on import */
     private const EXAMPLE_PREFIX = 'مثال';
 
+    private ?SalesNameResolver $salesNames = null;
+
     /** Sample row written under the headers (dates are relative so the example never looks stale) */
     private function exampleRow(): array
     {
@@ -255,6 +257,11 @@ class BridesExcelService
             'source' => $this->fromList($text('source'), self::SOURCES, 'المصدر') ?? 'walkin',
             'status' => $this->fromList($text('status'), self::STATUSES, 'حالة الحجز') ?? 'confirmed',
         ];
+        if ($row['sales_name']) {
+            // Sales names must match an employee (or one of their other spellings) so reports don't split one person in two
+            $row['sales_name'] = ($this->salesNames ??= new SalesNameResolver())->resolve($row['sales_name'])
+                ?? throw new \InvalidArgumentException("اسم السيلز \"{$row['sales_name']}\" غير مسجل في الموظفين — أضيفيه كاسم بديل للموظفة في صفحة الموظفين");
+        }
         if (!$row['name']) throw new \InvalidArgumentException('اسم العروس مطلوب');
         if (!$row['phone']) throw new \InvalidArgumentException('رقم الهاتف مطلوب');
 

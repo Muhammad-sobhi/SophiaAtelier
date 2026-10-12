@@ -12,7 +12,7 @@ class Employee extends Model
 
     protected $fillable = [
         'name', 'phone', 'email', 'role', 'daily_rate', 'pay_cycle', 'pay_cycle_days',
-        'hire_date', 'notes', 'password', 'address', 'id_number', 'id_image', 'id_image_back', 'permissions'
+        'hire_date', 'notes', 'password', 'address', 'id_number', 'id_image', 'id_image_back', 'permissions', 'sales_aliases'
     ];
 
     protected $hidden = ['password', 'id_number', 'id_image', 'id_image_back'];
@@ -24,6 +24,7 @@ class Employee extends Model
             'daily_rate' => 'decimal:2',
             'hire_date' => 'date',
             'permissions' => 'array',
+            'sales_aliases' => 'array',
         ];
     }
 

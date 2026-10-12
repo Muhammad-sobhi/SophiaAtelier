@@ -36,9 +36,15 @@ class ReportController extends Controller
      * Only the columns the report uses are loaded, and client accessors are disabled,
      * so the whole report is a handful of queries instead of several per row.
      */
-    public function salesEmployees(): JsonResponse
+    public function salesEmployees(\App\Services\SalesNameResolver $sales): JsonResponse
     {
         $noAppends = fn($client) => $client?->setAppends([]);
+        // Old rows may spell a sales name differently (e.g. Arabic vs English); report them under the employee name
+        $normalize = function ($model, array $columns) use ($sales) {
+            foreach ($columns as $column) {
+                $model?->setAttribute($column, $sales->normalize($model->getAttribute($column)));
+            }
+        };
 
         $bookings = Booking::whereHas('client')
             ->select('id', 'client_id', 'dress_id', 'status', 'sales_name', 'pickup_sales_name', 'return_sales_name',
@@ -46,9 +52,10 @@ class ReportController extends Controller
             ->with(['client:id,name,phone,city', 'dress:id,name,code'])
             ->latest()
             ->get()
-            ->each(function (Booking $booking) use ($noAppends) {
+            ->each(function (Booking $booking) use ($noAppends, $normalize) {
                 $booking->setAppends([]);
                 $noAppends($booking->client);
+                $normalize($booking, ['sales_name', 'pickup_sales_name', 'return_sales_name']);
             });
 
         $fittings = Fitting::select('id', 'booking_id', 'status', 'sales_name', 'sales_associate', 'fitting_date',
@@ -56,9 +63,11 @@ class ReportController extends Controller
             ->with(['booking:id,client_id,dress_id,sales_name', 'booking.client:id,name', 'booking.dress:id,name'])
             ->latest('fitting_date')
             ->get()
-            ->each(function (Fitting $fitting) use ($noAppends) {
+            ->each(function (Fitting $fitting) use ($noAppends, $normalize) {
                 $fitting->booking?->setAppends([]);
                 $noAppends($fitting->booking?->client);
+                $normalize($fitting, ['sales_name', 'sales_associate']);
+                $normalize($fitting->booking, ['sales_name']);
             });
 
         $visits = Visit::whereHas('client')
@@ -66,7 +75,10 @@ class ReportController extends Controller
             ->with('client:id,name,phone')
             ->latest('visit_date')
             ->get()
-            ->each(fn(Visit $visit) => $noAppends($visit->client));
+            ->each(function (Visit $visit) use ($noAppends, $normalize) {
+                $noAppends($visit->client);
+                $normalize($visit, ['sales_name']);
+            });
 
         return response()->json([
             'bookings' => $bookings,

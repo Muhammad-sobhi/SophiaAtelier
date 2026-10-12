@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { PhoneWarning } from '@/components/ui/PhoneWarning';
+import { SalesCombobox } from '@/components/common/SalesCombobox';
 
 export const getDressConflict = (dress, targetDate, currentClientId = null, targetCity = 'القاهرة') => {
   if (!dress || !targetDate) return null;
@@ -803,33 +804,12 @@ export function UnifiedStageModal({
                 <span>مسؤول المبيعات / السيلز (Sales Person)</span>
                 <span className="text-[8.5px] font-normal text-amber-700">(اختياري)</span>
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <select
-                  value={employeesList.some(e => e.name === currentSalesValue) ? currentSalesValue : (currentSalesValue ? '__custom__' : '')}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val !== '__custom__') {
-                      setCurrentSalesValue(val);
-                    }
-                  }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
-                >
-                  <option value="">-- اختر موظف المبيعات --</option>
-                  {employeesList.map((emp) => (
-                    <option key={emp.id} value={emp.name}>{emp.name} {emp.role ? `(${emp.role})` : ''}</option>
-                  ))}
-                  <option value="__custom__">✍️ كتابة اسم آخر...</option>
-                </select>
-                {(!employeesList.some(e => e.name === currentSalesValue) || currentSalesValue === '') && (
-                  <input
-                    type="text"
-                    placeholder="أو اكتب اسم السيلز..."
-                    value={currentSalesValue}
-                    onChange={(e) => setCurrentSalesValue(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none text-right"
-                  />
-                )}
-              </div>
+              <SalesCombobox
+                value={currentSalesValue}
+                onChange={setCurrentSalesValue}
+                employees={employeesList}
+                label={null}
+              />
             </div>
 
             {/* STAGE: BOOKING (Screenshot 1 Style) */}

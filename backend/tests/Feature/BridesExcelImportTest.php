@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Dress;
+use App\Models\Employee;
 use App\Services\BridesExcelService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -49,5 +50,23 @@ class BridesExcelImportTest extends TestCase
         $clients = Client::where('phone', '+201034046999')->orderBy('id')->pluck('name')->all();
         $this->assertSame(['Bride One', 'Bride Two'], $clients, 'brides sharing a phone stay separate and keep their names');
         $this->assertSame(2, Booking::whereIn('dress_id', [$d1->id, $d2->id])->count());
+    }
+
+    public function test_sales_name_is_saved_as_the_employee_name_and_unknown_names_are_rejected()
+    {
+        Employee::create(['name' => 'zz-mona', 'sales_aliases' => ['زز منى']]);
+        Dress::factory()->create(['code' => 'IMP-S1']);
+        Dress::factory()->create(['code' => 'IMP-S2']);
+        $row = ['status' => 'تم الإرجاع', 'total_amount' => 10000, 'deposit_amount' => 2000, 'booking_date' => '01/05/2026', 'wedding_date' => '10/06/2026'];
+        $path = $this->file([
+            $row + ['name' => 'Sales Bride', 'phone' => '01034047001', 'dress_code' => 'IMP-S1', 'sales_name' => 'زز منى'],
+            $row + ['name' => 'Ghost Bride', 'phone' => '01034047002', 'dress_code' => 'IMP-S2', 'sales_name' => 'zz-ghost'],
+        ]);
+
+        $result = app(BridesExcelService::class)->import($path);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertStringContainsString('zz-ghost', json_encode($result['skipped'], JSON_UNESCAPED_UNICODE));
+        $this->assertSame('zz-mona', Client::where('name', 'Sales Bride')->first()->bookings()->first()->sales_name);
     }
 }

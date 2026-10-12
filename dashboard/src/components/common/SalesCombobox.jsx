@@ -1,111 +1,100 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, ChevronDown, Check, Plus, X } from 'lucide-react';
+import { User, ChevronDown, Check, X } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
+// Searchable employee picker. Only names from /employees can be chosen,
+// so sales names stay identical to the employees page (no free-text variants).
 export function SalesCombobox({
   value = '',
   onChange,
   label = 'مسؤول المبيعات (السيلز)',
-  placeholder = 'اختر من القائمة أو اكتب اسماً يدوياً...',
+  placeholder = 'ابحث واختر موظف المبيعات...',
   disabled = false,
   required = false,
   className = '',
+  employees: propEmployees,
 }) {
-  const [employees, setEmployees] = useState([]);
+  const [fetchedEmployees, setFetchedEmployees] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value || '');
+  const [query, setQuery] = useState('');
   const containerRef = useRef(null);
+  const employees = propEmployees || fetchedEmployees;
 
   useEffect(() => {
-    setInputValue(value || '');
-  }, [value]);
-
-  useEffect(() => {
+    if (propEmployees) return;
     let isMounted = true;
     apiClient.get('/employees')
       .then((res) => {
         if (!isMounted) return;
-        const list = Array.isArray(res) ? res : res?.data || [];
-        setEmployees(list);
+        setFetchedEmployees(Array.isArray(res) ? res : res?.data || []);
       })
       .catch((err) => {
         console.warn('Could not load employees for sales combobox:', err);
       });
     return () => { isMounted = false; };
-  }, []);
+  }, [propEmployees]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false);
+        setQuery('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleInputChange = (e) => {
-    const newVal = e.target.value;
-    setInputValue(newVal);
-    onChange?.(newVal);
-    if (!isOpen) setIsOpen(true);
-  };
-
   const handleSelectOption = (name) => {
-    setInputValue(name);
     onChange?.(name);
     setIsOpen(false);
+    setQuery('');
   };
 
   const handleClear = (e) => {
     e.stopPropagation();
-    setInputValue('');
     onChange?.('');
+    setQuery('');
   };
 
-  // Filtered list based on current input
   const filteredEmployees = employees.filter((emp) => {
-    if (!inputValue.trim()) return true;
-    const q = inputValue.toLowerCase().trim();
+    if (!query.trim()) return true;
+    const q = query.toLowerCase().trim();
     return (
       (emp.name || '').toLowerCase().includes(q) ||
       (emp.role || emp.position || '').toLowerCase().includes(q)
     );
   });
 
-  const isCustomValue = inputValue.trim() && !employees.some(e => e.name?.trim() === inputValue.trim());
+  // Old records may hold a name that is not an employee; show it but flag it.
+  const isLegacyValue = value?.trim() && employees.length > 0 && !employees.some(e => e.name?.trim() === value.trim());
 
   return (
     <div className={`space-y-1 text-right relative ${className}`} dir="rtl" ref={containerRef}>
       {label && (
-        <label className="text-[11px] font-extrabold text-slate-700 flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <User size={13} className="text-indigo-500" />
-            <span>{label}</span>
-            {required && <span className="text-rose-500">*</span>}
-          </span>
-          <span className="text-[9.5px] font-bold text-slate-400">
-            (اختر أو اكتب يدوياً)
-          </span>
+        <label className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1.5">
+          <User size={13} className="text-indigo-500" />
+          <span>{label}</span>
+          {required && <span className="text-rose-500">*</span>}
         </label>
       )}
 
       <div className="relative">
         <input
           type="text"
-          value={inputValue}
-          onChange={handleInputChange}
+          value={isOpen ? query : (value || '')}
+          onChange={(e) => { setQuery(e.target.value); if (!isOpen) setIsOpen(true); }}
           onFocus={() => setIsOpen(true)}
-          placeholder={placeholder}
+          placeholder={isOpen && value ? value : placeholder}
           disabled={disabled}
-          required={required}
-          className="w-full pr-8 pl-8 py-2 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400 placeholder:font-normal"
+          required={required && !value}
+          className={`w-full pr-8 pl-8 py-2 bg-slate-50 border hover:border-slate-300 focus:border-indigo-500 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400 placeholder:font-normal ${isLegacyValue ? 'border-amber-300' : 'border-slate-200'}`}
         />
 
         <User size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
 
         <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {inputValue && !disabled && (
+          {value && !disabled && (
             <button
               type="button"
               onClick={handleClear}
@@ -126,27 +115,15 @@ export function SalesCombobox({
         </div>
       </div>
 
-      {/* Dropdown Menu */}
+      {isLegacyValue && !isOpen && (
+        <p className="text-[9.5px] font-bold text-amber-600">اسم غير مسجل في الموظفين، اختر الموظف الصحيح من القائمة</p>
+      )}
+
       {isOpen && (
         <div className="absolute top-full mt-1.5 right-0 left-0 bg-white rounded-2xl border border-slate-200 shadow-xl z-[999] py-1.5 max-h-56 overflow-y-auto scrollbar-thin animate-in fade-in zoom-in-95 duration-100">
-          {/* Custom option prompt if user typed something not in list */}
-          {isCustomValue && (
-            <div
-              onClick={() => handleSelectOption(inputValue.trim())}
-              className="px-3 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 flex items-center justify-between cursor-pointer border-b border-slate-100"
-            >
-              <span className="flex items-center gap-2 truncate">
-                <Plus size={13} />
-                <span>إضافة كاسم يدوي: <b>"{inputValue.trim()}"</b></span>
-              </span>
-              <span className="text-[10px] bg-indigo-100/80 px-1.5 py-0.5 rounded text-indigo-700">يدوي</span>
-            </div>
-          )}
-
-          {/* Employee list */}
           {filteredEmployees.length > 0 ? (
             filteredEmployees.map((emp) => {
-              const isSelected = inputValue.trim() === emp.name?.trim();
+              const isSelected = value?.trim() === emp.name?.trim();
               return (
                 <div
                   key={emp.id}
@@ -171,11 +148,9 @@ export function SalesCombobox({
               );
             })
           ) : (
-            !isCustomValue && (
-              <div className="px-3 py-4 text-center text-xs text-slate-400 font-bold">
-                لا يوجد موظفين مسجلين
-              </div>
-            )
+            <div className="px-3 py-4 text-center text-xs text-slate-400 font-bold">
+              {employees.length ? 'لا يوجد موظف بهذا الاسم' : 'لا يوجد موظفين مسجلين'}
+            </div>
           )}
         </div>
       )}

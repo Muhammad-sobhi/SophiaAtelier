@@ -43,6 +43,7 @@ export default function EmployeesPage() {
   // Form fields
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [salesAliases, setSalesAliases] = useState('');
   const [phone, setPhone] = useState('');
   const [dailyRate, setDailyRate] = useState('');
   const [hireDate, setHireDate] = useState('');
@@ -86,6 +87,7 @@ export default function EmployeesPage() {
         id: emp.id,
         name: emp.name || '',
         role: emp.role || emp.position || 'موظف',
+        salesAliases: emp.sales_aliases || [],
         phone: emp.phone || '',
         dailyRate: parseFloat(emp.daily_rate) || 0,
         hireDate: emp.hire_date ? String(emp.hire_date).slice(0, 10) : '',
@@ -130,6 +132,7 @@ export default function EmployeesPage() {
     setEditingEmployee(emp);
     setName(emp.name);
     setRole(emp.role || '');
+    setSalesAliases((emp.salesAliases || []).join('، '));
     setPhone(emp.phone);
     setDailyRate(emp.dailyRate ? String(emp.dailyRate) : '');
     setHireDate(emp.hireDate || '');
@@ -149,6 +152,7 @@ export default function EmployeesPage() {
     setEditingEmployee(null);
     setName('');
     setRole('');
+    setSalesAliases('');
     setPhone('');
     setDailyRate('');
     setHireDate('');
@@ -179,6 +183,8 @@ export default function EmployeesPage() {
     const payload = {
       name,
       role: role || 'موظف',
+      // Comma-separated other spellings of the name (Arabic/English) used to merge old sales records
+      sales_aliases: [...new Set(salesAliases.split(/[,،\n]/).map((a) => a.trim()).filter(Boolean))],
       phone,
       daily_rate: parseFloat(dailyRate) || 0,
       hire_date: hireDate || null,
@@ -424,6 +430,17 @@ export default function EmployeesPage() {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
                 
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-slate-600">أسماء أخرى للموظف في السجلات (اختياري)</label>
+                <input
+                type="text"
+                placeholder="مثال: لمياء، Lamia"
+                value={salesAliases}
+                onChange={(e) => setSalesAliases(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                <p className="text-[10px] text-slate-400 font-bold">افصل بينها بفاصلة. أي حجز أو زيارة مسجلة بأحد هذه الأسماء تظهر في التقارير باسم الموظف.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
