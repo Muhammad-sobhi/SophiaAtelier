@@ -48,6 +48,9 @@ class FixDuplicatesCommandTest extends TestCase
         $this->assertSame(5, Booking::whereIn('id', [$original->id, $copy->id, $otherBride->id, $single->id, $double->id])->count());
         $this->assertSame(5, Revenue::where('type', 'insurance_refund')->whereIn('booking_id', [$single->id, $double->id])->count());
 
+        $this->artisan('data:fix-duplicates', ['--apply' => true, '--except' => (string) $copy->id])->assertSuccessful();
+        $this->assertNotNull($copy->fresh(), 'an excepted booking is left alone');
+
         $this->artisan('data:fix-duplicates', ['--apply' => true])->assertSuccessful();
 
         $this->assertNotNull($original->fresh());

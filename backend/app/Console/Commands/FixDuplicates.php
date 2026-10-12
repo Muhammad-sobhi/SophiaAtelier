@@ -16,14 +16,15 @@ use Illuminate\Support\Facades\DB;
  */
 class FixDuplicates extends Command
 {
-    protected $signature = 'data:fix-duplicates {--apply : Delete the duplicates (default is a dry run)}';
+    protected $signature = 'data:fix-duplicates {--apply : Delete the duplicates (default is a dry run)} {--except= : Comma-separated booking ids to leave for a manual look}';
     protected $description = 'Remove bookings imported twice and insurance refunds saved twice (dry run unless --apply)';
 
     public function handle(): int
     {
         $apply = (bool) $this->option('apply');
 
-        $bookings = $this->duplicateBookings();
+        $except = array_filter(array_map('intval', explode(',', (string) $this->option('except'))));
+        $bookings = array_values(array_filter($this->duplicateBookings(), fn($r) => !in_array($r['remove'], $except, true)));
         $refunds = $this->extraRefunds();
 
         if ($bookings) {
