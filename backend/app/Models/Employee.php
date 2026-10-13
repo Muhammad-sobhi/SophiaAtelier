@@ -11,7 +11,7 @@ class Employee extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'phone', 'email', 'role', 'daily_rate', 'pay_cycle', 'pay_cycle_days',
+        'name', 'phone', 'email', 'role', 'daily_rate', 'pay_type', 'piece_rate', 'attendance_deductions', 'pay_cycle', 'pay_cycle_days',
         'hire_date', 'notes', 'password', 'address', 'id_number', 'id_image', 'id_image_back', 'permissions', 'sales_aliases'
     ];
 
@@ -22,6 +22,8 @@ class Employee extends Model
         return [
             'password' => 'hashed',
             'daily_rate' => 'decimal:2',
+            'piece_rate' => 'decimal:2',
+            'attendance_deductions' => 'boolean',
             'hire_date' => 'date',
             'permissions' => 'array',
             'sales_aliases' => 'array',
@@ -41,6 +43,11 @@ class Employee extends Model
     public function loans(): HasMany
     {
         return $this->hasMany(EmployeeLoan::class);
+    }
+
+    public function pieceEntries(): HasMany
+    {
+        return $this->hasMany(EmployeePieceEntry::class);
     }
 
     protected static function booted()

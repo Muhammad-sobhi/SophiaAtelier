@@ -4,7 +4,7 @@ import { Plus, Phone, DollarSign, Mail, Lock, MapPin, CreditCard, Image, X, Tras
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { PERMISSION_PAGES, PERMISSION_ACTIONS } from '@/lib/nav-items';
-import { cycleDays, cycleLabel, formatMoney, MONTH_DAYS } from '@/lib/payroll';
+import { cycleDays, cycleLabel, formatMoney, MONTH_DAYS, PAY_TYPES } from '@/lib/payroll';
 
 const permissionLabel = (key) =>
 PERMISSION_PAGES.find((p) => p.path === key)?.label || PERMISSION_ACTIONS.find((a) => a.key === key)?.label || key;
@@ -46,6 +46,9 @@ export default function EmployeesPage() {
   const [salesAliases, setSalesAliases] = useState('');
   const [phone, setPhone] = useState('');
   const [dailyRate, setDailyRate] = useState('');
+  const [payType, setPayType] = useState('daily');
+  const [pieceRate, setPieceRate] = useState('');
+  const [attendanceDeductions, setAttendanceDeductions] = useState(true);
   const [hireDate, setHireDate] = useState('');
   const [payCycle, setPayCycle] = useState('monthly');
   const [payCycleDays, setPayCycleDays] = useState('');
@@ -90,6 +93,9 @@ export default function EmployeesPage() {
         salesAliases: emp.sales_aliases || [],
         phone: emp.phone || '',
         dailyRate: parseFloat(emp.daily_rate) || 0,
+        payType: emp.pay_type || 'daily',
+        pieceRate: parseFloat(emp.piece_rate) || 0,
+        attendanceDeductions: emp.attendance_deductions ?? true,
         hireDate: emp.hire_date ? String(emp.hire_date).slice(0, 10) : '',
         payCycle: emp.pay_cycle || 'monthly',
         payCycleDays: emp.pay_cycle_days || '',
@@ -135,6 +141,9 @@ export default function EmployeesPage() {
     setSalesAliases((emp.salesAliases || []).join('، '));
     setPhone(emp.phone);
     setDailyRate(emp.dailyRate ? String(emp.dailyRate) : '');
+    setPayType(emp.payType || 'daily');
+    setPieceRate(emp.pieceRate ? String(emp.pieceRate) : '');
+    setAttendanceDeductions(emp.attendanceDeductions ?? true);
     setHireDate(emp.hireDate || '');
     setPayCycle(emp.payCycle || 'monthly');
     setPayCycleDays(emp.payCycleDays || '');
@@ -155,6 +164,9 @@ export default function EmployeesPage() {
     setSalesAliases('');
     setPhone('');
     setDailyRate('');
+    setPayType('daily');
+    setPieceRate('');
+    setAttendanceDeductions(true);
     setHireDate('');
     setPayCycle('monthly');
     setPayCycleDays('');
@@ -186,7 +198,10 @@ export default function EmployeesPage() {
       // Comma-separated other spellings of the name (Arabic/English) used to merge old sales records
       sales_aliases: [...new Set(salesAliases.split(/[,،\n]/).map((a) => a.trim()).filter(Boolean))],
       phone,
-      daily_rate: parseFloat(dailyRate) || 0,
+      daily_rate: payType === 'per_piece' ? 0 : parseFloat(dailyRate) || 0,
+      pay_type: payType,
+      piece_rate: payType === 'daily' ? 0 : parseFloat(pieceRate) || 0,
+      attendance_deductions: attendanceDeductions,
       hire_date: hireDate || null,
       pay_cycle: payCycle,
       pay_cycle_days: payCycle === 'custom' ? parseInt(payCycleDays) || null : null,
@@ -340,11 +355,20 @@ export default function EmployeesPage() {
                   <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2 space-y-0.5">
                     <div className="flex items-center gap-2 text-xs text-emerald-700 font-extrabold">
                       <DollarSign size={13} className="text-emerald-500" />
-                      <span>الراتب {cycleLabel(emp.payCycle, emp.payCycleDays)}: {formatMoney(emp.dailyRate * cycleDays(emp.payCycle, emp.payCycleDays))}</span>
+                      {emp.payType === 'per_piece' ?
+                    <span>بالقطعة: {formatMoney(emp.pieceRate)} للقطعة ({cycleLabel(emp.payCycle, emp.payCycleDays)})</span> :
+                    <span>الراتب {cycleLabel(emp.payCycle, emp.payCycleDays)}: {formatMoney(emp.dailyRate * cycleDays(emp.payCycle, emp.payCycleDays))}</span>
+                    }
                     </div>
-                    <p className="text-[9px] text-slate-500 font-bold pr-5">
-                      الأجر اليومي {formatMoney(emp.dailyRate)} × {cycleDays(emp.payCycle, emp.payCycleDays)} يوم
-                    </p>
+                    {emp.payType !== 'per_piece' &&
+                  <p className="text-[9px] text-slate-500 font-bold pr-5">
+                        الأجر اليومي {formatMoney(emp.dailyRate)} × {cycleDays(emp.payCycle, emp.payCycleDays)} يوم
+                        {emp.payType === 'both' && ` + القطعة ${formatMoney(emp.pieceRate)}`}
+                      </p>
+                  }
+                    {!emp.attendanceDeductions &&
+                  <p className="text-[9px] text-amber-600 font-bold pr-5">بدون خصم غياب أو ساعات</p>
+                  }
                   </div>
                 </div>
 
@@ -456,19 +480,59 @@ export default function EmployeesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-600">الأجر اليومي (ج.م)</label>
-                  <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputMode="decimal"
-                  placeholder="مثال: 200"
-                  value={dailyRate}
-                  onChange={(e) => setDailyRate(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
-                
+                  <label className="text-xs font-extrabold text-slate-600">طريقة حساب الأجر</label>
+                  <select
+                  value={payType}
+                  onChange={(e) => setPayType(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700">
+                    {PAY_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
                 </div>
               </div>
+
+              <div className={`grid ${payType === 'both' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                {payType !== 'per_piece' && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">الأجر اليومي (ج.م)</label>
+                    <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="مثال: 200"
+                    value={dailyRate}
+                    onChange={(e) => setDailyRate(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  </div>
+                )}
+                {payType !== 'daily' && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-600">سعر القطعة (ج.م)</label>
+                    <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="مثال: 25"
+                    required
+                    value={pieceRate}
+                    onChange={(e) => setPieceRate(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700" />
+                  </div>
+                )}
+              </div>
+
+              <label className="flex items-start gap-2 text-xs font-extrabold text-slate-600 cursor-pointer">
+                <input
+                type="checkbox"
+                checked={attendanceDeductions}
+                onChange={(e) => setAttendanceDeductions(e.target.checked)}
+                className="mt-0.5 accent-indigo-600" />
+                <span>
+                  خصم الغياب والإجازات غير المدفوعة والساعات الناقصة
+                  <span className="block text-[10px] font-bold text-slate-400">السلف تُخصم دائماً من الراتب{payType === 'per_piece' && ' — الموظف بالقطعة ليس له أجر يومي يُخصم منه'}</span>
+                </span>
+              </label>
 
               <div className={`grid ${payCycle === 'custom' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
                 <div className="space-y-1">
@@ -516,10 +580,16 @@ export default function EmployeesPage() {
 
               {/* Live salary preview for the chosen cycle */}
               {(() => {
-              const rate = parseFloat(dailyRate) || 0;
+              const rate = payType === 'per_piece' ? 0 : parseFloat(dailyRate) || 0;
               const days = cycleDays(payCycle, payCycleDays);
               return (
                 <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3.5 space-y-1" aria-live="polite">
+                    {payType !== 'daily' &&
+                  <p className="text-[10px] font-bold text-indigo-700">
+                        + عدد القطع × {formatMoney(parseFloat(pieceRate) || 0)} للقطعة (تُسجَّل يومياً أو مرة واحدة عند الصرف)
+                      </p>
+                  }
+                    {payType !== 'per_piece' && <>
                     <div className="flex items-center justify-between text-xs font-extrabold text-emerald-700">
                       <span>الراتب {cycleLabel(payCycle, payCycleDays)}</span>
                       <span className="text-sm">{formatMoney(rate * days)}</span>
@@ -531,6 +601,10 @@ export default function EmployeesPage() {
                     </p>
                     {payCycle !== 'monthly' && rate > 0 &&
                   <p className="text-[10px] font-bold text-slate-400">ما يعادل شهرياً: {formatMoney(rate * MONTH_DAYS)}</p>
+                  }
+                    </>}
+                    {payType === 'per_piece' &&
+                  <p className="text-[10px] font-bold text-slate-500">يُصرف {cycleLabel(payCycle, payCycleDays)}{payCycle === 'weekly' && ' — الأسبوع من السبت إلى الجمعة'}</p>
                   }
                   </div>);
 

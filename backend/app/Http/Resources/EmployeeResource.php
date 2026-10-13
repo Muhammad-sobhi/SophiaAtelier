@@ -26,6 +26,9 @@ class EmployeeResource extends JsonResource
 
         if ($isAdmin) {
             $data['daily_rate'] = $this->daily_rate;
+            $data['pay_type'] = $this->pay_type;
+            $data['piece_rate'] = $this->piece_rate;
+            $data['attendance_deductions'] = $this->attendance_deductions;
             $data['pay_cycle'] = $this->pay_cycle;
             $data['pay_cycle_days'] = $this->pay_cycle_days;
             $data['notes'] = $this->notes;

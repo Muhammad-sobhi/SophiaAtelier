@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeLoan;
+use App\Models\EmployeePieceEntry;
 use App\Models\EmployeeSalaryPayment;
 use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
@@ -93,5 +94,33 @@ class PayrollController extends Controller
     public function destroyPayment(EmployeeSalaryPayment $payment): JsonResponse
     {
         return response()->json($this->payroll->undo($payment));
+    }
+
+    /**
+     * Record pieces made by a per-piece employee (one day, or the whole period when paying).
+     * POST /api/payroll/pieces
+     */
+    public function storePieces(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'date' => 'required|date|before_or_equal:today',
+            'pieces' => 'required|integer|min:1|max:100000',
+            'piece_rate' => 'nullable|numeric|min:0.01',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $employee = Employee::findOrFail($validated['employee_id']);
+
+        return response()->json($this->payroll->addPieces($employee, $validated, $request->user()?->id), 201);
+    }
+
+    /**
+     * Delete a piece entry.
+     * DELETE /api/payroll/pieces/{entry}
+     */
+    public function destroyPieces(EmployeePieceEntry $entry): JsonResponse
+    {
+        return response()->json($this->payroll->removePieces($entry));
     }
 }

@@ -15,6 +15,14 @@ export function cycleLabel(payCycle, payCycleDays) {
   return 'شهري';
 }
 
+// How the employee is paid: daily rate, recorded pieces x piece rate, or both
+export const PAY_TYPES = [
+  { id: 'daily', label: 'أجر يومي' },
+  { id: 'per_piece', label: 'بالقطعة' },
+  { id: 'both', label: 'أجر يومي + قطعة' },
+];
+export const payTypeLabel = (id) => PAY_TYPES.find((t) => t.id === id)?.label || PAY_TYPES[0].label;
+
 export const formatMoney = (n) => `${(Math.round((Number(n) || 0) * 100) / 100).toLocaleString()} ج.م`;
 
 // "شهر 10 / 2026" for monthly rows, "من 05/09 إلى 11/09" for weekly / custom rows of /payroll/summary

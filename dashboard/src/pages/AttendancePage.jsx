@@ -18,8 +18,9 @@ import {
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import PaySalaryModal from '@/components/payroll/PaySalaryModal';
+import PieceEntryModal from '@/components/payroll/PieceEntryModal';
 import { PAYMENT_METHODS } from '@/components/manufacturing/shared';
-import { cycleLabel, periodLabel } from '@/lib/payroll';
+import { cycleLabel, periodLabel, payTypeLabel } from '@/lib/payroll';
 
 // Salary payment status of a payroll row (paid_amount vs net_salary for the month)
 const PAYMENT_STATUS = {
@@ -300,6 +301,7 @@ export default function AttendancePage() {
   const [payrollList, setPayrollList] = useState([]);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [payingRow, setPayingRow] = useState(null);
+  const [piecesRow, setPiecesRow] = useState(null);
 
   // Loan Modal State
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
@@ -572,6 +574,17 @@ export default function AttendancePage() {
     if (!row) return;
     setPayrollList((prev) => prev.map((p) => sameRow(p, row) ? row : p));
     setSelectedPayslip((prev) => prev && sameRow(prev, row) ? row : prev);
+  };
+
+  const handleDeletePieces = async (entry) => {
+    if (!await confirmDialog(`حذف ${entry.pieces} قطعة بتاريخ ${entry.date}؟`)) return;
+    try {
+      applyPayrollRow(await apiClient.delete(`/payroll/pieces/${entry.id}`));
+      toast.success('تم حذف القطع');
+    } catch (err) {
+      console.error('Failed to delete piece entry:', err);
+      toast.error(err.message || 'تعذر حذف القطع');
+    }
   };
 
   const handleUndoSalaryPayment = async (payment) => {
@@ -1009,6 +1022,11 @@ export default function AttendancePage() {
                         <span className="text-[8px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
                           {cycleLabel(pay.pay_cycle, pay.pay_cycle_days)}
                         </span>
+                        {pay.pay_type !== 'daily' && (
+                          <span className="text-[8px] text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded font-bold">
+                            {payTypeLabel(pay.pay_type)}
+                          </span>
+                        )}
                         {(() => {
                           const st = PAYMENT_STATUS[pay.payment_status] || PAYMENT_STATUS.unpaid;
                           return (
@@ -1023,6 +1041,7 @@ export default function AttendancePage() {
 
                   {/* Metrics */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold text-slate-600 w-full xl:w-auto">
+                    {pay.pay_type !== 'per_piece' && (
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold">راتب الدورة:</span>
                       <span className="font-extrabold text-slate-800">{pay.cycle_salary.toLocaleString()} ج.م</span>
@@ -1030,6 +1049,14 @@ export default function AttendancePage() {
                         {pay.daily_rate.toLocaleString()} ج.م × {pay.pay_cycle_days} يوم
                       </span>
                     </div>
+                    )}
+                    {pay.pay_type !== 'daily' && (
+                    <div>
+                      <span className="text-[9px] text-slate-400 block font-bold">القطع:</span>
+                      <span className="font-extrabold text-violet-700">{pay.pieces_pay.toLocaleString()} ج.م</span>
+                      <span className="text-[8px] text-violet-600 font-bold block">{pay.total_pieces} قطعة</span>
+                    </div>
+                    )}
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold">أيام الحضور / ساعات:</span>
                       <span className="font-extrabold text-slate-800">{pay.present_days} يوم ({pay.total_worked_hours} س)</span>
@@ -1053,7 +1080,15 @@ export default function AttendancePage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full xl:w-auto xl:flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:flex-shrink-0">
+                    {canManagePayroll && pay.pay_type !== 'daily' && (
+                      <button
+                    onClick={() => setPiecesRow(pay)}
+                    className="flex-1 xl:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+                        <Plus size={14} />
+                        <span>تسجيل قطع</span>
+                      </button>
+                    )}
                     {canManagePayroll && pay.remaining_amount > 0 && (
                       <button
                     onClick={() => setPayingRow(pay)}
@@ -1196,6 +1231,41 @@ export default function AttendancePage() {
             </div>
 
             <div className="space-y-3 text-xs">
+              {selectedPayslip.pay_type !== 'daily' && (
+                <div className="bg-violet-50/50 border border-violet-100 p-3.5 rounded-2xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="font-extrabold text-violet-700 text-[11px]">القطع المسجلة:</p>
+                    {canManagePayroll && (
+                      <button onClick={() => setPiecesRow(selectedPayslip)} className="flex items-center gap-1 text-[10px] font-bold text-violet-700 hover:text-violet-900 cursor-pointer">
+                        <Plus size={12} /> تسجيل قطع
+                      </button>
+                    )}
+                  </div>
+                  {selectedPayslip.piece_entries?.length > 0 ? (
+                    selectedPayslip.piece_entries.map((entry) => (
+                      <div key={entry.id} className="flex justify-between items-center text-[11px]">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">
+                            {entry.date} — {entry.pieces} × {entry.piece_rate} ج.م{entry.notes ? ` (${entry.notes})` : ''}
+                          </span>
+                          {canManagePayroll && (
+                            <button onClick={() => handleDeletePieces(entry)} className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer" title="حذف" aria-label="حذف القطع"><Trash2 size={11} /></button>
+                          )}
+                        </div>
+                        <span className="font-bold text-violet-700 flex-shrink-0">{entry.amount.toLocaleString()} ج.م</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-400 font-bold">لم تُسجَّل قطع في هذه الفترة</p>
+                  )}
+                  <div className="flex justify-between text-[11px] border-t border-violet-200 pt-1 mt-1">
+                    <span className="font-bold text-violet-700">الإجمالي ({selectedPayslip.total_pieces} قطعة):</span>
+                    <span className="font-extrabold text-violet-700">{selectedPayslip.pieces_pay.toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+              )}
+
+              {selectedPayslip.pay_type !== 'per_piece' && (
               <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1.5 border border-slate-100">
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-bold">راتب الدورة ({selectedPayslip.daily_rate.toLocaleString()} × {selectedPayslip.pay_cycle_days} يوم):</span>
@@ -1210,9 +1280,13 @@ export default function AttendancePage() {
                   <span className="font-bold text-slate-600">{selectedPayslip.hourly_rate} ج.م</span>
                 </div>
               </div>
+              )}
 
               <div className="bg-rose-50/50 border border-rose-100 p-3.5 rounded-2xl space-y-1.5">
                 <p className="font-extrabold text-rose-700 text-[11px]">تفاصيل الخصومات والاستقطاعات:</p>
+                {!selectedPayslip.attendance_deductions && (
+                  <p className="text-[10px] font-bold text-amber-600">لا يُخصم الغياب أو الساعات من هذا الموظف (السلف فقط)</p>
+                )}
 
                 {/* Absent days — per record */}
                 {selectedPayslip.absent_records?.length > 0 ? (
@@ -1224,7 +1298,7 @@ export default function AttendancePage() {
                           <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
                         )}
                       </div>
-                      <span className="font-bold text-rose-600">-{selectedPayslip.daily_rate} ج.م</span>
+                      <span className="font-bold text-rose-600">-{selectedPayslip.attendance_deductions ? selectedPayslip.daily_rate : 0} ج.م</span>
                     </div>
                   ))
                 ) : (
@@ -1249,7 +1323,7 @@ export default function AttendancePage() {
                           <button onClick={() => handleDeleteAttendance(rec.id)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف"><Trash2 size={11} /></button>
                         )}
                       </div>
-                      <span className="font-bold text-rose-600">-{(rec.shortage_hours * selectedPayslip.hourly_rate).toFixed(2)} ج.م</span>
+                      <span className="font-bold text-rose-600">-{selectedPayslip.attendance_deductions ? (rec.shortage_hours * selectedPayslip.hourly_rate).toFixed(2) : 0} ج.م</span>
                     </div>
                   ))
                 ) : (
@@ -1504,6 +1578,9 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {piecesRow && (
+        <PieceEntryModal pay={piecesRow} onClose={() => setPiecesRow(null)} onSaved={applyPayrollRow} />
+      )}
       {payingRow && (
         <PaySalaryModal pay={payingRow} onClose={() => setPayingRow(null)} onPaid={applyPayrollRow} />
       )}

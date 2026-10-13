@@ -194,6 +194,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:payroll.manage')->group(function () {
         Route::post('/payroll/payments', [PayrollController::class, 'pay']);
         Route::delete('/payroll/payments/{payment}', [PayrollController::class, 'destroyPayment']);
+        Route::post('/payroll/pieces', [PayrollController::class, 'storePieces']);
+        Route::delete('/payroll/pieces/{entry}', [PayrollController::class, 'destroyPieces']);
         Route::post('/employee-loans', [EmployeeLoanController::class, 'store']);
         Route::put('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'update']);
         Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);

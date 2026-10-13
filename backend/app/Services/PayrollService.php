@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\EmployeeLoan;
+use App\Models\EmployeePieceEntry;
 use App\Models\EmployeeSalaryPayment;
 use App\Models\Expense;
 use App\Models\LeaveRequest;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  * - weekly:  Saturday to Friday, worth daily_rate x 7
  * - custom:  blocks of pay_cycle_days days counted from the hire date, worth daily_rate x pay_cycle_days
  * Absences, unpaid leave, missing shift hours and the period's loans are deducted; overtime is added.
+ * Pay type per_piece / both: the pieces recorded in the period (pieces x rate) are added; per_piece has no daily rate.
+ * With attendance_deductions off, only loans are deducted.
  * Paying a period writes a "salary" expense, so it shows in the finance page.
  */
 class PayrollService
@@ -113,7 +116,10 @@ class PayrollService
         $from = $start->format('Y-m-d');
         $to = $end->format('Y-m-d');
 
-        $dailyRate = (float) $employee->daily_rate;
+        $payType = $employee->pay_type ?? 'daily';
+        // A per-piece employee earns nothing per day: no cycle salary, day deductions or overtime
+        $dailyRate = $payType === 'per_piece' ? 0.0 : (float) $employee->daily_rate;
+        $deductAttendance = $employee->attendance_deductions ?? true;
         $hourlyRate = $dailyRate / self::SHIFT_HOURS;
         $cycleDays = $this->cycleDays($employee);
         $cycleSalary = round($dailyRate * $cycleDays, 2);
@@ -185,12 +191,21 @@ class PayrollService
             'reason' => $loan->reason,
         ])->values()->all();
 
-        $unexcusedAbsenceDeduction = round($absentDays * $dailyRate, 2);
-        $unpaidLeaveDeduction = round($unpaidLeaveDays * $dailyRate, 2);
-        $shortageDeduction = round($shortageHours * $hourlyRate, 2);
+        // Pieces recorded in the period, at the rate each entry was recorded with
+        $pieceEntries = EmployeePieceEntry::where('employee_id', $employee->id)
+            ->whereBetween('date', [$from, $to])
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+        $totalPieces = (int) $pieceEntries->sum('pieces');
+        $piecesPay = round((float) $pieceEntries->sum('amount'), 2);
+
+        $unexcusedAbsenceDeduction = $deductAttendance ? round($absentDays * $dailyRate, 2) : 0.0;
+        $unpaidLeaveDeduction = $deductAttendance ? round($unpaidLeaveDays * $dailyRate, 2) : 0.0;
+        $shortageDeduction = $deductAttendance ? round($shortageHours * $hourlyRate, 2) : 0.0;
         $totalDeductions = round($unexcusedAbsenceDeduction + $unpaidLeaveDeduction + $shortageDeduction + $loanDeduction, 2);
         $overtimePay = round($totalOvertimeHours * $hourlyRate * self::OVERTIME_FACTOR, 2);
-        $netSalary = round(max(0, $cycleSalary - $totalDeductions + $overtimePay), 2);
+        $netSalary = round(max(0, $cycleSalary + $piecesPay - $totalDeductions + $overtimePay), 2);
 
         $payments = EmployeeSalaryPayment::where('employee_id', $employee->id)
             ->where('period', $key)
@@ -201,8 +216,10 @@ class PayrollService
         $remainingAmount = round(max(0, $netSalary - $paidAmount), 2);
 
         // Nothing to pay and nothing recorded: leave the employee out
-        $hasActivity = $attendances->isNotEmpty() || $leaves->isNotEmpty() || $loans->isNotEmpty() || $payments->isNotEmpty();
-        if ($dailyRate <= 0 && !$hasActivity) {
+        $hasActivity = $attendances->isNotEmpty() || $leaves->isNotEmpty() || $loans->isNotEmpty()
+            || $payments->isNotEmpty() || $pieceEntries->isNotEmpty();
+        $paidByPiece = $payType !== 'daily' && (float) $employee->piece_rate > 0;
+        if ($dailyRate <= 0 && !$paidByPiece && !$hasActivity) {
             return null;
         }
 
@@ -212,6 +229,8 @@ class PayrollService
             'position' => $employee->role ?: 'موظف',
             'pay_cycle' => $employee->pay_cycle ?? 'monthly',
             'pay_cycle_days' => $cycleDays,
+            'pay_type' => $payType,
+            'attendance_deductions' => (bool) $deductAttendance,
             'period_key' => $key,
             'period_start' => $from,
             'period_end' => $to,
@@ -219,6 +238,17 @@ class PayrollService
             'daily_rate' => round($dailyRate, 2),
             'hourly_rate' => round($hourlyRate, 2),
             'cycle_salary' => $cycleSalary,
+            'piece_rate' => round((float) $employee->piece_rate, 2),
+            'total_pieces' => $totalPieces,
+            'pieces_pay' => $piecesPay,
+            'piece_entries' => $pieceEntries->map(fn (EmployeePieceEntry $e) => [
+                'id' => $e->id,
+                'date' => $e->date->format('Y-m-d'),
+                'pieces' => $e->pieces,
+                'piece_rate' => (float) $e->piece_rate,
+                'amount' => (float) $e->amount,
+                'notes' => $e->notes,
+            ])->values()->all(),
             'present_days' => $presentDays,
             'absent_days' => $absentDays,
             'paid_leave_days' => $paidLeaveDays,
@@ -315,6 +345,55 @@ class PayrollService
 
             return $this->compute($employee, $period);
         });
+    }
+
+    /**
+     * Record pieces made by the employee on a date (daily, or once when paying); returns that date's period row.
+     *
+     * @param array{date: string, pieces: int, piece_rate?: float|string|null, notes?: ?string} $data
+     */
+    public function addPieces(Employee $employee, array $data, ?int $userId): ?array
+    {
+        $rate = round((float) ($data['piece_rate'] ?? $employee->piece_rate), 2);
+        if ($rate <= 0) {
+            throw ValidationException::withMessages(['piece_rate' => 'حدد سعر القطعة (في بيانات الموظف أو هنا)']);
+        }
+        $period = $this->periodContaining($employee, Carbon::parse($data['date']));
+
+        $entry = EmployeePieceEntry::create([
+            'employee_id' => $employee->id,
+            'date' => $data['date'],
+            'pieces' => (int) $data['pieces'],
+            'piece_rate' => $rate,
+            'amount' => round((int) $data['pieces'] * $rate, 2),
+            'notes' => $data['notes'] ?? null,
+            'created_by' => $userId,
+        ]);
+
+        ActivityLogger::log('تسجيل قطع لموظف', 'Employee', $employee->id, [
+            'date' => $entry->date->format('Y-m-d'),
+            'pieces' => $entry->pieces,
+            'piece_rate' => $rate,
+        ]);
+
+        return $this->compute($employee, $period);
+    }
+
+    /**
+     * Delete a piece entry; returns its period row.
+     */
+    public function removePieces(EmployeePieceEntry $entry): ?array
+    {
+        $employee = $entry->employee;
+        $period = $this->periodContaining($employee, Carbon::parse($entry->date));
+        $entry->delete();
+
+        ActivityLogger::log('حذف قطع موظف', 'Employee', $employee->id, [
+            'date' => $entry->date->format('Y-m-d'),
+            'pieces' => $entry->pieces,
+        ]);
+
+        return $this->compute($employee, $period);
     }
 
     /**

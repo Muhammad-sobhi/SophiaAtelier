@@ -21,6 +21,9 @@ class StoreEmployeeRequest extends FormRequest
             'email' => 'nullable|email|unique:employees,email|unique:users,email',
             'role' => 'nullable|string|max:255',
             'daily_rate' => 'nullable|numeric|min:0', // pay per day; cycle salary = daily_rate x cycle days
+            'pay_type' => 'sometimes|in:daily,per_piece,both', // per_piece / both: paid for recorded pieces x piece_rate
+            'piece_rate' => 'sometimes|numeric|min:0',
+            'attendance_deductions' => 'sometimes|boolean',
             'pay_cycle' => 'nullable|in:monthly,weekly,custom',
             'pay_cycle_days' => 'nullable|integer|min:1|max:365',
             'hire_date' => 'nullable|date',
