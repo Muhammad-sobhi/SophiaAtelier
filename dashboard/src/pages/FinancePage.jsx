@@ -150,7 +150,8 @@ const mapTransaction = (row) => {
     paymentMethod: (row.payment_method || 'cash').toLowerCase().replace(/ /g, '_'),
     receiptImage: row.receipt_url,
     rawDate: row.date ? row.date.split('T')[0] : '',
-    backendCategory: row.category
+    backendCategory: row.category,
+    employeeId: row.employee_id ? String(row.employee_id) : ''
   };
 };
 
@@ -335,6 +336,9 @@ export default function FinancePage() {
   const [newPaymentMethod, setNewPaymentMethod] = useState('cash');
   const [revenueSplitPayments, setRevenueSplitPayments] = useState([{ amount: '', payment_method: 'cash' }]);
   const [newReceiptImage, setNewReceiptImage] = useState(null);
+  const [newEmployeeId, setNewEmployeeId] = useState('');
+  const [employees, setEmployees] = useState(null);
+  const [isSavingTx, setIsSavingTx] = useState(false);
   const [editingTxId, setEditingTxId] = useState(null);
   const [editingTxOriginalType, setEditingTxOriginalType] = useState(null);
 
@@ -434,6 +438,17 @@ export default function FinancePage() {
   }, [selectedStatModalType, fetchAllFilteredTransactions]);
 
 
+  // Employees for the salary expense picker, loaded the first time it is needed
+  useEffect(() => {
+    if (!isModalOpen || newCategory !== 'salary' || employees) return;
+    apiClient.get('/employees')
+      .then((res) => setEmployees(Array.isArray(res) ? res : res?.data || []))
+      .catch((e) => {
+        console.error('Failed to load employees:', e);
+        toast.error('تعذر تحميل قائمة الموظفين');
+      });
+  }, [isModalOpen, newCategory, employees]);
+
   const handleOpenEditModal = (tx) => {
     setIsModalOpen(true);
     setEditingTxId(tx.id.replace(/^(revenue-|expense-)/, ''));
@@ -456,6 +471,7 @@ export default function FinancePage() {
     setNewDate(tx.rawDate || new Date().toISOString().split('T')[0]);
     setNewPaymentMethod(tx.paymentMethod || 'cash');
     setNewReceiptImage(tx.receiptImage || null);
+    setNewEmployeeId(tx.employeeId || '');
     
     const mappedPayments = tx.payments && tx.payments.length > 0 
       ? tx.payments.map(p => ({ amount: String(p.amount), payment_method: p.payment_method }))
@@ -484,11 +500,13 @@ export default function FinancePage() {
 
   const handleAddTransactionSubmit = async (e) => {
     e.preventDefault();
-    if (!newDesc.trim() || !newAmount.trim()) return;
+    const isRevenue = newType === 'إيراد';
+    const isSalary = !isRevenue && newCategory === 'salary';
+    if ((!isSalary && !newDesc.trim()) || !newAmount.trim() || (isSalary && !newEmployeeId) || isSavingTx) return;
 
     const amountVal = parseFloat(newAmount);
-    const isRevenue = newType === 'إيراد';
 
+    setIsSavingTx(true);
     try {
       if (isRevenue) {
         const validPayments = revenueSplitPayments.filter(p => parseFloat(p.amount) > 0);
@@ -514,14 +532,17 @@ export default function FinancePage() {
       } else {
         let backendCat = 'other';
         if (newCategory === 'operational') backendCat = 'purchase';else
-        if (newCategory === 'utilities') backendCat = 'maintenance';
+        if (newCategory === 'utilities') backendCat = 'maintenance';else
+        if (isSalary) backendCat = 'salary';
 
+        const employeeName = isSalary ? employees?.find((emp) => String(emp.id) === newEmployeeId)?.name : null;
         const payload = {
           category: backendCat,
           amount: amountVal,
-          description: newDesc,
+          description: newDesc.trim() || `راتب - ${employeeName || ''}`,
           date: newDate,
           payment_method: newPaymentMethod,
+          employee_id: isSalary ? newEmployeeId : null,
           receipt_image: newReceiptImage
         };
 
@@ -545,9 +566,12 @@ export default function FinancePage() {
       setNewDate(new Date().toISOString().split('T')[0]);
       setNewPaymentMethod('cash');
       setNewReceiptImage(null);
+      setNewEmployeeId('');
     } catch (e) {
       console.error('Failed to add transaction:', e);
       toast.error(e.data?.message || 'فشل حفظ المعاملة');
+    } finally {
+      setIsSavingTx(false);
     }
   };
 
@@ -679,6 +703,7 @@ export default function FinancePage() {
               setNewDate(new Date().toISOString().split('T')[0]);
               setNewPaymentMethod('cash');
               setNewReceiptImage(null);
+              setNewEmployeeId('');
             }}
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-md shadow-indigo-600/10 active:scale-95 cursor-pointer w-full sm:w-auto"
           >
@@ -1293,11 +1318,11 @@ export default function FinancePage() {
             <form onSubmit={handleAddTransactionSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
               {/* Description */}
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">الوصف المعاملة</label>
+                <label className="text-xs font-extrabold text-slate-600">الوصف المعاملة{newCategory === 'salary' && newType !== 'إيراد' && ' (اختياري)'}</label>
                 <input
                 type="text"
-                required
-                placeholder="مثال: فاتورة صيانة المحل أو دفعة مبيعات"
+                required={!(newCategory === 'salary' && newType !== 'إيراد')}
+                placeholder={newCategory === 'salary' && newType !== 'إيراد' ? 'مثال: راتب شهر 3/2025 (يُكتب تلقائياً لو تُرك فارغاً)' : 'مثال: فاتورة صيانة المحل أو دفعة مبيعات'}
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
@@ -1310,7 +1335,10 @@ export default function FinancePage() {
                   <label className="text-xs font-extrabold text-slate-600">نوع المعاملة</label>
                   <select
                   value={newType}
-                  onChange={(e) => setNewType(e.target.value)}
+                  onChange={(e) => {
+                    setNewType(e.target.value);
+                    if (e.target.value === 'إيراد' && newCategory === 'salary') setNewCategory('other');
+                  }}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
                   
                     <option value="مصروف">مصروف (سحب/تكلفة)</option>
@@ -1328,10 +1356,31 @@ export default function FinancePage() {
                     <option value="shop">مبيعات وحجوزات المحل</option>
                     <option value="operational">المشتريات والرواتب</option>
                     <option value="utilities">المرافق والخدمات</option>
+                    {newType !== 'إيراد' && <option value="salary">رواتب موظفين</option>}
                     <option value="other">مصروفات أخرى</option>
                   </select>
                 </div>
               </div>
+
+              {/* Employee (salary expenses) */}
+              {newType !== 'إيراد' && newCategory === 'salary' &&
+              <div className="space-y-1">
+                  <label htmlFor="finance-salary-employee" className="text-xs font-extrabold text-slate-600">الموظف</label>
+                  <select
+                  id="finance-salary-employee"
+                  required
+                  disabled={!employees}
+                  value={newEmployeeId}
+                  onChange={(e) => setNewEmployeeId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700 disabled:opacity-60">
+                  
+                    <option value="">{employees ? 'اختر الموظف' : 'جاري تحميل الموظفين...'}</option>
+                    {(employees || []).map((emp) =>
+                  <option key={emp.id} value={String(emp.id)}>{emp.name}</option>
+                  )}
+                  </select>
+                </div>
+              }
 
               {/* Amount & Payment Method for Revenue vs Expense */}
               {newType === 'إيراد' ? (
@@ -1361,10 +1410,12 @@ export default function FinancePage() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-extrabold text-slate-600">المبلغ (ج.م)</label>
+                      <label className="text-xs font-extrabold text-slate-600">{newCategory === 'salary' ? 'الراتب (ج.م)' : 'المبلغ (ج.م)'}</label>
                       <input
                         type="number"
                         required
+                        min="0.01"
+                        step="0.01"
                         placeholder="مثال: 500"
                         value={newAmount}
                         onChange={(e) => setNewAmount(e.target.value)}
@@ -1373,7 +1424,7 @@ export default function FinancePage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-extrabold text-slate-600">التاريخ</label>
+                      <label className="text-xs font-extrabold text-slate-600">{newCategory === 'salary' ? 'تاريخ الراتب' : 'التاريخ'}</label>
                       <input
                         type="date"
                         required
@@ -1440,9 +1491,10 @@ export default function FinancePage() {
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white sticky bottom-0">
                 <button
                 type="submit"
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-sm">
+                disabled={isSavingTx}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer text-center shadow-sm">
                 
-                  حفظ المعاملة
+                  {isSavingTx ? 'جاري الحفظ...' : 'حفظ المعاملة'}
                 </button>
                 <button
                 type="button"

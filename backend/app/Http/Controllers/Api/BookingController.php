@@ -260,7 +260,14 @@ class BookingController extends Controller
             \App\Models\Visit::assertVisitWindow($openVisit?->visit_date, $validated['event_date'], 'event_date');
         }
 
-        if (($status === 'confirmed' || $status === 'picked_up') && !$forceOverride) {
+        // Availability only depends on the dresses, the wedding date and the status, so a price or
+        // booking-date fix of a booking whose dress overlaps another one is not blocked
+        $day = fn($d) => $d ? \Carbon\Carbon::parse($d)->toDateString() : null;
+        $availabilityChanged = $clientId != $booking->client_id || $dressId != $booking->dress_id
+            || $dress2Id != $booking->dress_2_id || $status !== $booking->status
+            || $day($eventDate) !== $day($booking->event_date);
+
+        if ($availabilityChanged && ($status === 'confirmed' || $status === 'picked_up') && !$forceOverride) {
             $conflict1 = Booking::checkDressAvailability(
                 $clientId,
                 $dressId,

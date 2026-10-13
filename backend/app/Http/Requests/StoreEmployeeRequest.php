@@ -16,7 +16,9 @@ class StoreEmployeeRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email',
+            // An existing login (e.g. the admin) must not be taken over by a new employee record,
+            // since Employee::saved syncs name/password/role onto the user with the same email
+            'email' => 'nullable|email|unique:employees,email|unique:users,email',
             'role' => 'nullable|string|max:255',
             'daily_rate' => 'nullable|numeric|min:0', // pay per day; cycle salary = daily_rate x cycle days
             'pay_cycle' => 'nullable|in:monthly,weekly,custom',

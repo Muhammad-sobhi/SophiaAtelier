@@ -12,6 +12,11 @@ class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
+        $request->validate([
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+        ]);
+
         $query = Attendance::with('employee');
 
         if ($employeeId = $request->input('employee_id')) {
@@ -20,6 +25,14 @@ class AttendanceController extends Controller
 
         if ($date = $request->input('date')) {
             $query->whereDate('date', $date);
+        }
+
+        if ($from = $request->input('from')) {
+            $query->whereDate('date', '>=', $from);
+        }
+
+        if ($to = $request->input('to')) {
+            $query->whereDate('date', '<=', $to);
         }
 
         if ($request->has('all')) {

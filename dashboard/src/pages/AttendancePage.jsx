@@ -27,7 +27,17 @@ const PAYMENT_STATUS = {
   partial: { label: 'صرف جزئي', className: 'bg-amber-50 text-amber-700 border-amber-200' },
   unpaid: { label: 'لم يُصرف', className: 'bg-slate-100 text-slate-600 border-slate-200' }
 };
-const paymentMethodLabel = (id) => PAYMENT_METHODS.find((m) => m.id === id)?.label || id;
+// Attendance status as shown in the monthly grid (letter + label, so state isn't conveyed by color alone)
+const ATTENDANCE_STATUS = {
+  present: { short: 'ح', label: 'حاضر', className: 'bg-emerald-100 text-emerald-700' },
+  late: { short: 'ت', label: 'متأخر', className: 'bg-amber-100 text-amber-700' },
+  absent: { short: 'غ', label: 'غائب', className: 'bg-rose-100 text-rose-700' },
+  leave: { short: 'إ', label: 'إجازة / عطلة', className: 'bg-indigo-100 text-indigo-700' },
+  half_day: { short: 'ن', label: 'نصف يوم', className: 'bg-sky-100 text-sky-700' }
+};
+const WEEKDAY_SHORT = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
+
+const paymentMethodLabel =(id) => PAYMENT_METHODS.find((m) => m.id === id)?.label || id;
 
 // A payroll row is one pay period of one employee (a month, a Saturday-Friday week, or a custom block of days)
 const sameRow = (a, b) => a.employee_id === b.employee_id && a.period_key === b.period_key;
@@ -87,6 +97,178 @@ const sameRow = (a, b) => a.employee_id === b.employee_id && a.period_key === b.
 
 
 
+// Read-only month view: a table on desktop (row per employee, column per day), a calendar card per employee on mobile.
+// Clicking a day opens it in the daily editor.
+function MonthlyAttendanceGrid({ month, employees, records, isLoading, onOpenDay }) {
+  const [year, monthNum] = month.split('-').map(Number);
+  const daysInMonth = new Date(year, monthNum, 0).getDate();
+  const today = new Date().toISOString().split('T')[0];
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    const date = `${month}-${String(day).padStart(2, '0')}`;
+    return { day, date, weekday: new Date(year, monthNum - 1, day).getDay() };
+  });
+  // Mobile calendar weeks run Saturday → Friday, like the payroll week
+  const leadingBlanks = (days[0].weekday + 1) % 7;
+  const calendarWeekdays = [6, 0, 1, 2, 3, 4, 5];
+
+  // employee_id -> date -> record
+  const byEmployee = {};
+  records.forEach((rec) => {
+    const date = String(rec.date).substring(0, 10);
+    (byEmployee[rec.employee_id] ||= {})[date] = rec;
+  });
+
+  const rows = employees.map((emp) => {
+    const empRecords = byEmployee[emp.id] || {};
+    const totals = { present: 0, late: 0, absent: 0, leave: 0, hours: 0 };
+    Object.values(empRecords).forEach((rec) => {
+      if (totals[rec.status] !== undefined) totals[rec.status]++;
+      if (rec.status !== 'absent' && rec.status !== 'leave') totals.hours += parseFloat(rec.worked_hours) || 0;
+    });
+    totals.hours = Math.round(totals.hours * 100) / 100;
+    return { emp, empRecords, totals };
+  });
+
+  const totalColumns = [
+  { key: 'present', label: 'ح', title: 'حاضر', className: 'text-emerald-700' },
+  { key: 'late', label: 'ت', title: 'متأخر', className: 'text-amber-700' },
+  { key: 'absent', label: 'غ', title: 'غائب', className: 'text-rose-700' },
+  { key: 'leave', label: 'إ', title: 'إجازة', className: 'text-indigo-700' },
+  { key: 'hours', label: 'ساعات', title: 'ساعات', className: 'text-slate-700' }];
+
+
+  const renderDayButton = (emp, d, rec, sizeClass) => {
+    const st = rec && ATTENDANCE_STATUS[rec.status];
+    const timeRange = rec?.check_in && rec?.check_out ?
+    `${String(rec.check_in).substring(11, 16)} - ${String(rec.check_out).substring(11, 16)}` :
+    '';
+    const title = rec ?
+    [`${d.date} — ${st?.label || rec.status}`, timeRange, rec.worked_hours ? `${parseFloat(rec.worked_hours)} ساعة` : '', rec.notes].filter(Boolean).join('\n') :
+    `${d.date} — غير مسجل`;
+
+    return (
+      <button
+        type="button"
+        title={title}
+        aria-label={`${emp.name} ${title}`}
+        onClick={() => onOpenDay(d.date)}
+        className={`${sizeClass} rounded-lg font-extrabold cursor-pointer transition-all hover:ring-2 hover:ring-indigo-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+        st ? st.className : 'bg-white border border-dashed border-slate-200 text-slate-300'} ${
+        d.date === today ? 'ring-2 ring-indigo-400' : ''}`
+        }>
+        {st ? st.short : '–'}
+      </button>);
+
+  };
+
+  if (isLoading) {
+    return <div className="flex-1 flex items-center justify-center text-xs font-bold text-slate-400">جاري تحميل حضور الشهر...</div>;
+  }
+
+  if (employees.length === 0) {
+    return <div className="flex-1 flex items-center justify-center text-xs font-bold text-slate-400">لا يوجد موظفين</div>;
+  }
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold text-slate-500 flex-shrink-0">
+        {Object.values(ATTENDANCE_STATUS).map((s) =>
+        <span key={s.short} className="flex items-center gap-1">
+            <span className={`w-5 h-5 rounded-md flex items-center justify-center ${s.className}`}>{s.short}</span>
+            {s.label}
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <span className="w-5 h-5 rounded-md flex items-center justify-center bg-white border border-dashed border-slate-200 text-slate-300">–</span>
+          غير مسجل
+        </span>
+      </div>
+
+      {/* Mobile: one calendar card per employee */}
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-3 scrollbar-thin">
+        {rows.map(({ emp, empRecords, totals }) =>
+        <div key={emp.id} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-indigo-500 text-white rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0">
+                {emp.name.charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-extrabold text-xs text-slate-800 truncate">{emp.name}</h4>
+                <p className="text-[10px] text-slate-400 font-semibold">{emp.position || 'موظف'}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-1.5">
+              {totalColumns.map((c) =>
+            <div key={c.key} className="bg-white border border-slate-100 rounded-xl py-1.5 text-center">
+                  <div className={`text-sm font-extrabold ${c.className}`}>{totals[c.key]}</div>
+                  <div className="text-[9px] font-bold text-slate-400">{c.title}</div>
+                </div>
+            )}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {calendarWeekdays.map((wd) =>
+            <div key={wd} className={`text-[9px] font-bold ${wd === 5 ? 'text-slate-400' : 'text-slate-500'}`}>{WEEKDAY_SHORT[wd]}</div>
+            )}
+              {Array.from({ length: leadingBlanks }, (_, i) => <div key={`blank-${i}`} />)}
+              {days.map((d) =>
+            <div key={d.day} className="flex flex-col items-center gap-0.5">
+                  {renderDayButton(emp, d, empRecords[d.date], 'w-full aspect-square max-w-10 text-[11px]')}
+                  <span className={`text-[9px] font-bold ${d.date === today ? 'text-indigo-600' : 'text-slate-400'}`}>{d.day}</span>
+                </div>
+            )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: full month table */}
+      <div className="hidden md:block flex-1 min-h-0 overflow-auto border border-slate-100 rounded-2xl scrollbar-thin">
+        <table className="border-separate border-spacing-0 text-xs">
+          <thead>
+            <tr>
+              <th className="sticky top-0 start-0 z-20 bg-slate-50 border-b border-e border-slate-100 px-3 py-2 text-start font-extrabold text-slate-600 min-w-36">الموظف</th>
+              {days.map((d) =>
+              <th
+                key={d.day}
+                className={`sticky top-0 z-10 border-b border-slate-100 px-1 py-1.5 text-center font-bold min-w-9 ${
+                d.date === today ? 'bg-indigo-50 text-indigo-700' : d.weekday === 5 ? 'bg-slate-100 text-slate-500' : 'bg-slate-50 text-slate-600'}`
+                }>
+                  <div className="text-[11px]">{d.day}</div>
+                  <div className="text-[9px] font-semibold opacity-70">{WEEKDAY_SHORT[d.weekday]}</div>
+                </th>
+              )}
+              {totalColumns.map((c) =>
+              <th key={c.key} title={c.title} className="sticky top-0 z-10 bg-slate-50 border-b border-s border-slate-100 px-2 py-2 text-center font-extrabold text-slate-600">{c.label}</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ emp, empRecords, totals }) =>
+            <tr key={emp.id} className="hover:bg-slate-50/60">
+                <td className="sticky start-0 z-10 bg-white border-b border-e border-slate-100 px-3 py-2 font-extrabold text-slate-800 whitespace-nowrap">
+                  {emp.name}
+                </td>
+                {days.map((d) =>
+              <td key={d.day} className={`border-b border-slate-100 p-0.5 text-center ${d.weekday === 5 ? 'bg-slate-50/70' : ''}`}>
+                    {renderDayButton(emp, d, empRecords[d.date], 'w-8 h-8 text-[11px]')}
+                  </td>
+              )}
+                {totalColumns.map((c) =>
+              <td key={c.key} className={`border-b border-s border-slate-100 px-2 text-center font-bold whitespace-nowrap ${c.className}`}>{totals[c.key]}</td>
+              )}
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>);
+
+}
+
 export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState('attendance');
   const [employees, setEmployees] = useState([]);
@@ -98,6 +280,10 @@ export default function AttendancePage() {
   const [attendanceMap, setAttendanceMap] = useState({});
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [attendanceSuccess, setAttendanceSuccess] = useState(false);
+  const [attendanceView, setAttendanceView] = useState('daily');
+  const [monthlyMonth, setMonthlyMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [monthlyRecords, setMonthlyRecords] = useState([]);
+  const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
 
   // Leaves Tab State
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -166,6 +352,19 @@ export default function AttendancePage() {
       setAttendanceMap(map);
     }).catch((err) => console.error('Failed to load attendance:', err));
   }, [selectedDate]);
+
+  // Fetch the whole month for the monthly grid
+  useEffect(() => {
+    if (activeTab !== 'attendance' || attendanceView !== 'monthly' || !monthlyMonth) return;
+
+    const [y, m] = monthlyMonth.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    setIsLoadingMonthly(true);
+    apiClient.get(`/attendance?from=${monthlyMonth}-01&to=${monthlyMonth}-${String(lastDay).padStart(2, '0')}&all=1`).
+    then((res) => setMonthlyRecords(Array.isArray(res) ? res : res.data || [])).
+    catch((err) => console.error('Failed to load monthly attendance:', err)).
+    finally(() => setIsLoadingMonthly(false));
+  }, [activeTab, attendanceView, monthlyMonth]);
 
   // Fetch leaves
   useEffect(() => {
@@ -441,17 +640,49 @@ export default function AttendancePage() {
       <div className="flex-1 flex flex-col min-h-0 bg-white rounded-3xl p-4 sm:p-6 border border-slate-100/70 shadow-xs overflow-hidden">
           {/* Controls Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-4 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                {[
+              { id: 'daily', label: 'يومي' },
+              { id: 'monthly', label: 'شهري' }].
+              map((v) =>
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setAttendanceView(v.id)}
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                attendanceView === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`
+                }>
+                    {v.label}
+                  </button>
+              )}
+              </div>
+
+              {attendanceView === 'daily' ?
             <div className="flex items-center gap-3">
-              <label className="text-xs font-extrabold text-slate-600 whitespace-nowrap">اختر تاريخ اليوم:</label>
-              <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500 w-full sm:w-auto" />
-            
+                  <label htmlFor="attendance-date" className="text-xs font-extrabold text-slate-600 whitespace-nowrap">اختر تاريخ اليوم:</label>
+                  <input
+                id="attendance-date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500 w-full sm:w-auto" />
+                </div> :
+
+            <div className="flex items-center gap-3">
+                  <label htmlFor="attendance-month" className="text-xs font-extrabold text-slate-600 whitespace-nowrap">اختر الشهر:</label>
+                  <input
+                id="attendance-month"
+                type="month"
+                value={monthlyMonth}
+                onChange={(e) => setMonthlyMonth(e.target.value)}
+                className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-500 w-full sm:w-auto" />
+                </div>
+            }
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            {attendanceView === 'daily' &&
+          <div className="flex items-center gap-3 w-full sm:w-auto">
               {attendanceSuccess &&
             <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-xl border border-green-200">
                   ✓ تم حفظ الحضور اليومي بنجاح
@@ -465,10 +696,24 @@ export default function AttendancePage() {
                 {isSavingAttendance ? 'جاري الحفظ...' : 'حفظ كشف الحضور'}
               </button>
             </div>
+          }
           </div>
 
+          {attendanceView === 'monthly' &&
+        <MonthlyAttendanceGrid
+          month={monthlyMonth}
+          employees={employees}
+          records={monthlyRecords}
+          isLoading={isLoadingMonthly}
+          onOpenDay={(date) => {
+            setSelectedDate(date);
+            setAttendanceView('daily');
+          }} />
+        }
+
           {/* Attendance List */}
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+          {attendanceView === 'daily' &&
+        <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {employees.map((emp) => {
             const record = attendanceMap[emp.id] || {
               employee_id: emp.id,
@@ -570,6 +815,7 @@ export default function AttendancePage() {
 
           })}
           </div>
+        }
         </div>
       }
 

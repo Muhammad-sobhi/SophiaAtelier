@@ -37,7 +37,7 @@ class ExpenseController extends Controller
             'payment_method' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'date' => 'required|date',
-            'employee_id' => 'nullable|exists:employees,id',
+            'employee_id' => 'nullable|required_if:category,salary|exists:employees,id',
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
@@ -73,7 +73,7 @@ class ExpenseController extends Controller
             'payment_method' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'date' => 'sometimes|required|date',
-            'employee_id' => 'nullable|exists:employees,id',
+            'employee_id' => 'nullable|required_if:category,salary|exists:employees,id',
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);

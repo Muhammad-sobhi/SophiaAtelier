@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateEmployeeRequest extends FormRequest
 {
@@ -13,10 +14,17 @@ class UpdateEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
+        $employee = $this->route('employee');
+
         return [
             'name' => 'sometimes|required|string|max:255',
             'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email',
+            // Only this employee's own login may share the email (see StoreEmployeeRequest)
+            'email' => [
+                'nullable', 'email',
+                Rule::unique('employees', 'email')->ignore($employee->id),
+                Rule::unique('users', 'email')->ignore($employee->email, 'email'),
+            ],
             'role' => 'nullable|string|max:255',
             'daily_rate' => 'nullable|numeric|min:0', // pay per day; cycle salary = daily_rate x cycle days
             'pay_cycle' => 'nullable|in:monthly,weekly,custom',
