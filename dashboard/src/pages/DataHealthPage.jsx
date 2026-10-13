@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, RotateCcw, Loader2, ChevronDown, CheckCircle2, AlertTriangle, Search,
-  Trash2, ExternalLink, GitMerge, Lightbulb, CalendarCheck, CalendarX, Pencil, X,
+  Trash2, ExternalLink, GitMerge, Lightbulb, CalendarCheck, CalendarX, Pencil, X, Wallet,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
@@ -9,6 +9,7 @@ import { formatDate, cleanDate, todayStr } from '@/lib/utils';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { BrideJourneyPopup } from '@/components/bride-journey/BrideJourneyPopup';
+import { BookingPaymentsModal } from '@/components/bride-journey/BookingPaymentsModal';
 
 const GROUPS = [
   { id: 'bookings', label: 'الحجوزات' },
@@ -65,7 +66,7 @@ function BrideCell({ row }) {
   );
 }
 
-function BookingTable({ rows, busy, onOpen, onEdit, onDelete }) {
+function BookingTable({ rows, busy, fix, onOpen, onEdit, onPayments, onDelete }) {
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
@@ -87,7 +88,8 @@ function BookingTable({ rows, busy, onOpen, onEdit, onDelete }) {
             <Td className="font-mono text-[10.5px] text-slate-400">{r.created}</Td>
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Pencil} label="تعديل" tone="emerald" onClick={() => onEdit(r)} disabled={busy} />
+                {fix === 'payments' && <ActionButton icon={Wallet} label="الدفعات / تسجيل الباقي" tone="emerald" onClick={() => onPayments(r)} disabled={busy} />}
+                {Array.isArray(fix) && <ActionButton icon={Pencil} label={fixLabel(fix)} tone="emerald" onClick={() => onEdit(r)} disabled={busy} />}
                 {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الحجز" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
@@ -99,7 +101,7 @@ function BookingTable({ rows, busy, onOpen, onEdit, onDelete }) {
   );
 }
 
-function RevenueTable({ rows, busy, onOpen, onEdit, onDelete }) {
+function RevenueTable({ rows, busy, fix, onOpen, onEdit, onDelete }) {
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
@@ -119,7 +121,7 @@ function RevenueTable({ rows, busy, onOpen, onEdit, onDelete }) {
             <Td className="whitespace-normal text-[11px] text-slate-500 min-w-[180px] max-w-[260px]">{r.notes || '—'}</Td>
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Pencil} label="تعديل" tone="emerald" onClick={() => onEdit(r)} disabled={busy} />
+                {Array.isArray(fix) && <ActionButton icon={Pencil} label={fixLabel(fix)} tone="emerald" onClick={() => onEdit(r)} disabled={busy} />}
                 {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الدفعة" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
@@ -289,22 +291,38 @@ function ClientTable({ rows, busy, onOpen }) {
 
 // Fields the admin can correct directly on one booking / payment. The bride card only edits a booking
 // before pickup, so picked-up and returned bookings (most old data) are fixed here.
-const EDIT_FIELDS = {
-  booking: [
-    { key: 'booking_date', label: 'تاريخ الحجز', type: 'date', max: true },
-    { key: 'event_date', label: 'تاريخ الفرح', type: 'date' },
-    { key: 'pickup_scheduled_on', label: 'ميعاد الاستلام', type: 'date' },
-    { key: 'return_scheduled_on', label: 'ميعاد الإرجاع', type: 'date' },
-    { key: 'total_amount', label: 'قيمة الإيجار (ج.م)', type: 'number' },
-  ],
-  revenue: [
-    { key: 'payment_date', label: 'تاريخ الدفع', type: 'date', max: true },
-    { key: 'amount', label: 'المبلغ (ج.م)', type: 'number' },
-  ],
+const FIELDS = {
+  booking_date: { label: 'تاريخ الحجز', type: 'date', max: true },
+  event_date: { label: 'تاريخ الفرح', type: 'date' },
+  pickup_scheduled_on: { label: 'ميعاد الاستلام', type: 'date' },
+  return_scheduled_on: { label: 'ميعاد الإرجاع', type: 'date' },
+  total_amount: { label: 'قيمة الإيجار (ج.م)', type: 'number', min: 0 },
+  payment_date: { label: 'تاريخ الدفع', type: 'date', max: true },
+  amount: { label: 'المبلغ (ج.م)', type: 'number' },
 };
 
-function EditRowModal({ entity, row, onCancel, onSave }) {
-  const fields = EDIT_FIELDS[entity];
+// The fix each check offers on its rows: the fields that cause it, or 'payments' for the booking's
+// payments screen (record the remaining money, edit the total, delete a duplicate payment).
+// Checks not listed only have open-card / delete.
+const CHECK_FIX = {
+  booking_after_wedding: ['booking_date', 'event_date'],
+  booking_no_date: ['booking_date'],
+  booking_no_event: ['event_date'],
+  booking_future_date: ['booking_date'],
+  booking_zero_total: ['total_amount'],
+  booking_overpaid: 'payments',
+  booking_unpaid_after_pickup: 'payments',
+  booking_bad_schedule: ['event_date', 'pickup_scheduled_on', 'return_scheduled_on'],
+  revenue_no_date: ['payment_date'],
+  revenue_future: ['payment_date'],
+  revenue_non_positive: ['amount'],
+  revenue_deposit_before_booking: ['payment_date'],
+};
+
+const fixLabel = (keys) => (keys.length === 1 ? `تعديل ${FIELDS[keys[0]].label.replace(/ \(.*\)$/, '')}` : 'تعديل التواريخ');
+
+function EditRowModal({ entity, row, keys, onCancel, onSave }) {
+  const fields = keys.map((key) => ({ key, ...FIELDS[key] }));
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [
     f.key, f.type === 'date' ? cleanDate(row[f.key] || '') : String(row[f.key] ?? ''),
   ])));
@@ -358,7 +376,7 @@ function EditRowModal({ entity, row, onCancel, onSave }) {
               <input
                 type={f.type}
                 required={f.type === 'date' || f.key === 'total_amount'}
-                min={f.type === 'number' && f.key === 'total_amount' ? 0 : undefined}
+                min={f.min}
                 step={f.type === 'number' ? 'any' : undefined}
                 max={f.max ? todayStr() : undefined}
                 value={values[f.key]}
@@ -392,6 +410,8 @@ function CheckDetails({ checkKey, onChanged }) {
   const [selected, setSelected] = useState(new Set());
   const [bride, setBride] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [payments, setPayments] = useState(null);
+  const fix = CHECK_FIX[checkKey];
 
   const load = useCallback(async () => {
     setError(null);
@@ -444,6 +464,18 @@ function CheckDetails({ checkKey, onChanged }) {
     await afterChange('تم الحفظ');
   };
 
+  const openPayments = async (r) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setPayments(await apiClient.get(`/bookings/${r.id}`));
+    } catch (err) {
+      toast.error(err.message || 'تعذر فتح الدفعات');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteBooking = (r) => run(
     `حذف الحجز #${r.id} للعروسة ${r.client_name || ''}؟ هيتحذف معاه كل الدفعات والبروفات بتاعته نهائياً.`,
     () => apiClient.delete(`/bookings/${r.id}`),
@@ -491,7 +523,7 @@ function CheckDetails({ checkKey, onChanged }) {
   const q = query.trim().toLowerCase();
   const rows = data.rows.filter((r) => matches(r, q));
   const closable = checkKey === 'visit_stale_open';
-  const common = { rows, busy, onOpen: openBride };
+  const common = { rows, busy, fix, onOpen: openBride, onEdit: setEditing };
 
   return (
     <div className="border-t border-slate-100">
@@ -529,8 +561,8 @@ function CheckDetails({ checkKey, onChanged }) {
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-          {data.entity === 'booking' && <BookingTable {...common} onEdit={setEditing} onDelete={deleteBooking} />}
-          {data.entity === 'revenue' && <RevenueTable {...common} onEdit={setEditing} onDelete={deleteRevenue} />}
+          {data.entity === 'booking' && <BookingTable {...common} onPayments={openPayments} onDelete={deleteBooking} />}
+          {data.entity === 'revenue' && <RevenueTable {...common} onDelete={deleteRevenue} />}
           {data.entity === 'visit' && (
             <VisitTable {...common} closable={closable} selected={selected} setSelected={setSelected} onClose={closeVisits} onDelete={deleteVisit} />
           )}
@@ -541,7 +573,17 @@ function CheckDetails({ checkKey, onChanged }) {
       )}
 
       {editing && (
-        <EditRowModal entity={data.entity} row={editing} onCancel={() => setEditing(null)} onSave={saveEdit} />
+        <EditRowModal entity={data.entity} row={editing} keys={fix} onCancel={() => setEditing(null)} onSave={saveEdit} />
+      )}
+
+      {payments && (
+        <BookingPaymentsModal
+          isOpen
+          bride={payments.client}
+          booking={payments}
+          onClose={() => { setPayments(null); afterChange(); }}
+          onSuccess={load}
+        />
       )}
 
       {bride && (

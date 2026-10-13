@@ -353,7 +353,7 @@ export function BookingPaymentsModal({
                     <input
                       type="number"
                       min="1"
-                      step="50"
+                      step="any"
                       value={newPayment.amount}
                       onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
                       placeholder="0"
@@ -458,7 +458,7 @@ export function BookingPaymentsModal({
                             <input
                               type="number"
                               min="0"
-                              step="50"
+                              step="any"
                               value={editForm.amount}
                               onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
                               className="w-full bg-white border border-amber-200 rounded-xl px-2 py-1.5 text-xs font-black text-slate-800"
