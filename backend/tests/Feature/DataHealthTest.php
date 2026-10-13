@@ -42,6 +42,25 @@ class DataHealthTest extends TestCase
         $this->getJson('/api/data-health/not_a_check')->assertNotFound();
     }
 
+    public function test_fixing_a_returned_booking_clears_the_check()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $client = Client::create(['name' => 'Old Bride', 'phone' => '01044440002', 'city' => 'القاهرة']);
+        $booking = Booking::create(['client_id' => $client->id, 'dress_id' => Dress::factory()->create()->id,
+            'booking_date' => '2026-09-20', 'event_date' => '2026-08-15', 'status' => 'returned', 'total_amount' => 1000]);
+
+        // A booking date after the wedding is refused
+        $this->putJson("/api/bookings/{$booking->id}", ['booking_date' => '2026-08-20'])->assertStatus(422);
+
+        $this->putJson("/api/bookings/{$booking->id}", ['booking_date' => '2026-06-01'])->assertOk();
+        $this->assertSame('returned', $booking->fresh()->status);
+        $ids = collect($this->getJson('/api/data-health/booking_after_wedding')->json('rows'))->pluck('id');
+        $this->assertNotContains($booking->id, $ids);
+
+        // Payment-only edits of a booking still go through
+        $this->putJson("/api/bookings/{$booking->id}", ['total_amount' => 1200])->assertOk();
+    }
+
     public function test_merge_moves_everything_to_the_kept_bride()
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

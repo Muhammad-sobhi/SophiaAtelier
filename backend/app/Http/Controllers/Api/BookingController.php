@@ -244,6 +244,14 @@ class BookingController extends Controller
         $status = $request->input('status', $booking->status);
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
 
+        // Only when a date is being changed, so payment-only edits of old bad rows still go through
+        $bookingDate = $request->input('booking_date', $booking->booking_date);
+        if ($request->hasAny(['booking_date', 'event_date']) && $bookingDate && $eventDate
+            && \Carbon\Carbon::parse($bookingDate)->toDateString() > \Carbon\Carbon::parse($eventDate)->toDateString()) {
+            return response()->json(['message' => 'تاريخ الحجز لا يمكن أن يكون بعد تاريخ الفرح',
+                'errors' => ['booking_date' => ['تاريخ الحجز لا يمكن أن يكون بعد تاريخ الفرح']]], 422);
+        }
+
         // A new wedding date must keep the bride's open visit at most 4 months before it
         if (isset($validated['event_date'])
             && \Carbon\Carbon::parse($validated['event_date'])->toDateString() !== $booking->event_date?->toDateString()) {

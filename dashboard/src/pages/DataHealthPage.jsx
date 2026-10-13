@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, RotateCcw, Loader2, ChevronDown, CheckCircle2, AlertTriangle, Search,
-  Trash2, ExternalLink, GitMerge, Lightbulb, CalendarCheck, CalendarX,
+  Trash2, ExternalLink, GitMerge, Lightbulb, CalendarCheck, CalendarX, Pencil, X,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cleanDate, todayStr } from '@/lib/utils';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { BrideJourneyPopup } from '@/components/bride-journey/BrideJourneyPopup';
@@ -64,7 +65,7 @@ function BrideCell({ row }) {
   );
 }
 
-function BookingTable({ rows, busy, onOpen, onDelete }) {
+function BookingTable({ rows, busy, onOpen, onEdit, onDelete }) {
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
@@ -86,6 +87,7 @@ function BookingTable({ rows, busy, onOpen, onDelete }) {
             <Td className="font-mono text-[10.5px] text-slate-400">{r.created}</Td>
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
+                <ActionButton icon={Pencil} label="تعديل" tone="emerald" onClick={() => onEdit(r)} disabled={busy} />
                 {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الحجز" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
@@ -97,7 +99,7 @@ function BookingTable({ rows, busy, onOpen, onDelete }) {
   );
 }
 
-function RevenueTable({ rows, busy, onOpen, onDelete }) {
+function RevenueTable({ rows, busy, onOpen, onEdit, onDelete }) {
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
@@ -117,6 +119,7 @@ function RevenueTable({ rows, busy, onOpen, onDelete }) {
             <Td className="whitespace-normal text-[11px] text-slate-500 min-w-[180px] max-w-[260px]">{r.notes || '—'}</Td>
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
+                <ActionButton icon={Pencil} label="تعديل" tone="emerald" onClick={() => onEdit(r)} disabled={busy} />
                 {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الدفعة" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
@@ -284,6 +287,103 @@ function ClientTable({ rows, busy, onOpen }) {
   );
 }
 
+// Fields the admin can correct directly on one booking / payment. The bride card only edits a booking
+// before pickup, so picked-up and returned bookings (most old data) are fixed here.
+const EDIT_FIELDS = {
+  booking: [
+    { key: 'booking_date', label: 'تاريخ الحجز', type: 'date', max: true },
+    { key: 'event_date', label: 'تاريخ الفرح', type: 'date' },
+    { key: 'pickup_scheduled_on', label: 'ميعاد الاستلام', type: 'date' },
+    { key: 'return_scheduled_on', label: 'ميعاد الإرجاع', type: 'date' },
+    { key: 'total_amount', label: 'قيمة الإيجار (ج.م)', type: 'number' },
+  ],
+  revenue: [
+    { key: 'payment_date', label: 'تاريخ الدفع', type: 'date', max: true },
+    { key: 'amount', label: 'المبلغ (ج.م)', type: 'number' },
+  ],
+};
+
+function EditRowModal({ entity, row, onCancel, onSave }) {
+  const fields = EDIT_FIELDS[entity];
+  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [
+    f.key, f.type === 'date' ? cleanDate(row[f.key] || '') : String(row[f.key] ?? ''),
+  ])));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !saving) onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, saving]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (saving) return;
+    if (entity === 'booking' && values.booking_date && values.event_date && values.booking_date > values.event_date) {
+      setError('تاريخ الحجز لا يمكن أن يكون بعد تاريخ الفرح');
+      return;
+    }
+    // Send only what changed, so untouched fields keep their stored values
+    const changes = Object.fromEntries(fields
+      .filter((f) => values[f.key] !== (f.type === 'date' ? cleanDate(row[f.key] || '') : String(row[f.key] ?? '')))
+      .map((f) => [f.key, f.type === 'number' ? Number(values[f.key]) : values[f.key] || null]));
+    if (!Object.keys(changes).length) { onCancel(); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(changes);
+    } catch (err) {
+      setError(err.message || 'حصل خطأ، حاول تاني');
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4" style={{ zIndex: 100000 }} dir="rtl">
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl w-full max-w-md text-right">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-black text-slate-800">
+            {entity === 'booking' ? `تعديل الحجز #${row.id}` : `تعديل الدفعة #${row.id}`}
+            {row.client_name && <span className="text-slate-500 font-bold"> — {row.client_name}</span>}
+          </h3>
+          <button type="button" onClick={onCancel} disabled={saving} aria-label="إغلاق" className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 cursor-pointer">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {fields.map((f) => (
+            <label key={f.key} className="block">
+              <span className="text-[11px] font-black text-slate-600 block mb-1">{f.label}</span>
+              <input
+                type={f.type}
+                required={f.type === 'date' || f.key === 'total_amount'}
+                min={f.type === 'number' && f.key === 'total_amount' ? 0 : undefined}
+                step={f.type === 'number' ? 'any' : undefined}
+                max={f.max ? todayStr() : undefined}
+                value={values[f.key]}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-400"
+              />
+            </label>
+          ))}
+        </div>
+        {error && <p className="mx-4 mb-3 text-[11.5px] font-bold text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">{error}</p>}
+        <div className="flex gap-2 px-4 pb-4">
+          <button type="submit" disabled={saving} className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black cursor-pointer disabled:opacity-60">
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            حفظ
+          </button>
+          <button type="button" onClick={onCancel} disabled={saving} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black cursor-pointer">
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
 function CheckDetails({ checkKey, onChanged }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -291,6 +391,7 @@ function CheckDetails({ checkKey, onChanged }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(new Set());
   const [bride, setBride] = useState(null);
+  const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -334,6 +435,13 @@ function CheckDetails({ checkKey, onChanged }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  const saveEdit = async (changes) => {
+    const path = data.entity === 'booking' ? `/bookings/${editing.id}` : `/revenues/${editing.id}`;
+    await apiClient.put(path, changes);
+    setEditing(null);
+    await afterChange('تم الحفظ');
   };
 
   const deleteBooking = (r) => run(
@@ -421,8 +529,8 @@ function CheckDetails({ checkKey, onChanged }) {
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-          {data.entity === 'booking' && <BookingTable {...common} onDelete={deleteBooking} />}
-          {data.entity === 'revenue' && <RevenueTable {...common} onDelete={deleteRevenue} />}
+          {data.entity === 'booking' && <BookingTable {...common} onEdit={setEditing} onDelete={deleteBooking} />}
+          {data.entity === 'revenue' && <RevenueTable {...common} onEdit={setEditing} onDelete={deleteRevenue} />}
           {data.entity === 'visit' && (
             <VisitTable {...common} closable={closable} selected={selected} setSelected={setSelected} onClose={closeVisits} onDelete={deleteVisit} />
           )}
@@ -430,6 +538,10 @@ function CheckDetails({ checkKey, onChanged }) {
             ? <DuplicateClients {...common} onMerge={mergeClients} onDelete={deleteClient} />
             : <ClientTable {...common} />)}
         </div>
+      )}
+
+      {editing && (
+        <EditRowModal entity={data.entity} row={editing} onCancel={() => setEditing(null)} onSave={saveEdit} />
       )}
 
       {bride && (
