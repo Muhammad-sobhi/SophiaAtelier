@@ -80,7 +80,9 @@ class PayrollController extends Controller
             'payment_method' => 'required|string|max:50',
             'payment_date' => 'required|date',
             'notes' => 'nullable|string|max:1000',
+            'receipt_image' => 'nullable',
         ]);
+        $validated['receipt_path'] = self::saveReceipt($request, 'receipt_image');
 
         $row = $this->payroll->pay((int) $validated['employee_id'], $validated['period_start'], $validated, $request->user()?->id);
 

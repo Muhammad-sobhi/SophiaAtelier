@@ -38,6 +38,8 @@ class EmployeeLoanController extends Controller
             'date' => 'required|date',
             'reason' => 'nullable|string',
             'status' => 'nullable|in:pending,approved,rejected,paid',
+            'payment_method' => 'nullable|string|max:50',
+            'receipt_image' => 'nullable',
         ]);
 
         $validated['status'] = $validated['status'] ?? 'approved';
@@ -48,6 +50,8 @@ class EmployeeLoanController extends Controller
         Expense::create([
             'category' => 'loan',
             'amount' => $validated['amount'],
+            'payment_method' => $validated['payment_method'] ?? 'cash',
+            'receipt_path' => self::saveReceipt($request, 'receipt_image'),
             'description' => 'سلفة موظف: ' . ($loan->employee->name ?? '') . ' — ' . ($validated['reason'] ?? 'بدون سبب'),
             'date' => $validated['date'],
             'employee_id' => $validated['employee_id'],

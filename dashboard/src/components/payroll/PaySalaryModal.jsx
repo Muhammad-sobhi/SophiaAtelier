@@ -4,6 +4,7 @@ import { toast } from '@/components/ui/Toast';
 import { todayStr } from '@/lib/utils';
 import { Modal, Field, SubmitRow, inputClass, PAYMENT_METHODS, errorMessage } from '@/components/manufacturing/shared';
 import { formatMoney as money, periodLabel } from '@/lib/payroll';
+import ReceiptPicker from './ReceiptPicker';
 
 /**
  * Pays an employee's salary (full or partial) for one pay period (month, week or custom block).
@@ -15,6 +16,7 @@ export default function PaySalaryModal({ pay, onClose, onPaid }) {
     payment_method: 'cash',
     payment_date: todayStr(),
     notes: '',
+    receipt_image: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -34,6 +36,7 @@ export default function PaySalaryModal({ pay, onClose, onPaid }) {
         payment_method: form.payment_method,
         payment_date: form.payment_date,
         notes: form.notes || null,
+        receipt_image: form.receipt_image,
       });
       toast.success('تم صرف الراتب وتسجيله في المالية');
       onPaid(row);
@@ -100,6 +103,9 @@ export default function PaySalaryModal({ pay, onClose, onPaid }) {
 
         <Field label="ملاحظات">
           <input className={inputClass} value={form.notes} onChange={set('notes')} placeholder="اختياري" />
+        </Field>
+        <Field label="إيصال الدفع">
+          <ReceiptPicker value={form.receipt_image} onChange={(v) => setForm({ ...form, receipt_image: v })} />
         </Field>
         <SubmitRow onCancel={onClose} isSubmitting={isSubmitting} label="تأكيد الصرف" />
       </form>

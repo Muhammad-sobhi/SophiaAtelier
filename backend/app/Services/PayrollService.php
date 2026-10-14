@@ -283,7 +283,7 @@ class PayrollService
     /**
      * Pay (fully or partially) the period that starts on $periodStart.
      *
-     * @param array{amount: float|string, payment_method: string, payment_date: string, notes?: ?string} $data
+     * @param array{amount: float|string, payment_method: string, payment_date: string, notes?: ?string, receipt_path?: ?string} $data
      */
     public function pay(int $employeeId, string $periodStart, array $data, ?int $userId): array
     {
@@ -310,6 +310,7 @@ class PayrollService
                 'employee_id' => $employee->id,
                 'amount' => $amount,
                 'payment_method' => $data['payment_method'],
+                'receipt_path' => $data['receipt_path'] ?? null,
                 'date' => $data['payment_date'],
                 'description' => 'راتب ' . $this->periodLabel($employee, $period) . ' - ' . $employee->name
                     . ($amount < $remaining ? ' (دفعة جزئية)' : '')

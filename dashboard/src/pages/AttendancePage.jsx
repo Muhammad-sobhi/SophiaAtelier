@@ -18,6 +18,7 @@ import {
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import PaySalaryModal from '@/components/payroll/PaySalaryModal';
+import ReceiptPicker from '@/components/payroll/ReceiptPicker';
 import PieceEntryModal from '@/components/payroll/PieceEntryModal';
 import { PAYMENT_METHODS } from '@/components/manufacturing/shared';
 import { cycleLabel, periodLabel, payTypeLabel } from '@/lib/payroll';
@@ -309,6 +310,9 @@ export default function AttendancePage() {
   const [loanAmount, setLoanAmount] = useState('');
   const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
   const [loanReason, setLoanReason] = useState('');
+  const [loanPaymentMethod, setLoanPaymentMethod] = useState('cash');
+  const [loanReceipt, setLoanReceipt] = useState(null);
+  const [isSavingLoan, setIsSavingLoan] = useState(false);
 
   // Edit Loan State
   const [editingLoan, setEditingLoan] = useState(null);
@@ -484,28 +488,41 @@ export default function AttendancePage() {
 
   const handleCreateLoan = async (e) => {
     e.preventDefault();
-    if (!loanEmployeeId || !loanAmount) return;
+    if (!loanEmployeeId || !loanAmount || isSavingLoan) return;
 
+    setIsSavingLoan(true);
     try {
       await apiClient.post('/employee-loans', {
         employee_id: loanEmployeeId,
         amount: parseFloat(loanAmount),
         date: loanDate,
         reason: loanReason,
+        payment_method: loanPaymentMethod,
+        receipt_image: loanReceipt,
         status: 'approved'
       });
+    } catch (err) {
+      console.error('Failed to create loan:', err);
+      toast.error(err?.message || 'حدث خطأ أثناء إضافة السلفة');
+      return;
+    } finally {
+      setIsSavingLoan(false);
+    }
 
-      setIsLoanModalOpen(false);
-      setLoanEmployeeId('');
-      setLoanAmount('');
-      setLoanReason('');
+    toast.success('تم تسجيل السلفة');
+    setIsLoanModalOpen(false);
+    setLoanEmployeeId('');
+    setLoanAmount('');
+    setLoanReason('');
+    setLoanPaymentMethod('cash');
+    setLoanReceipt(null);
 
-      // Refresh payroll to reflect the new loan
+    // Refresh payroll to reflect the new loan (a failure here does not mean the loan was not saved)
+    try {
       const res = await apiClient.get(`/payroll/summary?month=${payrollMonth}&year=${payrollYear}`);
       setPayrollList(Array.isArray(res) ? res : []);
     } catch (err) {
-      console.error('Failed to create loan:', err);
-      toast.error('حدث خطأ أثناء إضافة السلفة');
+      console.error('Failed to load payroll summary:', err);
     }
   };
 
@@ -1423,7 +1440,7 @@ export default function AttendancePage() {
       {/* Loan Creation Modal */}
       {isLoanModalOpen &&
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs text-slate-700">
-          <div className="bg-white rounded-3xl p-6 shadow-xl w-full max-w-md border border-slate-100">
+          <div className="bg-white rounded-3xl p-6 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-100">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <h3 className="text-sm font-extrabold text-slate-800">تسجيل سلفة / إقراض موظف</h3>
               <button
@@ -1481,6 +1498,20 @@ export default function AttendancePage() {
                 placeholder="سبب طلب السلفة..." />
               </div>
 
+              <div>
+                <label className="text-xs font-extrabold text-slate-600 block mb-1">طريقة الدفع</label>
+                <select
+                value={loanPaymentMethod}
+                onChange={(e) => setLoanPaymentMethod(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-2xl text-xs font-semibold">
+                  {PAYMENT_METHODS.map((m) =>
+                <option key={m.id} value={m.id}>{m.label}</option>
+                )}
+                </select>
+              </div>
+
+              <ReceiptPicker value={loanReceipt} onChange={setLoanReceipt} />
+
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl">
                 <p className="text-[10px] text-amber-700 font-bold">
                   ⚠️ سيتم خصم هذا المبلغ تلقائياً من الراتب القادم للموظف وتسجيله كمصروف في النظام المالي.
@@ -1490,8 +1521,9 @@ export default function AttendancePage() {
               <div className="flex gap-3 pt-2">
                 <button
                 type="submit"
-                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer">
-                  تسجيل السلفة
+                disabled={isSavingLoan}
+                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer">
+                  {isSavingLoan ? 'جاري الحفظ...' : 'تسجيل السلفة'}
                 </button>
                 <button
                 type="button"
