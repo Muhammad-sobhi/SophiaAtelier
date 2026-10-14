@@ -11,7 +11,7 @@ class EmployeeLoan extends Model
     use HasFactory;
 
     protected $fillable = [
-        'employee_id', 'amount', 'date', 'reason', 'status',
+        'employee_id', 'expense_id', 'amount', 'date', 'reason', 'status',
         'deducted_from_salary', 'deduction_month'
     ];
 
@@ -27,5 +27,11 @@ class EmployeeLoan extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    // The "loan" expense this loan wrote on the finance page
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class);
     }
 }

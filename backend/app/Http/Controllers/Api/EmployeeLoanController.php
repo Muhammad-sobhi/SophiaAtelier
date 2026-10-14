@@ -7,6 +7,7 @@ use App\Models\EmployeeLoan;
 use App\Models\Expense;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeLoanController extends Controller
 {
@@ -44,18 +45,25 @@ class EmployeeLoanController extends Controller
 
         $validated['status'] = $validated['status'] ?? 'approved';
 
-        $loan = EmployeeLoan::create($validated);
+        $receiptPath = self::saveReceipt($request, 'receipt_image');
 
-        // Auto-create an expense record for the loan
-        Expense::create([
-            'category' => 'loan',
-            'amount' => $validated['amount'],
-            'payment_method' => $validated['payment_method'] ?? 'cash',
-            'receipt_path' => self::saveReceipt($request, 'receipt_image'),
-            'description' => 'سلفة موظف: ' . ($loan->employee->name ?? '') . ' — ' . ($validated['reason'] ?? 'بدون سبب'),
-            'date' => $validated['date'],
-            'employee_id' => $validated['employee_id'],
-        ]);
+        $loan = DB::transaction(function () use ($validated, $receiptPath) {
+            $loan = EmployeeLoan::create($validated);
+
+            // Auto-create an expense record for the loan, linked so loan edits / deletes reach it
+            $expense = Expense::create([
+                'category' => 'loan',
+                'amount' => $validated['amount'],
+                'payment_method' => $validated['payment_method'] ?? 'cash',
+                'receipt_path' => $receiptPath,
+                'description' => self::expenseDescription($loan),
+                'date' => $validated['date'],
+                'employee_id' => $validated['employee_id'],
+            ]);
+            $loan->update(['expense_id' => $expense->id]);
+
+            return $loan;
+        });
 
         return response()->json($loan->load('employee'), 201);
     }
@@ -76,15 +84,35 @@ class EmployeeLoanController extends Controller
             'deduction_month' => 'nullable|string',
         ]);
 
-        $employeeLoan->update($validated);
+        DB::transaction(function () use ($employeeLoan, $validated) {
+            $employeeLoan->update($validated);
+
+            // Keep the linked finance expense in step with the loan
+            $employeeLoan->expense?->update([
+                'amount' => $employeeLoan->amount,
+                'date' => $employeeLoan->date,
+                'description' => self::expenseDescription($employeeLoan),
+            ]);
+        });
 
         return response()->json($employeeLoan->load('employee'));
     }
 
     public function destroy(EmployeeLoan $employeeLoan): JsonResponse
     {
-        $employeeLoan->delete();
+        DB::transaction(function () use ($employeeLoan) {
+            $expenseId = $employeeLoan->expense_id;
+            $employeeLoan->delete();
+            if ($expenseId) {
+                Expense::whereKey($expenseId)->delete();
+            }
+        });
 
         return response()->json(['message' => 'Loan deleted']);
+    }
+
+    private static function expenseDescription(EmployeeLoan $loan): string
+    {
+        return 'سلفة موظف: ' . ($loan->employee->name ?? '') . ' — ' . ($loan->reason ?: 'بدون سبب');
     }
 }
