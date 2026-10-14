@@ -165,6 +165,7 @@ export default function FinancePage() {
   const [transactionsError, setTransactionsError] = useState(false);
   const [paymentBreakdownData, setPaymentBreakdownData] = useState({});
   const transactionsRequestId = useRef(0);
+  const breakdownRequestId = useRef(0);
   const [selectedTx, setSelectedTx] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -368,6 +369,20 @@ export default function FinancePage() {
     return p.toString();
   }, [buildQS, activeTab, activePaymentFilter, debouncedSearch]);
 
+  // Payment method cards follow the date range, tab and search (not the payment method filter itself)
+  const loadPaymentBreakdown = useCallback(async () => {
+    const requestId = ++breakdownRequestId.current;
+    const p = new URLSearchParams(buildQS());
+    if (activeTab !== 'all') p.set('tab', activeTab);
+    if (debouncedSearch) p.set('search', debouncedSearch);
+    try {
+      const res = await apiClient.get(`/finance/payment-breakdown?${p.toString()}`);
+      if (requestId === breakdownRequestId.current) setPaymentBreakdownData(res?.payment_breakdown || {});
+    } catch (e) {
+      console.error('Failed to load payment breakdown:', e);
+    }
+  }, [buildQS, activeTab, debouncedSearch]);
+
   const loadSummary = useCallback(async () => {
     try {
       const summaryRes = await apiClient.get(`/finance/summary?${buildQS()}`);
@@ -379,7 +394,6 @@ export default function FinancePage() {
           held_insurances: summaryRes.held_insurances || 0,
           total_assets: summaryRes.total_assets || 0,
         });
-        setPaymentBreakdownData(summaryRes.payment_breakdown || {});
       }
     } catch (e) {
       console.error('Failed to load finance summary:', e);
@@ -414,11 +428,12 @@ export default function FinancePage() {
   }, [buildTransactionsQS, currentPage]);
 
   const loadData = useCallback(
-    () => Promise.all([loadSummary(), loadTransactions()]),
-    [loadSummary, loadTransactions]
+    () => Promise.all([loadSummary(), loadPaymentBreakdown(), loadTransactions()]),
+    [loadSummary, loadPaymentBreakdown, loadTransactions]
   );
 
   useEffect(() => {loadSummary();}, [loadSummary]);
+  useEffect(() => {loadPaymentBreakdown();}, [loadPaymentBreakdown]);
   useEffect(() => {loadTransactions();}, [loadTransactions]);
 
   // Every matching transaction (all pages), used by the CSV export and the stats modal
@@ -825,6 +840,11 @@ export default function FinancePage() {
               <Wallet size={15} className="text-indigo-500" />
               <h2 className="text-xs font-extrabold text-slate-700">تفصيل وسائل الدفع</h2>
               <span className="text-[9px] font-bold text-slate-400 hidden sm:inline">— اضغط لعرض معاملات وسيلة بعينها</span>
+              {(activeTab !== 'all' || debouncedSearch) &&
+              <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                  {[activeTab !== 'all' && categoryLabels[activeTab], debouncedSearch && `بحث: ${debouncedSearch}`].filter(Boolean).join(' · ')}
+                </span>
+              }
             </div>
             <button
               type="button"

@@ -176,6 +176,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
     Route::get('/finance/summary', [FinanceController::class, 'summary']);
     Route::get('/finance/transactions', [FinanceController::class, 'transactions']);
+    Route::get('/finance/payment-breakdown', [FinanceController::class, 'paymentBreakdown']);
 
     // Employee routes (staff & admin)
     Route::apiResource('employees', EmployeeController::class);

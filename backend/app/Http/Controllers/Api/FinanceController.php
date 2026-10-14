@@ -51,43 +51,13 @@ class FinanceController extends Controller
      */
     public function transactions(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date',
-            'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,manufacturing,other',
-            'payment_method' => 'nullable|string|max:50',
-            'search' => 'nullable|string|max:100',
+        $validated = $request->validate(self::FILTER_RULES + [
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
-        $tab = $validated['tab'] ?? 'all';
-        $method = $validated['payment_method'] ?? null;
-        $search = trim($validated['search'] ?? '');
-
-        $revenues = Revenue::query()->selectRaw("'revenue' as kind, id, payment_date as tx_date");
-        $expenses = Expense::query()->selectRaw("'expense' as kind, id, date as tx_date");
-
-        foreach ([[$revenues, 'payment_date'], [$expenses, 'date']] as [$query, $dateColumn]) {
-            if (!empty($validated['start_date'])) {
-                $query->where($dateColumn, '>=', $validated['start_date']);
-            }
-            if (!empty($validated['end_date'])) {
-                $query->where($dateColumn, '<=', $validated['end_date']);
-            }
-            if ($method) {
-                $query->whereRaw(self::NORMALIZED_METHOD_SQL . ' = ?', [$method]);
-            }
-        }
-
-        if ($tab !== 'all') {
-            $this->whereTab($revenues, 'type', self::REVENUE_TABS, self::REVENUE_DEFAULT_TAB, $tab);
-            $this->whereTab($expenses, 'category', self::EXPENSE_TABS, self::EXPENSE_DEFAULT_TAB, $tab);
-        }
-
-        if ($search !== '') {
-            $this->whereSearch($revenues, $search, 'notes', 'payment_date', 'type', self::REVENUE_TABS, self::REVENUE_DEFAULT_TAB, true);
-            $this->whereSearch($expenses, $search, 'description', 'date', 'category', self::EXPENSE_TABS, self::EXPENSE_DEFAULT_TAB, false);
-        }
+        [$revenues, $expenses] = $this->filteredQueries($validated, $validated['payment_method'] ?? null);
+        $revenues->selectRaw("'revenue' as kind, id, payment_date as tx_date");
+        $expenses->selectRaw("'expense' as kind, id, date as tx_date");
 
         $page = DB::query()
             ->fromSub($revenues->toBase()->unionAll($expenses->toBase()), 'tx')
@@ -128,6 +98,76 @@ class FinanceController extends Controller
             'per_page' => $page->perPage(),
             'total' => $page->total(),
         ]);
+    }
+
+    private const FILTER_RULES = [
+        'start_date' => 'nullable|date',
+        'end_date' => 'nullable|date',
+        'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,manufacturing,other',
+        'payment_method' => 'nullable|string|max:50',
+        'search' => 'nullable|string|max:100',
+    ];
+
+    /**
+     * Revenue and expense queries narrowed by the finance page filters (date range, tab, search, payment method).
+     */
+    private function filteredQueries(array $filters, ?string $method): array
+    {
+        $tab = $filters['tab'] ?? 'all';
+        $search = trim($filters['search'] ?? '');
+
+        $revenues = Revenue::query();
+        $expenses = Expense::query();
+
+        foreach ([[$revenues, 'payment_date'], [$expenses, 'date']] as [$query, $dateColumn]) {
+            if (!empty($filters['start_date'])) {
+                $query->where($dateColumn, '>=', $filters['start_date']);
+            }
+            if (!empty($filters['end_date'])) {
+                $query->where($dateColumn, '<=', $filters['end_date']);
+            }
+            if ($method) {
+                $query->whereRaw(self::NORMALIZED_METHOD_SQL . ' = ?', [$method]);
+            }
+        }
+
+        if ($tab !== 'all') {
+            $this->whereTab($revenues, 'type', self::REVENUE_TABS, self::REVENUE_DEFAULT_TAB, $tab);
+            $this->whereTab($expenses, 'category', self::EXPENSE_TABS, self::EXPENSE_DEFAULT_TAB, $tab);
+        }
+
+        if ($search !== '') {
+            $this->whereSearch($revenues, $search, 'notes', 'payment_date', 'type', self::REVENUE_TABS, self::REVENUE_DEFAULT_TAB, true);
+            $this->whereSearch($expenses, $search, 'description', 'date', 'category', self::EXPENSE_TABS, self::EXPENSE_DEFAULT_TAB, false);
+        }
+
+        return [$revenues, $expenses];
+    }
+
+    /**
+     * Per payment method totals of the transactions matching the date range, tab and search.
+     * The payment method filter is ignored so every method keeps its own card.
+     */
+    public function paymentBreakdown(Request $request): JsonResponse
+    {
+        $validated = $request->validate(self::FILTER_RULES);
+        [$revenues, $expenses] = $this->filteredQueries($validated, null);
+
+        $byMethod = fn ($query) => $query->selectRaw(self::NORMALIZED_METHOD_SQL . ' as method, SUM(amount) as total, COUNT(*) as count')
+            ->groupBy('method')->get()->keyBy('method');
+        $revenueByMethod = $byMethod($revenues);
+        $expenseByMethod = $byMethod($expenses);
+
+        $paymentBreakdown = [];
+        foreach ($revenueByMethod->keys()->merge($expenseByMethod->keys())->unique() as $method) {
+            $paymentBreakdown[$method] = [
+                'income' => round((float) ($revenueByMethod[$method]->total ?? 0), 2),
+                'outcome' => round((float) ($expenseByMethod[$method]->total ?? 0), 2),
+                'count' => (int) ($revenueByMethod[$method]->count ?? 0) + (int) ($expenseByMethod[$method]->count ?? 0),
+            ];
+        }
+
+        return response()->json(['payment_breakdown' => $paymentBreakdown]);
     }
 
     private function whereTab($query, string $column, array $map, string $defaultTab, string $tab): void
@@ -355,27 +395,7 @@ class FinanceController extends Controller
         $totalAssets = \App\Models\Dress::sum('purchase_price');
         $netProfit = $netRevenue - $netExpense;
 
-        // Per payment method totals over all revenues/expenses in the period.
-        $byMethod = function ($query, string $dateColumn) use ($startDate, $endDate) {
-            if ($startDate) $query->where($dateColumn, '>=', $startDate);
-            if ($endDate) $query->where($dateColumn, '<=', $endDate);
-            return $query->selectRaw(self::NORMALIZED_METHOD_SQL . ' as method, SUM(amount) as total, COUNT(*) as count')
-                ->groupBy('method')->get()->keyBy('method');
-        };
-        $revenueByMethod = $byMethod(Revenue::query(), 'payment_date');
-        $expenseByMethod = $byMethod(Expense::query(), 'date');
-
-        $paymentBreakdown = [];
-        foreach ($revenueByMethod->keys()->merge($expenseByMethod->keys())->unique() as $method) {
-            $paymentBreakdown[$method] = [
-                'income' => round((float) ($revenueByMethod[$method]->total ?? 0), 2),
-                'outcome' => round((float) ($expenseByMethod[$method]->total ?? 0), 2),
-                'count' => (int) ($revenueByMethod[$method]->count ?? 0) + (int) ($expenseByMethod[$method]->count ?? 0),
-            ];
-        }
-
         return response()->json([
-            'payment_breakdown' => $paymentBreakdown,
             'net_revenue' => round($netRevenue, 2),
             'net_expense' => round($netExpense, 2),
             'net_profit' => round($netProfit, 2),
