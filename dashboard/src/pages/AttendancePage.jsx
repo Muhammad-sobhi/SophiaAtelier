@@ -12,16 +12,16 @@ import {
   X,
   Edit2,
   Trash2,
-  Wallet,
-  CheckCircle2
+  Wallet
 } from 'lucide-react';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import PaySalaryModal from '@/components/payroll/PaySalaryModal';
 import ReceiptPicker from '@/components/payroll/ReceiptPicker';
 import PieceEntryModal from '@/components/payroll/PieceEntryModal';
+import PayrollTable from '@/components/payroll/PayrollTable';
 import { PAYMENT_METHODS } from '@/components/manufacturing/shared';
-import { cycleLabel, periodLabel, payTypeLabel } from '@/lib/payroll';
+import { cycleLabel, periodLabel } from '@/lib/payroll';
 
 // Salary payment status of a payroll row (paid_amount vs net_salary for the month)
 const PAYMENT_STATUS = {
@@ -1011,126 +1011,10 @@ export default function AttendancePage() {
           </div>
           }
 
-          {/* Payroll List */}
-          <div className="flex-1 bg-white rounded-3xl p-6 border border-slate-100/70 shadow-xs overflow-y-auto scrollbar-thin">
-            <div className="space-y-3">
-              {payrollList.length === 0 && (
-                <p className="text-center py-10 text-xs font-bold text-slate-400">لا توجد فترات رواتب تنتهي في هذا الشهر</p>
-              )}
-              {payrollList.map((pay) =>
-            <div
-              key={`${pay.employee_id}-${pay.period_key}`}
-              className="flex flex-col xl:flex-row items-center justify-between p-5 bg-slate-50/70 border border-slate-100 rounded-2xl gap-4 hover:border-indigo-200 transition-all">
-              
-                  <div className="flex items-center gap-3 w-full xl:w-1/4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-2xl flex items-center justify-center font-extrabold text-sm shadow-md shadow-indigo-100">
-                      {pay.employee_name.charAt(0)}
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-xs text-slate-800">{pay.employee_name}</h4>
-                      <p className="text-[10px] font-bold text-slate-500 mt-0.5">
-                        {periodLabel(pay)}
-                        {!pay.period_finished && <span className="text-sky-600 mr-1">(جارية)</span>}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-bold inline-block">
-                          {pay.position}
-                        </span>
-                        <span className="text-[8px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
-                          {cycleLabel(pay.pay_cycle, pay.pay_cycle_days)}
-                        </span>
-                        {pay.pay_type !== 'daily' && (
-                          <span className="text-[8px] text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded font-bold">
-                            {payTypeLabel(pay.pay_type)}
-                          </span>
-                        )}
-                        {(() => {
-                          const st = PAYMENT_STATUS[pay.payment_status] || PAYMENT_STATUS.unpaid;
-                          return (
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-extrabold border ${st.className}`}>
-                              {st.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold text-slate-600 w-full xl:w-auto">
-                    {pay.pay_type !== 'per_piece' && (
-                    <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">راتب الدورة:</span>
-                      <span className="font-extrabold text-slate-800">{pay.cycle_salary.toLocaleString()} ج.م</span>
-                      <span className="text-[8px] text-indigo-600 font-bold block">
-                        {pay.daily_rate.toLocaleString()} ج.م × {pay.pay_cycle_days} يوم
-                      </span>
-                    </div>
-                    )}
-                    {pay.pay_type !== 'daily' && (
-                    <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">القطع:</span>
-                      <span className="font-extrabold text-violet-700">{pay.pieces_pay.toLocaleString()} ج.م</span>
-                      <span className="text-[8px] text-violet-600 font-bold block">{pay.total_pieces} قطعة</span>
-                    </div>
-                    )}
-                    <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">أيام الحضور / ساعات:</span>
-                      <span className="font-extrabold text-slate-800">{pay.present_days} يوم ({pay.total_worked_hours} س)</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">الخصومات والاستقطاعات:</span>
-                      <span className="font-extrabold text-rose-600">-{pay.total_deductions.toLocaleString()} ج.م</span>
-                    </div>
-                    {pay.loan_deduction > 0 && (
-                      <div>
-                        <span className="text-[9px] text-amber-500 block font-bold">خصم سلفة:</span>
-                        <span className="font-extrabold text-amber-600">-{pay.loan_deduction.toLocaleString()} ج.م</span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-[9px] text-slate-400 block font-bold">الصافي المستحِق:</span>
-                      <span className="font-extrabold text-emerald-600 text-sm">{pay.net_salary.toLocaleString()} ج.م</span>
-                      {pay.paid_amount > 0 && pay.remaining_amount > 0 && (
-                        <span className="text-[8px] text-amber-600 font-bold block">متبقي: {pay.remaining_amount.toLocaleString()} ج.م</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:flex-shrink-0">
-                    {canManagePayroll && pay.pay_type !== 'daily' && (
-                      <button
-                    onClick={() => setPiecesRow(pay)}
-                    className="flex-1 xl:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
-                        <Plus size={14} />
-                        <span>تسجيل قطع</span>
-                      </button>
-                    )}
-                    {canManagePayroll && pay.remaining_amount > 0 && (
-                      <button
-                    onClick={() => setPayingRow(pay)}
-                    className="flex-1 xl:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs">
-                        <Wallet size={14} />
-                        <span>{pay.paid_amount > 0 ? 'صرف المتبقي' : 'صرف الراتب'}</span>
-                      </button>
-                    )}
-                    {pay.payment_status === 'paid' && (
-                      <span className="flex-1 xl:flex-none flex items-center justify-center gap-1 px-3 py-2 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold">
-                        <CheckCircle2 size={14} />
-                        <span>تم الصرف</span>
-                      </span>
-                    )}
-                    <button
-                  onClick={() => setSelectedPayslip(pay)}
-                  className="flex-1 xl:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all cursor-pointer">
-                      <FileText size={14} />
-                      <span>كشف حساب الراتب</span>
-                    </button>
-                  </div>
-                </div>
-            )}
-            </div>
-          </div>
+          <PayrollTable
+            rows={payrollList}
+            canManagePayroll={canManagePayroll}
+            onPayslip={setSelectedPayslip} />
         </div>
       }
 

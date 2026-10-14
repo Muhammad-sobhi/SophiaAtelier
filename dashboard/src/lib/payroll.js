@@ -30,3 +30,8 @@ const shortDate = (d) => d.split('-').reverse().slice(0, 2).join('/');
 export const periodLabel = (row) => row.pay_cycle === 'monthly'
   ? `شهر ${row.period_start.slice(5, 7)} / ${row.period_start.slice(0, 4)}`
   : `من ${shortDate(row.period_start)} إلى ${shortDate(row.period_end)}`;
+
+// Compact period text for grid cells: "الشهر" for monthly rows, "05/09 - 11/09" for weekly / custom rows
+export const periodRange = (row) => row.pay_cycle === 'monthly'
+  ? 'الشهر'
+  : `${shortDate(row.period_start)} - ${shortDate(row.period_end)}`;
