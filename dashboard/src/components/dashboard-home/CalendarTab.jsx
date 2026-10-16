@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Search, Calendar as CalendarIcon, X, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -31,6 +32,98 @@ const monthNamesAr = [
 
 const pad = (n) => String(n).padStart(2, '0');
 
+const weekDaysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+// Popup listing every event of a single day, grouped by event type
+function DayEventsModal({ date, events, onClose, onOpenClient }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const [y, m, d] = date.split('-').map(Number);
+  const weekDay = weekDaysAr[new Date(y, m - 1, d).getDay()];
+  const groups = EVENT_TYPES
+    .map((type) => ({ type, items: events.filter((ev) => ev.type === type.id) }))
+    .filter((g) => g.items.length > 0);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99980] flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-fade-in text-right"
+      dir="rtl"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`مواعيد يوم ${date}`}
+        className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-lg font-black shadow-xs">
+              {d}
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-800">
+                {weekDay} {d} {monthNamesAr[m - 1]} {y}
+              </h3>
+              <p className="text-[11px] font-bold text-slate-400">{events.length} موعد</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+            title="إغلاق"
+            aria-label="إغلاق"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+          {groups.length === 0 && (
+            <p className="text-center text-sm font-bold text-slate-400 py-10">لا توجد مواعيد في هذا اليوم</p>
+          )}
+          {groups.map(({ type, items }) => (
+            <div key={type.id} className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-black text-slate-600">
+                <span className={`w-2.5 h-2.5 rounded-full ${type.dot}`} />
+                <span>{type.label}</span>
+                <span className="text-[10px] px-1.5 rounded-full bg-slate-100 text-slate-500">{items.length}</span>
+              </div>
+              {items.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => onOpenClient(ev.client_id)}
+                  className={`w-full border rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-3 text-right cursor-pointer transition-all active:scale-[0.99] ${type.pill}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-black truncate">{ev.client_name}</p>
+                    {ev.dress_name && (
+                      <p className="text-[11px] font-bold opacity-75 truncate">{ev.dress_name}</p>
+                    )}
+                  </div>
+                  {ev.client_phone && (
+                    <span className="text-[11px] font-bold font-mono opacity-80 flex-shrink-0" dir="ltr">
+                      {ev.client_phone}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function CalendarTab({ calDate, setCalDate, onOpenClient }) {
   const [events, setEvents] = useState([]);
   const [months, setMonths] = useState([]);
@@ -38,6 +131,7 @@ export default function CalendarTab({ calDate, setCalDate, onOpenClient }) {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(null);
 
   const currentYear = calDate.getFullYear();
   const currentMonth = calDate.getMonth() + 1; // 1-indexed
@@ -257,7 +351,7 @@ export default function CalendarTab({ calDate, setCalDate, onOpenClient }) {
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-150 shadow-xs w-full overflow-x-auto">
         <div className={`min-w-[700px] transition-opacity ${loading ? 'opacity-50' : ''}`}>
           <div className="grid grid-cols-7 gap-2.5 mb-3">
-            {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((d) => (
+            {weekDaysAr.map((d) => (
               <div
                 key={d}
                 className="text-center text-xs font-black text-slate-500 py-2 bg-slate-50/90 rounded-2xl border border-slate-100/80"
@@ -273,15 +367,17 @@ export default function CalendarTab({ calDate, setCalDate, onOpenClient }) {
             ))}
 
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
-              const matches = eventsByDate[`${monthKey}-${pad(day)}`] || [];
+              const dateStr = `${monthKey}-${pad(day)}`;
+              const matches = eventsByDate[dateStr] || [];
               const hasMatches = matches.length > 0;
 
               return (
                 <div
                   key={day}
+                  onClick={hasMatches ? () => setSelectedDate(dateStr) : undefined}
                   className={`min-h-[115px] sm:min-h-[125px] border rounded-2xl sm:rounded-3xl p-2 sm:p-2.5 flex flex-col gap-1.5 transition-all duration-200 ${
                     hasMatches
-                      ? 'bg-white border-indigo-100 shadow-2xs hover:border-indigo-300'
+                      ? 'bg-white border-indigo-100 shadow-2xs hover:border-indigo-300 cursor-pointer'
                       : 'bg-slate-50/40 border-slate-150/70'
                   }`}
                 >
@@ -309,7 +405,7 @@ export default function CalendarTab({ calDate, setCalDate, onOpenClient }) {
                         <button
                           key={ev.id}
                           type="button"
-                          onClick={() => onOpenClient(ev.client_id)}
+                          onClick={(e) => { e.stopPropagation(); onOpenClient(ev.client_id); }}
                           className={`flex-shrink-0 min-h-[26px] h-[26px] text-[10px] font-extrabold px-2 py-1 text-center sm:text-right rounded-xl w-full truncate transition-all duration-150 active:scale-95 border cursor-pointer shadow-2xs flex items-center justify-between gap-1 ${type?.pill || ''}`}
                           title={`${ev.client_name} (${type?.label || ev.type})${ev.dress_name ? ` - ${ev.dress_name}` : ''}`}
                         >
@@ -327,6 +423,15 @@ export default function CalendarTab({ calDate, setCalDate, onOpenClient }) {
           </div>
         </div>
       </div>
+
+      {selectedDate && (
+        <DayEventsModal
+          date={selectedDate}
+          events={eventsByDate[selectedDate] || []}
+          onClose={() => setSelectedDate(null)}
+          onOpenClient={onOpenClient}
+        />
+      )}
     </div>
   );
 }
