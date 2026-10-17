@@ -12,7 +12,7 @@ import ReceiptPicker from './ReceiptPicker';
  */
 export default function PaySalaryModal({ pay, onClose, onPaid }) {
   const [form, setForm] = useState({
-    amount: String(pay.remaining_amount),
+    amount: String(pay.pay_amount ?? pay.remaining_amount),
     payment_method: 'cash',
     payment_date: todayStr(),
     notes: '',

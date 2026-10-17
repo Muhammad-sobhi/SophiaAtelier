@@ -301,6 +301,11 @@ export default function AttendancePage() {
   const [payrollYear, setPayrollYear] = useState(new Date().getFullYear());
   const [payrollList, setPayrollList] = useState([]);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+  // Amount to pay from the open payslip; starts at what is still due and can be edited before paying
+  const [payAmount, setPayAmount] = useState('');
+  useEffect(() => {
+    setPayAmount(selectedPayslip ? String(selectedPayslip.remaining_amount) : '');
+  }, [selectedPayslip]);
   const [payingRow, setPayingRow] = useState(null);
   const [piecesRow, setPiecesRow] = useState(null);
 
@@ -1295,14 +1300,29 @@ export default function AttendancePage() {
               <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
                 <div>
                   <p className="text-[10px] text-emerald-600 font-bold uppercase">الصافي الواجب صرفه للموظف</p>
-                  <h4 className="text-lg font-extrabold text-emerald-700 mt-0.5">
-                    {selectedPayslip.net_salary.toLocaleString()} ج.م
-                  </h4>
+                  {canManagePayroll && selectedPayslip.remaining_amount > 0 ? (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        aria-label="المبلغ المراد صرفه"
+                        className="w-32 bg-white border border-emerald-200 rounded-xl px-2 py-1 text-lg font-extrabold text-emerald-700 outline-none focus:border-emerald-400"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                      />
+                      <span className="text-lg font-extrabold text-emerald-700">ج.م</span>
+                    </div>
+                  ) : (
+                    <h4 className="text-lg font-extrabold text-emerald-700 mt-0.5">
+                      {selectedPayslip.net_salary.toLocaleString()} ج.م
+                    </h4>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                 {canManagePayroll && selectedPayslip.remaining_amount > 0 && (
                   <button
-                  onClick={() => setPayingRow(selectedPayslip)}
+                  onClick={() => setPayingRow({ ...selectedPayslip, pay_amount: parseFloat(payAmount) || selectedPayslip.remaining_amount })}
                   className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer">
                     <Wallet size={14} />
                     <span>صرف</span>
