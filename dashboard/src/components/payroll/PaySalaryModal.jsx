@@ -22,11 +22,11 @@ export default function PaySalaryModal({ pay, onClose, onPaid }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const amount = parseFloat(form.amount) || 0;
-  const tooMuch = amount > pay.remaining_amount;
+  const extra = amount - pay.remaining_amount;
 
   const submit = async (e) => {
     e.preventDefault();
-    if (amount <= 0 || tooMuch) return;
+    if (amount <= 0) return;
     setIsSubmitting(true);
     try {
       const row = await apiClient.post('/payroll/payments', {
@@ -77,7 +77,6 @@ export default function PaySalaryModal({ pay, onClose, onPaid }) {
               type="number"
               min="0.01"
               step="0.01"
-              max={pay.remaining_amount}
               required
               className={inputClass}
               value={form.amount}
@@ -94,10 +93,10 @@ export default function PaySalaryModal({ pay, onClose, onPaid }) {
           </Field>
         </div>
 
-        {tooMuch && (
-          <p className="text-[10px] font-bold text-rose-600">المبلغ أكبر من المتبقي المستحق ({money(pay.remaining_amount)})</p>
+        {extra > 0 && (
+          <p className="text-[10px] font-bold text-sky-600">سيُصرف {money(extra)} زيادة عن المتبقي المستحق.</p>
         )}
-        {!tooMuch && amount > 0 && amount < pay.remaining_amount && (
+        {amount > 0 && extra < 0 && (
           <p className="text-[10px] font-bold text-amber-600">دفعة جزئية — سيبقى {money(pay.remaining_amount - amount)} مستحقاً للموظف.</p>
         )}
 

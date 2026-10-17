@@ -301,9 +301,6 @@ class PayrollService
             if ($remaining <= 0) {
                 throw ValidationException::withMessages(['amount' => 'لا يوجد مبلغ مستحق متبقٍ لهذا الموظف عن هذه الفترة']);
             }
-            if ($amount > $remaining) {
-                throw ValidationException::withMessages(['amount' => 'المبلغ أكبر من المتبقي المستحق (' . number_format($remaining, 2) . ' ج.م)']);
-            }
 
             $expense = Expense::create([
                 'category' => 'salary',
