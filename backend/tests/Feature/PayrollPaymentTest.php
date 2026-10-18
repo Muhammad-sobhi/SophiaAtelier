@@ -66,8 +66,9 @@ class PayrollPaymentTest extends TestCase
         $this->assertTrue(EmployeeLoan::where('employee_id', $employee->id)->first()->deducted_from_salary);
         $this->assertSame(2500, (int) $this->rows(8, $employee)[0]['net_salary']);
 
-        $this->pay($employee, '2026-08-01', 2000)->assertStatus(422); // more than remaining
-        $this->pay($employee, '2026-08-01', 1500)->assertCreated()->assertJsonPath('payment_status', 'paid');
+        // The payer may edit the salary before paying, so more than the remaining amount is accepted
+        $this->pay($employee, '2026-08-01', 2000)->assertCreated()->assertJsonPath('payment_status', 'paid');
+        $this->pay($employee, '2026-08-01', 100)->assertStatus(422); // nothing left to pay
 
         $this->assertSame(2, Expense::where('employee_id', $employee->id)->where('category', 'salary')->count());
         $operational = $this->getJson('/api/finance/transactions?tab=operational&per_page=100')->assertOk()->json('data');
