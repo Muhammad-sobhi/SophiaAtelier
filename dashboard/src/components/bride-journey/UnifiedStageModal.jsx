@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
-import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates, visitWindowError, todayStr } from '@/lib/utils';
+import { cleanDate, isCairoCity, calculateScheduledDates as calculateDates, visitWindowError, todayStr, formatDate } from '@/lib/utils';
 import { formatVisitTime } from '@/lib/whatsapp';
 import { OPEN_VISIT_STATUSES, getLatestVisit, getVisitDresses } from './visitStatus';
 import { DressAvailability } from './DressAvailability';
@@ -126,6 +126,10 @@ export function UnifiedStageModal({
   const activeBooking = booking && !['cancelled', 'returned'].includes(booking.status) ? booking : null;
   const latestVisit = getLatestVisit(bride);
   const openVisit = latestVisit && OPEN_VISIT_STATUSES.includes(latestVisit.status) ? latestVisit : null;
+  // A new booking after a visit on an earlier day: the employee must say whether she booked at the visit or today
+  const earlierVisitDay = !activeBooking && latestVisit && [...OPEN_VISIT_STATUSES, 'done'].includes(latestVisit.status)
+    && cleanDate(latestVisit.visit_date || '') && cleanDate(latestVisit.visit_date) < todayStr()
+    ? cleanDate(latestVisit.visit_date) : null;
   const visitDresses = getVisitDresses(bride);
   // Booking prefill: current booking's dresses, else the dresses she tried, else the ones she asked to try
   const bookingPrefill = (() => {
@@ -182,7 +186,7 @@ export function UnifiedStageModal({
   const [bookingDress3Search, setBookingDress3Search] = useState('');
   const [bookingDress1Details, setBookingDress1Details] = useState(null);
   const [bookingDress2Details, setBookingDress2Details] = useState(null);
-  const [bookingDate, setBookingDate] = useState(cleanDate(booking?.booking_date || todayStr()));
+  const [bookingDate, setBookingDate] = useState(cleanDate(activeBooking?.booking_date || (earlierVisitDay ? '' : todayStr())));
   const [bookingEventDate, setBookingEventDate] = useState(cleanDate(booking?.event_date || bride.wedding_date || new Date().toISOString()));
 
   // Scheduled pickup & return dates (auto-calculated default based on city, fully editable)
@@ -853,7 +857,7 @@ export function UnifiedStageModal({
                   />
                 </div>
 
-                {/* Booking date: today for a new booking, editable when recording an older one */}
+                {/* Booking date: today for a new booking (chosen by the employee after an earlier visit), editable when recording an older one */}
                 <div className="bg-slate-50/60 p-2.5 sm:p-3 rounded-2xl border border-slate-200 space-y-1.5">
                   <label className="text-xs font-black text-slate-800 block text-right">🗓️ تاريخ الحجز (يوم دفع العربون):</label>
                   <input
@@ -864,6 +868,28 @@ export function UnifiedStageModal({
                     onChange={(e) => setBookingDate(cleanDate(e.target.value))}
                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-rose-500 text-right"
                   />
+                  {earlierVisitDay && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-bold text-amber-800">
+                        العروسة زارت يوم {formatDate(earlierVisitDay)}. اختار اليوم اللي حجزت ودفعت فيه العربون:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[[earlierVisitDay, 'يوم الزيارة'], [todayStr(), 'النهارده']].map(([day, label]) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => setBookingDate(day)}
+                            aria-pressed={bookingDate === day}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors ${bookingDate === day
+                              ? 'bg-rose-600 border-rose-600 text-white'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-rose-300'}`}
+                          >
+                            {label} ({formatDate(day)})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Scheduled Dates: Pickup & Return (Auto-calculated, fully editable) */}

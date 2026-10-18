@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Visit;
 use App\Services\ActivityLogger;
@@ -52,6 +53,21 @@ class DataHealthController extends Controller
         }
 
         return response()->json(['message' => 'تم دمج العروسة', 'client' => $keep]);
+    }
+
+    /** POST /data-health/confirm-booking-date — the booking date is right although it differs from the booked visit's day */
+    public function confirmBookingDate(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['booking_id' => 'required|integer|exists:bookings,id']);
+
+        $booking = Booking::findOrFail($validated['booking_id']);
+        $booking->forceFill(['booking_date_confirmed_at' => now()])->save();
+
+        ActivityLogger::log('تأكيد تاريخ الحجز من فحص البيانات', 'Booking', $booking->id, [
+            'booking_date' => $booking->booking_date?->toDateString(),
+        ]);
+
+        return response()->json(['message' => 'تم تأكيد تاريخ الحجز']);
     }
 
     /** POST /data-health/close-visits — close past visits that were never marked */

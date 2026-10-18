@@ -61,6 +61,71 @@ class DataHealthTest extends TestCase
         $this->putJson("/api/bookings/{$booking->id}", ['total_amount' => 1200])->assertOk();
     }
 
+    private function booking(Client $client, string $bookingDate, string $createdAt): Booking
+    {
+        $booking = Booking::create(['client_id' => $client->id, 'dress_id' => Dress::factory()->create()->id,
+            'booking_date' => $bookingDate, 'event_date' => '2026-12-15', 'status' => 'confirmed', 'total_amount' => 1000]);
+        $booking->forceFill(['created_at' => $createdAt])->saveQuietly();
+
+        return $booking;
+    }
+
+    private function checkIds(string $check): \Illuminate\Support\Collection
+    {
+        return collect($this->getJson("/api/data-health/{$check}")->assertOk()->json('rows'))->pluck('id');
+    }
+
+    public function test_booking_date_after_the_shop_day_it_was_recorded()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $client = Client::create(['name' => 'Edited Bride', 'phone' => '01044440010', 'city' => 'القاهرة']);
+        // Old edit bug: recorded 8 Sep, date overwritten with the edit day
+        $overwritten = $this->booking($client, '2026-10-03', '2026-09-08 20:16:40');
+        // Recorded 23:37 UTC on 6 Sep = 7 Sep in the shop, so 7 Sep is right
+        $lateNight = $this->booking($client, '2026-09-07', '2026-09-06 23:37:50');
+        $sameDay = $this->booking($client, '2026-09-08', '2026-09-08 10:00:00');
+
+        $ids = $this->checkIds('booking_date_after_created');
+        $this->assertTrue($ids->contains($overwritten->id));
+        $this->assertFalse($ids->contains($lateNight->id));
+        $this->assertFalse($ids->contains($sameDay->id));
+    }
+
+    public function test_booking_date_not_on_the_booked_visit_day_until_fixed_or_confirmed()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $late = Client::create(['name' => 'Late Entry', 'phone' => '01044440011', 'city' => 'القاهرة']);
+        Visit::create(['client_id' => $late->id, 'visit_date' => '2026-10-03', 'status' => 'booked']);
+        $lateBooking = $this->booking($late, '2026-10-05', '2026-10-05 20:00:00');
+
+        $sameDay = Client::create(['name' => 'Same Day', 'phone' => '01044440012', 'city' => 'القاهرة']);
+        Visit::create(['client_id' => $sameDay->id, 'visit_date' => '2026-10-03', 'status' => 'booked']);
+        $sameDayBooking = $this->booking($sameDay, '2026-10-03', '2026-10-03 12:00:00');
+
+        $rows = collect($this->getJson('/api/data-health/booking_date_not_visit_day')->assertOk()->json('rows'))->keyBy('id');
+        $this->assertSame('2026-10-03', $rows[$lateBooking->id]['visit_date']);
+        $this->assertArrayNotHasKey($sameDayBooking->id, $rows);
+
+        // She really booked on the written day
+        $this->postJson('/api/data-health/confirm-booking-date', ['booking_id' => $lateBooking->id])->assertOk();
+        $this->assertFalse($this->checkIds('booking_date_not_visit_day')->contains($lateBooking->id));
+        $this->assertSame('2026-10-05', $lateBooking->fresh()->booking_date->toDateString());
+
+        // Or the admin sets the visit day
+        $other = Client::create(['name' => 'Fixed Bride', 'phone' => '01044440013', 'city' => 'القاهرة']);
+        Visit::create(['client_id' => $other->id, 'visit_date' => '2026-10-04', 'status' => 'booked']);
+        $fixed = $this->booking($other, '2026-10-06', '2026-10-06 12:00:00');
+        $this->assertTrue($this->checkIds('booking_date_not_visit_day')->contains($fixed->id));
+        $this->putJson("/api/bookings/{$fixed->id}", ['booking_date' => '2026-10-04'])->assertOk();
+        $this->assertFalse($this->checkIds('booking_date_not_visit_day')->contains($fixed->id));
+    }
+
+    public function test_confirm_booking_date_is_admin_only()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'staff']));
+        $this->postJson('/api/data-health/confirm-booking-date', ['booking_id' => 1])->assertForbidden();
+    }
+
     public function test_merge_moves_everything_to_the_kept_bride()
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

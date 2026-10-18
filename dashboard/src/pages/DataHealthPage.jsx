@@ -51,6 +51,9 @@ function ActionButton({ icon: Icon, label, onClick, disabled, tone = 'slate' }) 
   );
 }
 
+// The booked visit day(s) of a row in the visit-day check
+const visitDays = (r) => (r.visit_date ? r.visit_date.split('، ').map(formatDate).join('، ') : '—');
+
 const Th = ({ children }) => <th className="py-2.5 px-3 font-black whitespace-nowrap">{children}</th>;
 // Actions stay visible at the row end (left in RTL) while the rest of a wide table scrolls
 const STICKY = 'sticky left-0 bg-white/95 shadow-[4px_0_6px_-4px_rgba(15,23,42,0.12)]';
@@ -66,11 +69,12 @@ function BrideCell({ row }) {
   );
 }
 
-function BookingTable({ rows, busy, fix, onOpen, onEdit, onPayments, onDelete }) {
+function BookingTable({ rows, busy, fix, withPayments, onOpen, onEdit, onPayments, onConfirmDate, onDelete }) {
+  const withVisitDay = rows.some((r) => r.visit_date !== undefined);
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
-        <tr><Th>#</Th><Th>العروسة</Th><Th>الفستان</Th><Th>الحجز</Th><Th>الفرح</Th><Th>الاستلام / الإرجاع</Th><Th>القيمة</Th><Th>مدفوع</Th><Th>تأمين</Th><Th>الحالة</Th><Th>اتسجل</Th><Th /></tr>
+        <tr><Th>#</Th><Th>العروسة</Th><Th>الفستان</Th>{withVisitDay && <Th>يوم الزيارة</Th>}<Th>الحجز</Th><Th>الفرح</Th><Th>الاستلام / الإرجاع</Th><Th>القيمة</Th><Th>مدفوع</Th><Th>تأمين</Th><Th>الحالة</Th><Th>اتسجل</Th><Th /></tr>
       </thead>
       <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
         {rows.map((r) => (
@@ -78,6 +82,7 @@ function BookingTable({ rows, busy, fix, onOpen, onEdit, onPayments, onDelete })
             <Td className="font-mono text-slate-400">{r.id}</Td>
             <Td><BrideCell row={r} /></Td>
             <Td className="whitespace-normal min-w-[160px]">{[r.dress, r.dress_2, r.dress_3].filter(Boolean).join('، ') || '—'}</Td>
+            {withVisitDay && <Td className="font-mono text-amber-800">{visitDays(r)}</Td>}
             <Td className="font-mono">{formatDate(r.booking_date)}</Td>
             <Td className="font-mono">{formatDate(r.event_date)}</Td>
             <Td className="font-mono text-[11px]">{formatDate(r.pickup_scheduled_on)} ← {formatDate(r.return_scheduled_on)}</Td>
@@ -90,6 +95,8 @@ function BookingTable({ rows, busy, fix, onOpen, onEdit, onPayments, onDelete })
               <div className="flex gap-1.5 justify-end">
                 {fix === 'payments' && <ActionButton icon={Wallet} label="الدفعات / تسجيل الباقي" tone="emerald" onClick={() => onPayments(r)} disabled={busy} />}
                 {Array.isArray(fix) && <ActionButton icon={Pencil} label={fixLabel(fix)} tone="emerald" onClick={() => onEdit(r)} disabled={busy} />}
+                {onConfirmDate && <ActionButton icon={CheckCircle2} label="التاريخ صح" tone="slate" onClick={() => onConfirmDate(r)} disabled={busy} />}
+                {withPayments && <ActionButton icon={Wallet} label="الدفعات" tone="slate" onClick={() => onPayments(r)} disabled={busy} />}
                 {r.client_id && <ActionButton icon={ExternalLink} label="فتح كرت العروسة" tone="indigo" onClick={() => onOpen(r.client_id)} disabled={busy} />}
                 <ActionButton icon={Trash2} label="حذف الحجز" tone="rose" onClick={() => onDelete(r)} disabled={busy} />
               </div>
@@ -317,7 +324,12 @@ const CHECK_FIX = {
   revenue_future: ['payment_date'],
   revenue_non_positive: ['amount'],
   revenue_deposit_before_booking: ['payment_date'],
+  booking_date_after_created: ['booking_date'],
+  booking_date_not_visit_day: ['booking_date'],
 };
+
+// Booking-date checks also offer the payments screen: the old bug moved the deposit date along with the booking date
+const DATE_CHECKS_WITH_PAYMENTS = ['booking_date_after_created', 'booking_date_not_visit_day'];
 
 const fixLabel = (keys) => (keys.length === 1 ? `تعديل ${FIELDS[keys[0]].label.replace(/ \(.*\)$/, '')}` : 'تعديل التواريخ');
 
@@ -501,6 +513,11 @@ function CheckDetails({ checkKey, onChanged }) {
     () => apiClient.post('/data-health/close-visits', { ids, status }),
     (res) => res?.message || 'تم',
   );
+  const confirmBookingDate = (r) => run(
+    `تأكيد إن تاريخ الحجز ${formatDate(r.booking_date)} صح للعروسة ${r.client_name || ''}؟ يعني حجزت فعلاً في اليوم ده مش يوم الزيارة (${visitDays(r)}).`,
+    () => apiClient.post('/data-health/confirm-booking-date', { booking_id: r.id }),
+    'تم تأكيد تاريخ الحجز',
+  );
   const mergeClients = (keep, others) => run(
     `دمج ${others.map((o) => `${o.client_name} (#${o.id})`).join('، ')} في ${keep.client_name} (#${keep.id})؟\n`
       + 'كل الحجوزات والزيارات والدفعات هتتنقل للسجل الأساسي، والسجلات التانية هتتشال. مينفعش يترجع.',
@@ -561,7 +578,15 @@ function CheckDetails({ checkKey, onChanged }) {
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-          {data.entity === 'booking' && <BookingTable {...common} onPayments={openPayments} onDelete={deleteBooking} />}
+          {data.entity === 'booking' && (
+            <BookingTable
+              {...common}
+              withPayments={DATE_CHECKS_WITH_PAYMENTS.includes(checkKey)}
+              onPayments={openPayments}
+              onConfirmDate={checkKey === 'booking_date_not_visit_day' ? confirmBookingDate : null}
+              onDelete={deleteBooking}
+            />
+          )}
           {data.entity === 'revenue' && <RevenueTable {...common} onDelete={deleteRevenue} />}
           {data.entity === 'visit' && (
             <VisitTable {...common} closable={closable} selected={selected} setSelected={setSelected} onClose={closeVisits} onDelete={deleteVisit} />

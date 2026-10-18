@@ -60,6 +60,29 @@ class CalendarEventsTest extends TestCase
         ], $this->eventsFor($client->id));
     }
 
+    public function test_a_visit_that_ended_in_a_booking_shows_only_as_the_booking_even_on_another_day()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $client = Client::create(['name' => 'Bride ' . uniqid(), 'phone' => '01000000000', 'city' => 'القاهرة']);
+
+        Visit::create(['client_id' => $client->id, 'visit_date' => '2099-03-02', 'status' => 'done']);
+        // Booking recorded two days after the visit it came from
+        Visit::create(['client_id' => $client->id, 'visit_date' => '2099-03-03', 'status' => 'booked']);
+        $this->makeBooking($client);
+
+        $this->assertSame([
+            'booking@2099-03-05',
+            'pickup@2099-03-19',
+            'return@2099-03-21',
+            'visit@2099-03-02',
+        ], $this->eventsFor($client->id));
+
+        // "Booked" visit of a bride without any booking is still shown (data-health lists it)
+        $noBooking = Client::create(['name' => 'Bride ' . uniqid(), 'phone' => '01000000000', 'city' => 'القاهرة']);
+        Visit::create(['client_id' => $noBooking->id, 'visit_date' => '2099-03-04', 'status' => 'booked']);
+        $this->assertSame(['visit@2099-03-04'], $this->eventsFor($noBooking->id));
+    }
+
     public function test_cancelled_bookings_and_their_fittings_are_excluded()
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

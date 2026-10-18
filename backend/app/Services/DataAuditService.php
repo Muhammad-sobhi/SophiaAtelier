@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +17,7 @@ class DataAuditService
     private const RENT = ['deposit', 'balance'];
     private const INCOMING = ['deposit', 'balance', 'insurance', 'security_deposit', 'fitting_fee'];
     private const REFUNDS = ['insurance_refund', 'deposit_refund'];
+    private const SHOP_TIMEZONE = 'Africa/Cairo';
 
     /**
      * key => [group, entity, label, hint, ids()]. The order is the check number shown by the command,
@@ -118,6 +121,14 @@ class DataAuditService
             'booking_duplicate' => ['bookings', 'booking', 'حجوزات مكررة (نفس العروسة والتليفون وتاريخ الفرح والفستان)',
                 'نفس الحجز متسجل أكتر من مرة (غالباً استيراد إكسل مرتين). سيب الأقدم واحذف الباقي.',
                 fn() => $this->duplicateBookingIds()],
+            'booking_date_after_created' => ['bookings', 'booking', 'حجوزات تاريخ الحجز بعد يوم تسجيلها على السيستم',
+                'تاريخ الحجز مينفعش يكون بعد يوم تسجيل الحجز (عمود "اتسجل"). ده من خطأ قديم كان بيغيّر تاريخ الحجز وتاريخ العربون ليوم أي تعديل. '
+                    . 'لو تعرف يوم الحجز الحقيقي (من الإيصال أو الفاتورة): اضغط "تعديل تاريخ الحجز"، وصحح تاريخ العربون من "الدفعات". لو مش متأكد سيبه.',
+                fn() => $this->bookingDateAfterCreatedIds()],
+            'booking_date_not_visit_day' => ['bookings', 'booking', 'حجوزات تاريخها مختلف عن يوم الزيارة اللي اتحجز فيها',
+                'الزيارة حالتها "حجزت" لكن تاريخ الحجز يوم تاني، فالتقارير بتحسب الحجز في يوم تاني. غالباً الحجز اتسجل على السيستم متأخر. '
+                    . 'لو العروسة حجزت يوم الزيارة: اضغط "تعديل تاريخ الحجز". لو حجزت فعلاً في اليوم المكتوب: اضغط "التاريخ صح". لو مش متأكد سيبه.',
+                fn() => $this->bookingDateNotVisitDayIds()],
         ];
     }
 
@@ -146,17 +157,17 @@ class DataAuditService
         $ids = $ids()->values();
 
         return ['key' => $key, 'group' => $group, 'entity' => $entity, 'label' => $label, 'hint' => $hint,
-            'count' => $ids->count(), 'rows' => $this->rows($entity, $ids)];
+            'count' => $ids->count(), 'rows' => $this->rows($entity, $ids, $key)];
     }
 
-    public function rows(string $entity, Collection $ids): Collection
+    public function rows(string $entity, Collection $ids, ?string $key = null): Collection
     {
         if ($ids->isEmpty()) {
             return collect();
         }
 
         return match ($entity) {
-            'booking' => $this->bookingRows($ids),
+            'booking' => $key === 'booking_date_not_visit_day' ? $this->withBookedVisitDays($this->bookingRows($ids)) : $this->bookingRows($ids),
             'revenue' => $this->revenueRows($ids),
             'visit' => $this->visitRows($ids),
             default => $this->clientRows($ids),
@@ -181,6 +192,16 @@ class DataAuditService
             ->selectSub($paid(['insurance', 'security_deposit']), 'insurance')
             ->selectRaw("DATE_FORMAT(b.created_at, '%Y-%m-%d %H:%i') AS created")
             ->get();
+    }
+
+    /** Adds the day(s) of the bride's "booked" visit that no booking is dated on */
+    private function withBookedVisitDays(Collection $rows): Collection
+    {
+        $days = $this->bookedVisitMismatches()->whereIn('b.id', $rows->pluck('id'))->get()->groupBy('booking_id');
+
+        return $rows->each(function ($r) use ($days) {
+            $r->visit_date = ($days[$r->id] ?? collect())->pluck('visit_date')->unique()->sort()->implode('، ');
+        });
     }
 
     private function revenueRows(Collection $ids): Collection
@@ -256,5 +277,34 @@ class DataAuditService
     private function duplicateBookingIds(): Collection
     {
         return $this->duplicateBookingGroups()->flatten(1)->pluck('id')->sort()->values();
+    }
+
+    /** Booking date after the shop-local day the booking was recorded (timestamps are stored in the app timezone) */
+    private function bookingDateAfterCreatedIds(): Collection
+    {
+        return DB::table('bookings')->where('status', '!=', 'cancelled')
+            ->whereRaw('DATE(booking_date) > DATE(created_at)')
+            ->orderBy('id')->get(['id', 'booking_date', 'created_at'])
+            ->filter(fn($b) => substr($b->booking_date, 0, 10)
+                > Carbon::parse($b->created_at, config('app.timezone'))->setTimezone(self::SHOP_TIMEZONE)->toDateString())
+            ->pluck('id')->values();
+    }
+
+    /** Bookings whose bride has a visit marked "booked" on a day none of her bookings is dated */
+    private function bookingDateNotVisitDayIds(): Collection
+    {
+        return $this->bookedVisitMismatches()->get()->pluck('booking_id')->unique()->sort()->values();
+    }
+
+    private function bookedVisitMismatches(): Builder
+    {
+        return DB::table('bookings AS b')
+            ->join('visits AS v', fn($j) => $j->on('v.client_id', '=', 'b.client_id')->where('v.status', 'booked'))
+            ->join('clients AS c', 'c.id', '=', 'b.client_id')->whereNull('c.deleted_at')
+            ->where('b.status', '!=', 'cancelled')->whereNull('b.booking_date_confirmed_at')
+            ->whereNotNull('v.visit_date')
+            ->whereNotExists(fn($q) => $q->from('bookings AS b2')->whereColumn('b2.client_id', 'b.client_id')
+                ->where('b2.status', '!=', 'cancelled')->whereRaw('DATE(b2.booking_date) = DATE(v.visit_date)'))
+            ->select('b.id AS booking_id', 'v.id AS visit_id', DB::raw('DATE(v.visit_date) AS visit_date'));
     }
 }
