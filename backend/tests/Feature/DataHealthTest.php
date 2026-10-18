@@ -91,6 +91,76 @@ class DataHealthTest extends TestCase
         $this->assertFalse($ids->contains($sameDay->id));
     }
 
+    private function confirmLog(Client $client, string $at): void
+    {
+        \Illuminate\Support\Facades\DB::table('activity_logs')->insert([
+            'action' => 'تأكيد حجز فستان', 'entity_type' => 'Client', 'entity_id' => $client->id, 'created_at' => $at,
+        ]);
+    }
+
+    public function test_booking_date_is_compared_with_the_first_booking_confirmation()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        // Pending booking made when the bride was registered, confirmed (with the deposit) five days later
+        $confirmedLater = Client::create(['name' => 'Confirmed Later', 'phone' => '01044440020', 'city' => 'القاهرة']);
+        $right = $this->booking($confirmedLater, '2026-09-20', '2026-09-15 14:08:49');
+        $this->confirmLog($confirmedLater, '2026-09-20 09:28:46');
+
+        // Confirmed 16 Sep, the old bug moved the date to a later edit
+        $edited = Client::create(['name' => 'Edited Later', 'phone' => '01044440021', 'city' => 'القاهرة']);
+        $wrong = $this->booking($edited, '2026-09-20', '2026-09-16 12:56:35');
+        $this->confirmLog($edited, '2026-09-16 13:09:08');
+        $this->confirmLog($edited, '2026-09-20 10:56:27');
+
+        // Confirmed 23:20 UTC on 5 Oct = 6 Oct in the shop
+        $night = Client::create(['name' => 'Night Entry', 'phone' => '01044440022', 'city' => 'القاهرة']);
+        $nightBooking = $this->booking($night, '2026-10-06', '2026-09-15 10:44:31');
+        $this->confirmLog($night, '2026-10-05 23:20:27');
+
+        $ids = $this->checkIds('booking_date_after_created');
+        $this->assertFalse($ids->contains($right->id));
+        $this->assertTrue($ids->contains($wrong->id));
+        $this->assertFalse($ids->contains($nightBooking->id));
+
+        $row = collect($this->getJson('/api/data-health/booking_date_after_created')->json('rows'))->firstWhere('id', $wrong->id);
+        $this->assertSame('2026-09-16 16:09', $row['first_confirm']);
+
+        // The admin knows the written date is right
+        $this->postJson('/api/data-health/confirm-booking-date', ['booking_id' => $wrong->id])->assertOk();
+        $this->assertFalse($this->checkIds('booking_date_after_created')->contains($wrong->id));
+    }
+
+    public function test_visit_and_booking_typed_in_together_after_the_visit_day()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $late = Client::create(['name' => 'Typed Late', 'phone' => '01044440030', 'city' => 'القاهرة']);
+        $visit = Visit::create(['client_id' => $late->id, 'visit_date' => '2026-09-06', 'status' => 'done']);
+        $visit->forceFill(['created_at' => '2026-09-08 20:08:00'])->saveQuietly();
+        $booking = $this->booking($late, '2026-09-08', '2026-09-08 20:08:45');
+
+        // Visit on its own day, came back and booked later: a real separate booking
+        $back = Client::create(['name' => 'Came Back', 'phone' => '01044440031', 'city' => 'القاهرة']);
+        $own = Visit::create(['client_id' => $back->id, 'visit_date' => '2026-09-06', 'status' => 'done']);
+        $own->forceFill(['created_at' => '2026-09-06 11:40:34'])->saveQuietly();
+        $later = $this->booking($back, '2026-09-11', '2026-09-11 20:01:17');
+
+        $rows = collect($this->getJson('/api/data-health/booking_date_visit_entered_late')->assertOk()->json('rows'))->keyBy('id');
+        $this->assertSame('2026-09-06', $rows[$booking->id]['visit_date']);
+        $this->assertArrayNotHasKey($later->id, $rows);
+    }
+
+    public function test_brides_with_the_same_name_and_wedding_date()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $a = Client::create(['name' => 'ساره سليم', 'phone' => '01004633343', 'city' => 'الإسكندرية', 'wedding_date' => '2026-10-15']);
+        $b = Client::create(['name' => 'سارة  سليم', 'phone' => '01000004148', 'city' => 'الإسكندرية', 'wedding_date' => '2026-10-15']);
+        $other = Client::create(['name' => 'ساره سليم', 'phone' => '01000004149', 'city' => 'القاهرة', 'wedding_date' => '2026-11-20']);
+
+        $rows = collect($this->getJson('/api/data-health/client_duplicate_name_wedding')->assertOk()->json('rows'))->keyBy('id');
+        $this->assertSame($rows[$a->id]['group_key'], $rows[$b->id]['group_key']);
+        $this->assertArrayNotHasKey($other->id, $rows);
+    }
+
     public function test_booking_date_not_on_the_booked_visit_day_until_fixed_or_confirmed()
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

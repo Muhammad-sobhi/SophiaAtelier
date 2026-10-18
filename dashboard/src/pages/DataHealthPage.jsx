@@ -71,10 +71,11 @@ function BrideCell({ row }) {
 
 function BookingTable({ rows, busy, fix, withPayments, onOpen, onEdit, onPayments, onConfirmDate, onDelete }) {
   const withVisitDay = rows.some((r) => r.visit_date !== undefined);
+  const withFirstConfirm = rows.some((r) => r.first_confirm !== undefined);
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
-        <tr><Th>#</Th><Th>العروسة</Th><Th>الفستان</Th>{withVisitDay && <Th>يوم الزيارة</Th>}<Th>الحجز</Th><Th>الفرح</Th><Th>الاستلام / الإرجاع</Th><Th>القيمة</Th><Th>مدفوع</Th><Th>تأمين</Th><Th>الحالة</Th><Th>اتسجل</Th><Th /></tr>
+        <tr><Th>#</Th><Th>العروسة</Th><Th>الفستان</Th>{withVisitDay && <Th>يوم الزيارة</Th>}<Th>الحجز</Th><Th>الفرح</Th><Th>الاستلام / الإرجاع</Th><Th>القيمة</Th><Th>مدفوع</Th><Th>تأمين</Th><Th>الحالة</Th><Th>اتسجل</Th>{withFirstConfirm && <Th>أول تأكيد حجز</Th>}<Th /></tr>
       </thead>
       <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
         {rows.map((r) => (
@@ -91,6 +92,7 @@ function BookingTable({ rows, busy, fix, withPayments, onOpen, onEdit, onPayment
             <Td className="font-mono">{money(r.insurance)}</Td>
             <Td>{BOOKING_STATUS[r.status] || r.status}</Td>
             <Td className="font-mono text-[10.5px] text-slate-400">{r.created}</Td>
+            {withFirstConfirm && <Td className="font-mono text-[10.5px] text-indigo-700">{r.first_confirm || '—'}</Td>}
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
                 {fix === 'payments' && <ActionButton icon={Wallet} label="الدفعات / تسجيل الباقي" tone="emerald" onClick={() => onPayments(r)} disabled={busy} />}
@@ -198,12 +200,16 @@ function VisitTable({ rows, busy, closable, selected, setSelected, onOpen, onClo
 }
 
 // Brides sharing a phone, grouped so the admin picks the record to keep and merges the rest into it
-function DuplicateClients({ rows, busy, onOpen, onMerge, onDelete }) {
+// Brides grouped by phone, or by the name + wedding date key the server sends (byName)
+function DuplicateClients({ rows, busy, byName, onOpen, onMerge, onDelete }) {
   const groups = useMemo(() => {
     const byPhone = new Map();
-    rows.forEach((r) => byPhone.set(r.phone, [...(byPhone.get(r.phone) || []), r]));
+    rows.forEach((r) => {
+      const key = byName ? r.group_key : r.phone;
+      byPhone.set(key, [...(byPhone.get(key) || []), r]);
+    });
     return [...byPhone.entries()].sort((a, b) => b[1].length - a[1].length);
-  }, [rows]);
+  }, [rows, byName]);
   const [keepByPhone, setKeepByPhone] = useState({});
 
   return (
@@ -217,8 +223,10 @@ function DuplicateClients({ rows, busy, onOpen, onMerge, onDelete }) {
         return (
           <div key={phone} className="border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-2">
-              <span className="font-mono text-xs font-black text-slate-700" dir="ltr">{phone}</span>
-              <span className="text-[11px] font-bold text-slate-500">{clients.length} سجلات على نفس الرقم</span>
+              {byName
+                ? <span className="text-xs font-black text-slate-700">{clients[0].client_name} — فرح {formatDate(clients[0].wedding_date)}</span>
+                : <span className="font-mono text-xs font-black text-slate-700" dir="ltr">{phone}</span>}
+              <span className="text-[11px] font-bold text-slate-500">{clients.length} {byName ? 'سجلات بنفس الاسم وتاريخ الفرح' : 'سجلات على نفس الرقم'}</span>
             </div>
             <table className="w-full text-right text-xs">
               <thead className="text-[10.5px] text-slate-500">
@@ -237,7 +245,7 @@ function DuplicateClients({ rows, busy, onOpen, onMerge, onDelete }) {
                       />
                     </Td>
                     <Td className="font-mono text-slate-400">{c.id}</Td>
-                    <Td className="font-black text-slate-800">{c.client_name}</Td>
+                    <Td>{byName ? <BrideCell row={c} /> : <span className="font-black text-slate-800">{c.client_name}</span>}</Td>
                     <Td className="font-mono">{formatDate(c.wedding_date)}</Td>
                     <Td className="font-mono">{c.bookings_count}{c.active_bookings > 0 && <span className="text-[10px] text-indigo-600"> ({c.active_bookings} شغال)</span>}</Td>
                     <Td className="font-mono">{c.visits_count}</Td>
@@ -326,10 +334,12 @@ const CHECK_FIX = {
   revenue_deposit_before_booking: ['payment_date'],
   booking_date_after_created: ['booking_date'],
   booking_date_not_visit_day: ['booking_date'],
+  booking_date_visit_entered_late: ['booking_date'],
 };
 
-// Booking-date checks also offer the payments screen: the old bug moved the deposit date along with the booking date
-const DATE_CHECKS_WITH_PAYMENTS = ['booking_date_after_created', 'booking_date_not_visit_day'];
+// Booking-date checks also offer the payments screen (the old bug moved the deposit date along with the booking date)
+// and "the date is right", since only the admin knows the real booking day
+const BOOKING_DATE_CHECKS = ['booking_date_after_created', 'booking_date_not_visit_day', 'booking_date_visit_entered_late'];
 
 const fixLabel = (keys) => (keys.length === 1 ? `تعديل ${FIELDS[keys[0]].label.replace(/ \(.*\)$/, '')}` : 'تعديل التواريخ');
 
@@ -514,7 +524,8 @@ function CheckDetails({ checkKey, onChanged }) {
     (res) => res?.message || 'تم',
   );
   const confirmBookingDate = (r) => run(
-    `تأكيد إن تاريخ الحجز ${formatDate(r.booking_date)} صح للعروسة ${r.client_name || ''}؟ يعني حجزت فعلاً في اليوم ده مش يوم الزيارة (${visitDays(r)}).`,
+    `تأكيد إن تاريخ الحجز ${formatDate(r.booking_date)} صح للعروسة ${r.client_name || ''}؟ يعني حجزت ودفعت العربون فعلاً في اليوم ده`
+      + (r.visit_date ? ` مش يوم الزيارة (${visitDays(r)}).` : '.'),
     () => apiClient.post('/data-health/confirm-booking-date', { booking_id: r.id }),
     'تم تأكيد تاريخ الحجز',
   );
@@ -581,9 +592,9 @@ function CheckDetails({ checkKey, onChanged }) {
           {data.entity === 'booking' && (
             <BookingTable
               {...common}
-              withPayments={DATE_CHECKS_WITH_PAYMENTS.includes(checkKey)}
+              withPayments={BOOKING_DATE_CHECKS.includes(checkKey)}
               onPayments={openPayments}
-              onConfirmDate={checkKey === 'booking_date_not_visit_day' ? confirmBookingDate : null}
+              onConfirmDate={BOOKING_DATE_CHECKS.includes(checkKey) ? confirmBookingDate : null}
               onDelete={deleteBooking}
             />
           )}
@@ -591,8 +602,8 @@ function CheckDetails({ checkKey, onChanged }) {
           {data.entity === 'visit' && (
             <VisitTable {...common} closable={closable} selected={selected} setSelected={setSelected} onClose={closeVisits} onDelete={deleteVisit} />
           )}
-          {data.entity === 'client' && (checkKey === 'client_duplicate_phone'
-            ? <DuplicateClients {...common} onMerge={mergeClients} onDelete={deleteClient} />
+          {data.entity === 'client' && (['client_duplicate_phone', 'client_duplicate_name_wedding'].includes(checkKey)
+            ? <DuplicateClients {...common} byName={checkKey === 'client_duplicate_name_wedding'} onMerge={mergeClients} onDelete={deleteClient} />
             : <ClientTable {...common} />)}
         </div>
       )}

@@ -121,14 +121,22 @@ class DataAuditService
             'booking_duplicate' => ['bookings', 'booking', 'حجوزات مكررة (نفس العروسة والتليفون وتاريخ الفرح والفستان)',
                 'نفس الحجز متسجل أكتر من مرة (غالباً استيراد إكسل مرتين). سيب الأقدم واحذف الباقي.',
                 fn() => $this->duplicateBookingIds()],
-            'booking_date_after_created' => ['bookings', 'booking', 'حجوزات تاريخ الحجز بعد يوم تسجيلها على السيستم',
-                'تاريخ الحجز مينفعش يكون بعد يوم تسجيل الحجز (عمود "اتسجل"). ده من خطأ قديم كان بيغيّر تاريخ الحجز وتاريخ العربون ليوم أي تعديل. '
-                    . 'لو تعرف يوم الحجز الحقيقي (من الإيصال أو الفاتورة): اضغط "تعديل تاريخ الحجز"، وصحح تاريخ العربون من "الدفعات". لو مش متأكد سيبه.',
+            'booking_date_after_created' => ['bookings', 'booking', 'حجوزات تاريخها بعد أول يوم اتأكد فيه الحجز على السيستم',
+                'تاريخ الحجز بعد أول مرة الحجز اتأكد فيها على السيستم (عمود "أول تأكيد" بتوقيت مصر، ولو فاضي فعمود "اتسجل"). غالباً من خطأ قديم كان بيغيّر تاريخ الحجز والعربون ليوم أي تعديل. '
+                    . 'اتأكد من العقد أو تحويل إنستاباي: لو لقيت اليوم الصح اضغط "تعديل تاريخ الحجز" وصحح العربون من "الدفعات". لو المكتوب صح اضغط "التاريخ صح". لو مش متأكد سيبه.',
                 fn() => $this->bookingDateAfterCreatedIds()],
             'booking_date_not_visit_day' => ['bookings', 'booking', 'حجوزات تاريخها مختلف عن يوم الزيارة اللي اتحجز فيها',
                 'الزيارة حالتها "حجزت" لكن تاريخ الحجز يوم تاني، فالتقارير بتحسب الحجز في يوم تاني. غالباً الحجز اتسجل على السيستم متأخر. '
                     . 'لو العروسة حجزت يوم الزيارة: اضغط "تعديل تاريخ الحجز". لو حجزت فعلاً في اليوم المكتوب: اضغط "التاريخ صح". لو مش متأكد سيبه.',
                 fn() => $this->bookingDateNotVisitDayIds()],
+            'booking_date_visit_entered_late' => ['bookings', 'booking', 'حجوزات اتسجلت مع زيارتها في نفس الوقت بعد يوم الزيارة',
+                'الزيارة والحجز اتكتبوا على السيستم مع بعض بعد يوم الزيارة، فالحجز أخد يوم الكتابة. غالباً العروسة حجزت يوم الزيارة. '
+                    . 'اتأكد من العقد أو تحويل إنستاباي: لو حجزت يوم الزيارة اضغط "تعديل تاريخ الحجز". لو المكتوب صح اضغط "التاريخ صح". لو مش متأكد سيبه.',
+                fn() => $this->bookingDateVisitEnteredLateIds()],
+            'client_duplicate_name_wedding' => ['brides', 'client', 'عرايس بنفس الاسم ونفس تاريخ الفرح',
+                'ممكن تكون نفس العروسة متسجلة مرتين (زي نسخة Legacy من الاستيراد)، وممكن عرايس مختلفين. قارن التليفون والحجوزات: '
+                    . 'لو نفس العروسة اختار السجل الأساسي و"ادمج" الباقي فيه. لو مختلفين سيبهم.',
+                fn() => $this->duplicateNameWeddingIds()],
         ];
     }
 
@@ -167,10 +175,17 @@ class DataAuditService
         }
 
         return match ($entity) {
-            'booking' => $key === 'booking_date_not_visit_day' ? $this->withBookedVisitDays($this->bookingRows($ids)) : $this->bookingRows($ids),
+            'booking' => match ($key) {
+                'booking_date_after_created' => $this->withFirstConfirmations($this->bookingRows($ids)),
+                'booking_date_not_visit_day' => $this->withFirstConfirmations($this->withVisitDays($this->bookingRows($ids), $this->bookedVisitMismatches())),
+                'booking_date_visit_entered_late' => $this->withFirstConfirmations($this->withVisitDays($this->bookingRows($ids), $this->visitEnteredLateMismatches())),
+                default => $this->bookingRows($ids),
+            },
             'revenue' => $this->revenueRows($ids),
             'visit' => $this->visitRows($ids),
-            default => $this->clientRows($ids),
+            default => $key === 'client_duplicate_name_wedding'
+                ? $this->clientRows($ids)->each(fn($c) => $c->group_key = $this->nameWeddingKey($c->client_name, $c->wedding_date))
+                : $this->clientRows($ids),
         };
     }
 
@@ -190,14 +205,15 @@ class DataAuditService
             ->selectSub($dressName('dress_3_id'), 'dress_3')
             ->selectSub($paid(self::RENT), 'paid_rent')
             ->selectSub($paid(['insurance', 'security_deposit']), 'insurance')
-            ->selectRaw("DATE_FORMAT(b.created_at, '%Y-%m-%d %H:%i') AS created")
-            ->get();
+            ->addSelect('b.created_at AS created')
+            ->get()
+            ->each(fn($r) => $r->created = $r->created ? $this->shopTime($r->created)->format('Y-m-d H:i') : null);
     }
 
-    /** Adds the day(s) of the bride's "booked" visit that no booking is dated on */
-    private function withBookedVisitDays(Collection $rows): Collection
+    /** Adds the visit day(s) a booking row is compared with */
+    private function withVisitDays(Collection $rows, Builder $pairs): Collection
     {
-        $days = $this->bookedVisitMismatches()->whereIn('b.id', $rows->pluck('id'))->get()->groupBy('booking_id');
+        $days = $pairs->whereIn('b.id', $rows->pluck('id'))->get()->groupBy('booking_id');
 
         return $rows->each(function ($r) use ($days) {
             $r->visit_date = ($days[$r->id] ?? collect())->pluck('visit_date')->unique()->sort()->implode('، ');
@@ -279,15 +295,93 @@ class DataAuditService
         return $this->duplicateBookingGroups()->flatten(1)->pluck('id')->sort()->values();
     }
 
-    /** Booking date after the shop-local day the booking was recorded (timestamps are stored in the app timezone) */
+    /**
+     * Booking date after the shop-local day the booking was first confirmed (the "تأكيد حجز فستان" activity log),
+     * or the day it was recorded when it has no log (logs started mid-September). Before late September a bride
+     * registered with dresses got a pending booking at once, so the record day alone is not the booking day.
+     */
     private function bookingDateAfterCreatedIds(): Collection
     {
-        return DB::table('bookings')->where('status', '!=', 'cancelled')
+        $confirmations = $this->confirmationsByClient();
+
+        return DB::table('bookings')->where('status', '!=', 'cancelled')->whereNull('booking_date_confirmed_at')
             ->whereRaw('DATE(booking_date) > DATE(created_at)')
-            ->orderBy('id')->get(['id', 'booking_date', 'created_at'])
+            ->orderBy('id')->get(['id', 'client_id', 'booking_date', 'created_at'])
             ->filter(fn($b) => substr($b->booking_date, 0, 10)
-                > Carbon::parse($b->created_at, config('app.timezone'))->setTimezone(self::SHOP_TIMEZONE)->toDateString())
+                > ($this->firstConfirmation($b, $confirmations) ?? $this->shopTime($b->created_at))->toDateString())
             ->pluck('id')->values();
+    }
+
+    /** Timestamps are stored in the app timezone; the shop works in Cairo time */
+    private function shopTime(string $timestamp): Carbon
+    {
+        return Carbon::parse($timestamp, config('app.timezone'))->setTimezone(self::SHOP_TIMEZONE);
+    }
+
+    /** "تأكيد حجز فستان" log times per bride, oldest first */
+    private function confirmationsByClient(): Collection
+    {
+        return DB::table('activity_logs')->whereIn('entity_type', ['Client', 'client'])
+            ->where('action', 'تأكيد حجز فستان')->whereNotNull('entity_id')
+            ->orderBy('created_at')->get(['entity_id', 'created_at'])
+            ->groupBy('entity_id');
+    }
+
+    /** The first confirmation of this booking: the bride's first one from (just before) the booking's creation on */
+    private function firstConfirmation(object $booking, Collection $confirmations): ?Carbon
+    {
+        $from = Carbon::parse($booking->created_at)->subMinutes(5)->toDateTimeString();
+        $log = ($confirmations[$booking->client_id] ?? collect())->first(fn($l) => $l->created_at >= $from);
+
+        return $log ? $this->shopTime($log->created_at) : null;
+    }
+
+    private function withFirstConfirmations(Collection $rows): Collection
+    {
+        $confirmations = $this->confirmationsByClient();
+        $bookings = DB::table('bookings')->whereIn('id', $rows->pluck('id'))->get(['id', 'client_id', 'created_at'])->keyBy('id');
+
+        return $rows->each(function ($r) use ($confirmations, $bookings) {
+            $r->first_confirm = $this->firstConfirmation($bookings[$r->id], $confirmations)?->format('Y-m-d H:i');
+        });
+    }
+
+    /** Visit and booking typed in together (within an hour) after the visit day, the visit closed as attended */
+    private function bookingDateVisitEnteredLateIds(): Collection
+    {
+        return $this->visitEnteredLateMismatches()->get()->pluck('booking_id')->unique()->sort()->values();
+    }
+
+    private function visitEnteredLateMismatches(): Builder
+    {
+        return DB::table('bookings AS b')
+            ->join('visits AS v', fn($j) => $j->on('v.client_id', '=', 'b.client_id')->whereIn('v.status', ['done', 'arrived']))
+            ->join('clients AS c', 'c.id', '=', 'b.client_id')->whereNull('c.deleted_at')
+            ->where('b.status', '!=', 'cancelled')->whereNull('b.booking_date_confirmed_at')
+            ->whereNotNull('v.visit_date')
+            ->whereRaw('DATE(v.visit_date) < DATE(b.booking_date)')
+            ->whereRaw('DATE(v.visit_date) < DATE(v.created_at)')
+            ->whereRaw('ABS(TIMESTAMPDIFF(MINUTE, v.created_at, b.created_at)) <= 60')
+            ->whereNotExists(fn($q) => $q->from('bookings AS b2')->whereColumn('b2.client_id', 'b.client_id')
+                ->where('b2.status', '!=', 'cancelled')->whereRaw('DATE(b2.booking_date) = DATE(v.visit_date)'))
+            ->select('b.id AS booking_id', 'v.id AS visit_id', DB::raw('DATE(v.visit_date) AS visit_date'));
+    }
+
+    /** Brides whose (spelling-normalized) name and wedding date match another bride's */
+    private function duplicateNameWeddingIds(): Collection
+    {
+        return DB::table('clients')->whereNull('deleted_at')->whereNotNull('wedding_date')->where('name', '!=', '')
+            ->orderBy('id')->get(['id', 'name', 'wedding_date'])
+            ->groupBy(fn($c) => $this->nameWeddingKey($c->name, $c->wedding_date))
+            ->filter(fn($group) => $group->count() > 1)
+            ->flatten(1)->pluck('id')->sort()->values();
+    }
+
+    private function nameWeddingKey(?string $name, ?string $weddingDate): string
+    {
+        $name = strtr(trim(preg_replace('/\s+/u', ' ', (string) $name)), ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ة' => 'ه', 'ى' => 'ي']);
+
+        return $name . '|' . substr((string) $weddingDate, 0, 10);
     }
 
     /** Bookings whose bride has a visit marked "booked" on a day none of her bookings is dated */
