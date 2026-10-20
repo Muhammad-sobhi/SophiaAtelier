@@ -18,6 +18,10 @@ class DataAuditService
     private const INCOMING = ['deposit', 'balance', 'insurance', 'security_deposit', 'fitting_fee'];
     private const REFUNDS = ['insurance_refund', 'deposit_refund'];
     private const SHOP_TIMEZONE = 'Africa/Cairo';
+    /** Until this day editing a booking reset its booking date (and deposit date) to the edit day */
+    private const EDIT_DATE_BUG_FIXED_ON = '2026-10-12';
+    private const PAYMENT_LABELS = ['balance' => 'باقي', 'insurance' => 'تأمين', 'security_deposit' => 'تأمين',
+        'fitting_fee' => 'رسوم بروفة', 'insurance_refund' => 'استرداد تأمين', 'deposit_refund' => 'استرداد عربون', 'damage_fee' => 'خصم تلفيات'];
 
     /**
      * key => [group, entity, label, hint, ids()]. The order is the check number shown by the command,
@@ -137,6 +141,11 @@ class DataAuditService
                 'ممكن تكون نفس العروسة متسجلة مرتين (زي نسخة Legacy من الاستيراد)، وممكن عرايس مختلفين. قارن التليفون والحجوزات: '
                     . 'لو نفس العروسة اختار السجل الأساسي و"ادمج" الباقي فيه. لو مختلفين سيبهم.',
                 fn() => $this->duplicateNameWeddingIds()],
+            'booking_date_edit_evidence' => ['bookings', 'booking', 'حجوزات تاريخها اتغيّر ليوم تعديل وفيه دليل إنها اتحجزت قبل كده',
+                'فيه حاجة اتسجلت للحجز قبل تاريخه (دفعة، بروفة، زيارة "حجزت"، أو أول تأكيد حجز)، فالتاريخ غالباً اتغيّر ليوم تعديل بالخطأ القديم. '
+                    . 'عمود "الدليل" بيقول إيه اللي اتسجل وإمتى، و"اليوم المقترح" هو يوم الحجز الأرجح. اضغط "تعديل تاريخ الحجز" (هيتملي باليوم المقترح) وصحح العربون من "الدفعات". '
+                    . 'لو المكتوب صح اضغط "التاريخ صح".',
+                fn() => $this->editDateEvidence()->keys()->sort()->values()],
         ];
     }
 
@@ -179,6 +188,7 @@ class DataAuditService
                 'booking_date_after_created' => $this->withFirstConfirmations($this->bookingRows($ids)),
                 'booking_date_not_visit_day' => $this->withFirstConfirmations($this->withVisitDays($this->bookingRows($ids), $this->bookedVisitMismatches())),
                 'booking_date_visit_entered_late' => $this->withFirstConfirmations($this->withVisitDays($this->bookingRows($ids), $this->visitEnteredLateMismatches())),
+                'booking_date_edit_evidence' => $this->withEditDateEvidence($this->withFirstConfirmations($this->bookingRows($ids))),
                 default => $this->bookingRows($ids),
             },
             'revenue' => $this->revenueRows($ids),
@@ -400,5 +410,99 @@ class DataAuditService
             ->whereNotExists(fn($q) => $q->from('bookings AS b2')->whereColumn('b2.client_id', 'b.client_id')
                 ->where('b2.status', '!=', 'cancelled')->whereRaw('DATE(b2.booking_date) = DATE(v.visit_date)'))
             ->select('b.id AS booking_id', 'v.id AS visit_id', DB::raw('DATE(v.visit_date) AS visit_date'));
+    }
+
+    /**
+     * Bookings dated on or before the edit-date fix that have proof the bride was booked before the booking date:
+     * the old bug moved only the booking date (and the re-created deposit), so payments, fittings, the booked visit
+     * and the first confirmation log still carry the real time. booking id => [suggested day|null, evidence, edited].
+     * The suggestion is the first confirmation (when logs existed at the booking's creation) or the booked visit day.
+     */
+    private function editDateEvidence(): Collection
+    {
+        $bookings = DB::table('bookings AS b')->join('clients AS c', 'c.id', '=', 'b.client_id')->whereNull('c.deleted_at')
+            ->where('b.status', '!=', 'cancelled')->whereNull('b.booking_date_confirmed_at')->whereNotNull('b.booking_date')
+            ->where('b.booking_date', '<=', self::EDIT_DATE_BUG_FIXED_ON)
+            ->orderBy('b.booking_date')->get(['b.id', 'b.client_id', 'b.booking_date', 'b.created_at']);
+        if ($bookings->isEmpty()) {
+            return collect();
+        }
+
+        $ids = $bookings->pluck('id');
+        $revenues = DB::table('revenues')->whereIn('booking_id', $ids)->get(['booking_id', 'type', 'payment_date', 'created_at'])->groupBy('booking_id');
+        $fittings = DB::table('fittings')->whereIn('booking_id', $ids)->get(['booking_id', 'fitting_date', 'created_at'])->groupBy('booking_id');
+        $bookedVisits = DB::table('visits')->where('status', 'booked')->whereNotNull('visit_date')
+            ->whereIn('client_id', $bookings->pluck('client_id'))->get(['client_id', 'visit_date'])->groupBy('client_id');
+        $confirmations = $this->confirmationsByClient();
+        $logsSince = DB::table('activity_logs')->where('action', 'تأكيد حجز فستان')->min('created_at');
+        $byClient = $bookings->groupBy('client_id');
+        $day = fn(?string $timestamp) => $timestamp ? $this->shopTime($timestamp)->toDateString() : null;
+        $earliest = fn(array $days) => ($days = array_filter($days)) ? min($days) : null;
+
+        return $bookings->mapWithKeys(function ($b) use ($revenues, $fittings, $bookedVisits, $confirmations, $logsSince, $byClient, $day, $earliest) {
+            $date = substr($b->booking_date, 0, 10);
+            $before = fn(?string $d) => $d && $d < $date;
+            $proofs = [];   // [day, label, exact]
+
+            // Logs started mid-September: for an older booking its first log may already be an edit
+            $confirm = $this->firstConfirmation($b, $confirmations)?->toDateString();
+            $logged = $logsSince && $b->created_at >= $logsSince;
+            if ($confirm && $logged && !$before($confirm)) {
+                return [];   // first confirmed on its booking date: not moved by an edit (late entries have their own checks)
+            }
+            if ($before($confirm)) {
+                $proofs[] = [$confirm, 'أول تأكيد حجز', $logged];
+            }
+
+            // A booked visit after the bride's previous booking
+            $previous = $byClient[$b->client_id]->where('id', '<', $b->id)->max('booking_date');
+            $visit = ($bookedVisits[$b->client_id] ?? collect())->map(fn($v) => substr($v->visit_date, 0, 10))
+                ->filter(fn($d) => $before($d) && (!$previous || $d > substr($previous, 0, 10)))->max();
+            if ($visit) {
+                $proofs[] = [$visit, 'زيارة "حجزت"', true];
+            }
+
+            $edited = false;
+            foreach ($revenues[$b->id] ?? [] as $r) {
+                if ($r->type === 'deposit') {
+                    // The edit re-created the deposit on the edit day, after the booking itself was recorded
+                    $edited = $edited || ($day($r->created_at) === $date && $r->created_at > Carbon::parse($b->created_at)->addMinutes(10)->toDateTimeString());
+                    continue;
+                }
+                $paid = $earliest([substr((string) $r->payment_date, 0, 10), $day($r->created_at)]);
+                if ($before($paid)) {
+                    $proofs[] = [$paid, 'دفعة ' . (self::PAYMENT_LABELS[$r->type] ?? $r->type), false];
+                }
+            }
+            foreach ($fittings[$b->id] ?? [] as $f) {
+                $fitted = $earliest([substr((string) $f->fitting_date, 0, 10), $day($f->created_at)]);
+                if ($before($fitted)) {
+                    $proofs[] = [$fitted, 'بروفة', false];
+                }
+            }
+
+            if (!$proofs) {
+                return [];
+            }
+
+            usort($proofs, fn($x, $y) => strcmp($x[0], $y[0]));
+            $first = $proofs[0][0];
+            // The likeliest booking day: an exact proof no later than anything else recorded for the booking
+            $suggested = collect($proofs)->first(fn($p) => $p[2] && $p[0] === $first)[0] ?? null;
+            $evidence = collect($proofs)->unique(fn($p) => $p[1] . $p[0])->map(fn($p) => "{$p[1]} {$p[0]}")->implode('، ');
+
+            return [$b->id => ['suggested' => $suggested, 'evidence' => $evidence, 'edited' => $edited]];
+        });
+    }
+
+    private function withEditDateEvidence(Collection $rows): Collection
+    {
+        $evidence = $this->editDateEvidence();
+
+        return $rows->each(function ($r) use ($evidence) {
+            $e = $evidence[$r->id] ?? null;
+            $r->suggested_date = $e['suggested'] ?? null;
+            $r->evidence = $e ? $e['evidence'] . ($e['edited'] ? ' — العربون اتعمل من جديد يوم تاريخ الحجز (بصمة تعديل)' : '') : null;
+        });
     }
 }

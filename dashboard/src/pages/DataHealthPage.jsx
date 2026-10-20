@@ -72,10 +72,11 @@ function BrideCell({ row }) {
 function BookingTable({ rows, busy, fix, withPayments, onOpen, onEdit, onPayments, onConfirmDate, onDelete }) {
   const withVisitDay = rows.some((r) => r.visit_date !== undefined);
   const withFirstConfirm = rows.some((r) => r.first_confirm !== undefined);
+  const withEvidence = rows.some((r) => r.evidence !== undefined);
   return (
     <table className="w-full text-right text-xs">
       <thead className="bg-slate-50 text-[10.5px] text-slate-500">
-        <tr><Th>#</Th><Th>العروسة</Th><Th>الفستان</Th>{withVisitDay && <Th>يوم الزيارة</Th>}<Th>الحجز</Th><Th>الفرح</Th><Th>الاستلام / الإرجاع</Th><Th>القيمة</Th><Th>مدفوع</Th><Th>تأمين</Th><Th>الحالة</Th><Th>اتسجل</Th>{withFirstConfirm && <Th>أول تأكيد حجز</Th>}<Th /></tr>
+        <tr><Th>#</Th><Th>العروسة</Th><Th>الفستان</Th>{withVisitDay && <Th>يوم الزيارة</Th>}<Th>الحجز</Th><Th>الفرح</Th><Th>الاستلام / الإرجاع</Th><Th>القيمة</Th><Th>مدفوع</Th><Th>تأمين</Th><Th>الحالة</Th><Th>اتسجل</Th>{withFirstConfirm && <Th>أول تأكيد حجز</Th>}{withEvidence && <><Th>الدليل</Th><Th>اليوم المقترح</Th></>}<Th /></tr>
       </thead>
       <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
         {rows.map((r) => (
@@ -93,6 +94,12 @@ function BookingTable({ rows, busy, fix, withPayments, onOpen, onEdit, onPayment
             <Td>{BOOKING_STATUS[r.status] || r.status}</Td>
             <Td className="font-mono text-[10.5px] text-slate-400">{r.created}</Td>
             {withFirstConfirm && <Td className="font-mono text-[10.5px] text-indigo-700">{r.first_confirm || '—'}</Td>}
+            {withEvidence && (
+              <>
+                <Td className="whitespace-normal text-[11px] text-amber-900 min-w-[200px] max-w-[300px]">{r.evidence || '—'}</Td>
+                <Td className="font-mono text-emerald-700">{r.suggested_date ? formatDate(r.suggested_date) : '—'}</Td>
+              </>
+            )}
             <Td className={STICKY}>
               <div className="flex gap-1.5 justify-end">
                 {fix === 'payments' && <ActionButton icon={Wallet} label="الدفعات / تسجيل الباقي" tone="emerald" onClick={() => onPayments(r)} disabled={busy} />}
@@ -335,18 +342,20 @@ const CHECK_FIX = {
   booking_date_after_created: ['booking_date'],
   booking_date_not_visit_day: ['booking_date'],
   booking_date_visit_entered_late: ['booking_date'],
+  booking_date_edit_evidence: ['booking_date'],
 };
 
 // Booking-date checks also offer the payments screen (the old bug moved the deposit date along with the booking date)
 // and "the date is right", since only the admin knows the real booking day
-const BOOKING_DATE_CHECKS = ['booking_date_after_created', 'booking_date_not_visit_day', 'booking_date_visit_entered_late'];
+const BOOKING_DATE_CHECKS = ['booking_date_after_created', 'booking_date_not_visit_day', 'booking_date_visit_entered_late', 'booking_date_edit_evidence'];
 
 const fixLabel = (keys) => (keys.length === 1 ? `تعديل ${FIELDS[keys[0]].label.replace(/ \(.*\)$/, '')}` : 'تعديل التواريخ');
 
 function EditRowModal({ entity, row, keys, onCancel, onSave }) {
   const fields = keys.map((key) => ({ key, ...FIELDS[key] }));
+  // A booking-date fix starts from the suggested day when the check found one
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [
-    f.key, f.type === 'date' ? cleanDate(row[f.key] || '') : String(row[f.key] ?? ''),
+    f.key, f.type === 'date' ? cleanDate((f.key === 'booking_date' && row.suggested_date) || row[f.key] || '') : String(row[f.key] ?? ''),
   ])));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);

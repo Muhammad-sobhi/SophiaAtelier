@@ -37,7 +37,7 @@ class AuditData extends Command
             }
             $this->line('');
             $this->info("#{$number} {$check['label']} ({$check['ids']->count()})");
-            $rows = $audit->rows($check['entity'], $check['ids'])->map(fn($r) => (array) $r);
+            $rows = $audit->rows($check['entity'], $check['ids'], $check['key'])->map(fn($r) => (array) $r);
             if ($rows->isNotEmpty()) {
                 $this->table(array_keys($rows->first()), $rows->all());
             }

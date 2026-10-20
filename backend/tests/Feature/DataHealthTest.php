@@ -242,4 +242,40 @@ class DataHealthTest extends TestCase
         $this->assertSame('booked', $booked->fresh()->status);
         $this->postJson('/api/data-health/close-visits', ['ids' => [$past->id], 'status' => 'booked'])->assertStatus(422);
     }
+
+    public function test_booking_date_moved_to_an_edit_day_is_proven_by_older_records()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $rows = fn() => collect($this->getJson('/api/data-health/booking_date_edit_evidence')->assertOk()->json('rows'))->keyBy('id');
+
+        // Booked at a visit on 09-01, a balance paid 09-10, then an edit on 10-05 re-dated the booking and re-created the deposit
+        $edited = Client::create(['name' => 'Edited Bride', 'phone' => '01044449001', 'city' => 'القاهرة']);
+        $booking = $this->booking($edited, '2026-10-05', '2026-09-01 10:00:00');
+        Visit::create(['client_id' => $edited->id, 'visit_date' => '2026-09-01', 'status' => 'booked']);
+        Revenue::create(['booking_id' => $booking->id, 'type' => 'balance', 'amount' => 500, 'payment_method' => 'cash', 'payment_date' => '2026-09-10'])
+            ->forceFill(['created_at' => '2026-09-10 12:00:00'])->saveQuietly();
+        Revenue::create(['booking_id' => $booking->id, 'type' => 'deposit', 'amount' => 300, 'payment_method' => 'cash', 'payment_date' => '2026-10-05'])
+            ->forceFill(['created_at' => '2026-10-05 12:00:00'])->saveQuietly();
+
+        // Nothing recorded before the booking date
+        $clean = $this->booking(Client::create(['name' => 'Clean Bride', 'phone' => '01044449002', 'city' => 'القاهرة']), '2026-09-15', '2026-09-15 10:00:00');
+        // Booked after the fix: the bug could not have moved it
+        $late = $this->booking(Client::create(['name' => 'Late Bride', 'phone' => '01044449003', 'city' => 'القاهرة']), '2026-10-14', '2026-10-01 10:00:00');
+        Revenue::create(['booking_id' => $late->id, 'type' => 'balance', 'amount' => 500, 'payment_method' => 'cash', 'payment_date' => '2026-10-02']);
+
+        $row = $rows()[$booking->id];
+        $this->assertSame('2026-09-01', $row['suggested_date']);
+        $this->assertStringContainsString('دفعة باقي 2026-09-10', $row['evidence']);
+        $this->assertStringContainsString('بصمة تعديل', $row['evidence']);
+        $this->assertArrayNotHasKey($clean->id, $rows()->all());
+        $this->assertArrayNotHasKey($late->id, $rows()->all());
+
+        // A payment alone proves the booking is older but gives no exact day
+        Visit::where('client_id', $edited->id)->delete();
+        $this->assertNull($rows()[$booking->id]['suggested_date']);
+
+        // "The date is right" clears it
+        $this->postJson('/api/data-health/confirm-booking-date', ['booking_id' => $booking->id])->assertOk();
+        $this->assertArrayNotHasKey($booking->id, $rows()->all());
+    }
 }
