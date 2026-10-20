@@ -133,18 +133,30 @@ class VisitFlowTest extends TestCase
         $this->assertSame(['2026-11-18'], $dates);
     }
 
-    public function test_cleanup_command_declines_older_open_visits(): void
+    public function test_cleanup_command_keeps_the_confirmed_visit_and_deletes_the_duplicates(): void
     {
         $client = Client::create(['name' => 'Many Requests', 'phone' => '01022222222', 'city' => 'القاهرة']);
-        $old = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-22', 'status' => 'confirmed', 'source' => 'website']);
+        $confirmed = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-22', 'status' => 'confirmed', 'source' => 'website']);
         $done = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-10-01', 'status' => 'done', 'source' => 'website']);
-        $latest = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-18', 'status' => 'pending', 'source' => 'website']);
+        $dupe = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-18', 'status' => 'pending', 'source' => 'website']);
+        $fee = \App\Models\Revenue::create(['visit_id' => $dupe->id, 'type' => 'fitting_fee', 'amount' => 200, 'payment_method' => 'cash', 'payment_date' => '2026-10-15']);
+
+        // Only pending requests: the latest one stays
+        $other = Client::create(['name' => 'Pending Only', 'phone' => '01011111111', 'city' => 'القاهرة']);
+        $first = Visit::create(['client_id' => $other->id, 'visit_date' => '2026-11-05', 'status' => 'pending', 'source' => 'website']);
+        $last = Visit::create(['client_id' => $other->id, 'visit_date' => '2026-11-06', 'status' => 'pending', 'source' => 'website']);
+
+        $this->artisan('data:close-duplicate-visits')->assertSuccessful();
+        $this->assertNotNull($dupe->fresh()); // dry run
 
         $this->artisan('data:close-duplicate-visits --apply')->assertSuccessful();
 
-        $this->assertSame('declined', $old->fresh()->status);
+        $this->assertSame('confirmed', $confirmed->fresh()->status);
         $this->assertSame('done', $done->fresh()->status);
-        $this->assertSame('pending', $latest->fresh()->status);
+        $this->assertNull($dupe->fresh());
+        $this->assertSame($confirmed->id, $fee->fresh()->visit_id);
+        $this->assertNull($first->fresh());
+        $this->assertNotNull($last->fresh());
     }
 
     public function test_website_request_is_rejected_when_a_dress_is_out_on_her_visit_date(): void

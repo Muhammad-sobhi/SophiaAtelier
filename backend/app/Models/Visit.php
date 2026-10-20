@@ -97,13 +97,20 @@ class Visit extends Model
 
     /**
      * A bride keeps one open visit: staff always act on her latest one, so any other open request of hers
-     * would stay on the calendar forever. They are declined once this one is confirmed or closed.
+     * would stay on the calendar forever. They are declined once this one is confirmed or closed, and a trying
+     * fee paid on one of them moves to this visit.
      */
     public function declineOtherOpenVisits(): int
     {
-        return self::where('client_id', $this->client_id)->where('id', '!=', $this->id)
-            ->whereIn('status', self::OPEN_STATUSES)
-            ->update(['status' => 'declined']);
+        $otherIds = self::where('client_id', $this->client_id)->where('id', '!=', $this->id)
+            ->whereIn('status', self::OPEN_STATUSES)->pluck('id');
+        if ($otherIds->isEmpty()) {
+            return 0;
+        }
+
+        Revenue::whereIn('visit_id', $otherIds)->update(['visit_id' => $this->id]);
+
+        return self::whereIn('id', $otherIds)->update(['status' => 'declined']);
     }
 
     /** Set on a repeated website request: latest earlier visit with the same phone number */
