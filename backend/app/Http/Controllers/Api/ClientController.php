@@ -649,6 +649,7 @@ class ClientController extends Controller
                     ]);
                 }
                 $visit->markConfirmed($request->user()?->id);
+                $visit->declineOtherOpenVisits();
 
                 if ($request->filled('event_date')) {
                     $client->update(['wedding_date' => $request->input('event_date')]);
@@ -670,6 +671,7 @@ class ClientController extends Controller
                     return response()->json(['message' => 'لا توجد زيارة مفتوحة لهذه العروس'], 422);
                 }
                 $visit->update(['status' => $request->input('visit_status')]);
+                $visit->declineOtherOpenVisits();
                 if ($request->has('tried_dresses')) {
                     $visit->triedDresses()->syncWithPivotValues($request->input('tried_dresses', []), ['type' => 'tried']);
                 }

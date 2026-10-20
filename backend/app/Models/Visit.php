@@ -95,6 +95,17 @@ class Visit extends Model
         ])->save();
     }
 
+    /**
+     * A bride keeps one open visit: staff always act on her latest one, so any other open request of hers
+     * would stay on the calendar forever. They are declined once this one is confirmed or closed.
+     */
+    public function declineOtherOpenVisits(): int
+    {
+        return self::where('client_id', $this->client_id)->where('id', '!=', $this->id)
+            ->whereIn('status', self::OPEN_STATUSES)
+            ->update(['status' => 'declined']);
+    }
+
     /** Set on a repeated website request: latest earlier visit with the same phone number */
     public function previousVisit(): BelongsTo
     {

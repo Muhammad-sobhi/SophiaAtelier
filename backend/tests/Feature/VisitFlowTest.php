@@ -73,14 +73,78 @@ class VisitFlowTest extends TestCase
     {
         $dress = Dress::factory()->create();
         $first = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10');
+        $this->assertSame('confirmed', $first->status);
+        $first->update(['status' => 'done']);
 
         $response = $this->websitePost([$dress->id], '2026-11-05', '2026-12-10')->assertCreated();
         $repeat = Visit::latest('id')->first();
 
-        $this->assertSame('confirmed', $first->status);
         $this->assertFalse($response->json('auto_confirmed'));
         $this->assertSame('pending', $repeat->status);
         $this->assertSame($first->id, $repeat->previous_visit_id);
+    }
+
+    public function test_website_refuses_another_visit_while_one_is_upcoming(): void
+    {
+        $dress = Dress::factory()->create();
+        $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10');
+        $before = Visit::count();
+
+        // Same day again, another day, and the same number written another way
+        $this->websitePost([$dress->id], '2026-11-01', '2026-12-10')
+            ->assertStatus(422)->assertJsonPath('code', 'visit_already_booked')->assertJsonPath('visit_date', '2026-11-01');
+        $this->websitePost([$dress->id], '2026-11-08', '2026-12-10')
+            ->assertStatus(422)->assertJsonPath('code', 'visit_already_booked');
+        $this->websitePost([$dress->id], '2026-11-08', '2026-12-10', '+201099999999')
+            ->assertStatus(422)->assertJsonPath('code', 'visit_already_booked');
+
+        $this->assertSame($before, Visit::count());
+    }
+
+    public function test_declined_or_past_visit_does_not_block_a_new_website_request(): void
+    {
+        $dress = Dress::factory()->create();
+        $declined = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10', '01055555555');
+        $declined->update(['status' => 'declined']);
+        $this->websitePost([$dress->id], '2026-11-03', '2026-12-10', '01055555555')->assertCreated();
+
+        $old = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10', '01044444444');
+        $old->update(['visit_date' => now('Africa/Cairo')->subDays(3)->toDateString()]);
+        $this->websitePost([$dress->id], '2026-11-03', '2026-12-10', '01044444444')->assertCreated();
+    }
+
+    public function test_confirming_her_latest_visit_declines_the_older_open_one(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $client = Client::create(['name' => 'Two Requests', 'phone' => '01033333333', 'city' => 'القاهرة', 'wedding_date' => '2026-12-04']);
+        // Older request for 22-10 created first, newer one for 18-10 (from before the website refused a second request)
+        $old = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-22', 'status' => 'confirmed', 'source' => 'website']);
+        $new = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-18', 'status' => 'pending', 'source' => 'website']);
+
+        $this->artisan('data:close-duplicate-visits')->assertSuccessful();
+        $this->assertSame('confirmed', $old->fresh()->status); // dry run
+
+        $this->putJson("/api/clients/{$client->id}/stage-action", ['action' => 'confirm_visit'])->assertOk();
+        $this->assertSame('confirmed', $new->fresh()->status);
+        $this->assertSame('declined', $old->fresh()->status);
+
+        $dates = collect($this->getJson('/api/calendar/events?start_date=2026-11-01&end_date=2026-11-30')->assertOk()->json('events'))
+            ->where('client_id', $client->id)->pluck('date')->all();
+        $this->assertSame(['2026-11-18'], $dates);
+    }
+
+    public function test_cleanup_command_declines_older_open_visits(): void
+    {
+        $client = Client::create(['name' => 'Many Requests', 'phone' => '01022222222', 'city' => 'القاهرة']);
+        $old = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-22', 'status' => 'confirmed', 'source' => 'website']);
+        $done = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-10-01', 'status' => 'done', 'source' => 'website']);
+        $latest = Visit::create(['client_id' => $client->id, 'visit_date' => '2026-11-18', 'status' => 'pending', 'source' => 'website']);
+
+        $this->artisan('data:close-duplicate-visits --apply')->assertSuccessful();
+
+        $this->assertSame('declined', $old->fresh()->status);
+        $this->assertSame('done', $done->fresh()->status);
+        $this->assertSame('pending', $latest->fresh()->status);
     }
 
     public function test_website_request_is_rejected_when_a_dress_is_out_on_her_visit_date(): void
@@ -252,7 +316,7 @@ class VisitFlowTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
         $dress = Dress::factory()->create();
         // A repeat request stays pending until an employee confirms it
-        $this->websiteRequest([$dress->id], '2026-10-20', '2026-12-10');
+        $this->websiteRequest([$dress->id], '2026-10-20', '2026-12-10')->update(['status' => 'done']);
         $visit = $this->websiteRequest([$dress->id], '2026-11-01', '2026-12-10');
         $this->assertSame('pending', $visit->status);
 

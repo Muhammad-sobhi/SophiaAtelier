@@ -15,7 +15,7 @@ class CalendarController extends Controller
 {
     /**
      * One event per real appointment: visit, booking, fitting, pickup (to the bride) or return (from the bride).
-     * Cancelled bookings, their fittings and cancelled visits are excluded; a visit that ended in a booking shows as that booking.
+     * Cancelled bookings, their fittings and declined visits are excluded; a visit that ended in a booking shows as that booking.
      * GET /api/calendar/events?start_date=2026-07-01&end_date=2026-07-31
      */
     public function events(Request $request): JsonResponse
@@ -105,7 +105,7 @@ class CalendarController extends Controller
 
         $visits = Visit::whereHas('client')
             ->with('client:id,name,phone')
-            ->where('status', '!=', 'cancelled')
+            ->where('status', '!=', 'declined')
             ->when($start, fn ($q) => $q->whereBetween('visit_date', [$start, $endOfDay]))
             ->get();
 

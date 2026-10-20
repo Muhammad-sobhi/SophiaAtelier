@@ -80,6 +80,7 @@ export default function CartDrawer() {
 
   const [bookingResult, setBookingResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
 
   useEffect(() => { setVisitDate(readVisitDate(shopNow().date)); }, []);
@@ -217,6 +218,8 @@ export default function CartDrawer() {
       return;
     }
 
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setLoading(true);
     try {
@@ -253,6 +256,8 @@ export default function CartDrawer() {
           setError(a.slotFull);
         } else if (data.code === 'slot_in_past') {
           setError(a.slotPast);
+        } else if (data.code === 'visit_already_booked') {
+          setError(a.alreadyBooked(data.visit_date));
         } else if (res.status === 429) {
           setError(a.tooManyAttempts);
         } else {
@@ -267,6 +272,7 @@ export default function CartDrawer() {
     } catch (err) {
       setError(isAr ? 'تعذر إرسال الطلب، حاولي مرة أخرى.' : 'Booking submission failed. Please try again.');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
