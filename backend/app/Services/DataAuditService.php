@@ -20,6 +20,8 @@ class DataAuditService
     private const SHOP_TIMEZONE = 'Africa/Cairo';
     /** Until this day editing a booking reset its booking date (and deposit date) to the edit day */
     private const EDIT_DATE_BUG_FIXED_ON = '2026-10-12';
+    /** A phone shared by more brides than this is a made-up number typed for old brides, not one bride twice */
+    private const PLACEHOLDER_PHONE_BRIDES = 3;
     private const PAYMENT_LABELS = ['balance' => 'باقي', 'insurance' => 'تأمين', 'security_deposit' => 'تأمين',
         'fitting_fee' => 'رسوم بروفة', 'insurance_refund' => 'استرداد تأمين', 'deposit_refund' => 'استرداد عربون', 'damage_fee' => 'خصم تلفيات'];
 
@@ -113,10 +115,9 @@ class DataAuditService
                 $ids(fn() => DB::table('visits')->whereNotIn('client_id', $aliveClients()))],
 
             'client_duplicate_phone' => ['brides', 'client', 'عرايس رقم التليفون مكرر',
-                'لو نفس العروسة متسجلة مرتين: اختار السجل الأساسي و"ادمج" الباقي فيه. لو عرايس مختلفين على رقم وهمي: سيبهم أو صحح الرقم.',
-                fn() => DB::table('clients AS c')
-                    ->join('clients AS c2', fn($j) => $j->on('c2.phone', '=', 'c.phone')->on('c2.id', '!=', 'c.id')->whereNull('c2.deleted_at'))
-                    ->whereNull('c.deleted_at')->where('c.phone', '!=', '')->distinct()->orderBy('c.id')->pluck('c.id')],
+                'لو نفس العروسة متسجلة مرتين: اختار السجل الأساسي و"ادمج" الباقي فيه. لو عرايس مختلفين: سيبهم أو صحح الرقم. '
+                    . 'رقم عليه أكتر من ' . self::PLACEHOLDER_PHONE_BRIDES . ' عرايس بيتعتبر رقم وهمي (عرايس قديمة قبل السيستم)، فبيظهر منه بس العرايس اللي بنفس الاسم.',
+                fn() => $this->duplicatePhoneGroups()->flatten(1)->pluck('id')->sort()->values()],
             'client_wedding_mismatch' => ['brides', 'client', 'عرايس تاريخ فرحهم مختلف عن تاريخ الفرح في حجزهم الشغال', 'افتح كرت العروسة وصحح تاريخ الفرح.',
                 fn() => DB::table('clients')->join('bookings', 'bookings.client_id', '=', 'clients.id')
                     ->whereNull('clients.deleted_at')->whereIn('bookings.status', self::ACTIVE)->whereNotNull('clients.wedding_date')
@@ -193,9 +194,11 @@ class DataAuditService
             },
             'revenue' => $this->revenueRows($ids),
             'visit' => $this->visitRows($ids),
-            default => $key === 'client_duplicate_name_wedding'
-                ? $this->clientRows($ids)->each(fn($c) => $c->group_key = $this->nameWeddingKey($c->client_name, $c->wedding_date))
-                : $this->clientRows($ids),
+            default => match ($key) {
+                'client_duplicate_name_wedding' => $this->clientRows($ids)->each(fn($c) => $c->group_key = $this->nameWeddingKey($c->client_name, $c->wedding_date)),
+                'client_duplicate_phone' => $this->withGroupKeys($this->clientRows($ids), $this->duplicatePhoneGroups()),
+                default => $this->clientRows($ids),
+            },
         };
     }
 
@@ -377,6 +380,29 @@ class DataAuditService
             ->select('b.id AS booking_id', 'v.id AS visit_id', DB::raw('DATE(v.visit_date) AS visit_date'));
     }
 
+    /**
+     * Brides sharing a phone, keyed by group. On a placeholder number (shared by many brides) only brides
+     * with the same (spelling-normalized) name are grouped, since the rest are different old brides.
+     */
+    private function duplicatePhoneGroups(): Collection
+    {
+        return DB::table('clients')->whereNull('deleted_at')->whereNotNull('phone')->where('phone', '!=', '')
+            ->whereIn('phone', DB::table('clients')->whereNull('deleted_at')->select('phone')->groupBy('phone')->havingRaw('COUNT(*) > 1'))
+            ->orderBy('id')->get(['id', 'name', 'phone'])
+            ->groupBy('phone')
+            ->flatMap(fn($group, $phone) => $group->count() > self::PLACEHOLDER_PHONE_BRIDES
+                ? $group->groupBy(fn($c) => $phone . '|' . $this->normalizedName($c->name))
+                : [$phone => $group])
+            ->filter(fn($group) => $group->count() > 1);
+    }
+
+    private function withGroupKeys(Collection $rows, Collection $groups): Collection
+    {
+        $keys = $groups->flatMap(fn($group, $key) => $group->mapWithKeys(fn($c) => [$c->id => (string) $key]));
+
+        return $rows->each(fn($r) => $r->group_key = $keys[$r->id] ?? $r->phone);
+    }
+
     /** Brides whose (spelling-normalized) name and wedding date match another bride's */
     private function duplicateNameWeddingIds(): Collection
     {
@@ -389,9 +415,12 @@ class DataAuditService
 
     private function nameWeddingKey(?string $name, ?string $weddingDate): string
     {
-        $name = strtr(trim(preg_replace('/\s+/u', ' ', (string) $name)), ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ة' => 'ه', 'ى' => 'ي']);
+        return $this->normalizedName($name) . '|' . substr((string) $weddingDate, 0, 10);
+    }
 
-        return $name . '|' . substr((string) $weddingDate, 0, 10);
+    private function normalizedName(?string $name): string
+    {
+        return strtr(trim(preg_replace('/\s+/u', ' ', (string) $name)), ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ة' => 'ه', 'ى' => 'ي']);
     }
 
     /** Bookings whose bride has a visit marked "booked" on a day none of her bookings is dated */

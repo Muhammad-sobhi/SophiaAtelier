@@ -207,12 +207,12 @@ function VisitTable({ rows, busy, closable, selected, setSelected, onOpen, onClo
 }
 
 // Brides sharing a phone, grouped so the admin picks the record to keep and merges the rest into it
-// Brides grouped by phone, or by the name + wedding date key the server sends (byName)
+// Brides grouped by the key the server sends (phone, phone + name on a placeholder number, or name + wedding date)
 function DuplicateClients({ rows, busy, byName, onOpen, onMerge, onDelete }) {
   const groups = useMemo(() => {
     const byPhone = new Map();
     rows.forEach((r) => {
-      const key = byName ? r.group_key : r.phone;
+      const key = r.group_key || r.phone;
       byPhone.set(key, [...(byPhone.get(key) || []), r]);
     });
     return [...byPhone.entries()].sort((a, b) => b[1].length - a[1].length);
@@ -232,7 +232,7 @@ function DuplicateClients({ rows, busy, byName, onOpen, onMerge, onDelete }) {
             <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-2">
               {byName
                 ? <span className="text-xs font-black text-slate-700">{clients[0].client_name} — فرح {formatDate(clients[0].wedding_date)}</span>
-                : <span className="font-mono text-xs font-black text-slate-700" dir="ltr">{phone}</span>}
+                : <span className="font-mono text-xs font-black text-slate-700" dir="ltr">{clients[0].phone}</span>}
               <span className="text-[11px] font-bold text-slate-500">{clients.length} {byName ? 'سجلات بنفس الاسم وتاريخ الفرح' : 'سجلات على نفس الرقم'}</span>
             </div>
             <table className="w-full text-right text-xs">

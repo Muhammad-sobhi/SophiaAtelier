@@ -278,4 +278,25 @@ class DataHealthTest extends TestCase
         $this->postJson('/api/data-health/confirm-booking-date', ['booking_id' => $booking->id])->assertOk();
         $this->assertArrayNotHasKey($booking->id, $rows()->all());
     }
+
+    public function test_a_placeholder_phone_only_groups_brides_with_the_same_name()
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $bride = fn(string $name, string $phone) => Client::create(['name' => $name, 'phone' => $phone, 'city' => 'القاهرة']);
+
+        // Same bride twice on her own number
+        $twice = [$bride('Real Bride', '01055550001'), $bride('Real Bride 2', '01055550001')];
+        // Old brides typed on one made-up number: different brides, except one entered twice
+        $others = collect(['Old A', 'Old B', 'Old C'])->map(fn($n) => $bride($n, '01055550000'));
+        $sameName = [$bride('منة حسين', '01055550000'), $bride('منه حسين', '01055550000')];
+
+        $rows = collect($this->getJson('/api/data-health/client_duplicate_phone')->assertOk()->json('rows'))->keyBy('id');
+
+        $this->assertSame($rows[$twice[0]->id]['group_key'], $rows[$twice[1]->id]['group_key']);
+        $this->assertSame($rows[$sameName[0]->id]['group_key'], $rows[$sameName[1]->id]['group_key']);
+        $this->assertNotSame($rows[$twice[0]->id]['group_key'], $rows[$sameName[0]->id]['group_key']);
+        foreach ($others as $other) {
+            $this->assertArrayNotHasKey($other->id, $rows->all());
+        }
+    }
 }
