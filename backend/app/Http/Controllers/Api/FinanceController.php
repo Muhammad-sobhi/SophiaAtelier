@@ -23,6 +23,7 @@ class FinanceController extends Controller
         'utilities' => ['cleaning', 'maintenance'],
         'transfers' => ['transfer_out', 'owner_withdrawal'],
         'manufacturing' => ManufacturingService::EXPENSE_CATEGORIES,
+        'fabrics' => ['fabrics'],
     ];
     private const EXPENSE_DEFAULT_TAB = 'other';
 
@@ -32,6 +33,7 @@ class FinanceController extends Controller
         'utilities' => 'المرافق والخدمات العامة',
         'transfers' => 'مناقلات وسحب وإيداع',
         'manufacturing' => 'التصنيع والخامات والموردين',
+        'fabrics' => 'خامات وأقمشة',
         'other' => 'مصروفات أخرى',
     ];
 
@@ -103,7 +105,7 @@ class FinanceController extends Controller
     private const FILTER_RULES = [
         'start_date' => 'nullable|date',
         'end_date' => 'nullable|date',
-        'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,manufacturing,other',
+        'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,manufacturing,fabrics,other',
         'payment_method' => 'nullable|string|max:50',
         'search' => 'nullable|string|max:100',
     ];

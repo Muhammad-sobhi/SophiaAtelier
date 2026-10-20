@@ -11,6 +11,27 @@ use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
+    // Material purchases (خامات وأقمشة): what was bought, how much, and the price per unit
+    private const MATERIAL_RULES = [
+        'material_name' => 'nullable|required_if:category,fabrics|string|max:255',
+        'quantity' => 'nullable|required_if:category,fabrics|numeric|min:0.01',
+        'unit_price' => 'nullable|required_if:category,fabrics|numeric|min:0',
+    ];
+
+    /**
+     * A fabrics expense costs quantity × unit price; other categories don't keep material fields.
+     */
+    private static function withMaterialTotal(array $validated): array
+    {
+        if (($validated['category'] ?? null) === 'fabrics') {
+            $validated['amount'] = round($validated['quantity'] * $validated['unit_price'], 2);
+        } elseif (array_key_exists('category', $validated)) {
+            $validated['material_name'] = $validated['quantity'] = $validated['unit_price'] = null;
+        }
+
+        return $validated;
+    }
+
     public function index(Request $request)
     {
         $query = Expense::with('employee');
@@ -33,15 +54,18 @@ class ExpenseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,other',
-            'amount' => 'required|numeric|min:0',
+            'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,fabrics,other',
+            'amount' => 'required_unless:category,fabrics|nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'date' => 'required|date',
             'employee_id' => 'nullable|required_if:category,salary|exists:employees,id',
+            ...self::MATERIAL_RULES,
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
+
+        $validated = self::withMaterialTotal($validated);
 
         $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
         if ($receiptPath) {
@@ -72,15 +96,18 @@ class ExpenseController extends Controller
             return response()->json(['message' => 'هذا المصروف مسجل من سلف الموظفين — عدّله أو احذفه من صفحة الحضور والرواتب'], 422);
         }
         $validated = $request->validate([
-            'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,other',
-            'amount' => 'sometimes|required|numeric|min:0',
+            'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,fabrics,other',
+            'amount' => 'sometimes|required_unless:category,fabrics|nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'date' => 'sometimes|required|date',
             'employee_id' => 'nullable|required_if:category,salary|exists:employees,id',
+            ...self::MATERIAL_RULES,
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
+
+        $validated = self::withMaterialTotal($validated);
 
         $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
         if ($receiptPath) {

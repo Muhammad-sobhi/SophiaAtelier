@@ -10,7 +10,7 @@ class Expense extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['category', 'amount', 'payment_method', 'description', 'date', 'employee_id', 'receipt_path'];
+    protected $fillable = ['category', 'amount', 'payment_method', 'description', 'material_name', 'quantity', 'unit_price', 'date', 'employee_id', 'receipt_path'];
 
     protected $appends = ['receipt_url'];
 
@@ -31,6 +31,8 @@ class Expense extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'quantity' => 'decimal:2',
+            'unit_price' => 'decimal:2',
             'date' => 'date:Y-m-d',
         ];
     }

@@ -65,6 +65,7 @@ const categoryLabels = {
   'utilities': 'المرافق والخدمات العامة',
   'transfers': 'مناقلات وسحب وإيداع',
   'manufacturing': 'التصنيع والخامات والموردين',
+  'fabrics': 'خامات وأقمشة',
   'other': 'مصروفات أخرى',
   'materials': 'شراء خامات',
   'supplier_payment': 'دفعة لمورد',
@@ -130,6 +131,7 @@ const mapTransaction = (row) => {
   if (row.category === 'salary' || row.category === 'loan' || row.category === 'purchase') mappedCat = 'operational';
   else if (row.category === 'cleaning' || row.category === 'maintenance') mappedCat = 'utilities';
   else if (MANUFACTURING_CATEGORIES.includes(row.category)) mappedCat = 'manufacturing';
+  else if (row.category === 'fabrics') mappedCat = 'fabrics';
   else if (row.category === 'transfer_out') {
     mappedCat = 'transfers';
     txType = 'مناقلة (صادر)';
@@ -151,7 +153,10 @@ const mapTransaction = (row) => {
     receiptImage: row.receipt_url,
     rawDate: row.date ? row.date.split('T')[0] : '',
     backendCategory: row.category,
-    employeeId: row.employee_id ? String(row.employee_id) : ''
+    employeeId: row.employee_id ? String(row.employee_id) : '',
+    materialName: row.material_name || '',
+    quantity: row.quantity != null ? parseFloat(row.quantity) : null,
+    unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : null
   };
 };
 
@@ -338,6 +343,9 @@ export default function FinancePage() {
   const [revenueSplitPayments, setRevenueSplitPayments] = useState([{ amount: '', payment_method: 'cash' }]);
   const [newReceiptImage, setNewReceiptImage] = useState(null);
   const [newEmployeeId, setNewEmployeeId] = useState('');
+  const [newMaterialName, setNewMaterialName] = useState('');
+  const [newQuantity, setNewQuantity] = useState('');
+  const [newUnitPrice, setNewUnitPrice] = useState('');
   const [employees, setEmployees] = useState(null);
   const [isSavingTx, setIsSavingTx] = useState(false);
   const [editingTxId, setEditingTxId] = useState(null);
@@ -487,6 +495,9 @@ export default function FinancePage() {
     setNewPaymentMethod(tx.paymentMethod || 'cash');
     setNewReceiptImage(tx.receiptImage || null);
     setNewEmployeeId(tx.employeeId || '');
+    setNewMaterialName(tx.materialName || '');
+    setNewQuantity(tx.quantity != null ? String(tx.quantity) : '');
+    setNewUnitPrice(tx.unitPrice != null ? String(tx.unitPrice) : '');
     
     const mappedPayments = tx.payments && tx.payments.length > 0 
       ? tx.payments.map(p => ({ amount: String(p.amount), payment_method: p.payment_method }))
@@ -517,9 +528,13 @@ export default function FinancePage() {
     e.preventDefault();
     const isRevenue = newType === 'إيراد';
     const isSalary = !isRevenue && newCategory === 'salary';
-    if ((!isSalary && !newDesc.trim()) || !newAmount.trim() || (isSalary && !newEmployeeId) || isSavingTx) return;
+    const isFabrics = !isRevenue && newCategory === 'fabrics';
+    if (isSavingTx) return;
+    if (isFabrics) {
+      if (!newMaterialName.trim() || !(parseFloat(newQuantity) > 0) || !(parseFloat(newUnitPrice) >= 0)) return;
+    } else if ((!isSalary && !newDesc.trim()) || !newAmount.trim() || (isSalary && !newEmployeeId)) return;
 
-    const amountVal = parseFloat(newAmount);
+    const amountVal = isFabrics ? parseFloat(newQuantity) * parseFloat(newUnitPrice) : parseFloat(newAmount);
 
     setIsSavingTx(true);
     try {
@@ -548,7 +563,8 @@ export default function FinancePage() {
         let backendCat = 'other';
         if (newCategory === 'operational') backendCat = 'purchase';else
         if (newCategory === 'utilities') backendCat = 'maintenance';else
-        if (isSalary) backendCat = 'salary';
+        if (isSalary) backendCat = 'salary';else
+        if (isFabrics) backendCat = 'fabrics';
 
         const employeeName = isSalary ? employees?.find((emp) => String(emp.id) === newEmployeeId)?.name : null;
         const payload = {
@@ -558,7 +574,13 @@ export default function FinancePage() {
           date: newDate,
           payment_method: newPaymentMethod,
           employee_id: isSalary ? newEmployeeId : null,
-          receipt_image: newReceiptImage
+          receipt_image: newReceiptImage,
+          ...(isFabrics && {
+            material_name: newMaterialName.trim(),
+            quantity: parseFloat(newQuantity),
+            unit_price: parseFloat(newUnitPrice),
+            description: newDesc.trim() || newMaterialName.trim()
+          })
         };
 
         if (editingTxId && editingTxOriginalType === 'expense') {
@@ -582,6 +604,9 @@ export default function FinancePage() {
       setNewPaymentMethod('cash');
       setNewReceiptImage(null);
       setNewEmployeeId('');
+      setNewMaterialName('');
+      setNewQuantity('');
+      setNewUnitPrice('');
     } catch (e) {
       console.error('Failed to add transaction:', e);
       toast.error(e.data?.message || 'فشل حفظ المعاملة');
@@ -719,6 +744,9 @@ export default function FinancePage() {
               setNewPaymentMethod('cash');
               setNewReceiptImage(null);
               setNewEmployeeId('');
+              setNewMaterialName('');
+              setNewQuantity('');
+              setNewUnitPrice('');
             }}
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-md shadow-indigo-600/10 active:scale-95 cursor-pointer w-full sm:w-auto"
           >
@@ -916,6 +944,7 @@ export default function FinancePage() {
         { id: 'utilities', label: 'المرافق والخدمات' },
         { id: 'transfers', label: 'مناقلات وسحب وإيداع 🔄' },
         { id: 'manufacturing', label: 'التصنيع والموردين' },
+        { id: 'fabrics', label: 'خامات وأقمشة' },
         { id: 'other', label: 'مصروفات أخرى' }].
         map((tab) =>
         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -1203,6 +1232,14 @@ export default function FinancePage() {
                     <span className="text-xs font-bold text-indigo-700 mt-1 block">{selectedTx.clientName}</span>
                   </div>
                 )}
+                {selectedTx.materialName && (
+                  <div className="col-span-2">
+                    <span className="text-[10px] font-extrabold text-slate-400 block">الخامة</span>
+                    <span className="text-xs font-bold text-slate-700 mt-1 block">
+                      {selectedTx.materialName} — {selectedTx.quantity?.toLocaleString()} × {selectedTx.unitPrice?.toLocaleString()} ج.م
+                    </span>
+                  </div>
+                )}
                 {selectedTx.dressNames && (
                   <div className="col-span-2">
                     <span className="text-[10px] font-extrabold text-slate-400 block">الفستان</span>
@@ -1338,11 +1375,14 @@ export default function FinancePage() {
             <form onSubmit={handleAddTransactionSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow text-right scrollbar-thin">
               {/* Description */}
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600">الوصف المعاملة{newCategory === 'salary' && newType !== 'إيراد' && ' (اختياري)'}</label>
+                <label className="text-xs font-extrabold text-slate-600">الوصف المعاملة{['salary', 'fabrics'].includes(newCategory) && newType !== 'إيراد' && ' (اختياري)'}</label>
                 <input
                 type="text"
-                required={!(newCategory === 'salary' && newType !== 'إيراد')}
-                placeholder={newCategory === 'salary' && newType !== 'إيراد' ? 'مثال: راتب شهر 3/2025 (يُكتب تلقائياً لو تُرك فارغاً)' : 'مثال: فاتورة صيانة المحل أو دفعة مبيعات'}
+                required={!(['salary', 'fabrics'].includes(newCategory) && newType !== 'إيراد')}
+                placeholder={newType === 'إيراد' ? 'مثال: فاتورة صيانة المحل أو دفعة مبيعات' :
+                newCategory === 'salary' ? 'مثال: راتب شهر 3/2025 (يُكتب تلقائياً لو تُرك فارغاً)' :
+                newCategory === 'fabrics' ? 'مثال: اسم المورد أو ملاحظات (يُكتب اسم الخامة لو تُرك فارغاً)' :
+                'مثال: فاتورة صيانة المحل أو دفعة مبيعات'}
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700" />
@@ -1357,7 +1397,7 @@ export default function FinancePage() {
                   value={newType}
                   onChange={(e) => {
                     setNewType(e.target.value);
-                    if (e.target.value === 'إيراد' && newCategory === 'salary') setNewCategory('other');
+                    if (e.target.value === 'إيراد' && ['salary', 'fabrics'].includes(newCategory)) setNewCategory('other');
                   }}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
                   
@@ -1377,6 +1417,7 @@ export default function FinancePage() {
                     <option value="operational">المشتريات والرواتب</option>
                     <option value="utilities">المرافق والخدمات</option>
                     {newType !== 'إيراد' && <option value="salary">رواتب موظفين</option>}
+                    {newType !== 'إيراد' && <option value="fabrics">خامات وأقمشة</option>}
                     <option value="other">مصروفات أخرى</option>
                   </select>
                 </div>
@@ -1428,7 +1469,62 @@ export default function FinancePage() {
                 </div>
               ) : (
                 <>
+                  {newCategory === 'fabrics' &&
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label htmlFor="finance-material-name" className="text-xs font-extrabold text-slate-600">اسم الخامة / القماش</label>
+                      <input
+                        id="finance-material-name"
+                        type="text"
+                        required
+                        maxLength={255}
+                        placeholder="مثال: تول فرنساوي"
+                        value={newMaterialName}
+                        onChange={(e) => setNewMaterialName(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label htmlFor="finance-material-qty" className="text-xs font-extrabold text-slate-600">الكمية</label>
+                        <input
+                          id="finance-material-qty"
+                          type="number"
+                          required
+                          min="0.01"
+                          step="0.01"
+                          placeholder="مثال: 10"
+                          value={newQuantity}
+                          onChange={(e) => setNewQuantity(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label htmlFor="finance-material-price" className="text-xs font-extrabold text-slate-600">سعر الوحدة (ج.م)</label>
+                        <input
+                          id="finance-material-price"
+                          type="number"
+                          required
+                          min="0"
+                          step="0.01"
+                          placeholder="مثال: 50"
+                          value={newUnitPrice}
+                          onChange={(e) => setNewUnitPrice(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  }
+
                   <div className="grid grid-cols-2 gap-4">
+                    {newCategory === 'fabrics' ?
+                    <div className="space-y-1">
+                      <span className="text-xs font-extrabold text-slate-600 block">الإجمالي (ج.م)</span>
+                      <div className="w-full px-4 py-2.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl text-xs font-extrabold text-indigo-700">
+                        {(Math.round((parseFloat(newQuantity) || 0) * (parseFloat(newUnitPrice) || 0) * 100) / 100).toLocaleString()} ج.م
+                      </div>
+                    </div> :
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600">{newCategory === 'salary' ? 'الراتب (ج.م)' : 'المبلغ (ج.م)'}</label>
                       <input
@@ -1442,6 +1538,7 @@ export default function FinancePage() {
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
                       />
                     </div>
+                    }
 
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600">{newCategory === 'salary' ? 'تاريخ الراتب' : 'التاريخ'}</label>
