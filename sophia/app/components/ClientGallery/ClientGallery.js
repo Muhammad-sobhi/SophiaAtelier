@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
+import LazyVideo from '../LazyVideo/LazyVideo';
 import { ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
 import { useScrollAnimation } from '../ScrollAnimations/useScrollAnimation';
 import { useStore } from '../../context/StoreContext';
@@ -85,13 +86,9 @@ export default function ClientGallery() {
               >
                 <div className={styles.imageWrap}>
                   {isVideo ? (
-                    <video
+                    <LazyVideo
                       src={c.image}
                       className={styles.image}
-                      muted
-                      loop
-                      autoPlay
-                      playsInline
                     />
                   ) : (
                     <Image

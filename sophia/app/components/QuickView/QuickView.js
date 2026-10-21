@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import LazyVideo from '../LazyVideo/LazyVideo';
 import { X, Heart, Star, ChevronLeft, ChevronRight, Sparkles, Shirt, Scale, Palette, Package } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { offerLabel, offerName } from '../../lib/offers';
@@ -88,7 +89,7 @@ export default function QuickView() {
                       onClick={() => setActiveImage(img)}
                     >
                       {isVid ? (
-                        <video src={img} className={styles.thumbImg} muted loop autoPlay playsInline />
+                        <LazyVideo src={img} className={styles.thumbImg} />
                       ) : (
                         <Image
                           src={img}

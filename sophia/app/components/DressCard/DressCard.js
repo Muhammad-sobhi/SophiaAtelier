@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
+import LazyVideo from '../LazyVideo/LazyVideo';
 import { Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { offerLabel } from '../../lib/offers';
@@ -89,7 +90,7 @@ export default function DressCard({
         onTouchEnd={handleTouchEnd}
       >
         {/\.(mp4|mov|webm|avi|m4v|3gp|3gpp|mkv)($|\?)/i.test(currentImage) ? (
-          <video src={currentImage} className={styles.image} muted loop autoPlay playsInline />
+          <LazyVideo src={currentImage} className={styles.image} />
         ) : (
           <Image
             src={currentImage}

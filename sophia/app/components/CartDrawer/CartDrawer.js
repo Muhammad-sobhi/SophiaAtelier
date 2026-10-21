@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import LazyVideo from '../LazyVideo/LazyVideo';
 import { useRouter } from 'next/navigation';
 import { X, Trash2, Calendar, Clock, CheckCircle, AlertCircle, Heart, Loader2 } from 'lucide-react';
 import { useStore, MAX_BAG_DRESSES } from '../../context/StoreContext';
@@ -329,7 +330,7 @@ export default function CartDrawer() {
                 return (
                   <div key={item.id} className={`${styles.item} ${blocking ? styles.itemBlocked : ''}`}>
                     {isVideoUrl(item.image) ? (
-                    <video src={item.image} className={styles.itemImage} muted loop autoPlay playsInline aria-label={item.name} />
+                    <LazyVideo src={item.image} className={styles.itemImage} aria-label={item.name} />
                   ) : (
                     <Image src={item.image} alt={item.name} width={80} height={100} className={styles.itemImage} />
                   )}
