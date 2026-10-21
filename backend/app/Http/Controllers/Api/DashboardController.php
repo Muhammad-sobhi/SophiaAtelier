@@ -160,6 +160,7 @@ class DashboardController extends Controller
      */
     public function dressesSummary(): JsonResponse
     {
+        $openStatuses = Dress::openBookingStatuses();
         $dresses = Dress::with([
             'images',
             'category',
@@ -171,15 +172,13 @@ class DashboardController extends Controller
         ])
             ->latest()
             ->get()
-            ->map(function ($dress) {
+            ->map(function ($dress) use ($openStatuses) {
                 $primaryImage = $dress->images->where('is_primary', true)->first()
                     ?? $dress->images->first();
 
-                $stage = 'available';
-                if ($dress->status === 'rented' || $dress->status === 'booked') {
-                    $stage = 'booked';
-                }
-  
+                // The strip and lifecycle card only know 'ready' and 'booked' (an out dress is booked with status 'out')
+                $stage = $dress->currentStatus($openStatuses) === 'available' ? 'ready' : 'booked';
+
                 return [
                 'id' => $dress->id,
                 'name' => $dress->name,

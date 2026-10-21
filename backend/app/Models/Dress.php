@@ -79,6 +79,40 @@ class Dress extends Model
         return $this->hasMany(Booking::class, 'dress_3_id');
     }
 
+    /**
+     * [dress_id => 'booked'|'out'] from open bookings (main, second and third dress).
+     * Creating a booking never sets dresses.status to 'booked', so the stored status alone misses booked dresses.
+     */
+    public static function openBookingStatuses(): array
+    {
+        $statuses = [];
+        $openBookings = Booking::whereIn('status', ['confirmed', 'picked_up', 'out'])
+            ->select('dress_id', 'dress_2_id', 'dress_3_id', 'status')
+            ->get();
+        foreach ($openBookings as $b) {
+            foreach (array_filter([$b->dress_id, $b->dress_2_id, $b->dress_3_id]) as $dressId) {
+                if ($b->status !== 'confirmed') {
+                    $statuses[$dressId] = 'out';
+                } elseif (!isset($statuses[$dressId])) {
+                    $statuses[$dressId] = 'booked';
+                }
+            }
+        }
+
+        return $statuses;
+    }
+
+    /** 'available' | 'booked' | 'out' from openBookingStatuses(); a dress marked out/booked by hand keeps that status */
+    public function currentStatus(array $openBookingStatuses): string
+    {
+        $fromBookings = $openBookingStatuses[$this->id] ?? null;
+        if ($fromBookings === 'out' || $this->status === 'out') {
+            return 'out';
+        }
+
+        return $fromBookings === 'booked' || $this->status === 'booked' ? 'booked' : 'available';
+    }
+
     public function visitsAsTried()
     {
         return $this->belongsToMany(Visit::class, 'visit_dresses')

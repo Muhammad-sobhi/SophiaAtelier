@@ -421,31 +421,51 @@ class ReportController extends Controller
 
     public function dressesReport(Request $request): JsonResponse
     {
-        $fromDate = $request->filled('from_date') ? $request->input('from_date') : null;
-        $toDate = $request->filled('to_date') ? $request->input('to_date') : null;
+        $validated = $request->validate([
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date',
+            'date_by' => 'nullable|in:booking,event',
+        ]);
+        $fromDate = $validated['from_date'] ?? null;
+        $toDate = $validated['to_date'] ?? null;
+        $byEvent = ($validated['date_by'] ?? 'booking') === 'event';
         $search = trim($request->input('search', ''));
         $sort = $request->input('sort', 'top'); // 'top' | 'idle' | 'all'
 
-        // 1. Query Bookings in the specified period (or all-time)
+        // 1. Query Bookings in the specified period (or all-time), by wedding date or by booking date.
+        // By booking date, bookings without a booking_date fall back to their creation date.
         $bookingQuery = Booking::where('status', '!=', 'cancelled');
-        if ($fromDate) {
-            $bookingQuery->where(function ($q) use ($fromDate) {
-                $q->whereDate('booking_date', '>=', $fromDate)
-                  ->orWhere(function ($sub) use ($fromDate) {
-                      $sub->whereNull('booking_date')->whereDate('created_at', '>=', $fromDate);
-                  });
-            });
-        }
-        if ($toDate) {
-            $bookingQuery->where(function ($q) use ($toDate) {
-                $q->whereDate('booking_date', '<=', $toDate)
-                  ->orWhere(function ($sub) use ($toDate) {
-                      $sub->whereNull('booking_date')->whereDate('created_at', '<=', $toDate);
-                  });
-            });
+        if ($byEvent) {
+            $bookingQuery
+                ->when($fromDate, fn($q) => $q->whereDate('event_date', '>=', $fromDate))
+                ->when($toDate, fn($q) => $q->whereDate('event_date', '<=', $toDate));
+        } else {
+            if ($fromDate) {
+                $bookingQuery->where(function ($q) use ($fromDate) {
+                    $q->whereDate('booking_date', '>=', $fromDate)
+                      ->orWhere(function ($sub) use ($fromDate) {
+                          $sub->whereNull('booking_date')->whereDate('created_at', '>=', $fromDate);
+                      });
+                });
+            }
+            if ($toDate) {
+                $bookingQuery->where(function ($q) use ($toDate) {
+                    $q->whereDate('booking_date', '<=', $toDate)
+                      ->orWhere(function ($sub) use ($toDate) {
+                          $sub->whereNull('booking_date')->whereDate('created_at', '<=', $toDate);
+                      });
+                });
+            }
         }
 
         $bookings = $bookingQuery->select('id', 'dress_id', 'dress_2_id', 'dress_3_id', 'total_amount', 'status')->get();
+
+        // Rental prices of every dress on a multi-dress booking (deleted dresses too) to split its amount
+        $multiDressIds = $bookings->filter(fn($b) => $b->dress_2_id || $b->dress_3_id)
+            ->flatMap(fn($b) => [$b->dress_id, $b->dress_2_id, $b->dress_3_id])
+            ->filter()->unique()->values();
+        $rentalPrices = $multiDressIds->isEmpty() ? collect()
+            : Dress::withTrashed()->whereIn('id', $multiDressIds)->pluck('rental_price', 'id');
 
         $bookingCounts = [];
         $revenueMap = [];
@@ -457,13 +477,18 @@ class ReportController extends Controller
             $count = count($dressIds);
             if ($count === 0) continue;
 
+            // A booking stores one total: split it by each dress's rental price so the parts still add up
+            // to the booking amount. If any dress has no rental price, split it equally.
             $total = floatval($b->total_amount ?? 0);
-            $amountPerDress = $count > 1 ? ($total / $count) : $total;
+            $prices = array_map(fn($id) => floatval($rentalPrices[$id] ?? 0), $dressIds);
+            $priceSum = array_sum($prices);
+            $useRatio = $count > 1 && min($prices) > 0;
 
-            foreach ($dressIds as $dId) {
+            foreach ($dressIds as $i => $dId) {
                 $bookingCounts[$dId] = ($bookingCounts[$dId] ?? 0) + 1;
-                if ($amountPerDress > 0) {
-                    $revenueMap[$dId] = ($revenueMap[$dId] ?? 0) + $amountPerDress;
+                $amountForDress = $useRatio ? $total * $prices[$i] / $priceSum : $total / $count;
+                if ($amountForDress > 0) {
+                    $revenueMap[$dId] = ($revenueMap[$dId] ?? 0) + $amountForDress;
                 }
 
                 if ($b->status === 'picked_up') {
@@ -502,16 +527,17 @@ class ReportController extends Controller
             ->pluck('count', 'dress_id')
             ->toArray();
 
-        // 3. Status Distribution Cards Calculation
+        // 3. Current state of each dress from its open bookings
+        $openStatuses = Dress::openBookingStatuses();
+        $statusOf = fn(Dress $dress) => $dress->currentStatus($openStatuses);
+
+        // 4. Status Distribution Cards Calculation
         $totalDressesCount = Dress::count();
         if (!$fromDate && !$toDate) {
-            $countsByStatus = Dress::groupBy('status')
-                ->select('status', DB::raw('count(*) as count'))
-                ->pluck('count', 'status')
-                ->toArray();
+            $countsByStatus = Dress::select('id', 'status')->get()->countBy($statusOf);
 
             $statusCounts = [
-                'ready' => ($countsByStatus['ready'] ?? 0) + ($countsByStatus['available'] ?? 0),
+                'ready' => $countsByStatus['available'] ?? 0,
                 'booked' => $countsByStatus['booked'] ?? 0,
                 'out' => $countsByStatus['out'] ?? 0,
             ];
@@ -527,7 +553,7 @@ class ReportController extends Controller
             ];
         }
 
-        // 4. Retrieve Dresses and apply search filter
+        // 5. Retrieve Dresses and apply search filter
         $dressQuery = Dress::query();
         if ($search !== '') {
             $cleanSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
@@ -540,7 +566,7 @@ class ReportController extends Controller
 
         $dressesList = $dressQuery->get();
 
-        $mapped = $dressesList->map(function ($d) use ($bookingCounts, $revenueMap, $triedCounts) {
+        $mapped = $dressesList->map(function ($d) use ($bookingCounts, $revenueMap, $triedCounts, $statusOf) {
             $bCount = $bookingCounts[$d->id] ?? 0;
             $rentalPrice = floatval($d->rental_price ?? 0);
             $rev = $revenueMap[$d->id] ?? ($bCount > 0 ? ($bCount * $rentalPrice) : 0);
@@ -553,14 +579,14 @@ class ReportController extends Controller
                 'code' => $d->code,
                 'image_path' => $d->image_path,
                 'rental_price' => $rentalPrice,
-                'status' => $d->status,
+                'status' => $statusOf($d),
                 'times_booked' => $bCount,
                 'times_tried' => $tCount,
                 'total_revenue' => round($rev, 2),
             ];
         });
 
-        // 5. Apply sorting
+        // 6. Apply sorting
         if ($sort === 'top') {
             $sorted = $mapped->sort(function ($a, $b) {
                 if ($b['times_booked'] !== $a['times_booked']) {
@@ -582,6 +608,7 @@ class ReportController extends Controller
         }
 
         return response()->json([
+            'date_by' => $byEvent ? 'event' : 'booking',
             'status_counts' => $statusCounts,
             'total_dresses' => $sorted->count(),
             'total_bookings' => $sorted->sum('times_booked'),

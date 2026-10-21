@@ -5,6 +5,11 @@ import {
 } from 'lucide-react';
 import { apiClient, getStorageUrl } from '@/lib/api-client';
 
+const DATE_BY_OPTIONS = [
+  { id: 'booking', label: 'تاريخ الحجز' },
+  { id: 'event', label: 'تاريخ الفرح' },
+];
+
 // Dresses Report Component with 100% Backend-Calculated Metrics (View-Only)
 export function DressesReport() {
   const [reportData, setReportData] = useState({
@@ -25,6 +30,7 @@ export function DressesReport() {
   const [datePreset, setDatePreset] = useState('all'); // 'all' | 'this_month' | 'last_month' | 'last_30_days' | 'custom'
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [dateBy, setDateBy] = useState('booking'); // which booking date the period filters on
 
   // Handle Date Preset Selection
   const handleSelectPreset = (preset) => {
@@ -56,7 +62,7 @@ export function DressesReport() {
   // Reset pagination on filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, viewMode, fromDate, toDate, perPage]);
+  }, [searchQuery, viewMode, fromDate, toDate, dateBy, perPage]);
 
   // Fetch Report Data from Backend (100% Backend Calculation)
   const fetchReport = useCallback(async () => {
@@ -65,6 +71,7 @@ export function DressesReport() {
       const params = {};
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
+      if (fromDate || toDate) params.date_by = dateBy;
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (viewMode) params.sort = viewMode;
 
@@ -82,7 +89,7 @@ export function DressesReport() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, searchQuery, viewMode]);
+  }, [fromDate, toDate, dateBy, searchQuery, viewMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -238,6 +245,21 @@ export function DressesReport() {
 
           {/* Custom Date Inputs (From / To) */}
           <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
+            <div className="flex p-1 bg-slate-100 rounded-xl" role="group" aria-label="الفترة حسب">
+              {DATE_BY_OPTIONS.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setDateBy(o.id)}
+                  aria-pressed={dateBy === o.id}
+                  className={`px-2.5 py-0.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    dateBy === o.id ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
               <label className="text-[11px] font-bold text-slate-400">من:</label>
               <input
@@ -293,7 +315,7 @@ export function DressesReport() {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
               <span>
-                إحصائيات الفترة من <span className="font-mono font-black">{fromDate || 'البداية'}</span> إلى <span className="font-mono font-black">{toDate || 'اليوم'}</span>:
+                {dateBy === 'event' ? 'أفراح الفترة' : 'حجوزات الفترة'} من <span className="font-mono font-black">{fromDate || 'البداية'}</span> إلى <span className="font-mono font-black">{toDate || 'اليوم'}</span>:
               </span>
             </div>
             <div className="flex items-center gap-4 text-[11px]">
@@ -398,10 +420,12 @@ export function DressesReport() {
                           <span className={`px-2 py-0.5 rounded-lg text-[9.5px] font-black ${
                             dress.status === 'ready' || dress.status === 'available' ? 'bg-emerald-50 text-emerald-700' :
                             dress.status === 'out' ? 'bg-blue-50 text-blue-700' :
+                            dress.status === 'booked' ? 'bg-indigo-50 text-indigo-700' :
                             'bg-slate-100 text-slate-600'
                           }`}>
                             {dress.status === 'ready' || dress.status === 'available' ? 'جاهز' :
-                             dress.status === 'out' ? 'مستلم' : dress.status}
+                             dress.status === 'out' ? 'مستلم' :
+                             dress.status === 'booked' ? 'محجوز' : dress.status}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-700">
@@ -447,10 +471,12 @@ export function DressesReport() {
                       <span className={`px-2 py-0.5 rounded-lg text-[9.5px] font-black flex-shrink-0 ${
                         dress.status === 'ready' || dress.status === 'available' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                         dress.status === 'out' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                        dress.status === 'booked' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
                         'bg-slate-100 text-slate-600'
                       }`}>
                         {dress.status === 'ready' || dress.status === 'available' ? 'جاهز' :
-                         dress.status === 'out' ? 'مستلم' : dress.status}
+                         dress.status === 'out' ? 'مستلم' :
+                         dress.status === 'booked' ? 'محجوز' : dress.status}
                       </span>
                     </div>
 
