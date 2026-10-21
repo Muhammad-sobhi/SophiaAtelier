@@ -23,7 +23,7 @@ export default function NewCollection() {
     <section className={styles.section}>
       <div className={styles.bgWrap} ref={bgRef}>
         <Image
-          src="/images/new-collection.png"
+          src="/images/new-collection.webp"
           alt="Éternelle Collection"
           fill
           priority

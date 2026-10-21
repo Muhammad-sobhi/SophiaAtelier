@@ -106,7 +106,7 @@ export default function ContactSection() {
             {/* Left Image Section */}
             <div className={styles.leftImageWrapper} data-animate="slide-left">
               <Image
-                src="/images/contact.png"
+                src="/images/contact.webp"
                 alt="Bridal Studio Display"
                 fill
                 quality={95}

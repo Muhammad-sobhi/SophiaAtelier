@@ -9,10 +9,10 @@ import { getStorageUrl } from '../../lib/api';
 import styles from './ClientGallery.module.css';
 
 const DEFAULT_CLIENTS = [
-  { id: 1, image: '/images/product-1.png', name: 'Sarah & James' },
-  { id: 2, image: '/images/product-2.png', name: 'Emily & David' },
-  { id: 3, image: '/images/product-3.png', name: 'Olivia & Michael' },
-  { id: 4, image: '/images/product-4.png', name: 'Sophia & Daniel' },
+  { id: 1, image: '/images/product-1.webp', name: 'Sarah & James' },
+  { id: 2, image: '/images/product-2.webp', name: 'Emily & David' },
+  { id: 3, image: '/images/product-3.webp', name: 'Olivia & Michael' },
+  { id: 4, image: '/images/product-4.webp', name: 'Sophia & Daniel' },
 ];
 
 export default function ClientGallery() {
@@ -45,7 +45,7 @@ export default function ClientGallery() {
   const displayClients = clientGallery.length > 0
     ? clientGallery.map((c) => ({
         id: c.id,
-        image: c.image_path ? getStorageUrl(c.image_path) : '/images/product-1.png',
+        image: c.image_path ? getStorageUrl(c.image_path) : '/images/product-1.webp',
         name: c.client_name,
       }))
     : DEFAULT_CLIENTS;

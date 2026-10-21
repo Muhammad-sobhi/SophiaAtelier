@@ -424,7 +424,7 @@ export default function TrackOrder() {
       <section className={styles.conciergeSection} ref={conciergeRef}>
         <div className={styles.conciergeBanner}>
           <div className={styles.conciergeImageWrap}>
-            <Image src="/images/about.png" alt="Your Bridal Concierge" fill quality={90} className={styles.conciergeImage} />
+            <Image src="/images/about.webp" alt="Your Bridal Concierge" fill quality={90} className={styles.conciergeImage} />
           </div>
 
           <div className={styles.conciergeContent}>

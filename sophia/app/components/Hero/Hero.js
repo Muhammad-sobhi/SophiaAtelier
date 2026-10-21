@@ -34,7 +34,7 @@ export default function Hero() {
       {/* Parallax BG */}
       <div className={styles.bgWrap} ref={bgRef}>
         <Image
-          src="/images/hero-bg.png"
+          src="/images/hero-bg.webp"
           alt="Luxury bridal salon"
           fill
           priority
@@ -80,7 +80,7 @@ export default function Hero() {
         {/* Bride Image — blended into the scene */}
         <div className={styles.brideWrap}>
           <Image
-            src="/images/hero-bride.png"
+            src="/images/hero-bride.webp"
             alt="Bride in wedding dress"
             width={650}
             height={820}

@@ -139,7 +139,7 @@ function CollectionsContent() {
         <div className={styles.heroBanner}>
           <div className={styles.bgWrap}>
             <Image
-              src="/images/appointments.png"
+              src="/images/appointments.webp"
               alt="Our Collections"
               fill
               priority

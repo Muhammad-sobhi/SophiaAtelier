@@ -17,11 +17,11 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 }
 
 export function getStorageUrl(path) {
-  if (!path) return '/images/product-1.png';
+  if (!path) return '/images/product-1.webp';
   if (typeof path === 'object') {
     path = path.image_path || path.image || path.url || '';
   }
-  if (!path || typeof path !== 'string') return '/images/product-1.png';
+  if (!path || typeof path !== 'string') return '/images/product-1.webp';
 
   if (path.startsWith('blob:')) return path;
   if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -82,8 +82,8 @@ export async function fetchDresses() {
         priceNum: 0,
         trying_fee: d.trying_fee,
         rental_price: d.rental_price,
-        image: d.images && d.images.length > 0 ? getStorageUrl(d.images[0].image_path) : '/images/product-1.png',
-        images: d.images && d.images.length > 0 ? d.images.map((img) => getStorageUrl(img.image_path)) : ['/images/product-1.png'],
+        image: d.images && d.images.length > 0 ? getStorageUrl(d.images[0].image_path) : '/images/product-1.webp',
+        images: d.images && d.images.length > 0 ? d.images.map((img) => getStorageUrl(img.image_path)) : ['/images/product-1.webp'],
         badge: d.new_collection ? 'New' : '',
         new_collection: d.new_collection,
         category: d.category?.name || 'All',

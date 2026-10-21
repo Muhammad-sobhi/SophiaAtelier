@@ -27,9 +27,9 @@ export default function DressCard({
   // Extract images array
   const images = product?.images && product.images.length > 0
     ? product.images
-    : (product?.image ? [product.image] : ['/images/product-1.png']);
+    : (product?.image ? [product.image] : ['/images/product-1.webp']);
 
-  const currentImage = images[currentIdx] || product?.image || '/images/product-1.png';
+  const currentImage = images[currentIdx] || product?.image || '/images/product-1.webp';
   const hasMultipleImages = images.length > 1;
 
   const nextImage = (e) => {
