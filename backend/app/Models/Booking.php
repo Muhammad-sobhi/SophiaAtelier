@@ -14,7 +14,7 @@ class Booking extends Model
     protected $fillable = [
         'client_id', 'dress_id', 'dress_2_id', 'dress_3_id', 'booking_date', 'event_date',
         'pickup_scheduled_on', 'return_scheduled_on',
-        'status', 'total_amount', 'deposit_amount', 'insurance_amount', 'notes',
+        'status', 'total_amount', 'deposit_amount', 'insurance_amount', 'offer_id', 'discount_amount', 'notes',
         'receipt_path', 'bill_image_path', 'payment_method', 'sales_name', 'pickup_sales_name', 'return_sales_name', 'is_override',
         'cancelled_at', 'cancelled_by', 'cancelled_by_name', 'cancelled_stage',
         'cancellation_reason', 'cancellation_note',
@@ -55,6 +55,7 @@ class Booking extends Model
             'total_amount' => 'decimal:2',
             'deposit_amount' => 'decimal:2',
             'insurance_amount' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'is_override' => 'boolean',
             'cancelled_at' => 'datetime',
         ];
@@ -135,6 +136,11 @@ class Booking extends Model
     public function dress(): BelongsTo
     {
         return $this->belongsTo(Dress::class);
+    }
+
+    public function offer(): BelongsTo
+    {
+        return $this->belongsTo(Offer::class);
     }
 
     public function dress2(): BelongsTo

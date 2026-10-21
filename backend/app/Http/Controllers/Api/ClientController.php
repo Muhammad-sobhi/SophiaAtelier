@@ -613,7 +613,8 @@ class ClientController extends Controller
             'visit_date' => 'nullable|date',
             'visit_time' => 'nullable|string|max:50',
             'event_date' => 'nullable|date',
-            'booking_date' => 'nullable|date|before_or_equal:today',
+            // "Today" in Cairo: the server clock is UTC, which is still yesterday after midnight in Egypt
+            'booking_date' => 'nullable|date|before_or_equal:' . now('Africa/Cairo')->toDateString(),
             'pickup_scheduled_on' => 'nullable|date',
             'return_scheduled_on' => 'nullable|date',
             'pickup_date' => 'nullable|date',
@@ -621,6 +622,8 @@ class ClientController extends Controller
             'total_amount' => 'nullable|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
+            'offer_id' => 'nullable|integer',
+            'discount_amount' => 'nullable|numeric|min:0',
             'trying_fee' => 'nullable|numeric|min:0',
             'amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:50',

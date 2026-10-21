@@ -9,7 +9,8 @@ import { useStore } from '../../context/StoreContext';
 import DressCard from '../DressCard/DressCard';
 import styles from './BestSellers.module.css';
 
-export default function BestSellers({ onQuickView, onToggleWishlist, isWishlisted }) {
+// Also used for the running offer's dresses by passing products/title/id
+export default function BestSellers({ onQuickView, onToggleWishlist, isWishlisted, products, title, id = 'bestsellers' }) {
   const { dresses, loadingDresses, t, lang } = useStore();
   const trackRef = useRef(null);
   const sectionRef = useScrollAnimation();
@@ -20,13 +21,13 @@ export default function BestSellers({ onQuickView, onToggleWishlist, isWishliste
     trackRef.current.scrollBy({ left: dir * (w + 24), behavior: 'smooth' });
   };
 
-  const displayProducts = dresses.slice(0, 8);
+  const displayProducts = products || dresses.slice(0, 8);
 
   return (
-    <section className={`section-padding ${styles.section}`} id="bestsellers" ref={sectionRef}>
+    <section className={`section-padding ${styles.section}`} id={id} ref={sectionRef}>
       <div className="container">
         <div className={styles.header}>
-          <span className={styles.title}>{t.bestSellers.title}</span>
+          <span className={styles.title}>{title || t.bestSellers.title}</span>
           <Link href="/collections" className={styles.viewAll}>{t.hero.explore}</Link>
         </div>
 

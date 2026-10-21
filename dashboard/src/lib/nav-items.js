@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Factory,
   Settings,
+  BadgePercent,
   Image as ImageIcon } from 'lucide-react';
 
 export const menuItems = [
@@ -24,6 +25,7 @@ export const menuItems = [
 { icon: Users, label: 'العرائس', path: '/dashboard/brides' },
 { icon: Gem, label: 'الفساتين', path: '/dashboard/dresses' },
 { icon: Layers, label: 'التشكيلات', path: '/dashboard/collections' },
+{ icon: BadgePercent, label: 'العروض', path: '/dashboard/offers' },
 { icon: ImageIcon, label: 'معرض العملاء', shortLabel: 'المعرض', path: '/dashboard/client-gallery' },
 { icon: Ruler, label: 'القياسات', path: '/dashboard/fittings' },
 { icon: CheckSquare, label: 'المهام', path: '/dashboard/tasks' },

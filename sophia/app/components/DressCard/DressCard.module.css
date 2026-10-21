@@ -34,10 +34,18 @@
   transform: scale(1.04);
 }
 
-.badge {
+.badges {
   position: absolute;
   top: 14px;
   left: 14px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.badge {
   padding: 5px 12px;
   background: #c8a96a;
   color: white;
@@ -47,7 +55,14 @@
   letter-spacing: 1.5px;
   text-transform: uppercase;
   border-radius: 99px;
-  z-index: 4;
+}
+
+/* Running offer: blush so it reads apart from the gold "New" badge */
+.offerBadge {
+  background: var(--color-secondary);
+  color: #5a3d38;
+  text-transform: none;
+  letter-spacing: 0.5px;
 }
 
 /* Slider Arrows */
@@ -246,8 +261,8 @@
     opacity: 0.9;
   }
 
-  /* Controls are always visible on touch; keep the badge clear of them */
-  .badge {
+  /* Controls are always visible on touch; keep the badges clear of them */
+  .badges {
     top: 58px;
   }
 
@@ -282,9 +297,12 @@
     white-space: nowrap;
   }
 
-  .badge {
+  .badges {
     top: 46px;
     left: 8px;
+  }
+
+  .badge {
     padding: 4px 9px;
     font-size: 8px;
   }

@@ -170,6 +170,19 @@ export async function fetchPublicFaqs() {
   }
 }
 
+// Running offers (labels and covered dress ids only; prices stay hidden)
+export async function fetchActiveOffers() {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}/public/offers`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error('Failed to fetch offers:', e);
+    return [];
+  }
+}
+
 /**
  * Dress availability for the bride's try-on date and wedding date.
  * Without dress_ids it checks the whole catalog (wedding date only).

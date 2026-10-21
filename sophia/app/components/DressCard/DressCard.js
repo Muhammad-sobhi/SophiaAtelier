@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { offerLabel } from '../../lib/offers';
 import styles from './DressCard.module.css';
 
 export default function DressCard({
@@ -16,7 +17,8 @@ export default function DressCard({
   dataDelay,
   className = '',
 }) {
-  const { t, lang, weddingDate, catalogAvailability } = useStore();
+  const { t, lang, weddingDate, catalogAvailability, offerForDress } = useStore();
+  const offer = offerForDress(product.id);
   const onWedding = weddingDate ? catalogAvailability[product.id] : null;
   const [currentIdx, setCurrentIdx] = useState(0);
   const touchStartX = useRef(null);
@@ -100,7 +102,12 @@ export default function DressCard({
           />
         )}
 
-        {product.badge && <span className={styles.badge}>{product.badge}</span>}
+        {(product.badge || offer) && (
+          <div className={styles.badges}>
+            {product.badge && <span className={styles.badge}>{product.badge}</span>}
+            {offer && <span className={`${styles.badge} ${styles.offerBadge}`}>{offerLabel(offer, lang, t)}</span>}
+          </div>
+        )}
 
         {/* Image Slider Controls (Arrows) */}
         {hasMultipleImages && (

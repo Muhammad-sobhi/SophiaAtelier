@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { fetchDresses, fetchPublicCategories, fetchPublicCollections, fetchPublicGallery, checkAvailability } from '../lib/api';
+import { fetchDresses, fetchPublicCategories, fetchPublicCollections, fetchPublicGallery, fetchActiveOffers, checkAvailability } from '../lib/api';
 import { translations } from '../lib/translations';
 
 const StoreContext = createContext(null);
@@ -180,6 +180,18 @@ export function StoreProvider({ children }) {
     loadApiData();
   }, [loadApiData]);
 
+  // Offers expire, so they are fetched fresh and kept out of the catalog cache
+  const [offers, setOffers] = useState([]);
+  useEffect(() => {
+    fetchActiveOffers().then(setOffers);
+  }, []);
+
+  /** The first running offer covering this dress (dress_ids null = every dress) */
+  const offerForDress = useCallback(
+    (id) => offers.find((o) => o.dress_ids === null || o.dress_ids.includes(id)) || null,
+    [offers]
+  );
+
   /* Cart — one piece of each dress, up to 3 dresses per visit */
   const addToCart = useCallback((product) => {
     const tr = translations[lang] || translations.en;
@@ -255,6 +267,7 @@ export function StoreProvider({ children }) {
     weddingDate, setWeddingDate, catalogAvailability,
     wishlist, toggleWishlist, isWishlisted,
     dresses, categories, collections, clientGallery, loadingDresses, refreshData: loadApiData,
+    offers, offerForDress,
     brideUser, loginBride, registerBride, logoutBride,
     authModalOpen, setAuthModalOpen,
     quickViewProduct, openQuickView, closeQuickView,

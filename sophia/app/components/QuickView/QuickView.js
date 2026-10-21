@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { X, Heart, Star, ChevronLeft, ChevronRight, Sparkles, Shirt, Scale, Palette, Package } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { offerLabel, offerName } from '../../lib/offers';
 import styles from './QuickView.module.css';
 
 export default function QuickView() {
-  const { quickViewProduct: product, closeQuickView, addToCart, toggleWishlist, isWishlisted, t, lang, weddingDate, catalogAvailability } = useStore();
+  const { quickViewProduct: product, closeQuickView, addToCart, toggleWishlist, isWishlisted, t, lang, weddingDate, catalogAvailability, offerForDress } = useStore();
   const [activeImage, setActiveImage] = useState('');
 
   const isAr = lang === 'ar';
@@ -30,6 +31,7 @@ export default function QuickView() {
     closeQuickView();
   };
 
+  const offer = offerForDress(product.id);
   const displayName = isAr ? (product.name_ar || product.name) : (product.name || product.name_ar);
   const displayDesc = isAr ? (product.description_ar || product.description) : (product.description || product.description_ar);
   const displayCategory = isAr ? (product.category_ar || product.category) : (product.category || product.category_ar);
@@ -145,6 +147,9 @@ export default function QuickView() {
               )}
               {displayCategory && (
                 <span className={styles.categoryBadge}>{displayCategory}</span>
+              )}
+              {offer && (
+                <span className={styles.offerBadge}>{offerName(offer, lang)} · {offerLabel(offer, lang, t)}</span>
               )}
             </div>
 
