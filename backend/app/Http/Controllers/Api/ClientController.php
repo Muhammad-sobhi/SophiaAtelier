@@ -317,6 +317,7 @@ class ClientController extends Controller
 
         if (!$isPublic && $request->hasFile('image')) {
             $path = $request->file('image')->store('clients', 'public');
+            \App\Services\ImageOptimizer::optimize($path);
             $validated['image_path'] = $path;
         }
 
@@ -408,6 +409,7 @@ class ClientController extends Controller
                 Storage::disk('public')->delete($client->image_path);
             }
             $path = $request->file('image')->store('clients', 'public');
+            \App\Services\ImageOptimizer::optimize($path);
             $validated['image_path'] = $path;
         }
 

@@ -44,6 +44,7 @@ class CategoryController extends Controller
             }
 
             $path = $request->file('image')->store('categories', 'public');
+            \App\Services\ImageOptimizer::optimize($path);
             $validated['image_path'] = $path;
 
             // Ensure file is readable
@@ -85,6 +86,7 @@ class CategoryController extends Controller
             }
 
             $path = $request->file('image')->store('categories', 'public');
+            \App\Services\ImageOptimizer::optimize($path);
             $validated['image_path'] = $path;
 
             $fullPath = storage_path('app/public/' . $path);

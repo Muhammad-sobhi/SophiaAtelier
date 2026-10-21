@@ -53,11 +53,11 @@ const CategoryIcon = ({ type }) => {
 };
 
 const DEFAULT_MOCKUP_CATEGORIES = [
-  { id: 1, name: 'Wedding Dresses', name_ar: 'فساتين الزفاف', count: 82, type: 'wedding', image: '/images/categories/ballgown.png' },
-  { id: 2, name: 'Evening Dresses', name_ar: 'فساتين سهرة', count: 36, type: 'evening', image: '/images/categories/aline.png' },
-  { id: 3, name: 'Veils & Accessories', name_ar: 'طرحة وإكسسوارات', count: 27, type: 'veil', image: '/images/categories/mermaid.png' },
-  { id: 4, name: 'Bridesmaid & Kids', name_ar: 'وصيفات وأطفال', count: 18, type: 'kids', image: '/images/categories/sheath.png' },
-  { id: 5, name: 'Accessories', name_ar: 'مجوهرات وملحقات', count: 24, type: 'ring', image: '/images/categories/minimal.png' },
+  { id: 1, name: 'Wedding Dresses', name_ar: 'فساتين الزفاف', count: 82, type: 'wedding', image: '/images/categories/ballgown.webp' },
+  { id: 2, name: 'Evening Dresses', name_ar: 'فساتين سهرة', count: 36, type: 'evening', image: '/images/categories/aline.webp' },
+  { id: 3, name: 'Veils & Accessories', name_ar: 'طرحة وإكسسوارات', count: 27, type: 'veil', image: '/images/categories/mermaid.webp' },
+  { id: 4, name: 'Bridesmaid & Kids', name_ar: 'وصيفات وأطفال', count: 18, type: 'kids', image: '/images/categories/sheath.webp' },
+  { id: 5, name: 'Accessories', name_ar: 'مجوهرات وملحقات', count: 24, type: 'ring', image: '/images/categories/minimal.webp' },
 ];
 
 export default function Categories() {

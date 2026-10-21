@@ -11,19 +11,19 @@ const DEFAULT_COLLECTIONS = [
   {
     name: 'Classic',
     tagline: 'Timeless & Elegant',
-    image: '/images/collection-classic.png',
+    image: '/images/collection-classic.webp',
     href: '/collections?collection=Classic',
   },
   {
     name: 'Royal',
     tagline: 'Luxurious & Glamorous',
-    image: '/images/collection-royal.png',
+    image: '/images/collection-royal.webp',
     href: '/collections?collection=Royal',
   },
   {
     name: 'Boho',
     tagline: 'Free-Spirited & Romantic',
-    image: '/images/collection-boho.png',
+    image: '/images/collection-boho.webp',
     href: '/collections?collection=Boho',
   },
 ];
@@ -36,19 +36,19 @@ export default function Collections() {
     {
       name: lang === 'ar' ? 'كلاسيك' : 'Classic',
       tagline: lang === 'ar' ? 'أناقة كلاسيكية خالدة' : 'Timeless & Elegant',
-      image: '/images/collection-classic.png',
+      image: '/images/collection-classic.webp',
       href: '/collections?collection=Classic',
     },
     {
       name: lang === 'ar' ? 'ملكي' : 'Royal',
       tagline: lang === 'ar' ? 'فخامة وملكية ساحرة' : 'Luxurious & Glamorous',
-      image: '/images/collection-royal.png',
+      image: '/images/collection-royal.webp',
       href: '/collections?collection=Royal',
     },
     {
       name: lang === 'ar' ? 'بوهو' : 'Boho',
       tagline: lang === 'ar' ? 'رومانسية وعصرية' : 'Free-Spirited & Romantic',
-      image: '/images/collection-boho.png',
+      image: '/images/collection-boho.webp',
       href: '/collections?collection=Boho',
     },
   ];
@@ -57,7 +57,7 @@ export default function Collections() {
     ? collections.map((c) => ({
         name: lang === 'ar' && c.name_ar ? c.name_ar : c.name,
         tagline: lang === 'ar' && c.name_ar ? c.name_ar : (c.tagline || 'Exclusive Collection'),
-        image: c.image ? getStorageUrl(c.image) : '/images/collection-classic.png',
+        image: c.image ? getStorageUrl(c.image) : '/images/collection-classic.webp',
         href: `/collections?collection=${encodeURIComponent(c.name)}`,
       }))
     : defaultCollections;

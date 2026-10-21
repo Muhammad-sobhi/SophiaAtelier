@@ -33,7 +33,7 @@
   height: 580px;
 }
 
-/* Main tall image on the left (about3.png) */
+/* Main tall image on the left (about3.webp) */
 .mainImageWrap {
   position: absolute;
   top: 0;
@@ -50,7 +50,7 @@
   object-position: center center;
 }
 
-/* Overlapping square detail image on bottom right (about.png) */
+/* Overlapping square detail image on bottom right (about.webp) */
 .overlapImageWrap {
   position: absolute;
   bottom: 0;

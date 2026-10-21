@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Image from 'next/image';
+import LazyVideo from '../LazyVideo/LazyVideo';
 import { X, Trash2, Eye } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { isVideoUrl } from '../../lib/api';
@@ -36,7 +37,7 @@ export default function WishlistDrawer() {
             {wishlist.map((item) => (
               <div key={item.id} className={styles.item}>
                 {isVideoUrl(item.image) ? (
-                    <video src={item.image} className={styles.itemImage} muted loop autoPlay playsInline aria-label={item.name} />
+                    <LazyVideo src={item.image} className={styles.itemImage} aria-label={item.name} />
                   ) : (
                     <Image src={item.image} alt={item.name} width={80} height={100} className={styles.itemImage} />
                   )}

@@ -47,7 +47,7 @@ export default function AboutSection() {
           <div className={styles.imageComposition} data-animate="slide-left">
             <div className={styles.mainImageWrap}>
               <Image
-                src="/images/about.png"
+                src="/images/about.webp"
                 alt="Luxury gown in boutique"
                 fill
                 quality={95}
@@ -57,7 +57,7 @@ export default function AboutSection() {
             </div>
             <div className={styles.overlapImageWrap}>
               <Image
-                src="/images/about2.png"
+                src="/images/about2.webp"
                 alt="Handcrafted lacework detail"
                 fill
                 quality={95}
@@ -94,7 +94,7 @@ export default function AboutSection() {
       <section className={styles.promiseSection} ref={promiseRef}>
         <div className={styles.promiseBanner}>
           <Image
-            src="/images/about3.png"
+            src="/images/about3.webp"
             alt="Bridal gown sketch and flowers"
             fill
             quality={95}
