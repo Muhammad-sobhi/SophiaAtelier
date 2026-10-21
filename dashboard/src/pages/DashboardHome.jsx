@@ -83,7 +83,7 @@ export default function DashboardPage() {
 
   const fetchBrides = async () => {
     try {
-      const res = await apiClient.get('/clients?per_page=1000');
+      const res = await apiClient.get('/clients?per_page=1000&summary=1');
       const list = Array.isArray(res) ? res : res.data || [];
       const mapped = list.map(mapBride);
       setBrides(mapped);
@@ -270,13 +270,8 @@ export default function DashboardPage() {
             if (freshBride && freshBride.id === activeBrideForModal.id) {
               setActiveBrideForModal(freshBride);
             }
-            const freshBrides = await refreshAllData();
-            if (activeBrideForModal && Array.isArray(freshBrides)) {
-              const updated = freshBrides.find(b => b.id === activeBrideForModal.id);
-              if (updated) {
-                setActiveBrideForModal(updated);
-              }
-            }
+            // The refreshed list only carries summaries, so the popup keeps the full record above
+            await refreshAllData();
           }}
         />
       )}

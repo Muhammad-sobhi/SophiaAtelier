@@ -85,6 +85,21 @@ export function BrideJourneyPopup({
     }
   }, [initialBride]);
 
+  // Lists pass a summary of the bride; load her full record (dress images, payments, visit dresses) on open
+  useEffect(() => {
+    if (!initialBride?.id) return;
+    let cancelled = false;
+    apiClient.get(`/clients/${initialBride.id}`)
+      .then((res) => {
+        const fresh = res?.data || res;
+        if (!cancelled && fresh?.id === initialBride.id) {
+          setLocalBride({ ...fresh, current_stage: fresh.current_stage || fresh.stage || 'visit' });
+        }
+      })
+      .catch((err) => console.warn('Failed to load client data:', err));
+    return () => { cancelled = true; };
+  }, [initialBride?.id]);
+
   // Visit stage: check each requested dress on the try-on date and on the wedding date
   const availabilityBride = localBride || initialBride;
   const availabilityVisit = getLatestVisit(availabilityBride);

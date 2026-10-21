@@ -15,7 +15,20 @@ class ClientController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Client::withCount(['visits', 'bookings'])->with([
+        // summary=1: what the dashboard board needs per bride (stage, dates, dress names), without
+        // the dresses' images/accessories and payments that only the opened bride's popup reads
+        $query = $request->boolean('summary') ? Client::withCount(['visits', 'bookings'])->with([
+            'visits' => function ($q) {
+                $q->latest();
+            },
+            'bookings' => function ($q) {
+                $q->latest()->latest('id');
+            },
+            'bookings.dress:id,code,name,trying_fee',
+            'bookings.dress2:id,code,name',
+            'bookings.dress3:id,code,name',
+            'fittings',
+        ]) : Client::withCount(['visits', 'bookings'])->with([
             'visits' => function ($q) {
                 $q->latest();
             },
