@@ -44,6 +44,7 @@ class CollectionController extends Controller
             }
 
             $validated['image'] = $request->file('image')->store('collections', 'public');
+            \App\Services\ImageOptimizer::optimize($validated['image']);
 
             // Ensure file is readable
             $fullPath = storage_path('app/public/' . $validated['image']);
@@ -89,6 +90,7 @@ class CollectionController extends Controller
             }
 
             $validated['image'] = $request->file('image')->store('collections', 'public');
+            \App\Services\ImageOptimizer::optimize($validated['image']);
 
             $fullPath = storage_path('app/public/' . $validated['image']);
             if (file_exists($fullPath)) {

@@ -322,6 +322,7 @@ class DressController extends Controller
             if ($existing + $index >= 4) break;
 
             $path = $file->store('dresses', 'public');
+            \App\Services\ImageOptimizer::optimize($path);
 
             // Ensure the file is readable
             $fullPath = storage_path('app/public/' . $path);

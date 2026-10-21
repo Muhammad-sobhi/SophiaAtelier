@@ -43,6 +43,7 @@ class ClientGalleryController extends Controller
         }
 
         $path = $request->file('image')->store('client-gallery', 'public');
+        \App\Services\ImageOptimizer::optimize($path);
 
         // Ensure file is readable
         $fullPath = storage_path('app/public/' . $path);
@@ -83,6 +84,7 @@ class ClientGalleryController extends Controller
             }
 
             $validated['image_path'] = $request->file('image')->store('client-gallery', 'public');
+            \App\Services\ImageOptimizer::optimize($validated['image_path']);
 
             $fullPath = storage_path('app/public/' . $validated['image_path']);
             if (file_exists($fullPath)) {
