@@ -8,9 +8,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserHasPermission
 {
-    public function handle(Request $request, Closure $next, string $permission): Response
+    /** Passes when the user has any one of the given permissions (permission:a,b) */
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
-        if (! $request->user() || ! $request->user()->hasPermission($permission)) {
+        $user = $request->user();
+        if (! $user || ! collect($permissions)->contains(fn ($permission) => $user->hasPermission($permission))) {
             return response()->json(['message' => 'ليس لديك صلاحية لتنفيذ هذا الإجراء'], 403);
         }
 

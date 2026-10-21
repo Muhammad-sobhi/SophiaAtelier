@@ -39,7 +39,7 @@ class AttendanceController extends Controller
             return response()->json($query->latest('date')->get());
         }
 
-        return response()->json($query->latest('date')->paginate($request->input('per_page', 50)));
+        return response()->json($query->latest('date')->paginate(min(max((int) $request->input('per_page', 50), 1), 1000)));
     }
 
     public function store(Request $request): JsonResponse

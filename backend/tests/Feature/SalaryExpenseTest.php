@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class SalaryExpenseTest extends TestCase
 {
-    use DatabaseTransactions;
 
     public function test_past_salary_is_recorded_as_expense_for_the_employee()
     {

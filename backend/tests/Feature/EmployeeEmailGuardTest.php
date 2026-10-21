@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class EmployeeEmailGuardTest extends TestCase
 {
-    use DatabaseTransactions;
 
     public function test_new_employee_cannot_take_over_an_existing_login()
     {

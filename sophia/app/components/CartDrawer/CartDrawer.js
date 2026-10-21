@@ -228,8 +228,8 @@ export default function CartDrawer() {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
           client_id: brideUser.id,
-          client_name: brideUser.name || 'Bride User',
-          client_phone: brideUser.phone || '0000000000',
+          client_name: brideUser.name,
+          client_phone: brideUser.phone,
           client_email: brideUser.email || null,
           client_city: brideUser.city || 'Cairo',
           visit_date: visitDate,

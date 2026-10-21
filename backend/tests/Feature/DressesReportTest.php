@@ -6,13 +6,11 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Dress;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class DressesReportTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function book(array $dressIds, string $status, string $bookingDate = '2099-03-05', string $eventDate = '2099-06-20'): void
     {

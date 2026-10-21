@@ -7,14 +7,12 @@ use App\Models\Client;
 use App\Models\Dress;
 use App\Models\Employee;
 use App\Services\BridesExcelService;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class BridesExcelImportTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function file(array $rows): string
     {

@@ -8,13 +8,11 @@ use App\Models\Dress;
 use App\Models\Fitting;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class CalendarEventsTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function makeBooking(Client $client, array $attrs = []): Booking
     {

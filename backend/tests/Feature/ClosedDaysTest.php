@@ -7,13 +7,11 @@ use App\Models\ClosedDay;
 use App\Models\Dress;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ClosedDaysTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function actingAsRole(string $role): User
     {

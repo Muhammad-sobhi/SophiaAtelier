@@ -8,13 +8,11 @@ use App\Models\Dress;
 use App\Models\Fitting;
 use App\Models\Revenue;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class CancelBookingTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function bookedBride(string $status = 'confirmed'): array
     {

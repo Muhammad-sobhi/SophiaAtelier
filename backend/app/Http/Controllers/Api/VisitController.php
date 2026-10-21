@@ -88,20 +88,10 @@ class VisitController extends Controller
         if (!empty($validated['time_slot'])) {
             $normalized = self::normalizeTimeSlot($validated['time_slot']);
             $validated['time_slot'] = $normalized;
-
-            // Check limit
-            $existingCount = Visit::whereDate('visit_date', $validated['visit_date'])
-                ->where('status', '!=', 'declined')->where('time_slot', $normalized)
-                ->count();
-
-            if ($existingCount >= 4) {
-                return response()->json([
-                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
-                ], 422);
-            }
         }
 
-        $visit = Visit::create($validated);
+        // Checked and saved under the slot's lock, so the slot cannot go over its limit
+        $visit = Visit::inSlot($validated['visit_date'], $validated['time_slot'] ?? null, fn() => Visit::create($validated));
 
         if (isset($validated['tried_dresses'])) {
             $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'], ['type' => 'tried']);
@@ -151,22 +141,11 @@ class VisitController extends Controller
         if (!empty($validated['time_slot'])) {
             $normalized = self::normalizeTimeSlot($validated['time_slot']);
             $validated['time_slot'] = $normalized;
-
-            // Check limit excluding current visit
-            $visitDate = $validated['visit_date'] ?? $visit->visit_date;
-            $existingCount = Visit::whereDate('visit_date', $visitDate)
-                ->where('status', '!=', 'declined')->where('time_slot', $normalized)
-                ->where('id', '!=', $visit->id)
-                ->count();
-
-            if ($existingCount >= 4) {
-                return response()->json([
-                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
-                ], 422);
-            }
         }
 
-        $visit->update($validated);
+        // Checked (without this visit) and saved under the slot's lock
+        Visit::inSlot($validated['visit_date'] ?? $visit->visit_date, $validated['time_slot'] ?? null,
+            fn() => $visit->update($validated), $visit->id);
 
         if (array_key_exists('tried_dresses', $validated)) {
             $visit->triedDresses()->syncWithPivotValues($validated['tried_dresses'] ?? [], ['type' => 'tried']);

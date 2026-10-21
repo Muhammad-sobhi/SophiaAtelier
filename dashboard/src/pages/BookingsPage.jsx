@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, findClientByName } from '@/lib/api-client';
 import {
   Calendar as CalendarIcon,
   ChevronRight,
@@ -38,51 +38,6 @@ export function getOccupiedDatesForBooking(weddingDateStr, city) {
 }
 
 
-const DRESS_PRICES = {
-  'فستان الأميرة كلاسيك': '12,000 ج.م',
-  'فستان السهرة ذهبي': '15,000 ج.م',
-  'فستان الزفاف الأبيض الملكي': '18,000 ج.م',
-  'فستان الناعم الوردي بريق': '10,000 ج.م',
-  'فستان مطرز بلوري': '14,000 ج.م',
-  'فستان الكوتور الفرنسي': '22,000 ج.م'
-};
-
-const initialBookings = [
-{
-  id: 1,
-  client: 'سارة أحمد',
-  dress: 'فستان الأميرة كلاسيك',
-  weddingDate: '2026-09-15',
-  amount: '12,000 ج.م',
-  status: 'مؤكد',
-  city: 'القاهرة',
-  paymentMethod: 'instapay',
-  receiptImage: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80'
-},
-{
-  id: 2,
-  client: 'نورة محمد',
-  dress: 'فستان السهرة ذهبي',
-  weddingDate: '2026-10-01',
-  amount: '15,000 ج.م',
-  status: 'في الانتظار',
-  city: 'جدة',
-  paymentMethod: 'bank transfer',
-  receiptImage: null
-},
-{
-  id: 3,
-  client: 'فاطمة العلي',
-  dress: 'فستان الزفاف الأبيض الملكي',
-  weddingDate: '2026-08-20',
-  amount: '18,000 ج.م',
-  status: 'مؤكد',
-  city: 'القاهرة',
-  paymentMethod: 'cash',
-  receiptImage: null
-}];
-
-
 const statusStyles = {
   'مؤكد': { dot: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
   'في الانتظار': { dot: 'bg-orange-500', text: 'text-orange-600', bg: 'bg-orange-50' },
@@ -97,34 +52,25 @@ const paymentMethodLabels = {
 };
 
 export default function BookingsPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 6, 12)); // July 2026
-  const [selectedDateStr, setSelectedDateStr] = useState('2026-07-12');
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [selectedDateStr, setSelectedDateStr] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Core collections
-  const [manualBookings, setManualBookings] = useState([]);
   const [mergedBookings, setMergedBookings] = useState([]);
   const [dressesObjects, setDressesObjects] = useState([]);
-  const [clientsObjects, setClientsObjects] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [editingBooking, setEditingBooking] = useState(null);
-  const [availableDresses, setAvailableDresses] = useState([
-  'فستان الأميرة كلاسيك',
-  'فستان السهرة ذهبي',
-  'فستان الزفاف الأبيض الملكي',
-  'فستان الناعم الوردي بريق',
-  'فستان مطرز بلوري',
-  'فستان الكوتور الفرنسي']
-  );
+  const [availableDresses, setAvailableDresses] = useState([]);
 
   // Add Booking Form state
   const [newClient, setNewClient] = useState('');
   const [newDresses, setNewDresses] = useState([]);
-  const [newWeddingDate, setNewWeddingDate] = useState('2026-09-15');
+  const [newWeddingDate, setNewWeddingDate] = useState('');
   const [newAmount, setNewAmount] = useState('0 ج.م');
   const [newStatus, setNewStatus] = useState('في الانتظار');
   const [newCity, setNewCity] = useState('القاهرة');
@@ -137,66 +83,6 @@ export default function BookingsPage() {
 
   // Custom Alert Popup Modal state
   const [alertConfig, setAlertConfig] = useState(null);
-
-  // Local check helper
-  const checkLocalAvailabilityConflict = (dressNames, dateStr, cityStr, excludeId) => {
-    if (!dressNames || dressNames.length === 0 || !dateStr) return null;
-
-    const proposedWedding = new Date(dateStr);
-    if (isNaN(proposedWedding.getTime())) return null;
-
-    const isCairo = isCairoCity(cityStr);
-    const daysBefore = isCairo ? 1 : 2;
-    const daysAfter = 1;
-
-    const proposedStart = new Date(proposedWedding);
-    proposedStart.setDate(proposedWedding.getDate() - daysBefore);
-    proposedStart.setHours(0, 0, 0, 0);
-
-    const proposedEnd = new Date(proposedWedding);
-    proposedEnd.setDate(proposedWedding.getDate() + daysAfter);
-    proposedEnd.setHours(23, 59, 59, 999);
-
-    for (const dName of dressNames) {
-      const existing = mergedBookings.filter((b) => {
-        if (b.status === 'ملغي') return false;
-        if (excludeId !== undefined && b.id === excludeId) return false;
-        
-        const bDresses = b.dressNames || [];
-        return bDresses.includes(dName);
-      });
-
-      for (const eb of existing) {
-        if (!eb.weddingDate) continue;
-        const exWedding = new Date(eb.weddingDate);
-        if (isNaN(exWedding.getTime())) continue;
-
-        const exCity = eb.city || 'القاهرة';
-        const exIsCairo = isCairoCity(exCity);
-        const exDaysBefore = exIsCairo ? 1 : 2;
-        const exDaysAfter = 1;
-
-        const exStart = new Date(exWedding);
-        exStart.setDate(exWedding.getDate() - exDaysBefore);
-        exStart.setHours(0, 0, 0, 0);
-
-        const exEnd = new Date(exWedding);
-        exEnd.setDate(exWedding.getDate() + exDaysAfter);
-        exEnd.setHours(23, 59, 59, 999);
-
-        if (proposedStart <= exEnd && proposedEnd >= exStart) {
-          const nextAvail = new Date(exEnd);
-          nextAvail.setDate(exEnd.getDate() + 1);
-          const yyyy = nextAvail.getFullYear();
-          const mm = String(nextAvail.getMonth() + 1).padStart(2, '0');
-          const dd = String(nextAvail.getDate()).padStart(2, '0');
-          return `الفستان "${dName}" غير متاح، سيكون متاحاً مجدداً بتاريخ: ${yyyy}-${mm}-${dd}`;
-        }
-      }
-    }
-
-    return null;
-  };
 
   // Load bookings from API
   const fetchBookings = async () => {
@@ -222,7 +108,6 @@ export default function BookingsPage() {
           receiptImage: null
         };
       });
-      setManualBookings(mapped);
       setMergedBookings(mapped);
     } catch (e) {
       console.error('Failed to load bookings:', e);
@@ -234,17 +119,11 @@ export default function BookingsPage() {
     if (active) {
       try {
         const emp = JSON.parse(active);
-        setIsAdmin(emp.role === 'admin' || emp.email === 'admin@atelier.test');
+        setIsAdmin(emp.role === 'admin');
       } catch (e) {}
     }
 
     fetchBookings();
-
-    // Load clients catalog from API
-    apiClient.get('/clients').then((res) => {
-      const data = res.data || [];
-      setClientsObjects(data);
-    }).catch(() => {});
 
     apiClient.get('/employees').then((res) => {
       setEmployees(res.data || []);
@@ -258,75 +137,13 @@ export default function BookingsPage() {
     }).catch(() => {});
   }, []);
 
-  // Check availability dynamically on field changes
-  useEffect(() => {
-    if (!isModalOpen && !editingBooking) return;
-    const conflict = checkLocalAvailabilityConflict(newDresses, newWeddingDate, newCity, editingBooking?.id);
-    if (conflict) {
-      setAlertConfig({
-        isOpen: true,
-        title: 'تنبيه بعدم توفر الفستان',
-        message: `${conflict}\n\nنظراً لحجزه لعروس أخرى وفترة الشحن والتجهيز اللازمة لمدينتها.`
-      });
-    }
-  }, [newDresses, newWeddingDate, newCity]);
-
   // Update dress price automatically in add form when dress changes
   useEffect(() => {
-    let total = 0;
-    newDresses.forEach(d => {
-      const priceStr = DRESS_PRICES[d];
-      if (priceStr) {
-        total += parseFloat(priceStr.replace(/[^\d.]/g, '')) || 0;
-      } else {
-        total += 10000;
-      }
-    });
+    // Each dress's own rental price from the catalog
+    const total = newDresses.reduce((sum, name) =>
+      sum + (parseFloat(dressesObjects.find((d) => d.name === name)?.rental_price) || 0), 0);
     setNewAmount(`${total.toLocaleString()} ج.م`);
-  }, [newDresses]);
-
-  const saveBookings = (updatedManual) => {
-    setManualBookings(updatedManual);
-    localStorage.setItem('atelier_bookings', JSON.stringify(updatedManual));
-
-    const storedVisits = localStorage.getItem('atelier_visits');
-    let visitsList = [];
-    if (storedVisits) {
-      try {
-        visitsList = JSON.parse(storedVisits);
-      } catch (e) {}
-    }
-    const syncedBookings = [];
-    visitsList.forEach((visit) => {
-      if (visit.bookedDresses && visit.bookedDresses.length > 0 && (visit.status === 'حجز مؤكد' || visit.status === 'حضر')) {
-        visit.bookedDresses.forEach((dressName) => {
-          const alreadyExists = updatedManual.some(
-            (b) => b.client === visit.client && b.dress === dressName
-          );
-          if (!alreadyExists) {
-            let wedDate = visit.date;
-            try {
-              const d = new Date(visit.date);
-              d.setMonth(d.getMonth() + 2);
-              wedDate = d.toISOString().split('T')[0];
-            } catch (err) {}
-            syncedBookings.push({
-              id: Number(visit.id) + 1000000,
-              client: visit.client,
-              dress: dressName,
-              weddingDate: wedDate,
-              amount: DRESS_PRICES[dressName] || '10,000 ج.م',
-              status: 'مؤكد',
-              isSyncedFromVisit: true,
-              paymentMethod: 'cash',
-              city: 'القاهرة'
-            });
-          }
-        });
-      }
-    });
-    setMergedBookings([...updatedManual, ...syncedBookings]);
-  };
+  }, [newDresses, dressesObjects]);
 
   const handleEditBookingClick = (b) => {
     setEditingBooking(b);
@@ -349,20 +166,13 @@ export default function BookingsPage() {
       return;
     }
 
-    const conflict = checkLocalAvailabilityConflict(newDresses, newWeddingDate, newCity, editingBooking.id);
-    if (conflict) {
-      setAlertConfig({
-        isOpen: true,
-        title: 'تنبيه تعارض الحجز',
-        message: conflict
-      });
-      return;
-    }
-
     const dressIds = newDresses.map(name => dressesObjects.find((d) => d.name === name)?.id).filter(Boolean);
 
-    const clientObj = clientsObjects.find((c) => c.name === newClient);
-    const clientId = clientObj?.id || 1;
+    const clientId = (await findClientByName(newClient))?.id;
+    if (!clientId) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: 'لم يتم العثور على العروس، اختاريها من القائمة' });
+      return;
+    }
 
     const amountNum = parseFloat(newAmount.replace(/[^\d.]/g, '')) || 0;
     const mappedStatus = newStatus === 'مؤكد' ? 'confirmed' : newStatus === 'ملغي' ? 'cancelled' : 'pending';
@@ -383,8 +193,8 @@ export default function BookingsPage() {
 
       setNewClient('');
       setNewDresses([]);
-      setNewWeddingDate('2026-09-15');
-      setNewAmount('12,000 ج.م');
+      setNewWeddingDate('');
+      setNewAmount('0 ج.م');
       setNewStatus('في الانتظار');
       setNewCity('القاهرة');
       setNewPaymentMethod('cash');
@@ -408,32 +218,23 @@ export default function BookingsPage() {
       return;
     }
 
-    const conflict = checkLocalAvailabilityConflict(newDresses, newWeddingDate, newCity);
-    if (conflict) {
-      setAlertConfig({
-        isOpen: true,
-        title: 'تنبيه تعارض الحجز',
-        message: conflict
-      });
-      return;
-    }
-
-    let clientObj = clientsObjects.find((c) => c.name.trim() === newClient.trim());
-    let clientId = clientObj?.id;
+    let clientId = (await findClientByName(newClient))?.id;
     if (!clientId) {
       try {
         const clientRes = await apiClient.post('/clients', {
-          name: newClient,
-          phone: '0000000000',
-          email: `${Date.now()}@booking-client.com`,
+          name: newClient.trim(),
           source: 'walkin',
           city: newCity
         });
         clientId = clientRes.id || clientRes.data?.id;
       } catch (err) {
         console.error('Failed to create client for booking:', err);
-        clientId = 1;
       }
+    }
+    // Never attach a booking to some other bride when the client could not be found or created
+    if (!clientId) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: 'تعذر حفظ بيانات العروس، حاولي مرة أخرى' });
+      return;
     }
 
     const dressIds = newDresses.map(name => dressesObjects.find((d) => d.name === name)?.id).filter(Boolean);
@@ -466,7 +267,7 @@ export default function BookingsPage() {
 
       setNewClient('');
       setNewDresses([]);
-      setNewWeddingDate('2026-09-15');
+      setNewWeddingDate('');
       setNewStatus('في الانتظار');
       setNewCity('القاهرة');
       setNewPaymentMethod('cash');

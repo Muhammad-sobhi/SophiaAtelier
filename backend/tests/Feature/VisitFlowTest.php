@@ -7,13 +7,17 @@ use App\Models\Client;
 use App\Models\Dress;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class VisitFlowTest extends TestCase
 {
-    use DatabaseTransactions;
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // The website only takes visits from today on: freeze "today" before the fixed dates below
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-01 10:00', 'Africa/Cairo'));
+    }
 
     private function websiteRequest(array $dressIds, string $visitDate, string $weddingDate, string $phone = '01099999999'): Visit
     {

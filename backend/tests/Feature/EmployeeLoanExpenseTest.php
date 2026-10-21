@@ -6,13 +6,11 @@ use App\Models\Employee;
 use App\Models\EmployeeLoan;
 use App\Models\Expense;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class EmployeeLoanExpenseTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private Employee $emp;
 

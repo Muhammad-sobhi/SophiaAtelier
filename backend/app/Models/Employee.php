@@ -64,8 +64,12 @@ class Employee extends Model
                 // Password is already hashed by the controller
                 $user->password = $employee->password;
                 
-                // Determine role from permissions
-                $user->role = (is_array($employee->permissions) && in_array('*', $employee->permissions)) ? 'admin' : 'staff';
+                // Determine role from permissions, only when they are set or changed: saving a name or
+                // password must not demote an admin whose employee record has no "*"
+                $permissionsSet = $employee->wasRecentlyCreated ? $employee->permissions !== null : $employee->wasChanged('permissions');
+                if (!$user->exists || $permissionsSet) {
+                    $user->role = (is_array($employee->permissions) && in_array('*', $employee->permissions)) ? 'admin' : 'staff';
+                }
                 $user->save();
             }
         });

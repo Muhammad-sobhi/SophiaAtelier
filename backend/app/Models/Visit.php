@@ -84,6 +84,42 @@ class Visit extends Model
         }
     }
 
+    /** Visits one time slot can take */
+    public const SLOT_CAPACITY = 4;
+
+    /**
+     * Runs $save while holding the time slot's lock, after checking the slot still has room, so two
+     * requests at the same moment cannot both take its last place. Without a date or slot it just saves.
+     */
+    public static function inSlot($visitDate, ?string $timeSlot, \Closure $save, ?int $exceptVisitId = null): mixed
+    {
+        if (!$visitDate || !$timeSlot) {
+            return $save();
+        }
+
+        $day = \Carbon\Carbon::parse($visitDate)->toDateString();
+        try {
+            return \Illuminate\Support\Facades\Cache::lock("visit-slot:{$day}:{$timeSlot}", 10)->block(5, function () use ($day, $timeSlot, $save, $exceptVisitId) {
+                $taken = static::whereDate('visit_date', $day)->where('status', '!=', 'declined')->where('time_slot', $timeSlot)
+                    ->when($exceptVisitId, fn($q) => $q->whereKeyNot($exceptVisitId))
+                    ->count();
+                if ($taken >= self::SLOT_CAPACITY) {
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                        'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.',
+                        'code' => 'slot_full',
+                    ], 422));
+                }
+
+                return $save();
+            });
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                'message' => 'طلبك قيد الإرسال بالفعل، يرجى الانتظار لحظات',
+                'code' => 'request_in_progress',
+            ], 429));
+        }
+    }
+
     /** Confirm the visit; without a user it was confirmed automatically (all dresses available) */
     public function markConfirmed(?int $userId): void
     {

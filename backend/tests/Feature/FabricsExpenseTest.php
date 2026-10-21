@@ -3,13 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class FabricsExpenseTest extends TestCase
 {
-    use DatabaseTransactions;
 
     public function test_fabrics_expense_costs_quantity_times_unit_price_and_counts_as_expense()
     {

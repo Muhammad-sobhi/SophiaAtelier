@@ -6,13 +6,11 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Dress;
 use App\Models\Revenue;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class AuditDataCommandTest extends TestCase
 {
-    use DatabaseTransactions;
 
     public function test_audit_reports_bad_rows_without_changing_them()
     {

@@ -47,48 +47,13 @@ Route::get('/public/best-sellers', [DressController::class, 'bestSellers']);
 Route::get('/public/system-status', function () {
     return response()->json([
         'status' => 'online',
-        'dress_code_auto_release' => true,
-        'version' => '2026.08.13-v4',
-        'server_time' => now()->toDateTimeString(),
     ]);
 });
 Route::get('/dresses', [DressController::class, 'index']);
-Route::get('/dresses/release-code/{code}', [DressController::class, 'releaseCode']);
 Route::get('/dresses/{dress}', [DressController::class, 'show']);
 
 // Direct file serving route for uploads (bypasses web server symlink issues completely)
-Route::get('/storage/{path}', function ($path) {
-    $cleanPath = ltrim($path, '/');
-    // Remove any "storage/" prefix that may have been prepended
-    $cleanPath = preg_replace('#^storage/#', '', $cleanPath);
-
-    // Try multiple potential locations
-    $searchPaths = [
-        storage_path('app/public/' . $cleanPath),
-        storage_path('app/' . $cleanPath),
-        public_path('storage/' . $cleanPath),
-    ];
-
-    $foundPath = null;
-    foreach ($searchPaths as $candidate) {
-        if (file_exists($candidate) && !is_dir($candidate)) {
-            $foundPath = $candidate;
-            break;
-        }
-    }
-
-    if (!$foundPath) {
-        // Return SVG placeholder with a 200 so <img> tags don't break
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500"><rect width="400" height="500" fill="#f8fafc"/><path d="M160 210 Q 200 170 240 210 Q 280 250 240 290 Q 200 330 160 290 Z" fill="#e2e8f0"/><circle cx="200" cy="180" r="25" fill="#cbd5e1"/><text x="50%" y="82%" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#94a3b8" text-anchor="middle">Sophia Atelier</text></svg>';
-        return response($svg, 200, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache']);
-    }
-
-    $mime = @mime_content_type($foundPath) ?: 'image/jpeg';
-    return response()->file($foundPath, [
-        'Content-Type' => $mime,
-        'Cache-Control' => 'public, max-age=31536000',
-    ]);
-})->where('path', '.*');
+Route::get('/storage/{path}', \App\Http\Controllers\StorageFileController::class)->where('path', '.*');
 
 // General Authenticated Routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -107,7 +72,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/clients/export-csv', [ClientController::class, 'exportCsv']);
     Route::get('/clients/excel-template', [ClientController::class, 'excelTemplate']);
     Route::post('/clients/import-excel', [ClientController::class, 'importExcel']);
-    Route::apiResource('clients', ClientController::class);
+    Route::apiResource('clients', ClientController::class)->except(['destroy']);
+    Route::apiResource('clients', ClientController::class)->only(['destroy'])->middleware('permission:/dashboard/brides');
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
     Route::put('/bookings/{booking}/revert-stage', [ClientController::class, 'revertStage']);
 
@@ -133,66 +99,80 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('fittings', FittingController::class);
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('reviews', ReviewController::class);
-    Route::apiResource('revenues', RevenueController::class);
-    Route::apiResource('expenses', ExpenseController::class);
+    // Payments are recorded from the brides journey too; changing or deleting one needs the brides or finance page
+    Route::apiResource('revenues', RevenueController::class)->only(['index', 'show', 'store']);
+    Route::apiResource('revenues', RevenueController::class)->only(['update', 'destroy'])
+        ->middleware('permission:/dashboard/brides,/dashboard/finance');
+    Route::apiResource('expenses', ExpenseController::class)->middleware('permission:/dashboard/finance,/dashboard/reports');
     Route::apiResource('faqs', FaqController::class);
 
     // Manufacturing: suppliers, materials stock, purchases, workshop workers and manufacturing orders
-    Route::apiResource('suppliers', \App\Http\Controllers\Api\SupplierController::class);
-    Route::post('/suppliers/{supplier}/payments', [\App\Http\Controllers\Api\SupplierController::class, 'storePayment']);
-    Route::delete('/suppliers/{supplier}/payments/{payment}', [\App\Http\Controllers\Api\SupplierController::class, 'destroyPayment']);
-    Route::get('/materials/movements', [\App\Http\Controllers\Api\MaterialController::class, 'movements']);
-    Route::delete('/materials/movements/{movement}', [\App\Http\Controllers\Api\MaterialController::class, 'destroyMovement']);
-    Route::post('/materials/maintenance-use', [\App\Http\Controllers\Api\MaterialController::class, 'useForMaintenance']);
-    Route::post('/materials/{material}/adjust', [\App\Http\Controllers\Api\MaterialController::class, 'adjust']);
-    Route::apiResource('materials', \App\Http\Controllers\Api\MaterialController::class)->except(['show']);
-    Route::apiResource('material-purchases', \App\Http\Controllers\Api\MaterialPurchaseController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::apiResource('workers', \App\Http\Controllers\Api\WorkerController::class);
-    Route::post('/workers/{worker}/payments', [\App\Http\Controllers\Api\WorkerController::class, 'storePayment']);
-    Route::delete('/workers/{worker}/payments/{payment}', [\App\Http\Controllers\Api\WorkerController::class, 'destroyPayment']);
-    Route::apiResource('manufacturing-orders', \App\Http\Controllers\Api\ManufacturingOrderController::class);
-    Route::post('/manufacturing-orders/{manufacturingOrder}/materials', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'addMaterials']);
-    Route::delete('/manufacturing-orders/{manufacturingOrder}/materials/{movement}', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'removeMaterial']);
-    Route::put('/manufacturing-orders/{manufacturingOrder}/dress', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'linkDress']);
-    Route::patch('/manufacturing-orders/{manufacturingOrder}/status', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'updateStatus']);
+    Route::middleware('permission:/dashboard/manufacturing')->group(function () {
+        Route::apiResource('suppliers', \App\Http\Controllers\Api\SupplierController::class);
+        Route::post('/suppliers/{supplier}/payments', [\App\Http\Controllers\Api\SupplierController::class, 'storePayment']);
+        Route::delete('/suppliers/{supplier}/payments/{payment}', [\App\Http\Controllers\Api\SupplierController::class, 'destroyPayment']);
+        Route::get('/materials/movements', [\App\Http\Controllers\Api\MaterialController::class, 'movements']);
+        Route::delete('/materials/movements/{movement}', [\App\Http\Controllers\Api\MaterialController::class, 'destroyMovement']);
+        Route::post('/materials/maintenance-use', [\App\Http\Controllers\Api\MaterialController::class, 'useForMaintenance']);
+        Route::post('/materials/{material}/adjust', [\App\Http\Controllers\Api\MaterialController::class, 'adjust']);
+        Route::apiResource('materials', \App\Http\Controllers\Api\MaterialController::class)->except(['show']);
+        Route::apiResource('material-purchases', \App\Http\Controllers\Api\MaterialPurchaseController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::apiResource('workers', \App\Http\Controllers\Api\WorkerController::class);
+        Route::post('/workers/{worker}/payments', [\App\Http\Controllers\Api\WorkerController::class, 'storePayment']);
+        Route::delete('/workers/{worker}/payments/{payment}', [\App\Http\Controllers\Api\WorkerController::class, 'destroyPayment']);
+        Route::apiResource('manufacturing-orders', \App\Http\Controllers\Api\ManufacturingOrderController::class);
+        Route::post('/manufacturing-orders/{manufacturingOrder}/materials', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'addMaterials']);
+        Route::delete('/manufacturing-orders/{manufacturingOrder}/materials/{movement}', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'removeMaterial']);
+        Route::put('/manufacturing-orders/{manufacturingOrder}/dress', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'linkDress']);
+        Route::patch('/manufacturing-orders/{manufacturingOrder}/status', [\App\Http\Controllers\Api\ManufacturingOrderController::class, 'updateStatus']);
+    });
 
     // Reports endpoints
-    Route::get('/reports/dresses', [ReportController::class, 'dressesReport']);
-    Route::get('/reports/bookings', [ReportController::class, 'bookingsReport']);
-    Route::get('/reports/visits', [ReportController::class, 'visits']);
-    Route::get('/reports/sales-employees', [ReportController::class, 'salesEmployees']);
-    Route::get('/reports/brides', [ReportController::class, 'brides']);
-    Route::get('/reports/cancellations', [ReportController::class, 'cancellations']);
-    Route::get('/reports/sales', [ReportController::class, 'sales']);
-    Route::get('/reports/sales-by-stage', [ReportController::class, 'salesByStage']);
-    Route::get('/reports/conversion', [ReportController::class, 'conversion']);
-    Route::get('/reports/top-dresses', [ReportController::class, 'topDresses']);
-    Route::get('/reports/worst-dresses', [ReportController::class, 'worstDresses']);
-    Route::get('/reports/revenue', [ReportController::class, 'revenue']);
-    Route::get('/reports/client-sources', [ReportController::class, 'clientSources']);
-    Route::get('/reports/executive-summary', [ReportController::class, 'executiveSummary']);
+    Route::middleware('permission:/dashboard/reports')->group(function () {
+        Route::get('/reports/dresses', [ReportController::class, 'dressesReport']);
+        Route::get('/reports/bookings', [ReportController::class, 'bookingsReport']);
+        Route::get('/reports/visits', [ReportController::class, 'visits']);
+        Route::get('/reports/sales-employees', [ReportController::class, 'salesEmployees']);
+        Route::get('/reports/brides', [ReportController::class, 'brides']);
+        Route::get('/reports/cancellations', [ReportController::class, 'cancellations']);
+        Route::get('/reports/sales', [ReportController::class, 'sales']);
+        Route::get('/reports/sales-by-stage', [ReportController::class, 'salesByStage']);
+        Route::get('/reports/conversion', [ReportController::class, 'conversion']);
+        Route::get('/reports/top-dresses', [ReportController::class, 'topDresses']);
+        Route::get('/reports/worst-dresses', [ReportController::class, 'worstDresses']);
+        Route::get('/reports/revenue', [ReportController::class, 'revenue']);
+        Route::get('/reports/client-sources', [ReportController::class, 'clientSources']);
+        Route::get('/reports/executive-summary', [ReportController::class, 'executiveSummary']);
+    });
 
     // Finance endpoints
-    Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
-    Route::get('/finance/summary', [FinanceController::class, 'summary']);
-    Route::get('/finance/transactions', [FinanceController::class, 'transactions']);
-    Route::get('/finance/payment-breakdown', [FinanceController::class, 'paymentBreakdown']);
+    Route::middleware('permission:/dashboard/finance,/dashboard/reports')->group(function () {
+        Route::get('/finance/ledger', [FinanceController::class, 'ledger']);
+        Route::get('/finance/summary', [FinanceController::class, 'summary']);
+        Route::get('/finance/transactions', [FinanceController::class, 'transactions']);
+        Route::get('/finance/payment-breakdown', [FinanceController::class, 'paymentBreakdown']);
+    });
 
     // Employee routes (staff & admin)
-    Route::apiResource('employees', EmployeeController::class);
+    Route::apiResource('employees', EmployeeController::class)->only(['index', 'show']);
+    Route::apiResource('employees', EmployeeController::class)->except(['index', 'show'])
+        ->middleware('permission:/dashboard/employees');
 
-    // Attendance (read & save for staff & admin)
-    Route::get('/attendance', [AttendanceController::class, 'index']);
-    Route::get('/attendance/{attendance}', [AttendanceController::class, 'show']);
-    Route::post('/attendance/bulk', [AttendanceController::class, 'bulkStore']);
-    Route::post('/attendance', [AttendanceController::class, 'store']);
-    Route::put('/attendance/{attendance}', [AttendanceController::class, 'update']);
-    Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
+    // Attendance and payroll summary: the attendance page
+    Route::middleware('permission:/dashboard/attendance')->group(function () {
+        // Attendance (read & save for staff & admin)
+        Route::get('/attendance', [AttendanceController::class, 'index']);
+        Route::get('/attendance/{attendance}', [AttendanceController::class, 'show']);
+        Route::post('/attendance/bulk', [AttendanceController::class, 'bulkStore']);
+        Route::post('/attendance', [AttendanceController::class, 'store']);
+        Route::put('/attendance/{attendance}', [AttendanceController::class, 'update']);
+        Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
 
-    // Payroll summary (for attendance/payroll tab)
-    Route::get('/payroll/summary', [PayrollController::class, 'summary']);
-    Route::post('/payroll/deduct-loans', [PayrollController::class, 'deductLoans']);
+        // Payroll summary (for attendance/payroll tab)
+        Route::get('/payroll/summary', [PayrollController::class, 'summary']);
+    });
     Route::middleware('permission:payroll.manage')->group(function () {
+        Route::post('/payroll/deduct-loans', [PayrollController::class, 'deductLoans']);
         Route::post('/payroll/payments', [PayrollController::class, 'pay']);
         Route::delete('/payroll/payments/{payment}', [PayrollController::class, 'destroyPayment']);
         Route::post('/payroll/pieces', [PayrollController::class, 'storePieces']);
@@ -205,8 +185,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('leave-requests', LeaveRequestController::class);
 
     // Employee Loans (read for staff & admin)
-    Route::get('/employee-loans', [EmployeeLoanController::class, 'index']);
-    Route::get('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'show']);
+    Route::get('/employee-loans', [EmployeeLoanController::class, 'index'])->middleware('permission:/dashboard/attendance');
+    Route::get('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'show'])->middleware('permission:/dashboard/attendance');
 
     // Static paths before the resource so "delete-all" is not captured as {notification}
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);

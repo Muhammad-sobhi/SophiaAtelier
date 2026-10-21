@@ -626,6 +626,18 @@
 }
 
 @media (max-width: 768px) {
+  /* The 4 journey steps stay on one row on phones */
+  .stepper {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .stepCol {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
   .btsGrid {
     grid-template-columns: 1fr;
     gap: 20px;

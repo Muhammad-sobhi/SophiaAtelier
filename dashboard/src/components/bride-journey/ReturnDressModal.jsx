@@ -5,13 +5,17 @@ import { apiClient } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { SalesCombobox } from '@/components/common/SalesCombobox';
 
-export function ReturnDressModal({
-  isOpen,
+// The early return lives in this wrapper: hooks must run in the same order on every render
+export function ReturnDressModal(props) {
+  if (!props.isOpen || !props.bride) return null;
+  return <ReturnDressModalContent {...props} />;
+}
+
+function ReturnDressModalContent({
   onClose,
   bride,
   onSuccess,
 }) {
-  if (!isOpen || !bride) return null;
 
   const booking = bride.bookings?.[0];
   const dress = booking?.dress;

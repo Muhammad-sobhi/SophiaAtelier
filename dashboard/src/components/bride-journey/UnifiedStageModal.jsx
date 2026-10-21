@@ -107,8 +107,13 @@ const STAGES = [
   { id: 'returned', label: 'إرجاع', icon: RotateCcw, color: 'text-emerald-600' },
 ];
 
-export function UnifiedStageModal({
-  isOpen,
+// The early return lives in this wrapper: hooks must run in the same order on every render
+export function UnifiedStageModal(props) {
+  if (!props.isOpen || !props.bride) return null;
+  return <UnifiedStageModalContent {...props} />;
+}
+
+function UnifiedStageModalContent({
   onClose,
   bride,
   stage: propStage,
@@ -117,7 +122,6 @@ export function UnifiedStageModal({
   employeesList: propEmployeesList,
   isEdit = false,
 }) {
-  if (!isOpen || !bride) return null;
 
   const currentStage = bride.current_stage || bride.stage || 'visit';
   const stage = propStage || currentStage;

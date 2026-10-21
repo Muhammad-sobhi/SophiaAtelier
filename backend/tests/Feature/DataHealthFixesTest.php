@@ -8,7 +8,6 @@ use App\Models\Dress;
 use App\Models\Revenue;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -18,7 +17,6 @@ use Tests\TestCase;
  */
 class DataHealthFixesTest extends TestCase
 {
-    use DatabaseTransactions;
 
     protected function setUp(): void
     {

@@ -11,8 +11,6 @@ return [
         'https://dashboard.sophiadresses.cloud',
         'https://admin.sophiadresses.cloud',
         'https://api.sophiadresses.cloud',
-        'http://localhost:5173',
-        'http://localhost:3000',
     ]),
     'allowed_origins_patterns' => array_filter([
         '#^https?://.*\.sophiadresses\.cloud$#',

@@ -10,7 +10,11 @@ return new class extends Migration
     public function up(): void
     {
         // 'requested' = dresses the bride asked to try (from the website or the visit form)
-        DB::statement("ALTER TABLE visit_dresses MODIFY type ENUM('requested', 'tried', 'booked') NOT NULL");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE visit_dresses MODIFY type ENUM('requested', 'tried', 'booked') NOT NULL");
+        } else {
+            Schema::table('visit_dresses', fn (Blueprint $table) => $table->enum('type', ['requested', 'tried', 'booked'])->change());
+        }
 
         Schema::table('visits', function (Blueprint $table) {
             $table->decimal('trying_fee', 10, 2)->default(0)->after('time_slot');
@@ -47,7 +51,11 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('visit_dresses')->where('type', 'requested')->delete();
-        DB::statement("ALTER TABLE visit_dresses MODIFY type ENUM('tried', 'booked') NOT NULL");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE visit_dresses MODIFY type ENUM('tried', 'booked') NOT NULL");
+        } else {
+            Schema::table('visit_dresses', fn (Blueprint $table) => $table->enum('type', ['tried', 'booked'])->change());
+        }
 
         Schema::table('visits', function (Blueprint $table) {
             $table->dropColumn('trying_fee');

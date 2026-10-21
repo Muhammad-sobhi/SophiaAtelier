@@ -122,30 +122,25 @@ export function Header({ onMenuClick }) {
     searchTimerRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
+        // Searched on the server: loading every bride and dress on each keystroke was very heavy
+        const q = encodeURIComponent(query.trim());
         const [clientsRes, dressesRes] = await Promise.allSettled([
-          apiClient.get('/clients?per_page=1000'),
-          apiClient.get('/dresses?per_page=all')
+          apiClient.get(`/clients?search=${q}&per_page=20`),
+          apiClient.get(`/dresses?search=${q}&per_page=20`)
         ]);
 
         const results = [];
 
         if (clientsRes.status === 'fulfilled') {
-          const clients = clientsRes.value.data || [];
-          const filtered = clients.filter((c) =>
-            c.name?.toLowerCase().includes(query.toLowerCase())
-          );
-          filtered.forEach((c) => {
+          // The API also matches phone numbers and cities, so its results are used as they are
+          (clientsRes.value.data || []).forEach((c) => {
             results.push({ id: c.id, label: c.name, type: 'client', path: '/dashboard/brides' });
           });
         }
 
         if (dressesRes.status === 'fulfilled') {
           const dresses = Array.isArray(dressesRes.value) ? dressesRes.value : (dressesRes.value?.data || []);
-          const filtered = dresses.filter((d) =>
-            d.name?.toLowerCase().includes(query.toLowerCase()) ||
-            d.code?.toLowerCase().includes(query.toLowerCase())
-          );
-          filtered.forEach((d) => {
+          dresses.forEach((d) => {
             results.push({ id: d.id, label: `${d.name} ${d.code ? `(${d.code})` : ''}`, type: 'dress', path: '/dashboard/dresses' });
           });
         }
@@ -164,13 +159,12 @@ export function Header({ onMenuClick }) {
     try {
       await apiClient.post('/auth/logout', {});
     } catch {
-
-
-
-
-
       // If backend is unreachable, still clear local auth
-    }localStorage.removeItem('atelier_current_employee');window.dispatchEvent(new Event('auth-change'));navigate('/dashboard');};
+    }
+    localStorage.removeItem('atelier_current_employee');
+    window.dispatchEvent(new Event('auth-change'));
+    navigate('/dashboard');
+  };
 
   const filteredNotifications = notifications.filter((notif) => {
     if (!currentUser) return false;

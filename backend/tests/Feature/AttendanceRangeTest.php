@@ -5,13 +5,11 @@ namespace Tests\Feature;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class AttendanceRangeTest extends TestCase
 {
-    use DatabaseTransactions;
 
     public function test_attendance_can_be_listed_for_a_date_range()
     {

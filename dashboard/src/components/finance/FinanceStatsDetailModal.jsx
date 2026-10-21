@@ -5,8 +5,13 @@ import {
 } from 'lucide-react';
 import { getStorageUrl } from '@/lib/api-client';
 
-export function FinanceStatsDetailModal({
-  isOpen,
+// The early return lives in this wrapper: hooks must run in the same order on every render
+export function FinanceStatsDetailModal(props) {
+  if (!props.isOpen || !props.statType) return null;
+  return <FinanceStatsDetailModalContent {...props} />;
+}
+
+function FinanceStatsDetailModalContent({
   onClose,
   statType, // 'net_profit' | 'net_revenue' | 'net_expense' | 'total_assets' | 'held_insurances'
   totals = {},
@@ -14,7 +19,6 @@ export function FinanceStatsDetailModal({
   dresses = [],
   heldInsurancesList = [],
 }) {
-  if (!isOpen || !statType) return null;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);

@@ -9,13 +9,11 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Models\Visit;
 use App\Services\SalesNameResolver;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class SalesNamesTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function seedRows(): array
     {

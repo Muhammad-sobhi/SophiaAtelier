@@ -52,7 +52,7 @@ class ContactMessageController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $messages = ContactMessage::latest()->paginate($request->input('per_page', 20));
+        $messages = ContactMessage::latest()->paginate(min(max((int) $request->input('per_page', 20), 1), 1000));
         return response()->json($messages);
     }
 

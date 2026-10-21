@@ -7,14 +7,12 @@ use App\Models\Client;
 use App\Models\Dress;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /** A visit may be at most 4 months (counted by day) before the wedding */
 class VisitWindowTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function websitePost(int $dressId, string $visitDate, string $weddingDate)
     {

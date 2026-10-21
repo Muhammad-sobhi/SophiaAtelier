@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -11,7 +10,6 @@ use Tests\TestCase;
 
 class ChangePasswordLogoutTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function seedOtherSession(User $user, string $id): void
     {

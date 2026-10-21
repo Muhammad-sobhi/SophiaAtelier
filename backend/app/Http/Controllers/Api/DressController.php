@@ -46,7 +46,10 @@ class DressController extends Controller
             });
         }
 
-        if ($request->has('is_website_visible')) {
+        // The website (guests) only ever sees dresses published on it
+        if (!auth('sanctum')->check()) {
+            $query->where('is_website_visible', true);
+        } elseif ($request->has('is_website_visible')) {
             $query->where('is_website_visible', filter_var($request->input('is_website_visible'), FILTER_VALIDATE_BOOLEAN));
         }
 
@@ -59,7 +62,7 @@ class DressController extends Controller
             if ($request->input('per_page') === 'all') {
                 return response()->json($this->guestSafe($query->get()));
             }
-            $perPage = (int) $request->input('per_page', 50);
+            $perPage = min(max((int) $request->input('per_page', 50), 1), 1000);
             return response()->json($this->guestSafe($query->paginate($perPage)));
         }
 
@@ -67,7 +70,7 @@ class DressController extends Controller
             return response()->json($this->guestSafe($query->latest()->get()));
         }
 
-        $perPage = (int) $request->input('per_page', 15);
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 1000);
         return response()->json($this->guestSafe($query->latest()->paginate($perPage)));
     }
 
@@ -175,6 +178,7 @@ class DressController extends Controller
     public function show(Dress $dress)
     {
         if (!auth('sanctum')->check()) {
+            abort_unless($dress->is_website_visible, 404);
             $dress->load(['category', 'collection', 'designer', 'images', 'accessories']);
             return response()->json($this->guestSafe(collect([$dress]))->first());
         }
@@ -285,7 +289,10 @@ class DressController extends Controller
                     }
                     $ext = strtolower($value->getClientOriginalExtension());
                     $allowed = ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm', 'avi', 'm4v', '3gp', '3gpp', 'mkv'];
-                    if (!in_array($ext, $allowed)) {
+                    // The stored extension comes from the content, so the content must be a picture or a video too
+                    $mime = (string) $value->getMimeType();
+                    $isMedia = (str_starts_with($mime, 'image/') && $mime !== 'image/svg+xml') || str_starts_with($mime, 'video/');
+                    if (!in_array($ext, $allowed) || !$isMedia) {
                         $fail("صيغة الملف ({$ext}) غير مدعومة. الصيغ المتاحة: صور (JPG, PNG, WEBP) وفيديوهات (MP4, MOV, WEBM, AVI, M4V, 3GP).");
                     }
                 }
@@ -396,41 +403,6 @@ class DressController extends Controller
     }
 
     /**
-     * Release a dress code from any soft-deleted dresses or clear conflicts.
-     * GET /api/dresses/release-code/{code}
-     */
-    public function releaseCode(string $code): JsonResponse
-    {
-        $cleanCode = trim($code);
-        if ($cleanCode === '') {
-            return response()->json(['message' => 'Invalid code'], 400);
-        }
-
-        // 1. Clear code on soft-deleted dresses
-        $deletedCount = \Illuminate\Support\Facades\DB::table('dresses')
-            ->whereNotNull('deleted_at')
-            ->where('code', $cleanCode)
-            ->update(['code' => null]);
-
-        // 2. Check if an active dress uses this code
-        $activeCount = \Illuminate\Support\Facades\DB::table('dresses')
-            ->whereNull('deleted_at')
-            ->where('code', $cleanCode)
-            ->count();
-
-        if (function_exists('opcache_reset')) {
-            @opcache_reset();
-        }
-
-        return response()->json([
-            'message' => "تمت معالجة كود الفستان {$cleanCode} بنجاح",
-            'clean_code' => $cleanCode,
-            'cleared_soft_deleted_count' => $deletedCount,
-            'active_dresses_count' => $activeCount,
-        ]);
-    }
-
-    /**
      * Get public best seller dresses sorted manually.
      * GET /api/public/best-sellers
      */
@@ -443,7 +415,7 @@ class DressController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        return response()->json($dresses);
+        return response()->json($this->guestSafe($dresses));
     }
 
     /**

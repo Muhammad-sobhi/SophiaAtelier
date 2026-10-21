@@ -247,3 +247,12 @@ export async function getAllPages(path) {
   );
   return [first, ...rest].flatMap((res) => res?.data || []);
 }
+
+// Finds a bride by her exact name through the API search: client lists are paginated,
+// so a locally loaded list misses older brides (and would create a duplicate)
+export async function findClientByName(name) {
+  const wanted = (name || '').trim();
+  if (!wanted) return null;
+  const res = await apiClient.get(`/clients?search=${encodeURIComponent(wanted)}&per_page=50`).catch(() => null);
+  return (res?.data || []).find((c) => c.name?.trim() === wanted) || null;
+}

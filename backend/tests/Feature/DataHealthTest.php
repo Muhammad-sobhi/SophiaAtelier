@@ -8,13 +8,11 @@ use App\Models\Dress;
 use App\Models\Revenue;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class DataHealthTest extends TestCase
 {
-    use DatabaseTransactions;
 
     public function test_only_admins_can_use_it()
     {

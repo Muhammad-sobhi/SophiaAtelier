@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
+                // A ready-made response (e.g. Visit::inSlot's "slot full") is sent as it is
+                if ($e instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                    return $e->getResponse();
+                }
+
                 if ($e instanceof \Illuminate\Validation\ValidationException) {
                     return response()->json([
                         'message' => 'بيانات غير صالحة',

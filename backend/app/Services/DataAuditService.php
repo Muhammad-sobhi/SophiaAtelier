@@ -241,7 +241,7 @@ class DataAuditService
             ->whereIn('r.id', $ids)->orderBy('r.booking_id')->orderBy('r.type')->orderBy('r.id')
             ->select('r.id', 'r.booking_id', 'c.id AS client_id', 'c.name AS client_name', 'r.type', 'r.amount',
                 'r.payment_method', 'r.payment_date', 'r.notes', 'b.total_amount')
-            ->selectRaw("DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i:%s') AS created")
+            ->addSelect('r.created_at AS created')
             ->get();
     }
 
@@ -374,7 +374,9 @@ class DataAuditService
             ->whereNotNull('v.visit_date')
             ->whereRaw('DATE(v.visit_date) < DATE(b.booking_date)')
             ->whereRaw('DATE(v.visit_date) < DATE(v.created_at)')
-            ->whereRaw('ABS(TIMESTAMPDIFF(MINUTE, v.created_at, b.created_at)) <= 60')
+            ->whereRaw(DB::getDriverName() === 'sqlite'
+                ? 'ABS(strftime(\'%s\', v.created_at) - strftime(\'%s\', b.created_at)) <= 3600'
+                : 'ABS(TIMESTAMPDIFF(MINUTE, v.created_at, b.created_at)) <= 60')
             ->whereNotExists(fn($q) => $q->from('bookings AS b2')->whereColumn('b2.client_id', 'b.client_id')
                 ->where('b2.status', '!=', 'cancelled')->whereRaw('DATE(b2.booking_date) = DATE(v.visit_date)'))
             ->select('b.id AS booking_id', 'v.id AS visit_id', DB::raw('DATE(v.visit_date) AS visit_date'));
@@ -398,7 +400,13 @@ class DataAuditService
 
     private function withGroupKeys(Collection $rows, Collection $groups): Collection
     {
-        $keys = $groups->flatMap(fn($group, $key) => $group->mapWithKeys(fn($c) => [$c->id => (string) $key]));
+        // Built by hand: flatMap() renumbers integer keys, which would lose the client ids
+        $keys = [];
+        foreach ($groups as $key => $group) {
+            foreach ($group as $c) {
+                $keys[$c->id] = (string) $key;
+            }
+        }
 
         return $rows->each(fn($r) => $r->group_key = $keys[$r->id] ?? $r->phone);
     }

@@ -45,6 +45,14 @@ class RevenueController extends Controller
 
         $payments = $request->input('payments');
         if (is_array($payments) && count($payments) > 0) {
+            $request->validate([
+                'payments' => 'array|max:20',
+                'payments.*' => 'array',
+                'payments.*.amount' => 'nullable|numeric|min:0',
+                'payments.*.payment_method' => 'nullable|string|max:100',
+                'payment_date' => 'nullable|date',
+                'notes' => 'nullable|string',
+            ]);
             $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
             $created = [];
             $bookingId = $links['booking_id'] ?? null;
@@ -54,26 +62,29 @@ class RevenueController extends Controller
             $paymentDate = $request->input('payment_date', now()->toDateString());
             $baseNotes = $request->input('notes', '');
 
-            foreach ($payments as $p) {
-                $amt = floatval($p['amount'] ?? 0);
-                $method = $p['payment_method'] ?? 'cash';
-                $rowReceipt = !empty($p['receipt_image'])
-                    ? self::saveReceiptData($p['receipt_image'])
-                    : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
+            // All the split payments are saved, or none of them
+            \Illuminate\Support\Facades\DB::transaction(function () use ($payments, $receiptPath, $bookingId, $visitId, $type, $paymentDate, $baseNotes, &$created) {
+                foreach ($payments as $p) {
+                    $amt = floatval($p['amount'] ?? 0);
+                    $method = $p['payment_method'] ?? 'cash';
+                    $rowReceipt = !empty($p['receipt_image'])
+                        ? self::saveReceiptData($p['receipt_image'])
+                        : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
 
-                if ($amt > 0) {
-                    $created[] = Revenue::create([
-                        'booking_id' => $bookingId,
-                        'visit_id' => $visitId,
-                        'type' => $type,
-                        'amount' => $amt,
-                        'payment_method' => $method,
-                        'payment_date' => $paymentDate,
-                        'notes' => $baseNotes,
-                        'receipt_path' => $rowReceipt,
-                    ]);
+                    if ($amt > 0) {
+                        $created[] = Revenue::create([
+                            'booking_id' => $bookingId,
+                            'visit_id' => $visitId,
+                            'type' => $type,
+                            'amount' => $amt,
+                            'payment_method' => $method,
+                            'payment_date' => $paymentDate,
+                            'notes' => $baseNotes,
+                            'receipt_path' => $rowReceipt,
+                        ]);
+                    }
                 }
-            }
+            });
 
             return response()->json($created, 201);
         }

@@ -35,6 +35,8 @@ class ProfileController extends Controller
             unset($validated['password'], $validated['current_password']);
         }
 
+        // Read before saving: afterwards getOriginal() already returns the new email
+        $previousEmail = $user->email;
         $user->update($validated);
 
         if (isset($validated['password'])) {
@@ -42,7 +44,7 @@ class ProfileController extends Controller
         }
 
         // Also update the related employee record if it exists
-        $employee = \App\Models\Employee::where('email', $user->getOriginal('email'))->first();
+        $employee = \App\Models\Employee::where('email', $previousEmail)->first();
         if ($employee) {
             $employeeData = [];
             if (isset($validated['name'])) $employeeData['name'] = $validated['name'];

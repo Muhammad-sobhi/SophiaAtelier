@@ -55,7 +55,7 @@ class BookingController extends Controller
             });
         }
 
-        $bookings = $query->latest()->paginate($request->input('per_page', 25));
+        $bookings = $query->latest()->paginate(min(max((int) $request->input('per_page', 25), 1), 1000));
 
         // Dynamically compute conflict/available dates for each dress option
         $conflicts = Booking::conflictDatesFor($bookings->getCollection());
@@ -455,7 +455,7 @@ class BookingController extends Controller
         return Booking::checkDressAvailability($clientId, $dressId, $eventDate, $excludeBookingId);
     }
 
-    public function publicStore(Request $request): JsonResponse
+    public function publicStore(Request $request, \App\Services\WebsiteVisitService $websiteVisits): JsonResponse
     {
         $validated = $request->validate([
             'client_id' => 'nullable|integer|exists:clients,id',
@@ -483,227 +483,8 @@ class BookingController extends Controller
             'receipt_image' => 'nullable',
         ]);
 
-        // Normalize parameters
-        $phone = $validated['client_phone'] ?? $validated['phone'] ?? null;
-        $email = $validated['client_email'] ?? $validated['email'] ?? null;
-        $bookingDate = $validated['visit_date'] ?? $validated['booking_date'] ?? now()->toDateString();
-        $eventDate = $validated['wedding_date'] ?? $validated['event_date'] ?? $bookingDate;
+        $result = $websiteVisits->request($validated);
 
-        // Dresses the bride wants to try (max 3), in the order she picked them
-        $dressIds = !empty($validated['dress_ids'])
-            ? $validated['dress_ids']
-            : array_filter([$validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null]);
-        $dressIds = array_slice(array_values(array_unique(array_map('intval', $dressIds))), 0, 3);
-
-        // Availability is checked on the wedding date too, so both are needed before a visit can be requested
-        if (empty($dressIds) || (empty($validated['wedding_date']) && empty($validated['event_date']))) {
-            return response()->json([
-                'message' => 'يرجى اختيار فستان واحد على الأقل وتحديد تاريخ الزفاف',
-                'code' => 'missing_dresses_or_wedding_date',
-            ], 422);
-        }
-
-        // Days closed by the admin do not take website visits (staff can still register one)
-        if (\App\Models\ClosedDay::isClosed($bookingDate)) {
-            return response()->json([
-                'message' => \App\Models\ClosedDay::closedMessage($bookingDate),
-                'code' => 'day_closed',
-            ], 422);
-        }
-
-        if ($windowError = \App\Models\Visit::visitWindowError($bookingDate, $eventDate)) {
-            return response()->json([
-                'message' => $windowError['message'],
-                'code' => 'visit_too_early',
-                'earliest_visit_date' => $windowError['earliest_visit_date'],
-            ], 422);
-        }
-
-        // 1. Find or create the client (bride) automatically
-        $client = null;
-        if (!empty($validated['client_id'])) {
-            $client = \App\Models\Client::find($validated['client_id']);
-        }
-        if (!$client && ($phone || $email)) {
-            $client = \App\Models\Client::where(function($q) use ($phone, $email) {
-                if ($phone) $q->whereIn('phone', array_filter([$phone, \App\Services\PhoneNumberService::normalizeMobile($phone), \App\Services\PhoneNumberService::localForm($phone)]));
-                if ($email) $q->orWhere('email', $email);
-            })->first();
-        }
-        if (!$client) {
-            $client = \App\Models\Client::create([
-                'name' => $validated['client_name'] ?? 'Bride User',
-                'phone' => $phone ?? '0000000000',
-                'email' => $email,
-                'address' => $validated['client_address'] ?? '',
-                'city' => $validated['client_city'] ?? 'Cairo',
-                'source' => 'website',
-            ]);
-        }
-
-        // Normalize time slot
-        $timeSlot = null;
-        if (!empty($validated['time_slot'])) {
-            $timeSlot = VisitController::normalizeTimeSlot($validated['time_slot']);
-
-            if (!preg_match('/^\d{2}:\d{2}$/', $timeSlot)) {
-                return response()->json(['message' => 'صيغة وقت الزيارة غير صحيحة', 'code' => 'invalid_slot'], 422);
-            }
-            // Visit slots are local shop time
-            if (\Carbon\Carbon::parse($bookingDate . ' ' . $timeSlot, 'Africa/Cairo')->isPast()) {
-                return response()->json([
-                    'message' => 'عذراً، هذا الموعد قد مضى. يرجى اختيار وقت لاحق.',
-                    'code' => 'slot_in_past',
-                ], 422);
-            }
-            
-            // Check visit limit of 4 per 30 mins
-            $existingCount = \App\Models\Visit::whereDate('visit_date', $bookingDate)
-                ->where('status', '!=', 'declined')->where('time_slot', $timeSlot)
-                ->count();
-
-            if ($existingCount >= 4) {
-                return response()->json([
-                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.',
-                    'code' => 'slot_full',
-                ], 422);
-            }
-        }
-
-        // Re-check the dresses at submit time: another bride may have booked one since the cart was checked
-        $availability = \App\Services\DressAvailabilityService::check(
-            \App\Models\Dress::whereIn('id', $dressIds)->get(),
-            $bookingDate,
-            $validated['wedding_date'] ?? $validated['event_date'] ?? null,
-            $client->city ?? $validated['client_city'] ?? null,
-            $client->id
-        );
-        $blocking = collect($availability['dresses'])->filter(fn($r) =>
-            ($r['wedding_date'] && !$r['wedding_date']['available'])
-            || ($r['visit_date'] && !$r['visit_date']['available'])
-        );
-        if ($blocking->isNotEmpty()) {
-            return response()->json([
-                'message' => 'بعض الفساتين غير متاحة في التواريخ المختارة',
-                'code' => 'dresses_unavailable',
-                'availability' => \App\Services\DressAvailabilityService::publicView($availability),
-            ], 422);
-        }
-        // One request at a time per phone, so a double tap or a retry cannot slip past the open-visit check below
-        $phoneKey = \App\Services\PhoneNumberService::matchKey($phone ?? $client->phone);
-        $lock = \Illuminate\Support\Facades\Cache::lock('public-visit:' . ($phoneKey ?: 'client-' . $client->id), 10);
-        if (!$lock->get()) {
-            return response()->json([
-                'message' => 'طلبك قيد الإرسال بالفعل، يرجى الانتظار لحظات',
-                'code' => 'request_in_progress',
-            ], 429);
-        }
-
-        try {
-            return $this->createWebsiteVisit($validated, $client, $phone, $bookingDate, $eventDate, $timeSlot, $dressIds);
-        } finally {
-            $lock->release();
-        }
-    }
-
-    private function createWebsiteVisit(array $validated, \App\Models\Client $client, ?string $phone, string $bookingDate, string $eventDate, ?string $timeSlot, array $dressIds): JsonResponse
-    {
-        $samePhoneClientIds = self::clientIdsWithSamePhone($phone ?? $client->phone)->push($client->id)->unique();
-
-        // She already has an upcoming visit (same phone, any registration): the website does not add another one,
-        // changes go through the staff
-        $openVisit = \App\Models\Visit::whereIn('client_id', $samePhoneClientIds)
-            ->whereIn('status', \App\Models\Visit::OPEN_STATUSES)
-            ->whereDate('visit_date', '>=', now('Africa/Cairo')->toDateString())
-            ->orderBy('visit_date')->first();
-        if ($openVisit) {
-            return response()->json([
-                'message' => 'لديكِ موعد زيارة قائم بالفعل بتاريخ ' . $openVisit->visit_date->toDateString() . '. للتعديل يرجى التواصل معنا.',
-                'code' => 'visit_already_booked',
-                'visit_date' => $openVisit->visit_date->toDateString(),
-                'time_slot' => $openVisit->time_slot,
-            ], 422);
-        }
-
-        // Same phone number already had a visit before, even under another registration or name:
-        // never auto-confirm, the employee reviews her previous visit and decides
-        $previousVisit = \App\Models\Visit::whereIn('client_id', $samePhoneClientIds)->latest('visit_date')->latest('id')->first();
-        $isRepeatRequest = $previousVisit !== null;
-
-        // First-time brides are confirmed automatically (unavailable dresses were already refused above)
-        $autoConfirm = !$isRepeatRequest;
-
-        \Illuminate\Support\Facades\DB::beginTransaction();
-        try {
-            // Keep the wedding date on the bride; it drives the dress availability check
-            if (!empty($validated['wedding_date']) || !empty($validated['event_date'])) {
-                $client->update(['wedding_date' => $eventDate]);
-            }
-
-            // A website request is only a try-on visit: no booking is created until the bride chooses a dress
-            $dressNames = \App\Models\Dress::whereIn('id', $dressIds)->pluck('name')->implode(', ');
-            $visitNotes = trim(($validated['notes'] ?? '') . ($dressNames ? " | الفساتين المهتمة بها: " . $dressNames : ''));
-
-            $visit = \App\Models\Visit::create([
-                'client_id' => $client->id,
-                'visit_date' => $bookingDate,
-                'status' => 'pending', // Waiting for staff confirmation
-                'source' => 'website',
-                'previous_visit_id' => $previousVisit?->id,
-                'notes' => $visitNotes,
-                'time_slot' => $timeSlot,
-                'trying_fee' => \App\Models\Dress::whereIn('id', $dressIds)->sum('trying_fee'),
-            ]);
-            $visit->requestedDresses()->syncWithPivotValues($dressIds, ['type' => 'requested']);
-            if ($autoConfirm) {
-                $visit->markConfirmed(null);
-            }
-
-            \App\Models\Notification::create([
-                'type' => 'new_appointment',
-                'title' => $isRepeatRequest
-                    ? '⚠️ طلب زيارة متكرر — العروس زارت من قبل، راجع قبل التأكيد'
-                    : 'زيارة مؤكدة تلقائياً من الموقع — أرسل رسالة التأكيد',
-                'message' => 'العروس: ' . $client->name . ' — موعد الزيارة: ' . $bookingDate . ' ' . ($validated['time_slot'] ?? 'غير محدد'),
-                'related_type' => 'visit',
-                'related_id' => $visit->id
-            ]);
-
-            \Illuminate\Support\Facades\DB::commit();
-
-            return response()->json([
-                'message' => 'Appointment request received successfully',
-                'client' => $client,
-                'visit' => $visit->load('requestedDresses'),
-                'auto_confirmed' => $autoConfirm,
-            ], 201);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            \Illuminate\Support\Facades\Log::error('Error creating public booking: ' . $e->getMessage());
-
-            return response()->json([
-                'message' => 'حدث خطأ أثناء حفظ طلب الموعد، يرجى المحاولة مرة أخرى',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
-    }
-
-    /** Ids of every bride registered with the same phone number (in any stored format) */
-    private static function clientIdsWithSamePhone(?string $phone): \Illuminate\Support\Collection
-    {
-        $key = \App\Services\PhoneNumberService::matchKey($phone);
-        $digits = preg_replace('/\D/', '', $key);
-        if (strlen($digits) < 8 || preg_match('/^0+$/', $digits)) {
-            return collect();
-        }
-
-        // Narrow by the last 8 digits in SQL (older rows keep mixed formats), then compare the normalized numbers
-        return \App\Models\Client::whereRaw(
-                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') LIKE ?",
-                ['%' . substr($digits, -8)]
-            )
-            ->get(['id', 'phone'])
-            ->filter(fn($c) => \App\Services\PhoneNumberService::matchKey($c->phone) === $key)
-            ->pluck('id');
+        return response()->json(['message' => 'Appointment request received successfully'] + $result, 201);
     }
 }

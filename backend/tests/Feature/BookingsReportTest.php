@@ -7,13 +7,11 @@ use App\Models\Client;
 use App\Models\Dress;
 use App\Models\Revenue;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class BookingsReportTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function makeBooking(string $bookingDate, array $payments = [], string $status = 'confirmed', ?Dress $dress2 = null, string $eventDate = '2099-06-20'): Booking
     {

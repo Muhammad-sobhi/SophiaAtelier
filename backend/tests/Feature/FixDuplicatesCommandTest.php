@@ -6,12 +6,10 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Dress;
 use App\Models\Revenue;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class FixDuplicatesCommandTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function booking(string $name, Dress $dress, string $event = '2026-06-10', string $phone = '01034046998'): Booking
     {

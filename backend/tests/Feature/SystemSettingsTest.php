@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Setting;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class SystemSettingsTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function actingAsRole(string $role): User
     {

@@ -21,7 +21,7 @@ class FittingController extends Controller
             $query->where('booking_id', $bookingId);
         }
 
-        $fittings = $query->latest('fitting_date')->paginate($request->input('per_page', 50));
+        $fittings = $query->latest('fitting_date')->paginate(min(max((int) $request->input('per_page', 50), 1), 1000));
         $fittings->getCollection()->each(fn($fitting) => $fitting->booking?->client?->hideAppendedRelations());
 
         return response()->json($fittings);

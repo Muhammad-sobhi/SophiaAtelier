@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Booking;
-use App\Models\Fitting;
 use App\Models\Visit;
+use App\Services\BrideJourneyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -137,6 +137,7 @@ class ClientController extends Controller
         if ($perPage < 1) {
             $perPage = 20;
         }
+        $perPage = min($perPage, 1000);
 
         $paginator = $query->latest()->paginate($perPage);
         $result = $paginator->toArray();
@@ -152,7 +153,6 @@ class ClientController extends Controller
     public function findClient(Request $request): JsonResponse
     {
         $request->validate([
-            'client_id' => 'nullable|integer',
             'phone' => ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9\s\-\(\)]+$/'],
             'email' => 'nullable|email|max:255',
         ], [
@@ -160,16 +160,9 @@ class ClientController extends Controller
             'email.email' => 'يرجى إدخال بريد إلكتروني صالح.',
         ]);
 
-        $clientId = $request->input('client_id');
+        // Looked up by the bride's own phone / email only: an id would let anyone read every bride's record
         $rawPhone = $request->input('phone');
         $rawEmail = $request->input('email');
-
-        if ($clientId) {
-            $client = Client::with(['visits.requestedDresses.images', 'visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->find($clientId);
-            if ($client) {
-                return response()->json($client);
-            }
-        }
 
         if (!$rawPhone && !$rawEmail) {
             return response()->json([
@@ -220,7 +213,7 @@ class ClientController extends Controller
             $query->where('email', $cleanEmail);
         }
 
-        $client = $query->with(['visits.requestedDresses.images', 'visits.triedDresses', 'visits.bookedDresses', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images', 'bookings.revenues'])->first();
+        $client = $query->first();
 
         if (!$client) {
             return response()->json([
@@ -228,7 +221,47 @@ class ClientController extends Controller
             ], 404);
         }
 
-        return response()->json($client);
+        return response()->json($this->trackingView($client));
+    }
+
+    /**
+     * What the website's "track my order" page shows the bride: her own journey only, without
+     * address, notes, payments, receipts or employee names.
+     */
+    private function trackingView(Client $client): array
+    {
+        $client->load(['visits', 'fittings', 'bookings.dress.images', 'bookings.dress2.images', 'bookings.dress3.images']);
+        $dress = fn($d) => $d ? [
+            'id' => $d->id, 'code' => $d->code, 'name' => $d->name, 'name_ar' => $d->name_ar, 'status' => $d->status,
+            'images' => $d->images->map(fn($i) => ['id' => $i->id, 'image_path' => $i->image_path, 'is_primary' => $i->is_primary])->values(),
+        ] : null;
+        $date = fn($v) => $v ? substr((string) $v, 0, 10) : null;
+
+        return [
+            'id' => $client->id,
+            'name' => $client->name,
+            'phone' => $client->phone,
+            'email' => $client->email,
+            'city' => $client->city,
+            'wedding_date' => $client->wedding_date,
+            'current_stage' => $client->current_stage,
+            'journey_step' => \App\Services\StageComputer::journeyStep($client),
+            // Latest first, as the track page shows the newest visit / booking
+            'visits' => $client->visits->sortByDesc(fn($v) => [$v->visit_date?->toDateString(), $v->id])->map(fn($v) => [
+                'id' => $v->id, 'visit_date' => $date($v->visit_date), 'time_slot' => $v->time_slot, 'status' => $v->status,
+            ])->values(),
+            // Fittings are optional extras shown as information: oldest first, without cancelled ones
+            'fittings' => $client->fittings->where('status', '!=', 'cancelled')->sortBy(fn($f) => [$f->fitting_date?->toDateString(), $f->id])->map(fn($f) => [
+                'id' => $f->id, 'booking_id' => $f->booking_id, 'fitting_date' => $date($f->fitting_date), 'status' => $f->status,
+            ])->values(),
+            'bookings' => $client->bookings->sortByDesc('id')->map(fn($b) => [
+                'id' => $b->id, 'status' => $b->status,
+                'booking_date' => $date($b->booking_date), 'event_date' => $date($b->event_date),
+                'pickup_scheduled_on' => $date($b->pickup_scheduled_on), 'return_scheduled_on' => $date($b->return_scheduled_on),
+                'total_amount' => $b->total_amount, 'deposit_amount' => $b->deposit_amount,
+                'dress' => $dress($b->dress), 'dress2' => $dress($b->dress2), 'dress3' => $dress($b->dress3),
+            ])->values(),
+        ];
     }
 
     public function show(Client $client): JsonResponse
@@ -261,8 +294,15 @@ class ClientController extends Controller
     public function store(\App\Http\Requests\StoreClientRequest $request): JsonResponse
     {
         $validated = $request->validated();
+        $isPublic = $request->is('api/public/*');
 
-        if ($request->hasFile('image')) {
+        // The website registers the bride only: fees, dresses, sales names and dates are set by staff
+        if ($isPublic) {
+            $validated = \Illuminate\Support\Arr::only($validated, ['name', 'phone', 'phone2', 'email', 'address', 'city', 'wedding_date', 'notes']);
+            $validated['source'] = 'website';
+        }
+
+        if (!$isPublic && $request->hasFile('image')) {
             $path = $request->file('image')->store('clients', 'public');
             $validated['image_path'] = $path;
         }
@@ -279,29 +319,30 @@ class ClientController extends Controller
         Visit::assertVisitWindow($validated['visit_date'] ?? ($dressIds ? now()->toDateString() : null), $validated['wedding_date'] ?? null);
 
         // The public registration may not request a visit on a day closed by the admin
-        if ($request->is('api/public/*') && \App\Models\ClosedDay::isClosed($validated['visit_date'] ?? null)) {
+        if ($isPublic && \App\Models\ClosedDay::isClosed($validated['visit_date'] ?? null)) {
             return response()->json([
                 'message' => \App\Models\ClosedDay::closedMessage($validated['visit_date']),
                 'code' => 'day_closed',
             ], 422);
         }
 
-        // Check visit time slot limit before creating anything
         $normalizedTimeSlot = null;
         if (!empty($validated['visit_time']) && !empty($validated['visit_date'])) {
             $normalizedTimeSlot = \App\Http\Controllers\Api\VisitController::normalizeTimeSlot($validated['visit_time']);
-            
-            $existingCount = \App\Models\Visit::whereDate('visit_date', $validated['visit_date'])
-                ->where('status', '!=', 'declined')->where('time_slot', $normalizedTimeSlot)
-                ->count();
-                
-            if ($existingCount >= 4) {
-                return response()->json([
-                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
-                ], 422);
-            }
         }
 
+        // The slot's room is checked under its lock, and the bride + visit are saved together:
+        // a full slot leaves no bride without her visit
+        $client = Visit::inSlot($validated['visit_date'] ?? null, $normalizedTimeSlot, fn() => \Illuminate\Support\Facades\DB::transaction(
+            fn() => $this->createClientWithVisit($request, $validated, $dressIds, $normalizedTimeSlot)
+        ));
+
+        return response()->json($isPublic ? $this->trackingView($client) : $client, 201);
+    }
+
+    /** Creates the bride and, when a visit date or dresses were given, her visit (see store) */
+    private function createClientWithVisit(Request $request, array $validated, array $dressIds, ?string $normalizedTimeSlot): Client
+    {
         $client = Client::create($validated);
 
         // Auto-calculate scheduled dates if wedding_date is present and dates were not passed
@@ -342,7 +383,7 @@ class ClientController extends Controller
             }
         }
 
-        return response()->json($client, 201);
+        return $client;
     }
 
     public function update(\App\Http\Requests\UpdateClientRequest $request, Client $client): JsonResponse
@@ -374,26 +415,24 @@ class ClientController extends Controller
             Visit::assertVisitWindow($visitDate, $weddingDate, $newVisitDate ? 'visit_date' : 'wedding_date');
         }
 
-        // Check visit time slot limit before updating anything
         $normalizedTimeSlot = null;
+        $existingVisit = null;
         if (!empty($validated['visit_date']) && !empty($validated['visit_time'])) {
             $normalizedTimeSlot = \App\Http\Controllers\Api\VisitController::normalizeTimeSlot($validated['visit_time']);
-            
-            $visitQuery = \App\Models\Visit::whereDate('visit_date', $validated['visit_date'])
-                ->where('status', '!=', 'declined')->where('time_slot', $normalizedTimeSlot);
-            
             $existingVisit = $client->visits()->whereDate('visit_date', $validated['visit_date'])->first();
-            if ($existingVisit) {
-                $visitQuery->where('id', '!=', $existingVisit->id);
-            }
-            
-            if ($visitQuery->count() >= 4) {
-                return response()->json([
-                    'message' => 'عذراً، هذا الوقت ممتلئ بالكامل (الحد الأقصى 4 زيارات). يرجى اختيار وقت آخر.'
-                ], 422);
-            }
         }
 
+        // The slot's room is checked (without her own visit) under its lock, and nothing is saved when it is full
+        Visit::inSlot($validated['visit_date'] ?? null, $normalizedTimeSlot, fn() => \Illuminate\Support\Facades\DB::transaction(
+            fn() => $this->applyClientUpdate($client, $validated, $normalizedTimeSlot)
+        ), $existingVisit?->id);
+
+        return response()->json($client);
+    }
+
+    /** Saves the bride and the booking / visit fields sent with her (see update) */
+    private function applyClientUpdate(Client $client, array $validated, ?string $normalizedTimeSlot): void
+    {
         $client->update($validated);
 
         // Recalculate pickup/return only when the wedding date actually changed (or none were set),
@@ -459,7 +498,6 @@ class ClientController extends Controller
             }
         }
 
-        return response()->json($client);
     }
 
     /** Put the dresses from a client form on her open visit. Returns false when no dress fields were sent. */
@@ -561,7 +599,7 @@ class ClientController extends Controller
      * PUT /api/clients/{client}/stage-action
      * Perform a stage action: schedule_fitting, confirm_booking, mark_picked_up, mark_returned
      */
-    public function stageAction(Request $request, Client $client): JsonResponse
+    public function stageAction(Request $request, Client $client, BrideJourneyService $journey): JsonResponse
     {
         $request->validate([
             'action' => 'required|string|in:confirm_visit,close_visit,schedule_fitting,confirm_booking,end_fitting,mark_picked_up,mark_returned,pay_remaining,cancel_booking',
@@ -610,710 +648,7 @@ class ClientController extends Controller
             'tried_dresses.*' => 'integer|exists:dresses,id',
         ]);
 
-        $action = $request->input('action');
-        switch ($action) {
-            case 'confirm_visit':
-                // Confirm the bride's open visit request (or register a walk-in visit) without
-                // overwriting the date/time she asked for unless the employee changed them
-                $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
-                Visit::assertVisitWindow(
-                    $request->input('visit_date') ?: ($visit?->visit_date ?? now()->toDateString()),
-                    $request->input('event_date') ?: $client->wedding_date
-                );
-                $visitTime = $request->filled('visit_time') ? VisitController::normalizeTimeSlot($request->input('visit_time')) : null;
-
-                $visitData = array_filter([
-                    'visit_date' => $request->input('visit_date'),
-                    'time_slot' => $visitTime,
-                    'sales_name' => $request->input('sales_name'),
-                ], fn($v) => $v !== null && $v !== '');
-                if ($request->has('trying_fee')) {
-                    $visitData['trying_fee'] = floatval($request->input('trying_fee', 0));
-                }
-
-                if ($visit) {
-                    // A new date/time means the bride must get a new WhatsApp confirmation
-                    $rescheduled = (isset($visitData['visit_date']) && $visitData['visit_date'] !== $visit->visit_date?->toDateString())
-                        || (isset($visitData['time_slot']) && $visitData['time_slot'] !== $visit->time_slot);
-                    if ($rescheduled) {
-                        $visitData['confirmation_sent_at'] = null;
-                    }
-                    $visit->update($visitData);
-                } else {
-                    // Visit registered by staff (in the shop, by phone or chat)
-                    $visit = Visit::create($visitData + [
-                        'client_id' => $client->id,
-                        'visit_date' => now()->toDateString(),
-                        'source' => $request->input('visit_source') ?: 'walkin',
-                        'notes' => 'تم تسجيل الزيارة من الداشبورد',
-                    ]);
-                }
-                $visit->markConfirmed($request->user()?->id);
-                $visit->declineOtherOpenVisits();
-
-                if ($request->filled('event_date')) {
-                    $client->update(['wedding_date' => $request->input('event_date')]);
-                }
-
-                // The dresses to try live on the visit itself; a booking is only created when she chooses
-                if ($request->hasAny(['dress_id', 'dress_2_id', 'dress_3_id'])) {
-                    $dressIds = array_values(array_unique(array_filter([
-                        $request->input('dress_id'), $request->input('dress_2_id'), $request->input('dress_3_id'),
-                    ])));
-                    $visit->requestedDresses()->syncWithPivotValues($dressIds, ['type' => 'requested']);
-                }
-                break;
-
-            case 'close_visit':
-                // After the try-on: she arrived, left without choosing (done), or did not show up; or the request was declined
-                $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
-                if (!$visit) {
-                    return response()->json(['message' => 'لا توجد زيارة مفتوحة لهذه العروس'], 422);
-                }
-                $visit->update(['status' => $request->input('visit_status')]);
-                $visit->declineOtherOpenVisits();
-                if ($request->has('tried_dresses')) {
-                    $visit->triedDresses()->syncWithPivotValues($request->input('tried_dresses', []), ['type' => 'tried']);
-                }
-                break;
-
-            case 'schedule_fitting':
-                // Create a fitting record via the latest booking
-                $booking = $client->bookings()->latest()->latest('id')->first();
-                $dressId = $request->input('dress_id') ?: ($booking ? $booking->dress_id : null);
-                if (!$dressId) {
-                    $dressId = \App\Models\Dress::value('id');
-                }
-                $fittingDate = $request->input('fitting_date', now()->addDays(3)->toDateString());
-
-                // Check if dress is booked/out on the proposed fitting date
-                if ($dressId) {
-                    $conflict = \App\Models\Booking::isDressOutOnDate($dressId, $fittingDate, $client->id);
-                    if ($conflict) {
-                        return response()->json([
-                            'message' => "الفستان غير متوفر للبروفة في هذا التاريخ لأنه خارج مع عميلة أخرى من {$conflict}"
-                        ], 422);
-                    }
-                }
-
-                if (!$booking) {
-                    $defaultDressId = $dressId ?: \App\Models\Dress::value('id');
-                    // Create a default booking first if none exists
-                    $booking = Booking::create([
-                        'client_id' => $client->id,
-                        'dress_id' => $defaultDressId,
-                        'booking_date' => now()->toDateString(),
-                        'event_date' => $request->input('event_date', $client->wedding_date ?: now()->addMonths(2)->toDateString()),
-                        'status' => 'pending',
-                        'total_amount' => 0,
-                    ]);
-                    $booking->update([
-                        'dress_id' => $defaultDressId,
-                        'status' => 'confirmed'
-                    ]);
-                }
-
-                Fitting::create([
-                    'booking_id' => $booking->id,
-                    'fitting_date' => $request->input('fitting_date', now()->addDays(3)->toDateString()),
-                    'status' => 'scheduled',
-                    'sales_name' => $request->input('sales_name'),
-                    'additional_notes' => 'الوقت: ' . $request->input('fitting_time', '01:00 م') . ' | ' . $request->input('notes', ''),
-                ]);
-
-                // Mark any active visits for the client as done
-                $client->visits()->where('status', '!=', 'done')->update(['status' => 'done']);
-
-                $tryingFee = floatval($request->input('trying_fee', 0));
-                $payments = $request->input('payments');
-                $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
-
-                if (is_array($payments) && count($payments) > 0) {
-                    foreach ($payments as $p) {
-                        $pAmt = floatval($p['amount'] ?? 0);
-                        $pMethod = $p['payment_method'] ?? 'cash';
-                        if ($pAmt > 0) {
-                            \App\Models\Revenue::create([
-                                'booking_id' => $booking->id,
-                                'type' => 'fitting_fee',
-                                'amount' => $pAmt,
-                                'payment_method' => $pMethod,
-                                'payment_date' => now()->toDateString(),
-                                'notes' => 'رسوم تجربة وقياس للفستان للعروس: ' . $client->name,
-                                'receipt_path' => $receiptPath,
-                            ]);
-                        }
-                    }
-                } elseif ($tryingFee > 0) {
-                    \App\Models\Revenue::create([
-                        'booking_id' => $booking->id,
-                        'type' => 'fitting_fee',
-                        'amount' => $tryingFee,
-                        'payment_method' => $request->input('payment_method', 'cash'),
-                        'payment_date' => now()->toDateString(),
-                        'notes' => 'رسوم تجربة وقياس للفستان',
-                        'receipt_path' => $receiptPath,
-                    ]);
-                }
-                break;
-
-            case 'confirm_booking':
-                $clientUpdates = [];
-                if ($request->filled('phone')) {
-                    $clientUpdates['phone'] = $request->input('phone');
-                }
-                if ($request->has('phone2')) {
-                    $clientUpdates['phone2'] = $request->input('phone2');
-                }
-                if (!empty($clientUpdates)) {
-                    $client->update($clientUpdates);
-                }
-
-                // Edit the current booking; a cancelled or finished one is history and starts a new booking
-                $booking = $client->bookings()->latest()->latest('id')->first();
-                if (!$booking || in_array($booking->status, ['cancelled', 'returned'])) {
-                    $booking = new \App\Models\Booking();
-                    $booking->client_id = $client->id;
-                }
-
-                $dressId = $request->input('dress_id');
-                $dress2Id = $request->input('dress_2_id');
-                $dress3Id = $request->input('dress_3_id');
-                $eventDate = $request->input('event_date', $client->wedding_date);
-                $forceOverride = ($request->boolean('force_override') || $request->boolean('is_override')) && $request->user()->role === 'admin';
-
-                // Validate availability for both dresses if not force override
-                if (!$forceOverride) {
-                    $conflicts = array_merge(
-                        \App\Services\DressAvailabilityService::getConflicts($client->id, $dressId, $eventDate, $booking->id),
-                        $dress2Id ? \App\Services\DressAvailabilityService::getConflicts($client->id, $dress2Id, $eventDate, $booking->id) : [],
-                        $dress3Id ? \App\Services\DressAvailabilityService::getConflicts($client->id, $dress3Id, $eventDate, $booking->id) : []
-                    );
-
-                    if (!empty($conflicts)) {
-                        return response()->json([
-                            'error' => 'الفستان غير متوفر في هذه الفترة',
-                            'conflicts' => $conflicts
-                        ], 422);
-                    }
-                }
-
-                $booking->dress_id = $dressId;
-                $booking->dress_2_id = $dress2Id;
-                $booking->dress_3_id = $dress3Id;
-                $booking->sales_name = $request->input('sales_name');
-                $booking->is_override = $forceOverride;
-                // Editing keeps the original booking date unless the employee sets one (e.g. recording an older booking)
-                $bookingDate = $request->input('booking_date') ?: ($booking->booking_date?->toDateString() ?? now()->toDateString());
-                if ($eventDate && $bookingDate > \Carbon\Carbon::parse($eventDate)->toDateString()) {
-                    return response()->json(['message' => 'تاريخ الحجز لا يمكن أن يكون بعد تاريخ الفرح'], 422);
-                }
-                $booking->booking_date = $bookingDate;
-                $booking->event_date = $eventDate;
-
-                // Handle pickup and return dates
-                if ($request->filled('pickup_scheduled_on')) {
-                    $booking->pickup_scheduled_on = $request->input('pickup_scheduled_on');
-                } elseif ($request->filled('pickup_date')) {
-                    $booking->pickup_scheduled_on = $request->input('pickup_date');
-                }
-
-                if ($request->filled('return_scheduled_on')) {
-                    $booking->return_scheduled_on = $request->input('return_scheduled_on');
-                } elseif ($request->filled('return_date')) {
-                    $booking->return_scheduled_on = $request->input('return_date');
-                }
-
-                if (empty($booking->pickup_scheduled_on) || empty($booking->return_scheduled_on)) {
-                    $scheduled = \App\Models\Booking::calculateScheduledDates($eventDate, $client->city);
-                    if (empty($booking->pickup_scheduled_on)) {
-                        $booking->pickup_scheduled_on = $scheduled['pickup_date'];
-                    }
-                    if (empty($booking->return_scheduled_on)) {
-                        $booking->return_scheduled_on = $scheduled['return_date'];
-                    }
-                }
-
-                $booking->total_amount = floatval($request->input('total_amount', 0));
-                $booking->deposit_amount = floatval($request->input('deposit_amount', 0));
-                $booking->insurance_amount = floatval($request->input('insurance_amount', 5000));
-                $booking->status = 'confirmed';
-                $booking->notes = $request->input('notes');
-                if ($request->input('payment_method')) {
-                    $booking->payment_method = $request->input('payment_method');
-                }
-
-                $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
-                if ($receiptPath) {
-                    $booking->receipt_path = $receiptPath;
-                }
-
-                $booking->save();
-
-                // Keep the bride's wedding date in sync with the booking's event date
-                $client->syncWeddingDateFrom($booking);
-
-                // The try-on visit ends with this booking
-                $bookedVisit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
-                if ($bookedVisit) {
-                    $bookedVisit->update(['status' => 'booked']);
-                    $bookedVisit->bookedDresses()->syncWithPivotValues(array_values(array_filter([$dressId, $dress2Id, $dress3Id])), ['type' => 'booked']);
-                }
-
-                $payments = $request->input('payments');
-                // Clean up previous deposit revenues for this booking to prevent duplicate entries when editing
-                $booking->revenues()->where('type', 'deposit')->delete();
-
-                if (is_array($payments) && count($payments) > 0) {
-                    $totalDeposit = 0;
-                    $methods = [];
-                    foreach ($payments as $p) {
-                        $pAmt = floatval($p['amount'] ?? 0);
-                        $pMethod = $p['payment_method'] ?? 'cash';
-                        $rowReceipt = !empty($p['receipt_image'])
-                            ? self::saveReceiptData($p['receipt_image'])
-                            : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
-
-                        if ($pAmt > 0) {
-                            $totalDeposit += $pAmt;
-                            $methods[] = $pMethod;
-                            \App\Models\Revenue::create([
-                                'booking_id' => $booking->id,
-                                'type' => 'deposit',
-                                'amount' => $pAmt,
-                                'payment_method' => $pMethod,
-                                'payment_date' => $bookingDate,
-                                'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
-                                'receipt_path' => $rowReceipt,
-                            ]);
-                        }
-                    }
-                    if ($totalDeposit > 0) {
-                        $booking->deposit_amount = $totalDeposit;
-                        $booking->payment_method = count(array_unique($methods)) > 1 ? 'multiple' : ($methods[0] ?? 'cash');
-                        $booking->save();
-                    }
-                } else {
-                    $deposit = floatval($request->input('deposit_amount', 0));
-                    if ($deposit > 0) {
-                        \App\Models\Revenue::create([
-                            'booking_id' => $booking->id,
-                            'type' => 'deposit',
-                            'amount' => $deposit,
-                            'payment_method' => $request->input('payment_method', 'cash'),
-                            'payment_date' => $bookingDate,
-                            'notes' => 'عربون حجز فستان من رحلة العروس' . ($booking->sales_name ? ' (السيلز: ' . $booking->sales_name . ')' : ''),
-                            'receipt_path' => $receiptPath,
-                        ]);
-                    }
-                }
-                break;
-
-            case 'end_fitting':
-                $fittings = $client->fittings()->get();
-                $endFittingSalesName = $request->input('sales_name');
-                if ($fittings->count() === 0) {
-                    $booking = $client->bookings()->latest()->latest('id')->first();
-                    if ($booking) {
-                        Fitting::create([
-                            'booking_id' => $booking->id,
-                            'fitting_date' => now()->toDateString(),
-                            'status' => 'completed',
-                            'sales_name' => $endFittingSalesName,
-                            'additional_notes' => 'تم إنهاء البروفات وتحويل العروس لمرحلة الاستلام',
-                        ]);
-                    }
-                } else {
-                    foreach ($fittings as $f) {
-                        $f->update([
-                            'status' => 'completed',
-                            'sales_name' => $endFittingSalesName ?: $f->sales_name,
-                        ]);
-                    }
-                }
-                break;
-
-            case 'mark_picked_up':
-                $booking = $client->bookings()->latest()->latest('id')->first();
-                if ($booking) {
-                    $updateData = [
-                        'status' => 'picked_up',
-                    ];
-                    if ($request->filled('total_amount')) {
-                        $updateData['total_amount'] = floatval($request->input('total_amount'));
-                    }
-                    if ($request->has('deposit_amount')) {
-                        $updateData['deposit_amount'] = floatval($request->input('deposit_amount'));
-                    }
-                    if ($request->has('insurance_amount')) {
-                        $updateData['insurance_amount'] = floatval($request->input('insurance_amount'));
-                    }
-                    if ($request->has('sales_name')) {
-                        $updateData['pickup_sales_name'] = $request->input('sales_name');
-                    }
-                    if ($request->filled('pickup_scheduled_on')) {
-                        $updateData['pickup_scheduled_on'] = $request->input('pickup_scheduled_on');
-                    } elseif ($request->filled('pickup_date')) {
-                        $updateData['pickup_scheduled_on'] = $request->input('pickup_date');
-                    }
-                    if ($request->filled('return_scheduled_on')) {
-                        $updateData['return_scheduled_on'] = $request->input('return_scheduled_on');
-                    } elseif ($request->filled('return_date')) {
-                        $updateData['return_scheduled_on'] = $request->input('return_date');
-                    }
-                    $booking->update($updateData);
-
-                    // Sync deposit payments if provided
-                    $depositPayments = $request->input('deposit_payments');
-                    if (is_array($depositPayments)) {
-                        $booking->revenues()->where('type', 'deposit')->delete();
-                        foreach ($depositPayments as $dp) {
-                            $dpAmt = floatval($dp['amount'] ?? 0);
-                            $dpMethod = $dp['payment_method'] ?? 'cash';
-                            if ($dpAmt > 0) {
-                                \App\Models\Revenue::create([
-                                    'booking_id' => $booking->id,
-                                    'type' => 'deposit',
-                                    'amount' => $dpAmt,
-                                    'payment_method' => $dpMethod,
-                                    'payment_date' => $booking->booking_date ?: now()->toDateString(),
-                                    'notes' => 'عربون حجز فستان للعروس: ' . $client->name,
-                                ]);
-                            }
-                        }
-                    }
-
-                    if ($booking->dress) {
-                        $booking->dress->update(['status' => 'out']);
-                    }
-                    if ($booking->dress2) {
-                        $booking->dress2->update(['status' => 'out']);
-                    }
-
-                    $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
-
-                    // Pickup money is dated on the actual pickup day chosen by staff (not the day the form was saved)
-                    $pickupPaymentDate = ($request->input('pickup_date') ?: $request->input('pickup_scheduled_on'))
-                        ? \Carbon\Carbon::parse($request->input('pickup_date') ?: $request->input('pickup_scheduled_on'))->toDateString()
-                        : now()->toDateString();
-
-                    // 1. Record balance payment(s)
-                    $balancePayments = $request->input('balance_payments');
-                    if (is_array($balancePayments)) {
-                        $booking->revenues()->where('type', 'balance')->delete();
-                        foreach ($balancePayments as $bp) {
-                            $bpAmt = floatval($bp['amount'] ?? 0);
-                            $bpMethod = $bp['payment_method'] ?? 'cash';
-                            $rowReceipt = !empty($bp['receipt_image'])
-                                ? self::saveReceiptData($bp['receipt_image'])
-                                : (!empty($bp['receipt']) ? self::saveReceiptData($bp['receipt']) : $receiptPath);
-
-                            if ($bpAmt > 0) {
-                                \App\Models\Revenue::create([
-                                    'booking_id' => $booking->id,
-                                    'type' => 'balance',
-                                    'amount' => $bpAmt,
-                                    'payment_method' => $bpMethod,
-                                    'payment_date' => $pickupPaymentDate,
-                                    'notes' => 'دفعة استلام الفستان النهائية للعروس: ' . $client->name,
-                                    'receipt_path' => $rowReceipt,
-                                ]);
-                            }
-                        }
-                    }
-
-                    // 2. Record insurance security deposit payment(s)
-                    $insurancePayments = $request->input('insurance_payments');
-                    if (is_array($insurancePayments)) {
-                        $booking->revenues()->where('type', 'insurance')->delete();
-                        foreach ($insurancePayments as $ip) {
-                            $ipAmt = floatval($ip['amount'] ?? 0);
-                            $ipMethod = $ip['payment_method'] ?? 'cash';
-                            $rowReceipt = !empty($ip['receipt_image'])
-                                ? self::saveReceiptData($ip['receipt_image'])
-                                : (!empty($ip['receipt']) ? self::saveReceiptData($ip['receipt']) : $receiptPath);
-
-                            if ($ipAmt > 0) {
-                                \App\Models\Revenue::create([
-                                    'booking_id' => $booking->id,
-                                    'type' => 'insurance',
-                                    'amount' => $ipAmt,
-                                    'payment_method' => $ipMethod,
-                                    'payment_date' => $pickupPaymentDate,
-                                    'notes' => 'تأمين الفستان المسترد للعروس: ' . $client->name,
-                                    'receipt_path' => $rowReceipt,
-                                ]);
-                            }
-                        }
-                    }
-                }
-                break;
-
-            case 'mark_returned':
-                $booking = $client->bookings()->latest()->latest('id')->first();
-                if ($booking) {
-                    $returnUpdate = ['status' => 'returned'];
-                    if ($request->has('sales_name')) {
-                        $returnUpdate['return_sales_name'] = $request->input('sales_name');
-                    }
-                    if ($request->has('insurance_amount')) {
-                        $returnUpdate['insurance_amount'] = floatval($request->input('insurance_amount'));
-                    }
-                    if ($request->filled('return_date')) {
-                        $returnUpdate['return_scheduled_on'] = $request->input('return_date');
-                    } elseif ($request->filled('return_scheduled_on')) {
-                        $returnUpdate['return_scheduled_on'] = $request->input('return_scheduled_on');
-                    }
-                    $booking->update($returnUpdate);
-                    // Returned dresses are available again; cleaning is handled outside the system
-                    if ($booking->dress) $booking->dress->update(['status' => 'available']);
-                    if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
-                    if ($booking->dress3) $booking->dress3->update(['status' => 'available']);
-
-                    // Return: write one insurance refund revenue = amount staff entered
-                    $damageDeduction = floatval($request->input('damage_deduction', 0));
-                    $maxRefund = max(0, floatval($booking->insurance_amount ?? 0) - $damageDeduction);
-                    $refundAmount = min(
-                        $maxRefund,
-                        floatval($request->input('insurance_refund', $maxRefund))
-                    );
-
-                    // Settlement is dated on the actual return day (not the day the form was saved)
-                    $settlementDate = $request->filled('return_date')
-                        ? \Carbon\Carbon::parse($request->input('return_date'))->toDateString()
-                        : now()->toDateString();
-
-                    // Editing an existing return replaces its settlement instead of duplicating it
-                    $previousSettlement = $booking->revenues()->whereIn('type', ['insurance_refund', 'damage_fee'])->get();
-                    $previousRefundReceipt = optional($previousSettlement->firstWhere('type', 'insurance_refund'))->receipt_path;
-                    $booking->revenues()->whereIn('type', ['insurance_refund', 'damage_fee'])->delete();
-
-                    $insuranceRev = $booking->revenues()
-                        ->where('notes', 'like', '%تأمين%')
-                        ->latest()
-                        ->first();
-
-                    $insuranceMethod = $insuranceRev ? $insuranceRev->payment_method : 'cash';
-
-                    // Damage deduction kept from the insurance -> recorded as its own damage_fee income
-                    if ($damageDeduction > 0) {
-                        \App\Models\Revenue::create([
-                            'booking_id' => $booking->id,
-                            'type' => 'damage_fee',
-                            'amount' => $damageDeduction,
-                            'payment_method' => $insuranceMethod,
-                            'payment_date' => $settlementDate,
-                            'notes' => 'خصم تلفيات من التأمين' . ($request->filled('damage_notes') ? ' - ' . $request->input('damage_notes') : ''),
-                        ]);
-                    }
-
-                    if ($refundAmount > 0) {
-                        $paymentMethod = $request->input('insurance_refund_method')
-                            ?: $insuranceMethod;
-
-                        $receiptPath = self::saveReceipt($request, 'insurance_refund_receipt')
-                            ?? self::saveReceiptData($request->input('insurance_refund_receipt'))
-                            ?? $previousRefundReceipt;
-
-                        \App\Models\Revenue::create([
-                            'booking_id' => $booking->id,
-                            'type' => 'insurance_refund',
-                            'amount' => -$refundAmount,
-                            'payment_method' => $paymentMethod,
-                            'payment_date' => $settlementDate,
-                            'notes' => 'استرداد تأمين' . ($request->filled('notes') ? ' - ' . $request->input('notes') : ''),
-                            'receipt_path' => $receiptPath,
-                        ]);
-                    }
-                }
-                break;
-
-            case 'pay_remaining':
-                $booking = $client->bookings()->latest()->latest('id')->first();
-                if ($booking) {
-                    $receiptPath = self::saveReceipt($request, 'receipt') ?? self::saveReceipt($request, 'receipt_image');
-                    $payments = $request->input('payments');
-                    $paidOn = $request->filled('payment_date')
-                        ? \Carbon\Carbon::parse($request->input('payment_date'))->toDateString()
-                        : now()->toDateString();
-
-                    if (is_array($payments) && count($payments) > 0) {
-                        foreach ($payments as $p) {
-                            $pAmt = floatval($p['amount'] ?? 0);
-                            $pMethod = $p['payment_method'] ?? 'cash';
-                            $rowReceipt = !empty($p['receipt_image'])
-                                ? self::saveReceiptData($p['receipt_image'])
-                                : (!empty($p['receipt']) ? self::saveReceiptData($p['receipt']) : $receiptPath);
-
-                            if ($pAmt > 0) {
-                                \App\Models\Revenue::create([
-                                    'booking_id' => $booking->id,
-                                    'type' => 'balance',
-                                    'amount' => $pAmt,
-                                    'payment_method' => $pMethod,
-                                    'payment_date' => $paidOn,
-                                    'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
-                                    'receipt_path' => $rowReceipt,
-                                ]);
-                            }
-                        }
-                    } else {
-                        $payAmount = floatval($request->input('amount', 0));
-                        if ($payAmount > 0) {
-                            \App\Models\Revenue::create([
-                                'booking_id' => $booking->id,
-                                'type' => 'balance',
-                                'amount' => $payAmount,
-                                'payment_method' => $request->input('payment_method', 'cash'),
-                                'payment_date' => $paidOn,
-                                'notes' => 'سداد باقي حساب الفستان للعروس: ' . $client->name . ($request->input('notes') ? ' - ' . $request->input('notes') : ''),
-                                'receipt_path' => $receiptPath,
-                            ]);
-                        }
-                    }
-
-                    // Handle insurance payments if provided
-                    $insurancePayments = $request->input('insurance_payments');
-                    if (is_array($insurancePayments) && count($insurancePayments) > 0) {
-                        $totalInsurance = 0;
-                        foreach ($insurancePayments as $ip) {
-                            $iAmt = floatval($ip['amount'] ?? 0);
-                            $iMethod = $ip['payment_method'] ?? 'cash';
-                            $iReceipt = !empty($ip['receipt_image'])
-                                ? self::saveReceiptData($ip['receipt_image'])
-                                : (!empty($ip['receipt']) ? self::saveReceiptData($ip['receipt']) : null);
-
-                            if ($iAmt > 0) {
-                                \App\Models\Revenue::create([
-                                    'booking_id' => $booking->id,
-                                    'type' => 'security_deposit',
-                                    'amount' => $iAmt,
-                                    'payment_method' => $iMethod,
-                                    'payment_date' => $paidOn,
-                                    'notes' => 'تأمين مسترد للعروس: ' . $client->name . ' (يُسترد عند إعادة الفستان)',
-                                    'receipt_path' => $iReceipt,
-                                ]);
-                                $totalInsurance += $iAmt;
-                            }
-                        }
-                        // Update booking's insurance_amount if it differs
-                        if ($totalInsurance > 0) {
-                            $booking->insurance_amount = $totalInsurance;
-                            $booking->save();
-                        }
-                    }
-                }
-                break;
-
-            case 'cancel_booking':
-                $booking = $client->bookings()->latest()->latest('id')->first();
-                if (!$booking || $booking->status !== 'confirmed') {
-                    return response()->json([
-                        'message' => 'لا يمكن إلغاء الحجز: لا يوجد حجز مؤكد لم يتم تسليم فستانه بعد'
-                    ], 422);
-                }
-
-                $revenues = $booking->revenues()->get();
-                $paidRent = (float) $revenues->whereIn('type', ['deposit', 'balance'])->sum('amount');
-                $paidInsurance = (float) $revenues->whereIn('type', ['insurance', 'security_deposit'])->sum('amount');
-                $depositRefund = round(floatval($request->input('deposit_refund', 0)), 2);
-                $insuranceRefund = round(floatval($request->input('insurance_refund', 0)), 2);
-
-                if ($depositRefund > round($paidRent, 2)) {
-                    return response()->json(['message' => 'مبلغ رد العربون أكبر من المدفوع (' . $paidRent . ' ج.م)'], 422);
-                }
-                if ($insuranceRefund > round($paidInsurance, 2)) {
-                    return response()->json(['message' => 'مبلغ رد التأمين أكبر من المدفوع (' . $paidInsurance . ' ج.م)'], 422);
-                }
-
-                $stageBefore = $client->current_stage;
-                $refundDate = $request->filled('refund_date')
-                    ? \Carbon\Carbon::parse($request->input('refund_date'))->toDateString()
-                    : now()->toDateString();
-                $reasonLabel = Booking::CANCELLATION_REASONS[$request->input('cancellation_reason')];
-                $user = $request->user();
-
-                \Illuminate\Support\Facades\DB::transaction(function () use ($request, $client, $booking, $stageBefore, $refundDate, $reasonLabel, $user, $depositRefund, $insuranceRefund) {
-                    $booking->update([
-                        'status' => 'cancelled',
-                        'cancelled_at' => now(),
-                        'cancelled_by' => $user?->id,
-                        'cancelled_by_name' => $request->input('sales_name') ?: $user?->name,
-                        'cancelled_stage' => $stageBefore,
-                        'cancellation_reason' => $request->input('cancellation_reason'),
-                        'cancellation_note' => $request->input('cancellation_note'),
-                    ]);
-
-                    // Close open fittings of this booking
-                    Fitting::where('booking_id', $booking->id)
-                        ->whereIn('status', ['scheduled', 'rescheduled'])
-                        ->update(['status' => 'cancelled']);
-
-                    // Free reserved dresses unless another active booking still holds them
-                    foreach (array_filter([$booking->dress_id, $booking->dress_2_id, $booking->dress_3_id]) as $dressId) {
-                        $stillHeld = Booking::where('id', '!=', $booking->id)
-                            ->whereIn('status', ['confirmed', 'picked_up'])
-                            ->where(fn($q) => $q->where('dress_id', $dressId)->orWhere('dress_2_id', $dressId)->orWhere('dress_3_id', $dressId))
-                            ->exists();
-                        if (!$stillHeld) {
-                            \App\Models\Dress::where('id', $dressId)->where('status', 'booked')->update(['status' => 'available']);
-                        }
-                    }
-
-                    // Refunds are negative revenue rows so finance totals and transactions reflect them
-                    $refunds = [
-                        ['deposit_refund', $depositRefund, 'deposit_refund_method', 'deposit_refund_receipt', 'رد عربون (إلغاء حجز)'],
-                        ['insurance_refund', $insuranceRefund, 'insurance_refund_method', 'insurance_refund_receipt', 'رد تأمين (إلغاء حجز)'],
-                    ];
-                    foreach ($refunds as [$type, $amount, $methodField, $receiptField, $label]) {
-                        if ($amount <= 0) {
-                            continue;
-                        }
-                        \App\Models\Revenue::create([
-                            'booking_id' => $booking->id,
-                            'type' => $type,
-                            'amount' => -$amount,
-                            'payment_method' => $request->input($methodField) ?: 'cash',
-                            'payment_date' => $refundDate,
-                            'notes' => $label . ' للعروس: ' . $client->name . ' - ' . $reasonLabel,
-                            'receipt_path' => self::saveReceipt($request, $receiptField),
-                        ]);
-                    }
-                });
-                break;
-
-            default:
-                return response()->json(['message' => 'Unknown action'], 400);
-        }
-
-        // Log the activity
-        $actionLabels = [
-            'confirm_visit' => 'تأكيد زيارة عروس',
-            'close_visit' => 'تحديث نتيجة زيارة عروس',
-            'schedule_fitting' => 'جدولة بروفة قياس',
-            'confirm_booking' => 'تأكيد حجز فستان',
-            'end_fitting' => 'إنهاء بروفات القياس',
-            'mark_picked_up' => 'تسليم الفستان للعروس',
-            'mark_returned' => 'استلام الفستان وتسوية التأمين',
-            'pay_remaining' => 'سداد دفعة مالية',
-            'cancel_booking' => 'إلغاء حجز عروس',
-        ];
-        $actionTitle = $actionLabels[$action] ?? "إجراء مرحلة: {$action}";
-        \App\Services\ActivityLogger::log(
-            $actionTitle,
-            'Client',
-            $client->id,
-            [
-                'bride_name' => $client->name,
-                'bride_phone' => $client->phone,
-                'sales_name' => $request->input('sales_name'),
-                'action_key' => $action,
-                'cancellation_reason' => $request->input('cancellation_reason'),
-                'deposit_refund' => $action === 'cancel_booking' ? floatval($request->input('deposit_refund', 0)) : null,
-                'insurance_refund' => $action === 'cancel_booking' ? floatval($request->input('insurance_refund', 0)) : null,
-            ],
-            $request->input('sales_name')
-        );
+        $journey->run($request->input('action'), $client, $request);
 
         // Refresh and return updated stage
         // Must unset loaded relations so current_stage recomputes from fresh DB data
@@ -1325,97 +660,21 @@ class ClientController extends Controller
         ]);
     }
 
-    public function revertStage(Request $request, \App\Models\Booking $booking): JsonResponse
+    public function revertStage(Request $request, \App\Models\Booking $booking, BrideJourneyService $journey): JsonResponse
     {
-        $targetStage = $request->input('target_stage');
         $client = $booking->client;
-        
-        \DB::beginTransaction();
-        try {
-            if ($targetStage === 'visit') {
-                // Delete everything related to the booking
-                $booking->revenues()->delete();
-                $booking->fittings()->delete();
-                if ($booking->dress) $booking->dress->update(['status' => 'available']);
-                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
-                if ($booking->dress3) $booking->dress3->update(['status' => 'available']);
-                $booking->delete();
 
-                // The visit that ended with this booking is open again
-                $bookedVisit = $client->visits()->where('status', 'booked')->latest()->latest('id')->first();
-                if ($bookedVisit) {
-                    $bookedVisit->update(['status' => 'arrived']);
-                    $bookedVisit->bookedDresses()->detach();
-                }
-                
-                $client->update(['current_stage' => 'visit']);
-            } 
-            elseif ($targetStage === 'booking') {
-                // Keep the booking (deposit remains), but remove fittings and after
-                $booking->fittings()->delete();
-                $booking->revenues()->whereIn('type', ['fitting_fee', 'balance', 'insurance', 'insurance_refund', 'late_fee', 'damage_fee'])->delete();
-                
-                if ($booking->dress) $booking->dress->update(['status' => 'available']);
-                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
-                
-                $booking->update(['status' => 'confirmed']);
-                $client->update(['current_stage' => 'booking']);
-            }
-            elseif ($targetStage === 'fitting') {
-                // Keep the fitting, but remove pickup/return data
-                $booking->revenues()->whereIn('type', ['balance', 'insurance', 'insurance_refund', 'late_fee', 'damage_fee'])->delete();
-                
-                if ($booking->dress) $booking->dress->update(['status' => 'available']);
-                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
-                
-                $booking->update(['status' => 'confirmed']);
-                
-                // Ensure the booking has a scheduled fitting so stage resolves to 'fitting'
-                $latestFitting = $booking->fittings()->latest()->first();
-                if ($latestFitting) {
-                    $latestFitting->update(['status' => 'scheduled']);
-                } else {
-                    \App\Models\Fitting::create([
-                        'booking_id' => $booking->id,
-                        'fitting_date' => now()->addDays(3)->toDateString(),
-                        'status' => 'scheduled',
-                        'additional_notes' => 'تمت العودة لمرحلة البروفة',
-                    ]);
-                }
-            }
-            elseif ($targetStage === 'pickup_pending' || $targetStage === 'unhandover') {
-                // Revert from Sub-stage 2 (out/delivered) back to Sub-stage 1 (ready for handover):
-                // Reset booking status to confirmed, dresses to available, and remove balance & insurance revenues recorded at pickup
-                $booking->revenues()->whereIn('type', ['balance', 'insurance', 'insurance_refund', 'late_fee', 'damage_fee'])->delete();
-                $booking->update(['status' => 'confirmed']);
-                if ($booking->dress) $booking->dress->update(['status' => 'available']);
-                if ($booking->dress2) $booking->dress2->update(['status' => 'available']);
-                if ($booking->dress3) $booking->dress3->update(['status' => 'available']);
-                // Ensure fittings are marked completed so stage remains picked_up (waiting for handover)
-                $booking->fittings()->update(['status' => 'completed']);
-                $client->update(['current_stage' => 'picked_up']);
-            }
-            elseif ($targetStage === 'picked_up') {
-                // Keep pickup, remove return data
-                $booking->revenues()->whereIn('type', ['insurance_refund', 'late_fee', 'damage_fee'])->delete();
-                $booking->update(['status' => 'picked_up']);
-                if ($booking->dress) $booking->dress->update(['status' => 'out']);
-                if ($booking->dress2) $booking->dress2->update(['status' => 'out']);
-                if ($booking->dress3) $booking->dress3->update(['status' => 'out']);
-                $client->update(['current_stage' => 'picked_up']);
-            }
-            
-            \DB::commit();
-            
+        try {
+            $journey->revert($booking, $request->input('target_stage'));
+
             $client->unsetRelation('fittings')->unsetRelation('bookings')->unsetRelation('visits');
             $client->refresh();
-            
+
             return response()->json([
                 'message' => 'تم التراجع بنجاح',
                 'current_stage' => $client->current_stage
             ]);
         } catch (\Exception $e) {
-            \DB::rollBack();
             return response()->json(['message' => 'فشل التراجع: ' . $e->getMessage()], 500);
         }
     }

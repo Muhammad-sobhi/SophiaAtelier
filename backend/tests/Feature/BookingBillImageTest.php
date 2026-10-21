@@ -6,7 +6,6 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\Dress;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -14,7 +13,6 @@ use Tests\TestCase;
 
 class BookingBillImageTest extends TestCase
 {
-    use DatabaseTransactions;
 
     private function booking(): Booking
     {

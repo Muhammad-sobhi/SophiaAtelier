@@ -9,13 +9,11 @@ use App\Models\EmployeeSalaryPayment;
 use App\Models\Expense;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class PayrollPaymentTest extends TestCase
 {
-    use DatabaseTransactions;
 
     protected function setUp(): void
     {

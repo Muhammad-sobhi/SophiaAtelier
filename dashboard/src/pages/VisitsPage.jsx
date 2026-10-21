@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, findClientByName } from '@/lib/api-client';
 import { toast } from '@/components/ui/Toast';
 import { Search, SlidersHorizontal, Plus, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Sparkles, Trash2, Edit3 } from 'lucide-react';
 
@@ -47,17 +47,6 @@ const formatTime = (time) => {
   return `${h}:${minutes} ${ampm}`;
 };
 
-const initialVisits = [
-{ id: 1, client: 'سارة أحمد', date: '2026-07-12', source: 'انستقرام', status: 'وصل', triedDresses: ['فستان الأميرة كلاسيك', 'فستان الزفاف الأبيض الملكي'], bookedDresses: [] },
-{ id: 2, client: 'نورة محمد', date: '2026-07-12', source: 'جوجل', status: 'انتهى', triedDresses: ['فستان السهرة ذهبي'], bookedDresses: ['فستان السهرة ذهبي'] },
-{ id: 3, client: 'فاطمة العلي', date: '2026-07-11', source: 'إحالة', status: 'حجز', triedDresses: ['فستان الزفاف الأبيض الملكي'], bookedDresses: ['فستان الزفاف الأبيض الملكي'] },
-{ id: 4, client: 'خديجة حسن', date: '2026-07-11', source: 'تويتر', status: 'لم يحضر', triedDresses: [], bookedDresses: [] },
-{ id: 5, client: 'مريم خالد', date: '2026-07-10', source: 'انستقرام', status: 'وصل', triedDresses: ['فستان الكوتور الفرنسي'], bookedDresses: [] },
-{ id: 6, client: 'ريم عبدالرحمن', date: '2026-07-10', source: 'سنابشات', status: 'انتهى', triedDresses: ['فستان الكوتور الفرنسي', 'فستان الأميرة كلاسيك'], bookedDresses: ['فستان الكوتور الفرنسي'] },
-{ id: 7, client: 'هند سعيد', date: '2026-07-09', source: 'جوجل', status: 'وصل', triedDresses: ['فستان الناعم الوردي بريق'], bookedDresses: [] },
-{ id: 8, client: 'دانا يوسف', date: '2026-07-09', source: 'إحالة', status: 'حجز', triedDresses: ['فستان الناعم الوردي بريق'], bookedDresses: ['فستان الناعم الوردي بريق'] }];
-
-
 const statusStyles = {
   'وصل': { dot: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
   'انتهى': { dot: 'bg-slate-400', text: 'text-slate-500', bg: 'bg-slate-50' },
@@ -84,7 +73,6 @@ export default function VisitsPage() {
   const [salesName, setSalesName] = useState('');
   const [employees, setEmployees] = useState([]);
   const [dressesData, setDressesData] = useState([]);
-  const [clientsObjects, setClientsObjects] = useState([]);
   const [bookingsList, setBookingsList] = useState([]);
   const [fullyBookedSlots, setFullyBookedSlots] = useState([]);
 
@@ -102,14 +90,8 @@ export default function VisitsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [editingVisit, setEditingVisit] = useState(null);
-  const [availableDresses, setAvailableDresses] = useState([
-  'فستان الأميرة كلاسيك',
-  'فستان السهرة ذهبي',
-  'فستان الزفاف الأبيض الملكي',
-  'فستان الناعم الوردي بريق',
-  'فستان مطرز بلوري',
-  'فستان الكوتور الفرنسي']
-  );
+  // The dresses to pick from are the real catalog (dress ids are looked up by name)
+  const availableDresses = dressesData.map((d) => d.name).filter(Boolean);
 
   const handleEditVisitClick = (v) => {
     setEditingVisit(v);
@@ -139,8 +121,11 @@ export default function VisitsPage() {
     }
 
     // Resolve client_id
-    const clientObj = clientsObjects.find((c) => c.name === newClient);
-    const clientId = clientObj?.id || 1;
+    const clientId = (newClient === editingVisit.client && editingVisit.clientId) || (await findClientByName(newClient))?.id;
+    if (!clientId) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: 'لم يتم العثور على العروس، اختاريها من القائمة' });
+      return;
+    }
 
     // Map source options
     let mappedSource = 'instagram';
@@ -194,7 +179,7 @@ export default function VisitsPage() {
     setConvertDress(initialDress);
 
     // Predetermine price based on dress selection
-    const priceStr = dressesData.find((d) => d.name === initialDress)?.rentalCost || '5,000 ج.م';
+    const priceStr = `${(parseFloat(dressesData.find((d) => d.name === initialDress)?.rental_price) || 0).toLocaleString()} ج.م`;
     setConvertAmount(priceStr);
 
     // Set wedding date to 2 months from today or visit date
@@ -213,7 +198,7 @@ export default function VisitsPage() {
 
   const handleDressChangeForConvert = (dressName) => {
     setConvertDress(dressName);
-    const priceStr = dressesData.find((d) => d.name === dressName)?.rentalCost || '5,000 ج.م';
+    const priceStr = `${(parseFloat(dressesData.find((d) => d.name === dressName)?.rental_price) || 0).toLocaleString()} ج.م`;
     setConvertAmount(priceStr);
   };
 
@@ -221,13 +206,13 @@ export default function VisitsPage() {
     e.preventDefault();
     if (!selectedVisitToConvert) return;
 
-    // Resolve client_id
-    const clientObj = clientsObjects.find((c) => c.name === selectedVisitToConvert.client);
-    const clientId = clientObj?.id || 1;
-
-    // Resolve dress_id
-    const dressObj = dressesData.find((d) => d.name === convertDress);
-    const dressId = dressObj?.id || 1;
+    // Resolve client_id and dress_id: never fall back to another bride or dress
+    const clientId = selectedVisitToConvert.clientId || (await findClientByName(selectedVisitToConvert.client))?.id;
+    const dressId = dressesData.find((d) => d.name === convertDress)?.id;
+    if (!clientId || !dressId) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: !clientId ? 'لم يتم العثور على العروس' : 'يرجى اختيار الفستان من القائمة' });
+      return;
+    }
 
     const amountNum = parseFloat(convertAmount.replace(/[^\d]/g, '')) || 0;
 
@@ -295,6 +280,7 @@ export default function VisitsPage() {
       const data = res.data || [];
       setVisitsList(data.map((v) => ({
         id: v.id,
+        clientId: v.client_id || v.client?.id,
         client: v.client?.name || v.client_name || '-',
         date: v.visit_date || v.date || '',
         time_slot: v.time_slot || null,
@@ -313,15 +299,11 @@ export default function VisitsPage() {
     if (active) {
       try {
         const emp = JSON.parse(active);
-        setIsAdmin(emp.role === 'admin' || emp.email === 'admin@atelier.test');
+        setIsAdmin(emp.role === 'admin');
       } catch (e) {}
     }
 
     fetchVisits();
-
-    apiClient.get('/clients').then((res) => {
-      setClientsObjects(res.data || []);
-    }).catch(() => {});
 
     apiClient.get('/bookings').then((res) => {
       setBookingsList(res.data || []);
@@ -337,11 +319,6 @@ export default function VisitsPage() {
       setDressesData(data);
     }).catch(() => {});
   }, []);
-
-  const saveVisits = (newVisits) => {
-    setVisitsList(newVisits);
-    // Mutations go through API
-  };
 
   const handleAddVisit = async (e) => {
     e.preventDefault();
@@ -359,21 +336,22 @@ export default function VisitsPage() {
     }
 
     // 1. Resolve or create client
-    let clientObj = clientsObjects.find((c) => c.name.trim() === newClient.trim());
-    let clientId = clientObj?.id;
+    let clientId = (await findClientByName(newClient))?.id;
     if (!clientId) {
       try {
         const clientRes = await apiClient.post('/clients', {
-          name: newClient,
-          phone: '0000000000',
-          email: `${Date.now()}@visit-client.com`,
+          name: newClient.trim(),
           source: 'walkin'
         });
         clientId = clientRes.id || clientRes.data?.id;
       } catch (err) {
         console.error('Failed to create client for visit:', err);
-        clientId = 1;
       }
+    }
+    // Never attach the visit to some other bride when the client could not be found or created
+    if (!clientId) {
+      setAlertConfig({ isOpen: true, title: 'خطأ', message: 'تعذر حفظ بيانات العروس، حاولي مرة أخرى' });
+      return;
     }
 
     // Map source options to valid enums required by backend validation: 'instagram', 'website', 'referral', 'walkin', 'whatsapp'

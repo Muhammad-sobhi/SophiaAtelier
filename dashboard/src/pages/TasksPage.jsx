@@ -176,7 +176,7 @@ export default function TasksPage() {
     if (active) {
       try {
         const emp = JSON.parse(active);
-        setIsAdmin(emp.role === 'admin' || emp.email === 'admin@atelier.test');
+        setIsAdmin(emp.role === 'admin');
       } catch (e) {}
     }
 

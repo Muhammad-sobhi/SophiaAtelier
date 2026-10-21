@@ -31,3 +31,6 @@ backend/storage/logs/*
 Thumbs.db
 .vscode/
 .idea/
+
+# Next.js build output written outside .next by a Windows path
+**/.next/

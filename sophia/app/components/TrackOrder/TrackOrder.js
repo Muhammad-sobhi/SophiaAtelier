@@ -23,14 +23,22 @@ import { useStore } from '../../context/StoreContext';
 import { useContactNumber } from '../../lib/useContactNumber';
 import styles from './TrackOrder.module.css';
 
-/* ── BRIDE JOURNEY STAGES ── */
-const BRIDE_JOURNEY_STAGES = [
-  { id: 'visit', label: '1. Visit &\nConsultation', icon: Calendar, desc: 'Boutique visit & gown selection' },
-  { id: 'fitting', label: '2. Fitting &\nMeasurements', icon: Scissors, desc: 'Detailed measurements & fitting' },
-  { id: 'booking', label: '3. Booking\nConfirmed', icon: Check, desc: 'Contract & gown reserved' },
-  { id: 'picked_up', label: '4. Gown\nPickup', icon: Shirt, desc: 'Delivered for your big day' },
-  { id: 'returned', label: '5. Returned &\nCompleted', icon: Heart, desc: 'Event completed with love' },
+/* ── BRIDE JOURNEY: 4 steps. Fittings are optional and shown as information, never as a step ── */
+const JOURNEY_STEPS = [
+  { id: 'visit', icon: Calendar },
+  { id: 'booking', icon: Check },
+  { id: 'pickup', icon: Shirt },
+  { id: 'return', icon: Heart },
 ];
+
+// journey_step from the API -> index of the current step (4 = all done); "with_bride" = picked up, return pending
+const STEP_PROGRESS = {
+  visit: 0,
+  booking: 1,
+  pickup: 2,
+  with_bride: 3,
+  returned: 4,
+};
 
 export default function TrackOrder() {
   const { brideUser, logoutBride, setAuthModalOpen, t, lang } = useStore();
@@ -45,9 +53,7 @@ export default function TrackOrder() {
     if (brideUser) {
       setClientData(null);
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const payload = brideUser.id
-        ? { phone: brideUser.phone, email: brideUser.email, client_id: brideUser.id }
-        : { phone: brideUser.phone, email: brideUser.email };
+      const payload = { phone: brideUser.phone, email: brideUser.email };
 
       fetch(`${API_BASE}/public/find-client`, {
         method: 'POST',
@@ -95,44 +101,24 @@ export default function TrackOrder() {
     );
   }
 
-  // Determine current stage from clientData.current_stage (visit -> fitting -> booking -> picked_up -> returned)
-  const currentStage = clientData?.current_stage || 'visit';
+  // The step comes from the API (journey_step): the dashboard stage names are columns, not events
+  const journeyStep = clientData?.journey_step || 'visit';
+  const isCancelled = journeyStep === 'cancelled';
+  const activeIndex = STEP_PROGRESS[journeyStep] ?? 0;
+  const tj = t.track.journey;
 
-  const getStageIndex = (stage) => {
-    switch (stage) {
-      case 'visit':
-        return 0;
-      case 'fitting':
-        return 1;
-      case 'booking':
-        return 2;
-      case 'ready_for_pickup':
-      case 'picked_up':
-      case 'out':
-        return 3;
-      case 'returned':
-        return 4;
-      default:
-        return 0;
-    }
-  };
-
-  const activeIndex = getStageIndex(currentStage);
   const latestBooking = clientData?.bookings && clientData.bookings.length > 0 ? clientData.bookings[0] : null;
   const currentDress = latestBooking?.dress;
   const currentDress2 = latestBooking?.dress2;
-
-  // Active visit or fitting info
   const latestVisit = clientData?.visits && clientData.visits.length > 0 ? clientData.visits[0] : null;
-  const latestFitting = clientData?.fittings && clientData.fittings.length > 0 ? clientData.fittings[0] : null;
+  const fittings = clientData?.fittings || [];
 
-  const brideJourneyStages = [
-    { id: 'visit', label: t.track.stages.visit, icon: Calendar, desc: 'Boutique visit & gown selection' },
-    { id: 'fitting', label: t.track.stages.fitting, icon: Scissors, desc: 'Detailed measurements & fitting' },
-    { id: 'booking', label: t.track.stages.booking, icon: Check, desc: 'Contract & gown reserved' },
-    { id: 'picked_up', label: t.track.stages.pickup, icon: Shirt, desc: 'Delivered for your big day' },
-    { id: 'returned', label: t.track.stages.return, icon: Heart, desc: 'Event completed with love' },
-  ];
+  const dressNames = [latestBooking?.dress, latestBooking?.dress2, latestBooking?.dress3]
+    .filter(Boolean)
+    .map((d) => (lang === 'ar' && d.name_ar) || d.name)
+    .join(' | ');
+  const weddingDate = latestBooking?.event_date || clientData?.wedding_date || null;
+  const money = (v) => `${Number(v || 0).toLocaleString()} ${tj.currency}`;
 
   return (
     <div className={styles.page}>
@@ -178,16 +164,22 @@ export default function TrackOrder() {
       </section>
 
       {/* ═══════════════════════════════════════
-          1. YOUR JOURNEY STAGES (MATCHES DASHBOARD)
+          1. YOUR JOURNEY STEPS (visit -> booking -> pickup -> return)
           ═══════════════════════════════════════ */}
       <section className={styles.progressSection} ref={progressRef}>
-        <span className={styles.sectionLabel}>YOUR BRIDE JOURNEY STAGE</span>
+        <span className={styles.sectionLabel}>{tj.sectionLabel}</span>
 
-        {/* Horizontal Stepper */}
+        {isCancelled && (
+          <div style={{ background: '#fcf2f2', border: '1px solid #f5c6c6', borderRadius: '12px', padding: '12px 16px', margin: '0 auto 20px', maxWidth: '640px', fontSize: '13px', color: '#9b2c2c', textAlign: 'center' }}>
+            <strong>{tj.cancelledTitle}</strong> — {tj.cancelledNote}
+          </div>
+        )}
+
+        {/* Horizontal Stepper: a cancelled booking shows no progress */}
         <div className={styles.stepper}>
-          {BRIDE_JOURNEY_STAGES.map((step, i) => {
-            const isCompleted = i < activeIndex;
-            const isCurrent = i === activeIndex;
+          {JOURNEY_STEPS.map((step, i) => {
+            const isCompleted = !isCancelled && i < activeIndex;
+            const isCurrent = !isCancelled && i === activeIndex;
             const statusClass = isCompleted ? styles.stepCompleted : isCurrent ? styles.stepCurrent : styles.stepUpcoming;
 
             return (
@@ -196,8 +188,8 @@ export default function TrackOrder() {
                 <div className={`${styles.stepCircle} ${statusClass}`}>
                   {isCompleted ? <Check size={18} strokeWidth={2.5} /> : <step.icon size={18} strokeWidth={1.5} />}
                 </div>
-                <span className={styles.stepLabel}>{step.label}</span>
-                <span className={styles.stepDate}>{isCompleted ? 'Completed' : isCurrent ? 'Active Stage' : 'Upcoming'}</span>
+                <span className={styles.stepLabel}>{`${i + 1}. ${t.track.stages[step.id]}`}</span>
+                <span className={styles.stepDate}>{isCompleted ? tj.completed : isCurrent ? tj.current : tj.upcoming}</span>
               </div>
             );
           })}
@@ -206,13 +198,13 @@ export default function TrackOrder() {
         {/* Legend */}
         <div className={styles.legend}>
           <span className={styles.legendItem}>
-            <span className={`${styles.legendDot} ${styles.legendCompleted}`} /> Completed
+            <span className={`${styles.legendDot} ${styles.legendCompleted}`} /> {tj.completed}
           </span>
           <span className={styles.legendItem}>
-            <span className={`${styles.legendDot} ${styles.legendCurrent}`} /> Active Stage
+            <span className={`${styles.legendDot} ${styles.legendCurrent}`} /> {tj.current}
           </span>
           <span className={styles.legendItem}>
-            <span className={`${styles.legendDot} ${styles.legendUpcoming}`} /> Upcoming
+            <span className={`${styles.legendDot} ${styles.legendUpcoming}`} /> {tj.upcoming}
           </span>
         </div>
       </section>
@@ -222,251 +214,149 @@ export default function TrackOrder() {
           ═══════════════════════════════════════ */}
       <section className={styles.detailsSection} ref={detailsRef}>
         <div className={styles.detailsGrid}>
-          {/* ── LEFT: STAGE SPECIFIC DETAILS ── */}
+          {/* ── LEFT: DETAILS OF THE CURRENT STEP ── */}
           <div className={styles.appointmentCard}>
-            {currentStage === 'returned' ? (
-              <>
-                <span className={styles.cardLabel} style={{ color: '#059669' }}>💖 STAGE 5: GOWN RETURNED & COMPLETED</span>
-                <h3 className={styles.appointmentHeading}>Thank You for Choosing Sophia Dresses!</h3>
-                <div className={styles.appointmentMeta}>
-                  <div className={styles.metaRow}>
-                    <Shirt size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Worn Gown</span>
-                      <span className={styles.metaValue}>{currentDress?.name || 'Luxury Wedding Gown'}</span>
-                    </div>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <Heart size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Journey Status</span>
-                      <span className={styles.metaValue}>Successfully Returned & Insurance Refunded</span>
-                    </div>
+            {(() => {
+              const row = (Icon, title, value) => (
+                <div className={styles.metaRow}>
+                  <Icon size={18} strokeWidth={1.4} className={styles.metaIcon} />
+                  <div>
+                    <span className={styles.metaTitle}>{title}</span>
+                    <span className={styles.metaValue}>{value}</span>
                   </div>
                 </div>
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '14px 16px', marginTop: '16px', fontSize: '12px', color: '#065f46', lineHeight: '1.5' }}>
-                  <strong>Congratulations Bride!</strong> We wish you a lifetime of love and happiness. If you have photos from your special day, we would love to feature your story in our Real Brides Gallery!
-                </div>
-              </>
-            ) : currentStage === 'picked_up' ? (
-              <>
-                <span className={styles.cardLabel} style={{ color: '#059669' }}>✨ STAGE 4: GOWN PICKUP</span>
-                <h3 className={styles.appointmentHeading}>
-                  {latestBooking?.status === 'picked_up' || currentDress?.status === 'out'
-                    ? 'Gown Handed Over for Your Big Day!'
-                    : 'Your Dress is Ready to Pick Up!'}
-                </h3>
-                {(() => {
-                  const weddingDateRaw = latestBooking?.event_date || clientData?.wedding_date || '';
-                  const weddingDateStr = weddingDateRaw ? weddingDateRaw.split('T')[0] : '';
-                  const isCairo = !clientData?.city || clientData.city.includes('القاهرة') || clientData.city.toLowerCase().includes('cairo');
-                  const pickupDaysBefore = isCairo ? 1 : 2;
-                  let pickupDateStr = weddingDateStr;
-                  if (weddingDateStr) {
-                    try {
-                      const parts = weddingDateStr.split('-');
-                      if (parts.length >= 3) {
-                        const y = parseInt(parts[0], 10);
-                        const m = parseInt(parts[1], 10) - 1;
-                        const d = parseInt(parts[2], 10);
-                        const pD = new Date(y, m, d - pickupDaysBefore);
-                        const dd = String(pD.getDate()).padStart(2, '0');
-                        const mm = String(pD.getMonth() + 1).padStart(2, '0');
-                        pickupDateStr = `${pD.getFullYear()}-${mm}-${dd}`;
-                      }
-                    } catch (e) {}
-                  }
+              );
+              const note = (text, tone = 'green') => (
+                <div style={{
+                  background: tone === 'green' ? '#ecfdf5' : '#faf8f5',
+                  border: `1px solid ${tone === 'green' ? '#a7f3d0' : '#efebe4'}`,
+                  borderRadius: '12px', padding: '12px 16px', marginTop: '16px', fontSize: '12px',
+                  color: tone === 'green' ? '#065f46' : '#555', lineHeight: '1.5',
+                }}>{text}</div>
+              );
+              const location = row(MapPin, tj.location, 'First Settlement, Al-Yasmeen 2, Villa 161 (basement)');
 
-                  return (
-                    <div className={styles.appointmentMeta}>
-                      <div className={styles.metaRow}>
-                        <Shirt size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                        <div>
-                          <span className={styles.metaTitle}>Selected Gown{currentDress2 ? 's' : ''}</span>
-                          <span className={styles.metaValue}>
-                            1. {currentDress?.name || 'Luxury Wedding Dress'}
-                            {currentDress2 && ` | 2. ${currentDress2.name}`}
-                          </span>
-                        </div>
-                      </div>
-                      <div className={styles.metaRow}>
-                        <Calendar size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                        <div>
-                          <span className={styles.metaTitle}>Scheduled Pickup Date</span>
-                          <span className={styles.metaValue}>{pickupDateStr || 'Scheduled via Studio'}</span>
-                        </div>
-                      </div>
-                      <div className={styles.metaRow}>
-                        <Calendar size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                        <div>
-                          <span className={styles.metaTitle}>Wedding / Event Date</span>
-                          <span className={styles.metaValue}>{weddingDateStr || 'Upcoming Event'}</span>
-                        </div>
-                      </div>
-                      <div className={styles.metaRow}>
-                        <MapPin size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                        <div>
-                          <span className={styles.metaTitle}>Boutique Location</span>
-                          <span className={styles.metaValue}>First Settlement, Al-Yasmeen 2, Villa 161 (basement)</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '12px 16px', marginTop: '16px', fontSize: '12px', color: '#065f46' }}>
-                  {latestBooking?.status === 'picked_up' || currentDress?.status === 'out' ? (
-                    <span><strong>Enjoy Your Wedding Day!</strong> Please return the gown within 1 day after your event. Your deposit/insurance will be refunded upon clean return!</span>
-                  ) : (
-                    <span><strong>Welcome to Boutique:</strong> Your gown is pressed and ready for collection! Please bring your ID and contract receipt.</span>
-                  )}
-                </div>
-              </>
-            ) : currentStage === 'booking' ? (
-              <>
-                <span className={styles.cardLabel} style={{ color: '#059669' }}>✨ STAGE 3: BOOKING CONFIRMED</span>
-                <h3 className={styles.appointmentHeading}>Your Wedding Dress is Officially Reserved!</h3>
-                <div className={styles.appointmentMeta}>
-                  <div className={styles.metaRow}>
-                    <Shirt size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Reserved Wedding Gown{currentDress2 ? 's' : ''}</span>
-                      <span className={styles.metaValue}>
-                        1. {currentDress?.name || 'Luxury Wedding Dress'}
-                        {currentDress2 && ` | 2. ${currentDress2.name}`}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <Calendar size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Wedding / Event Date</span>
-                      <span className={styles.metaValue}>
-                        {latestBooking?.event_date
-                          ? latestBooking.event_date.split('T')[0]
-                          : clientData?.wedding_date || 'Upcoming Event'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <Heart size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Booking Payment Info</span>
-                      <span className={styles.metaValue}>
-                        Deposit Paid: ${latestBooking?.deposit_amount || '1000'} | Total: ${latestBooking?.total_amount || '3500'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <MapPin size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Atelier Location</span>
-                      <span className={styles.metaValue}>First Settlement, Al-Yasmeen 2, Villa 161 (basement)</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '12px 16px', marginTop: '16px', fontSize: '12px', color: '#065f46' }}>
-                  <strong>Contract Confirmed:</strong> Your gown reservation is active in our studio. Our team will schedule your upcoming fitting sessions close to your wedding date!
-                </div>
-              </>
-            ) : (
-              <>
-                <span className={styles.cardLabel}>APPOINTMENT & FITTING SCHEDULE</span>
-                <h3 className={styles.appointmentHeading}>
-                  {clientData?.fittings && clientData.fittings.length > 0
-                    ? `Fittings (${clientData.fittings.length} Scheduled)`
-                    : latestVisit
-                    ? `Boutique Visit (${latestVisit.status === 'confirmed' ? 'confirmed' : 'waiting for confirmation'})`
-                    : 'Studio Consultation'}
-                </h3>
+              const content = {
+                visit: {
+                  title: tj.visitTitle,
+                  rows: latestVisit ? (
+                    <>
+                      {row(Calendar, tj.visitDate, `${latestVisit.visit_date}${latestVisit.time_slot ? ` (${latestVisit.time_slot})` : ''}`)}
+                      {row(Clock, tj.status, latestVisit.status === 'pending' ? tj.visitPending : tj.visitConfirmed)}
+                      {location}
+                    </>
+                  ) : location,
+                  note: latestVisit ? null : note(tj.noVisit, 'plain'),
+                },
+                booking: {
+                  title: tj.bookingTitle,
+                  rows: (
+                    <>
+                      {row(Shirt, tj.dresses, dressNames || '—')}
+                      {row(Calendar, tj.weddingDate, weddingDate || '—')}
+                      {latestBooking && row(Heart, tj.payment, `${tj.deposit}: ${money(latestBooking.deposit_amount)} | ${tj.total}: ${money(latestBooking.total_amount)}`)}
+                      {location}
+                    </>
+                  ),
+                },
+                pickup: {
+                  title: tj.pickupTitle,
+                  rows: (
+                    <>
+                      {row(Shirt, tj.dresses, dressNames || '—')}
+                      {row(Calendar, tj.pickupDate, latestBooking?.pickup_scheduled_on || tj.toBeSet)}
+                      {row(Calendar, tj.weddingDate, weddingDate || '—')}
+                      {location}
+                    </>
+                  ),
+                  note: note(tj.pickupNote),
+                },
+                with_bride: {
+                  title: tj.withBrideTitle,
+                  rows: (
+                    <>
+                      {row(Shirt, tj.dresses, dressNames || '—')}
+                      {row(Calendar, tj.returnDate, latestBooking?.return_scheduled_on || tj.toBeSet)}
+                      {location}
+                    </>
+                  ),
+                  note: note(tj.withBrideNote),
+                },
+                returned: {
+                  title: tj.returnedTitle,
+                  rows: row(Shirt, tj.dresses, dressNames || '—'),
+                  note: note(tj.returnedNote),
+                },
+                cancelled: {
+                  title: tj.cancelledTitle,
+                  rows: location,
+                  note: note(tj.cancelledNote, 'plain'),
+                },
+              }[journeyStep] || null;
 
-                <div className={styles.appointmentMeta}>
-                  {clientData?.fittings && clientData.fittings.length > 0 ? (
-                    clientData.fittings.map((fit, fitIdx) => {
-                      const fitNum = fitIdx + 1;
-                      const numLabel = fitNum === 1 ? '1st' : fitNum === 2 ? '2nd' : fitNum === 3 ? '3rd' : `${fitNum}th`;
-                      const fitDateStr = fit.fitting_date ? fit.fitting_date.split('T')[0] : 'Scheduled';
-                      return (
-                        <div key={fit.id || fitIdx} style={{ background: '#faf8f5', padding: '14px 16px', borderRadius: '12px', border: '1px solid #efebe4', marginBottom: fitIdx < clientData.fittings.length - 1 ? '10px' : '0' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#c8a96a', letterSpacing: '1px' }}>
-                              {numLabel.toUpperCase()} FITTING SCHEDULE
-                            </span>
-                            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '6px', background: fit.status === 'completed' ? '#dcfce7' : '#fef3c7', color: fit.status === 'completed' ? '#15803d' : '#b45309', fontWeight: '600' }}>
-                              {fit.status || 'scheduled'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '13px', color: '#111', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={14} style={{ color: '#888' }} /> {fitDateStr} {fit.time_slot ? `(${fit.time_slot})` : ''}
-                          </div>
-                          {fit.additional_notes && (
-                            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                              {fit.additional_notes}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className={styles.metaRow}>
-                      <Calendar size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                      <div>
-                        <span className={styles.metaTitle}>Date & Time</span>
-                        <span className={styles.metaValue}>
-                          {latestVisit
-                            ? `${latestVisit.visit_date ? latestVisit.visit_date.split('T')[0] : 'Scheduled'} (${latestVisit.time_slot || '12:00 PM'})`
-                            : 'Scheduled via Website'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+              if (!content) return null;
+              const stepNumber = Math.min(activeIndex, JOURNEY_STEPS.length - 1) + 1;
 
-                  <div className={styles.metaRow} style={{ marginTop: '14px' }}>
-                    <MapPin size={18} strokeWidth={1.4} className={styles.metaIcon} />
-                    <div>
-                      <span className={styles.metaTitle}>Boutique Location</span>
-                      <span className={styles.metaValue}>First Settlement, Al-Yasmeen 2, Villa 161 (basement)</span>
-                    </div>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <div className={styles.stylistAvatar}>
-                      <User size={18} strokeWidth={1.4} />
-                    </div>
-                    <div>
-                      <span className={styles.metaTitle}>Assigned Tailor / Stylist</span>
-                      <span className={styles.metaValue}>{latestFitting?.tailor_name || 'Sophia Atelier Stylist'}</span>
-                    </div>
-                  </div>
-                </div>
+              return (
+                <>
+                  <span className={styles.cardLabel} style={{ color: isCancelled ? '#c53030' : '#059669' }}>
+                    {isCancelled ? tj.cancelledLabel : `${tj.stepLabel} ${stepNumber}: ${t.track.stages[JOURNEY_STEPS[stepNumber - 1].id]}`}
+                  </span>
+                  <h3 className={styles.appointmentHeading}>{content.title}</h3>
+                  <div className={styles.appointmentMeta}>{content.rows}</div>
+                  {content.note}
+                </>
+              );
+            })()}
 
-                <div className={styles.appointmentActions}>
-                  <a href="/contact" className={styles.rescheduleBtn} style={{ textDecoration: 'none', textAlign: 'center' }}>BOOK NEW FITTING</a>
-                  <a
-                    href="https://www.google.com/maps?ll=30.047744,31.445114&z=15&t=m&hl=en-US&gl=US&mapclient=embed&q=30%C2%B002%2751.9%22N+31%C2%B026%2742.4%22E+30.047744,+31.445114@30.047744,31.445114"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.directionsBtn}
-                    style={{ textDecoration: 'none' }}
-                  >
-                    VIEW MAP DIRECTIONS <ArrowRight size={14} />
-                  </a>
-                </div>
-              </>
+            {/* Fittings are optional: shown as information only when the bride has some */}
+            {fittings.length > 0 && !isCancelled && (
+              <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #efebe4' }}>
+                <span className={styles.metaTitle} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Scissors size={14} /> {tj.fittingsTitle}
+                </span>
+                <span style={{ display: 'block', fontSize: '11px', color: '#888', margin: '2px 0 10px' }}>{tj.fittingsHint}</span>
+                {fittings.map((fit) => (
+                  <div key={fit.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#faf8f5', padding: '10px 14px', borderRadius: '10px', border: '1px solid #efebe4', marginBottom: '8px', fontSize: '13px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#111', fontWeight: 600 }}>
+                      <Calendar size={14} style={{ color: '#888' }} /> {fit.fitting_date}
+                    </span>
+                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '6px', fontWeight: 600, background: fit.status === 'completed' ? '#dcfce7' : '#fef3c7', color: fit.status === 'completed' ? '#15803d' : '#b45309' }}>
+                      {fit.status === 'completed' ? tj.fittingDone : tj.fittingScheduled}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
+
+            <div className={styles.appointmentActions}>
+              <a href={contact.whatsappHref} target="_blank" rel="noopener noreferrer" className={styles.rescheduleBtn} style={{ textDecoration: 'none', textAlign: 'center' }}>{tj.contactUs}</a>
+              <a
+                href="https://www.google.com/maps?ll=30.047744,31.445114&z=15&t=m&hl=en-US&gl=US&mapclient=embed&q=30%C2%B002%2751.9%22N+31%C2%B026%2742.4%22E+30.047744,+31.445114@30.047744,31.445114"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.directionsBtn}
+                style={{ textDecoration: 'none' }}
+              >
+                {tj.directions} <ArrowRight size={14} />
+              </a>
+            </div>
           </div>
 
           {/* ── RIGHT: LIVE HISTORY & UPDATES ── */}
           <div className={styles.updatesCard}>
-            <span className={styles.cardLabel}>LIVE JOURNEY UPDATES</span>
+            <span className={styles.cardLabel}>{tj.historyLabel}</span>
 
             <div className={styles.timeline}>
               {clientData?.bookings && clientData.bookings.length > 0 ? (
                 clientData.bookings.map((booking, idx) => {
-                  const cleanDate = (booking.booking_date || booking.pickup_date || 'Booking').toString().split('T')[0];
+                  const cleanDate = booking.booking_date || '—';
+                  const statusLabel = tj.bookingStatuses[booking.status] || booking.status;
                   return (
                     <div key={booking.id || idx} className={styles.timelineItem}>
                       <div className={styles.timelineDate}>
                         <span className={styles.timelineDateText}>{cleanDate}</span>
-                        <span className={styles.timelineTime}>{booking.status}</span>
+                        <span className={styles.timelineTime}>{statusLabel}</span>
                       </div>
 
                       <div className={styles.timelineDotCol}>
@@ -476,12 +366,10 @@ export default function TrackOrder() {
 
                       <div className={styles.timelineContent}>
                         <h5 className={styles.timelineTitle}>
-                          {booking.dress?.name
-                            ? `Gown 1: ${booking.dress.name}${booking.dress2?.name ? ` | Gown 2: ${booking.dress2.name}` : ''}`
-                            : `Booking #${booking.id}`}
+                          {[booking.dress, booking.dress2, booking.dress3].filter(Boolean).map((d) => (lang === 'ar' && d.name_ar) || d.name).join(' | ') || `#${booking.id}`}
                         </h5>
                         <p className={styles.timelineDesc}>
-                          Rental: ${booking.rental_price || booking.total_amount || '0'} | Status: {booking.status}
+                          {tj.total}: {money(booking.total_amount)} | {statusLabel}
                         </p>
                       </div>
                     </div>
@@ -492,7 +380,7 @@ export default function TrackOrder() {
                   <div key={visit.id || idx} className={styles.timelineItem}>
                     <div className={styles.timelineDate}>
                       <span className={styles.timelineDateText}>{visit.visit_date}</span>
-                      <span className={styles.timelineTime}>{visit.status}</span>
+                      <span className={styles.timelineTime}>{visit.status === 'pending' ? tj.visitPending : tj.visitStatuses[visit.status] || visit.status}</span>
                     </div>
 
                     <div className={styles.timelineDotCol}>
@@ -501,9 +389,9 @@ export default function TrackOrder() {
                     </div>
 
                     <div className={styles.timelineContent}>
-                      <h5 className={styles.timelineTitle}>Boutique Visit Scheduled</h5>
+                      <h5 className={styles.timelineTitle}>{tj.visitTitle}</h5>
                       <p className={styles.timelineDesc}>
-                        {visit.notes || 'Visit booked successfully via website.'}
+                        {visit.time_slot ? `${tj.visitDate}: ${visit.visit_date} (${visit.time_slot})` : `${tj.visitDate}: ${visit.visit_date}`}
                       </p>
                     </div>
                   </div>
