@@ -4,6 +4,7 @@ import Navbar from './components/Navbar/Navbar';
 import Hero from './components/Hero/Hero';
 import Collections from './components/Collections/Collections';
 import BestSellers from './components/BestSellers/BestSellers';
+import OfferDresses from './components/OfferDresses/OfferDresses';
 import NewCollection from './components/NewCollection/NewCollection';
 import DreamDress from './components/Appointment/Appointment';
 import ClientGallery from './components/ClientGallery/ClientGallery';
@@ -34,6 +35,11 @@ export default function Home() {
         wishlistCount={wishlist.length}
       />
       <Hero />
+      <OfferDresses
+        onQuickView={openQuickView}
+        onToggleWishlist={toggleWishlist}
+        isWishlisted={isWishlisted}
+      />
       <Collections />
       <BestSellers
         onQuickView={openQuickView}

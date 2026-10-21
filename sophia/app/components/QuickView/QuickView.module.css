@@ -212,6 +212,15 @@ html[dir="rtl"] .newBadge {
   border-radius: 8px;
 }
 
+.offerBadge {
+  background: var(--color-secondary);
+  color: #5a3d38;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
 .name {
   font-family: var(--font-heading, serif);
   font-size: 28px;

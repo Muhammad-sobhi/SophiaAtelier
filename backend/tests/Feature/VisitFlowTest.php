@@ -396,6 +396,19 @@ class VisitFlowTest extends TestCase
         $this->assertTrue($rows[$free->id]['wedding_date']['available']);
     }
 
+    public function test_booking_dated_today_in_cairo_is_accepted_after_midnight(): void
+    {
+        // 00:30 in Cairo is still the previous day in UTC
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-22 00:30', 'Africa/Cairo'));
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $bride = Client::create(['name' => 'Midnight Bride', 'phone' => '01022222222', 'city' => 'القاهرة']);
+
+        $this->putJson("/api/clients/{$bride->id}/stage-action", [
+            'action' => 'confirm_booking', 'dress_id' => Dress::factory()->create()->id,
+            'event_date' => '2027-01-10', 'booking_date' => '2026-10-22', 'total_amount' => 5000,
+        ])->assertOk();
+    }
+
     public function test_confirm_booking_keeps_booking_date_and_dates_deposit_on_it(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

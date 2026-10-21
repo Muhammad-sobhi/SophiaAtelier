@@ -14,6 +14,8 @@ import {
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { PhoneWarning } from '@/components/ui/PhoneWarning';
 import { SalesCombobox } from '@/components/common/SalesCombobox';
+import { OfferDiscountBox } from '@/components/OfferDiscountBox';
+import { useRunningOffers, resolveOfferDiscount } from '@/lib/offers';
 
 export const getDressConflict = (dress, targetDate, currentClientId = null, targetCity = 'القاهرة') => {
   if (!dress || !targetDate) return null;
@@ -214,9 +216,18 @@ function UnifiedStageModalContent({
     Boolean(booking?.return_scheduled_on) && cleanDate(booking.return_scheduled_on) !== storedDefaults.return_date
   );
 
+  // The rent before any offer; the booking stores what she pays (total_amount) and the discount apart
   const [bookingTotalAmount, setBookingTotalAmount] = useState(
-    activeBooking?.total_amount && parseFloat(activeBooking.total_amount) > 0 ? String(activeBooking.total_amount) : (prefillTotal > 0 ? String(prefillTotal) : '3500')
+    activeBooking?.total_amount && parseFloat(activeBooking.total_amount) > 0
+      ? String(parseFloat(activeBooking.total_amount) + parseFloat(activeBooking.discount_amount || 0))
+      : (prefillTotal > 0 ? String(prefillTotal) : '3500')
   );
+  const runningOffers = useRunningOffers();
+  const [bookingOfferId, setBookingOfferId] = useState(activeBooking?.offer_id || null);
+  const bookingDiscount = resolveOfferDiscount({
+    offers: runningOffers, offerId: bookingOfferId, gross: parseFloat(bookingTotalAmount || 0), savedBooking: activeBooking,
+  });
+  const bookingNetTotal = Math.max(0, parseFloat(bookingTotalAmount || 0) - bookingDiscount);
   const [bookingDepositAmount, setBookingDepositAmount] = useState(booking?.deposit_amount ? String(booking.deposit_amount) : '1000');
   const [bookingInsuranceAmount, setBookingInsuranceAmount] = useState(
     activeBooking?.insurance_amount && parseFloat(activeBooking.insurance_amount) > 0 ? String(activeBooking.insurance_amount) : String(5000 * Math.max(1, bookingPrefill.length))
@@ -629,7 +640,9 @@ function UnifiedStageModalContent({
           event_date: bookingEventDate || weddingDate,
           pickup_scheduled_on: bookingPickupDate || null,
           return_scheduled_on: bookingReturnDate || null,
-          total_amount: parseFloat(bookingTotalAmount || 0),
+          total_amount: bookingNetTotal,
+          offer_id: bookingOfferId,
+          discount_amount: bookingDiscount,
           deposit_amount: totalDepositCalculated,
           insurance_amount: parseFloat(bookingInsuranceAmount || '5000'),
           payment_method: validPayments.length === 1 ? validPayments[0].payment_method : (validPayments.length > 1 ? 'multiple' : 'cash'),
@@ -667,7 +680,7 @@ function UnifiedStageModalContent({
             : parseFloat(bookingDepositAmount || 0);
 
           await apiClient.put(`/bookings/${booking.id}`, {
-            total_amount: parseFloat(bookingTotalAmount || 0),
+            total_amount: bookingNetTotal,
             deposit_amount: calculatedDeposit,
             insurance_amount: parseFloat(bookingInsuranceAmount || 5000),
             deposit_payments: validPayments.length > 0 ? validPayments : [
@@ -1407,6 +1420,15 @@ function UnifiedStageModalContent({
                   </div>
                 </div>
 
+                <OfferDiscountBox
+                  offers={runningOffers}
+                  dressIds={selectedBookingIds().filter(Boolean)}
+                  gross={parseFloat(bookingTotalAmount || 0)}
+                  offerId={bookingOfferId}
+                  onChange={setBookingOfferId}
+                  savedBooking={activeBooking}
+                />
+
                 <MultiPaymentMethodInput
                   payments={bookingPayments}
                   onChange={(updated) => {
@@ -1997,6 +2019,9 @@ function UnifiedStageModalContent({
                           onChange={(e) => setBookingTotalAmount(e.target.value)}
                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-indigo-700 focus:outline-none font-mono text-right"
                         />
+                        {bookingDiscount > 0 && (
+                          <p className="text-[10px] font-bold text-emerald-600 mt-1">بعد خصم العرض: {bookingNetTotal.toLocaleString()} ج.م</p>
+                        )}
                       </div>
                       <div>
                         <label className="text-[10px] font-extrabold text-slate-600 block mb-1">العربون المدفوع (ج.م)</label>
@@ -2028,7 +2053,7 @@ function UnifiedStageModalContent({
 
                     {/* Remaining calculated summary */}
                     {(() => {
-                      const tot = parseFloat(bookingTotalAmount || 0);
+                      const tot = bookingNetTotal;
                       const dep = parseFloat(bookingDepositAmount || 0);
                       const rem = Math.max(0, tot - dep);
                       return (

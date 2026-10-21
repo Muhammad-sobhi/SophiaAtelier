@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\FittingController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReviewController;
@@ -44,6 +45,7 @@ Route::get('/public/faqs', [FaqController::class, 'publicIndex']);
 Route::get('/public/settings', [\App\Http\Controllers\Api\SettingController::class, 'publicIndex']);
 Route::get('/public/closed-days', [\App\Http\Controllers\Api\ClosedDayController::class, 'publicIndex']);
 Route::get('/public/best-sellers', [DressController::class, 'bestSellers']);
+Route::get('/public/offers', [OfferController::class, 'publicIndex']);
 Route::get('/public/system-status', function () {
     return response()->json([
         'status' => 'online',
@@ -105,6 +107,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:/dashboard/brides,/dashboard/finance');
     Route::apiResource('expenses', ExpenseController::class)->middleware('permission:/dashboard/finance,/dashboard/reports');
     Route::apiResource('faqs', FaqController::class);
+    Route::apiResource('offers', OfferController::class)->middleware('permission:/dashboard/offers');
 
     // Manufacturing: suppliers, materials stock, purchases, workshop workers and manufacturing orders
     Route::middleware('permission:/dashboard/manufacturing')->group(function () {

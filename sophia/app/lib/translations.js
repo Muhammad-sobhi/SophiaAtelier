@@ -22,6 +22,18 @@ export const translations = {
       explore: 'EXPLORE COLLECTION',
       howToBook: 'HOW TO BOOK',
     },
+    // Offers (banner, dress badge, home section)
+    offers: {
+      bookNow: 'Book your visit',
+      endsIn: 'Ends in',
+      days: 'd',
+      hours: 'h',
+      minutes: 'm',
+      off: (v) => `${v}% OFF`,
+      amountOff: (v) => `${v} EGP OFF`,
+      sectionTitle: (name) => `${name} OFFERS`,
+      close: 'Close offer',
+    },
     // Best Sellers
     bestSellers: {
       badge: 'POPULAR CHOICE',
@@ -371,6 +383,18 @@ export const translations = {
       desc: 'اكتشفي أرقى فساتين الزفاف المصممة بعناية لتبرز جمالكِ وتصنع لحظات لا تُنسى في ليلة العمر.',
       explore: 'استكشف التشكيلة',
       howToBook: 'طريقة الحجز',
+    },
+    // Offers (banner, dress badge, home section)
+    offers: {
+      bookNow: 'احجزي موعدك',
+      endsIn: 'ينتهي خلال',
+      days: 'يوم',
+      hours: 'ساعة',
+      minutes: 'دقيقة',
+      off: (v) => `خصم ${v}%`,
+      amountOff: (v) => `خصم ${v} ج.م`,
+      sectionTitle: (name) => `عروض ${name}`,
+      close: 'إغلاق العرض',
     },
     // Best Sellers
     bestSellers: {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Services\BookingOfferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -85,6 +86,8 @@ class BookingController extends Controller
             'total_amount' => 'required|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
+            'offer_id' => 'nullable|integer',
+            'discount_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'sales_name' => 'nullable|string|max:255',
             'payment_method' => 'nullable|string',
@@ -93,6 +96,10 @@ class BookingController extends Controller
             'receipt' => 'nullable',
             'receipt_image' => 'nullable',
         ]);
+
+        $validated = $this->withOffer($request, $validated, [
+            $validated['dress_id'], $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
+        ], (float) $validated['total_amount']);
 
         $status = $request->input('status', 'pending');
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
@@ -228,6 +235,8 @@ class BookingController extends Controller
             'total_amount' => 'sometimes|required|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
             'insurance_amount' => 'nullable|numeric|min:0',
+            'offer_id' => 'nullable|integer',
+            'discount_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'sales_name' => 'nullable|string|max:255',
             'payment_method' => 'nullable|string',
@@ -240,6 +249,9 @@ class BookingController extends Controller
         $clientId = $request->input('client_id', $booking->client_id);
         $dressId = $request->input('dress_id', $booking->dress_id);
         $dress2Id = $request->has('dress_2_id') ? $request->input('dress_2_id') : $booking->dress_2_id;
+        $dress3Id = $request->has('dress_3_id') ? $request->input('dress_3_id') : $booking->dress_3_id;
+        $validated = $this->withOffer($request, $validated, [$dressId, $dress2Id, $dress3Id],
+            (float) ($validated['total_amount'] ?? $booking->total_amount), $booking);
         $eventDate = $request->input('event_date', $booking->event_date);
         $status = $request->input('status', $booking->status);
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
@@ -448,6 +460,26 @@ class BookingController extends Controller
         $booking->delete();
 
         return response()->json(['message' => 'Booking deleted']);
+    }
+
+    /**
+     * Checks the offer applied in the form (only when the request sends offer_id; payment-only
+     * edits leave the booking's offer untouched).
+     */
+    private function withOffer(Request $request, array $validated, array $dressIds, float $netTotal, ?Booking $existing = null): array
+    {
+        unset($validated['offer_id'], $validated['discount_amount']);
+        if (! $request->has('offer_id')) {
+            return $validated;
+        }
+
+        return [...$validated, ...app(BookingOfferService::class)->resolve(
+            $request->integer('offer_id') ?: null,
+            (float) $request->input('discount_amount', 0),
+            $netTotal,
+            $dressIds,
+            $existing
+        )];
     }
 
     private function checkDressAvailability($clientId, $dressId, $eventDate, $excludeBookingId = null)

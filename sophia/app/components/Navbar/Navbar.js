@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Search, User, Heart, ShoppingBag, Menu, X, Globe } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import OfferBanner from '../OfferBanner/OfferBanner';
 import styles from './Navbar.module.css';
 
 export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, cartCount = 0, wishlistCount = 0 }) {
@@ -42,6 +43,7 @@ export default function Navbar({ onSearchClick, onWishlistClick, onCartClick, ca
 
   return (
     <>
+      <OfferBanner />
       <nav className={`${styles.navbar} ${scrolled ? styles.scrolled : ''}`} id="navbar">
         <div className={styles.navInner}>
           <Link href="/" className={styles.logo}>

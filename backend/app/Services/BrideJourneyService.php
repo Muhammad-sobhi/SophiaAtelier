@@ -256,6 +256,19 @@ class BrideJourneyService
             }
         }
 
+        // The offer staff applied in the form (absent from older callers: keep what the booking has)
+        if ($request->has('offer_id')) {
+            $offer = app(BookingOfferService::class)->resolve(
+                $request->integer('offer_id') ?: null,
+                (float) $request->input('discount_amount', 0),
+                (float) $request->input('total_amount', 0),
+                [$dressId, $dress2Id, $dress3Id],
+                $booking->exists ? $booking : null
+            );
+            $booking->offer_id = $offer['offer_id'];
+            $booking->discount_amount = $offer['discount_amount'];
+        }
+
         $booking->dress_id = $dressId;
         $booking->dress_2_id = $dress2Id;
         $booking->dress_3_id = $dress3Id;
