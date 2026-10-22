@@ -48,7 +48,7 @@ function FinanceStatsDetailModalContent({
     },
     total_assets: {
       title: 'تفاصيل أصول الفساتين بالأتيليه',
-      subtitle: 'قائمة الفساتين وتكلفة الشراء التقديرية لكل فستان وحالته الحالية',
+      subtitle: 'قائمة الفساتين وتكلفة وتاريخ شراء كل فستان وحالته الحالية',
       icon: Building2,
       color: 'sky',
       value: `${(totals.total_assets || 0).toLocaleString()} ج.م`,
@@ -122,6 +122,12 @@ function FinanceStatsDetailModalContent({
     });
   }, [rawItems, searchQuery, statType]);
 
+  // Purchase cost sum of the searched dresses, shown under the assets table
+  const assetsCostTotal = useMemo(() => {
+    if (statType !== 'total_assets') return 0;
+    return filteredItems.reduce((sum, d) => sum + (parseFloat(d.purchase_price) || 0), 0);
+  }, [filteredItems, statType]);
+
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / pageSize) || 1;
   const paginatedItems = useMemo(() => {
@@ -136,15 +142,16 @@ function FinanceStatsDetailModalContent({
     let rows = [];
 
     if (statType === 'total_assets') {
-      headers = ['كود الفستان', 'اسم الفستان', 'القسم', 'سعر الشراء / الأصل', 'سعر الإيجار', 'الحالة'];
+      headers = ['كود الفستان', 'اسم الفستان', 'القسم', 'تكلفة الشراء', 'تاريخ الشراء', 'الحالة'];
       rows = filteredItems.map(d => [
         d.code || '-',
         d.name || '-',
         d.category?.name || '-',
-        d.purchase_cost || d.price || 0,
-        d.rental_price || 0,
+        d.purchase_price || 0,
+        d.purchase_date ? String(d.purchase_date).slice(0, 10) : '-',
         d.status || 'ready'
       ]);
+      rows.push(['', 'الإجمالي', '', assetsCostTotal, '', '']);
     } else if (statType === 'held_insurances') {
       headers = ['اسم العروس', 'الهاتف', 'الفستان', 'مبلغ التأمين', 'تاريخ المناسبة', 'حالة العقد'];
       rows = filteredItems.map(h => [
@@ -256,8 +263,8 @@ function FinanceStatsDetailModalContent({
                         <th className="pb-3 pr-2">الكود</th>
                         <th className="pb-3">اسم الفستان</th>
                         <th className="pb-3">القسم</th>
-                        <th className="pb-3 text-center">سعر الأصل / الشراء</th>
-                        <th className="pb-3 text-center">سعر الإيجار</th>
+                        <th className="pb-3 text-center">تكلفة الشراء</th>
+                        <th className="pb-3 text-center">تاريخ الشراء</th>
                         <th className="pb-3 text-left pl-2">الحالة</th>
                       </>
                     ) : statType === 'held_insurances' ? (
@@ -289,10 +296,10 @@ function FinanceStatsDetailModalContent({
                           <td className="py-3 font-black text-slate-800">{item.name}</td>
                           <td className="py-3 text-slate-500 font-medium">{item.category?.name || '-'}</td>
                           <td className="py-3 text-center font-mono font-black text-slate-800">
-                            {parseFloat(item.purchase_cost || item.price || 0).toLocaleString()} ج.م
+                            {parseFloat(item.purchase_price || 0).toLocaleString()} ج.م
                           </td>
                           <td className="py-3 text-center font-mono text-slate-600">
-                            {parseFloat(item.rental_price || 0).toLocaleString()} ج.م
+                            {item.purchase_date ? String(item.purchase_date).slice(0, 10) : '—'}
                           </td>
                           <td className="py-3 text-left pl-2">
                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
@@ -360,6 +367,19 @@ function FinanceStatsDetailModalContent({
                     );
                   })}
                 </tbody>
+                {statType === 'total_assets' && (
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 font-black text-slate-800">
+                      <td className="pt-3 pr-2" colSpan={3}>
+                        إجمالي تكلفة الشراء ({filteredItems.length} فستان)
+                      </td>
+                      <td className="pt-3 text-center font-mono text-sky-700">
+                        {assetsCostTotal.toLocaleString()} ج.م
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}
