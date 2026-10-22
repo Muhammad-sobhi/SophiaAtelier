@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -19,7 +20,12 @@ class ProfileController extends Controller
         
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            // Permissions follow the employee with the same email, so another employee's email would hand over their access
+            'email' => [
+                'sometimes', 'required', 'email',
+                Rule::unique('users', 'email')->ignore($user->id),
+                Rule::unique('employees', 'email')->ignore($user->email, 'email'),
+            ],
             'current_password' => 'required_with:password|string',
             'password' => 'nullable|string|min:8|confirmed',
         ]);
