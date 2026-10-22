@@ -250,4 +250,45 @@ class SecurityHardeningTest extends TestCase
         $this->assertSame('new@test.local', Employee::first()->email);
         $this->assertSame('new@test.local', $user->refresh()->email);
     }
+
+    public function test_page_only_endpoints_need_their_page(): void
+    {
+        $this->staffWith(['/dashboard/attendance']);
+
+        $this->getJson('/api/revenues')->assertForbidden();
+        $this->getJson('/api/tasks')->assertForbidden();
+        $this->getJson('/api/reviews')->assertForbidden();
+        $this->getJson('/api/contact-messages')->assertForbidden();
+        $this->getJson('/api/clients/export-csv')->assertForbidden();
+        $this->getJson('/api/client-gallery')->assertForbidden();
+        $this->postJson('/api/categories', ['name' => 'X'])->assertForbidden();
+        $this->postJson('/api/dresses', ['name' => 'X'])->assertForbidden();
+        $this->putJson('/api/whatsapp-templates/welcome', ['content' => 'X'])->assertForbidden();
+
+        // The brides journey and shared lookups stay open to every staff login
+        $this->getJson('/api/clients')->assertOk();
+        $this->getJson('/api/dresses')->assertOk();
+        $this->getJson('/api/whatsapp-templates')->assertOk();
+        $this->getJson('/api/leave-requests')->assertOk();
+    }
+
+    public function test_page_permission_opens_its_endpoints(): void
+    {
+        $this->staffWith(['/dashboard/finance', '/dashboard/tasks', '/dashboard/dresses']);
+
+        $this->getJson('/api/revenues')->assertOk();
+        $this->getJson('/api/tasks')->assertOk();
+        $this->getJson('/api/categories')->assertOk();
+        $this->getJson('/api/collections')->assertOk();
+    }
+
+    public function test_staff_cannot_take_another_employees_permissions_by_email(): void
+    {
+        $user = $this->staffWith(['/dashboard/tasks']);
+        Employee::create(['name' => 'Manager', 'email' => 'manager@test.local', 'permissions' => ['*']]);
+
+        $this->putJson('/api/auth/profile', ['email' => 'manager@test.local'])->assertUnprocessable();
+        $this->assertSame('staff@test.local', $user->refresh()->email);
+        $this->assertFalse($user->hasPermission('/dashboard/finance'));
+    }
 }

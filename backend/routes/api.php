@@ -71,39 +71,62 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/calendar/events', [CalendarController::class, 'events']);
     Route::get('/calendar/months', [CalendarController::class, 'months']);
 
-    Route::get('/clients/export-csv', [ClientController::class, 'exportCsv']);
-    Route::get('/clients/excel-template', [ClientController::class, 'excelTemplate']);
-    Route::post('/clients/import-excel', [ClientController::class, 'importExcel']);
+    // Bulk export / import of every bride's contact details: the brides page only
+    Route::middleware('permission:/dashboard/brides')->group(function () {
+        Route::get('/clients/export-csv', [ClientController::class, 'exportCsv']);
+        Route::get('/clients/excel-template', [ClientController::class, 'excelTemplate']);
+        Route::post('/clients/import-excel', [ClientController::class, 'importExcel']);
+    });
     Route::apiResource('clients', ClientController::class)->except(['destroy']);
     Route::apiResource('clients', ClientController::class)->only(['destroy'])->middleware('permission:/dashboard/brides');
     Route::put('/clients/{client}/stage-action', [ClientController::class, 'stageAction']);
     Route::put('/bookings/{booking}/revert-stage', [ClientController::class, 'revertStage']);
 
-    Route::post('/dresses/best-sellers/reorder', [DressController::class, 'reorderBestSellers']);
-    Route::patch('/dresses/{dress}/best-seller', [DressController::class, 'toggleBestSeller']);
     Route::get('/dresses/{dress}/availability-check', [DressController::class, 'checkAvailability']);
-    Route::apiResource('dresses', DressController::class)->except(['index', 'show']);
-    Route::put('/dresses/{dress}/stage-action', [DressController::class, 'stageAction']);
+    // Dresses are read across the dashboard (brides journey, visits, bookings); changing them needs the dresses page
+    Route::middleware('permission:/dashboard/dresses')->group(function () {
+        Route::post('/dresses/best-sellers/reorder', [DressController::class, 'reorderBestSellers']);
+        Route::patch('/dresses/{dress}/best-seller', [DressController::class, 'toggleBestSeller']);
+        Route::apiResource('dresses', DressController::class)->except(['index', 'show']);
+        Route::put('/dresses/{dress}/stage-action', [DressController::class, 'stageAction']);
+        Route::post('/dresses/{dress}/images', [DressController::class, 'uploadImages']);
+        Route::delete('/dresses/{dress}/images/{image}', [DressController::class, 'deleteImage']);
+        Route::apiResource('designers', DesignerController::class);
+    });
 
-    Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('collections', \App\Http\Controllers\Api\CollectionController::class);
-    Route::apiResource('client-gallery', \App\Http\Controllers\Api\ClientGalleryController::class);
-    Route::apiResource('designers', DesignerController::class);
+    // Categories and collections are picked from the dresses and offers pages
+    Route::apiResource('categories', CategoryController::class)->only(['index', 'show'])
+        ->middleware('permission:/dashboard/dresses,/dashboard/offers');
+    Route::apiResource('categories', CategoryController::class)->except(['index', 'show'])
+        ->middleware('permission:/dashboard/dresses');
+    Route::apiResource('collections', \App\Http\Controllers\Api\CollectionController::class)->only(['index', 'show'])
+        ->middleware('permission:/dashboard/collections,/dashboard/dresses,/dashboard/offers');
+    Route::apiResource('collections', \App\Http\Controllers\Api\CollectionController::class)->except(['index', 'show'])
+        ->middleware('permission:/dashboard/collections');
+    Route::apiResource('client-gallery', \App\Http\Controllers\Api\ClientGalleryController::class)
+        ->middleware('permission:/dashboard/client-gallery');
     Route::get('visits/{visit}/availability', [VisitController::class, 'availability']);
     Route::post('visits/{visit}/confirmation-sent', [VisitController::class, 'markConfirmationSent']);
     Route::post('availability', [\App\Http\Controllers\Api\AvailabilityController::class, 'check']);
-    Route::apiResource('visits', VisitController::class);
+    // Visits, bookings and fittings run through the brides journey from the home page; deleting one needs its page
+    Route::apiResource('visits', VisitController::class)->except(['destroy']);
+    Route::apiResource('visits', VisitController::class)->only(['destroy'])->middleware('permission:/dashboard/visits');
     Route::post('bookings/{booking}/bill-image', [BookingController::class, 'uploadBillImage']);
     Route::delete('bookings/{booking}/bill-image', [BookingController::class, 'deleteBillImage']);
-    Route::apiResource('bookings', BookingController::class);
+    Route::apiResource('bookings', BookingController::class)->except(['destroy']);
+    Route::apiResource('bookings', BookingController::class)->only(['destroy'])->middleware('permission:/dashboard/bookings');
     Route::post('fittings/{fitting}/measurement-image', [FittingController::class, 'uploadMeasurementImage']);
     Route::delete('fittings/{fitting}/measurement-image', [FittingController::class, 'deleteMeasurementImage']);
-    Route::apiResource('fittings', FittingController::class);
-    Route::apiResource('tasks', TaskController::class);
-    Route::apiResource('reviews', ReviewController::class);
-    // Payments are recorded from the brides journey too; changing or deleting one needs the brides or finance page
-    Route::apiResource('revenues', RevenueController::class)->only(['index', 'show', 'store']);
-    Route::apiResource('revenues', RevenueController::class)->only(['update', 'destroy'])
+    Route::apiResource('fittings', FittingController::class)->except(['destroy']);
+    Route::apiResource('fittings', FittingController::class)->only(['destroy'])->middleware('permission:/dashboard/fittings');
+    // Visits and bookings pages add follow-up tasks too
+    Route::apiResource('tasks', TaskController::class)->only(['store'])
+        ->middleware('permission:/dashboard/tasks,/dashboard/visits,/dashboard/bookings');
+    Route::apiResource('tasks', TaskController::class)->except(['store'])->middleware('permission:/dashboard/tasks');
+    Route::apiResource('reviews', ReviewController::class)->middleware('permission:/dashboard/reviews');
+    // Payments are recorded from the brides journey too; listing, changing or deleting them needs the brides or finance page
+    Route::apiResource('revenues', RevenueController::class)->only(['store']);
+    Route::apiResource('revenues', RevenueController::class)->except(['store'])
         ->middleware('permission:/dashboard/brides,/dashboard/finance');
     Route::apiResource('expenses', ExpenseController::class)->middleware('permission:/dashboard/finance,/dashboard/reports');
     Route::apiResource('faqs', FaqController::class);
@@ -185,7 +208,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/employee-loans/{employeeLoan}', [EmployeeLoanController::class, 'destroy']);
     });
 
-    Route::apiResource('leave-requests', LeaveRequestController::class);
+    Route::apiResource('leave-requests', LeaveRequestController::class)->middleware('permission:/dashboard/attendance');
 
     // Employee Loans (read for staff & admin)
     Route::get('/employee-loans', [EmployeeLoanController::class, 'index'])->middleware('permission:/dashboard/attendance');
@@ -197,17 +220,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::apiResource('notifications', NotificationController::class)->only(['index', 'show', 'destroy']);
 
-    Route::apiResource('contact-messages', \App\Http\Controllers\Api\ContactMessageController::class)->only(['index', 'destroy']);
-    Route::post('/contact-messages/{id}/read', [\App\Http\Controllers\Api\ContactMessageController::class, 'markAsRead']);
+    Route::middleware('permission:/dashboard/contact-messages')->group(function () {
+        Route::apiResource('contact-messages', \App\Http\Controllers\Api\ContactMessageController::class)->only(['index', 'destroy']);
+        Route::post('/contact-messages/{id}/read', [\App\Http\Controllers\Api\ContactMessageController::class, 'markAsRead']);
+    });
 
-    // WhatsApp Message Templates
+    // WhatsApp Message Templates: every page sends messages with them, editing needs the templates page
     Route::get('/whatsapp-templates', [\App\Http\Controllers\Api\WhatsappTemplateController::class, 'index']);
     Route::get('/whatsapp-templates/{whatsappTemplate}', [\App\Http\Controllers\Api\WhatsappTemplateController::class, 'show']);
-    Route::put('/whatsapp-templates/{idOrKey}', [\App\Http\Controllers\Api\WhatsappTemplateController::class, 'update']);
-
-    // Dress image upload / delete
-    Route::post('/dresses/{dress}/images', [DressController::class, 'uploadImages']);
-    Route::delete('/dresses/{dress}/images/{image}', [DressController::class, 'deleteImage']);
+    Route::put('/whatsapp-templates/{idOrKey}', [\App\Http\Controllers\Api\WhatsappTemplateController::class, 'update'])
+        ->middleware('permission:/dashboard/whatsapp-templates');
 });
 
 // Admin-only Protected Routes

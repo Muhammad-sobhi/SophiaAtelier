@@ -439,7 +439,7 @@ export default function FittingsPage() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>كارت بروفة - ${selectedFitting.client}</title>
+          <title>كارت بروفة - ${escapeHtml(selectedFitting.client)}</title>
           <style>
             body { font-family: 'Arial', sans-serif; direction: rtl; padding: 20px; color: #333; }
             .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
@@ -453,41 +453,41 @@ export default function FittingsPage() {
         <body>
           <div class="header">
             <h1>فساتين صوفيا - كارت خياطة ومقاسات</h1>
-            <p>نوع البروفة: ${selectedFitting.type}</p>
+            <p>نوع البروفة: ${escapeHtml(selectedFitting.type)}</p>
           </div>
 
           <table class="info-table">
             <tr>
-              <td><strong>العميلة:</strong> ${selectedFitting.client}</td>
-              <td><strong>الفستان المختار:</strong> ${selectedFitting.dress_2_name ? `${selectedFitting.dress} + ${selectedFitting.dress_2_name}` : selectedFitting.dress}</td>
+              <td><strong>العميلة:</strong> ${escapeHtml(selectedFitting.client)}</td>
+              <td><strong>الفستان المختار:</strong> ${selectedFitting.dress_2_name ? `${escapeHtml(selectedFitting.dress)} + ${escapeHtml(selectedFitting.dress_2_name)}` : escapeHtml(selectedFitting.dress)}</td>
             </tr>
             <tr>
-              <td><strong>تاريخ الموعد:</strong> ${formatFittingDate(selectedFitting.date)}</td>
-              <td><strong>الخياط المسؤول:</strong> ${selectedFitting.tailor}</td>
+              <td><strong>تاريخ الموعد:</strong> ${escapeHtml(formatFittingDate(selectedFitting.date))}</td>
+              <td><strong>الخياط المسؤول:</strong> ${escapeHtml(selectedFitting.tailor)}</td>
             </tr>
           </table>
 
           <div class="section-title">جدول المقاسات الفعلي</div>
           <table class="measurements-table">
             <tr>
-              <td>الصدر: ${selectedFitting.measurements.chest} سم</td>
-              <td>الوسط: ${selectedFitting.measurements.waist} سم</td>
-              <td>الأرداف: ${selectedFitting.measurements.hips} سم</td>
+              <td>الصدر: ${escapeHtml(selectedFitting.measurements.chest)} سم</td>
+              <td>الوسط: ${escapeHtml(selectedFitting.measurements.waist)} سم</td>
+              <td>الأرداف: ${escapeHtml(selectedFitting.measurements.hips)} سم</td>
             </tr>
             <tr>
-              <td>الكتف: ${selectedFitting.measurements.shoulder} سم</td>
-              <td>طول الصدر: ${selectedFitting.measurements.chestLength}</td>
-              <td>طول الظهر: ${selectedFitting.measurements.backLength}</td>
+              <td>الكتف: ${escapeHtml(selectedFitting.measurements.shoulder)} سم</td>
+              <td>طول الصدر: ${escapeHtml(selectedFitting.measurements.chestLength)}</td>
+              <td>طول الظهر: ${escapeHtml(selectedFitting.measurements.backLength)}</td>
             </tr>
             <tr>
-              <td>طول الكم: ${selectedFitting.measurements.sleeveLength}</td>
-              <td>محيط الذراع: ${selectedFitting.measurements.armCircumference}</td>
-              <td>الطول الكلي: ${selectedFitting.measurements.height}</td>
+              <td>طول الكم: ${escapeHtml(selectedFitting.measurements.sleeveLength)}</td>
+              <td>محيط الذراع: ${escapeHtml(selectedFitting.measurements.armCircumference)}</td>
+              <td>الطول الكلي: ${escapeHtml(selectedFitting.measurements.height)}</td>
             </tr>
             <tr>
-              <td>طول الذيل: ${selectedFitting.measurements.trainLength}</td>
-              <td>ارتفاع الكعب: ${selectedFitting.measurements.heelHeight}</td>
-              <td>الوزن التقريبي: ${selectedFitting.measurements.weight} كجم</td>
+              <td>طول الذيل: ${escapeHtml(selectedFitting.measurements.trainLength)}</td>
+              <td>ارتفاع الكعب: ${escapeHtml(selectedFitting.measurements.heelHeight)}</td>
+              <td>الوزن التقريبي: ${escapeHtml(selectedFitting.measurements.weight)} كجم</td>
             </tr>
           </table>
 
@@ -503,7 +503,7 @@ export default function FittingsPage() {
 
           <div class="section-title">ملاحظات إضافية وتوجيهات الخياطة</div>
           <div class="notes">
-            ${selectedFitting.additionalNotes || 'لا توجد ملاحظات إضافية.'}
+            ${escapeHtml(selectedFitting.additionalNotes || 'لا توجد ملاحظات إضافية.')}
           </div>
         </body>
       </html>
