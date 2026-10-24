@@ -22,6 +22,7 @@ function FinanceStatsDetailModalContent({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [assetsSort, setAssetsSort] = useState(''); // '' | 'date_desc' | 'date_asc' | 'price_desc' | 'price_asc'
   const pageSize = 15;
 
   const meta = {
@@ -128,12 +129,28 @@ function FinanceStatsDetailModalContent({
     return filteredItems.reduce((sum, d) => sum + (parseFloat(d.purchase_price) || 0), 0);
   }, [filteredItems, statType]);
 
+  // Assets sort; dresses without a purchase date always go last on date sorts
+  const sortedItems = useMemo(() => {
+    if (statType !== 'total_assets' || !assetsSort) return filteredItems;
+    const [field, dir] = assetsSort.split('_');
+    const sign = dir === 'asc' ? 1 : -1;
+    return [...filteredItems].sort((a, b) => {
+      if (field === 'price') {
+        return sign * ((parseFloat(a.purchase_price) || 0) - (parseFloat(b.purchase_price) || 0));
+      }
+      const da = a.purchase_date ? String(a.purchase_date).slice(0, 10) : '';
+      const db = b.purchase_date ? String(b.purchase_date).slice(0, 10) : '';
+      if (!da || !db) return da ? -1 : db ? 1 : 0;
+      return sign * da.localeCompare(db);
+    });
+  }, [filteredItems, assetsSort, statType]);
+
   // Pagination
-  const totalPages = Math.ceil(filteredItems.length / pageSize) || 1;
+  const totalPages = Math.ceil(sortedItems.length / pageSize) || 1;
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, currentPage, pageSize]);
+    return sortedItems.slice(start, start + pageSize);
+  }, [sortedItems, currentPage, pageSize]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -143,7 +160,7 @@ function FinanceStatsDetailModalContent({
 
     if (statType === 'total_assets') {
       headers = ['كود الفستان', 'اسم الفستان', 'القسم', 'تكلفة الشراء', 'تاريخ الشراء', 'الحالة'];
-      rows = filteredItems.map(d => [
+      rows = sortedItems.map(d => [
         d.code || '-',
         d.name || '-',
         d.category?.name || '-',
@@ -241,6 +258,25 @@ function FinanceStatsDetailModalContent({
             />
             <Search size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           </div>
+
+          {statType === 'total_assets' && (
+            <select
+              value={assetsSort}
+              onChange={(e) => {
+                setAssetsSort(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              title="ترتيب الفساتين"
+              aria-label="ترتيب الفساتين"
+            >
+              <option value="">الترتيب الافتراضي</option>
+              <option value="date_desc">تاريخ الشراء: الأحدث أولاً</option>
+              <option value="date_asc">تاريخ الشراء: الأقدم أولاً</option>
+              <option value="price_desc">تكلفة الشراء: الأعلى أولاً</option>
+              <option value="price_asc">تكلفة الشراء: الأقل أولاً</option>
+            </select>
+          )}
 
           <span className="text-xs font-extrabold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl">
             {filteredItems.length} سجل
