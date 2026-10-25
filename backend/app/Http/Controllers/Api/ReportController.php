@@ -207,8 +207,10 @@ class ReportController extends Controller
         $start = Carbon::now()->startOfMonth();
         $end = Carbon::now()->endOfMonth();
 
-        $totalRevenue = Revenue::whereBetween('payment_date', [$start, $end])->sum('amount');
-        $totalExpenses = Expense::whereBetween('date', [$start, $end])->sum('amount');
+        // Operating income / expenses / profit, same rules as the finance page
+        $summary = app(\App\Services\FinanceService::class)->summary($start->toDateString(), $end->toDateString());
+        $totalRevenue = $summary['net_revenue'];
+        $totalExpenses = $summary['net_expense'];
 
         $revenueByType = Revenue::whereBetween('payment_date', [$start, $end])
             ->select('type', DB::raw('SUM(amount) as total'))
@@ -245,8 +247,9 @@ class ReportController extends Controller
         $start = $now->copy()->startOfMonth();
         $end = $now->copy()->endOfMonth();
 
-        $totalRevenue = Revenue::whereBetween('payment_date', [$start, $end])->sum('amount');
-        $totalExpenses = Expense::whereBetween('date', [$start, $end])->sum('amount');
+        $summary = app(\App\Services\FinanceService::class)->summary($start->toDateString(), $end->toDateString());
+        $totalRevenue = $summary['net_revenue'];
+        $totalExpenses = $summary['net_expense'];
         $totalBookings = Booking::whereBetween('booking_date', [$start, $end])->count();
         $cancelledBookings = Booking::where('status', 'cancelled')->whereBetween('cancelled_at', [$start, $end])->count();
         $totalClients = Client::count();

@@ -24,7 +24,7 @@ function mapApiNotification(n) {
       n.type === 'new_appointment' || n.related_type === 'booking' ? '/dashboard?tab=brides' :
       n.related_type === 'visit' ? '/dashboard/visits' :
       n.related_type === 'task' ? '/dashboard/tasks' :
-      n.related_type === 'revenue' ? '/dashboard/finance' :
+      n.related_type === 'revenue' || n.related_type === 'dress_purchase_payment' ? '/dashboard/finance' :
       n.related_type === 'fitting' ? '/dashboard/fittings' :
       n.related_type === 'dress' ? '/dashboard/dresses' : '/dashboard'
   };

@@ -20,6 +20,20 @@ class ReceiptStorage
         return null;
     }
 
+    /** Public URL of a stored receipt (same rules as the receipt_url of expenses and revenues) */
+    public static function url(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'data:') || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+        $path = ltrim(str_replace('public/', '', $path), '/');
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, 8);
+        }
+        return url('storage/' . $path);
+    }
+
     public static function saveData($data)
     {
         if (empty($data)) {

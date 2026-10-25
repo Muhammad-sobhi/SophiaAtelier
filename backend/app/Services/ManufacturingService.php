@@ -26,7 +26,7 @@ use Illuminate\Validation\ValidationException;
 class ManufacturingService
 {
     /** Expense categories written by this department (finance "manufacturing" tab) */
-    public const EXPENSE_CATEGORIES = ['materials', 'supplier_payment', 'manufacturing_wages'];
+    public const EXPENSE_CATEGORIES = ['materials', 'supplier_payment', 'manufacturing_wages', 'manufacturing_piece'];
 
     /**
      * @param array{supplier_id: ?int, purchase_date: string, items: array, paid_amount?: float, payment_method?: string, notes?: ?string} $data
@@ -283,7 +283,8 @@ class ManufacturingService
         return DB::transaction(function () use ($worker, $data) {
             $label = WorkerPayment::TYPES[$data['type']] ?? $data['type'];
             $expense = Expense::create([
-                'category' => 'manufacturing_wages',
+                // Piece pay is part of a dress's cost (the order's worker fee); other worker pay runs the workshop
+                'category' => $data['type'] === 'piece' ? 'manufacturing_piece' : 'manufacturing_wages',
                 'amount' => $data['amount'],
                 'payment_method' => $data['payment_method'] ?? 'cash',
                 'date' => $data['payment_date'],

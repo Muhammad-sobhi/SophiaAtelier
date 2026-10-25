@@ -4,11 +4,12 @@ import {
   DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
   X, FileText, Image as ImageIcon, Plus, CreditCard, Banknote,
   Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, Filter, Search,
-  Trash2, Paperclip, Download, FileSpreadsheet, ArrowLeftRight
+  Trash2, Paperclip, Download, FileSpreadsheet, ArrowLeftRight, ShoppingBag, Receipt, AlertTriangle
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
 import { FinanceStatsDetailModal } from '@/components/finance/FinanceStatsDetailModal';
 import SupplierBalancesCard from '@/components/finance/SupplierBalancesCard';
+import DressPurchasesSection from '@/components/finance/DressPurchasesSection';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 
@@ -76,7 +77,9 @@ const categoryLabels = {
   'salary': 'رواتب موظفين',
   'loan': 'سلف موظفين',
   'cleaning': 'مصاريف تنظيف',
-  'purchase': 'مشتريات فساتين وخامات',
+  'purchase': 'مشتريات قديمة (تحتاج تصنيف)',
+  'dress_purchase': 'شراء فساتين (أصول)',
+  'manufacturing_piece': 'أجر قطعة تصنيع',
   'maintenance': 'مصاريف صيانة',
   'transfer_out': 'مناقلة (تحويل صادر)',
   'transfer_in': 'مناقلة (تحويل وارد)',
@@ -89,22 +92,15 @@ const pmIcons = {
   'bank_transfer': Building2
 };
 
-// Expenses written by the manufacturing page (edited/deleted from there only)
-const MANUFACTURING_CATEGORIES = ['materials', 'supplier_payment', 'manufacturing_wages'];
-
 // Maps a row from /finance/transactions (a revenue or expense tagged with `kind`) to the page's transaction shape.
 const mapTransaction = (row) => {
   if (row.kind === 'revenue') {
     const val = parseFloat(row.amount || 0);
-    let mappedCat = 'shop';
+    // The section (tab) and money class come from the backend
+    const mappedCat = row.tab || 'shop';
     let txType = val >= 0 ? 'إيراد' : 'مرتجع';
-    if (row.type === 'transfer_in') {
-      mappedCat = 'transfers';
-      txType = 'مناقلة (وارد)';
-    } else if (row.type === 'capital_deposit') {
-      mappedCat = 'transfers';
-      txType = 'إيداع رصيد';
-    }
+    if (row.type === 'transfer_in') txType = 'مناقلة (وارد)';
+    else if (row.type === 'capital_deposit') txType = 'إيداع رصيد';
 
     return {
       id: `revenue-${row.id}`,
@@ -122,23 +118,15 @@ const mapTransaction = (row) => {
       billImage: row.bill_image_url,
       rawDate: row.payment_date ? row.payment_date.split('T')[0] : '',
       backendCategory: row.type,
+      financeClass: row.finance_class,
       payments: row.payments || []
     };
   }
 
-  let mappedCat = 'other';
-  let txType = 'مصروف';
-  if (row.category === 'salary' || row.category === 'loan' || row.category === 'purchase') mappedCat = 'operational';
-  else if (row.category === 'cleaning' || row.category === 'maintenance') mappedCat = 'utilities';
-  else if (MANUFACTURING_CATEGORIES.includes(row.category)) mappedCat = 'manufacturing';
-  else if (row.category === 'fabrics') mappedCat = 'fabrics';
-  else if (row.category === 'transfer_out') {
-    mappedCat = 'transfers';
-    txType = 'مناقلة (صادر)';
-  } else if (row.category === 'owner_withdrawal') {
-    mappedCat = 'transfers';
-    txType = 'سحب رصيد';
-  }
+  const mappedCat = row.tab || 'other';
+  let txType = row.finance_class === 'capital' ? 'شراء أصل' : 'مصروف';
+  if (row.category === 'transfer_out') txType = 'مناقلة (صادر)';
+  else if (row.category === 'owner_withdrawal') txType = 'سحب رصيد';
 
   return {
     id: `expense-${row.id}`,
@@ -153,6 +141,7 @@ const mapTransaction = (row) => {
     receiptImage: row.receipt_url,
     rawDate: row.date ? row.date.split('T')[0] : '',
     backendCategory: row.category,
+    financeClass: row.finance_class,
     employeeId: row.employee_id ? String(row.employee_id) : '',
     materialName: row.material_name || '',
     quantity: row.quantity != null ? parseFloat(row.quantity) : null,
@@ -161,6 +150,27 @@ const mapTransaction = (row) => {
 };
 
 const ITEMS_PER_PAGE = 20;
+
+const EMPTY_SUMMARY = {
+  net_revenue: 0, net_expense: 0, net_profit: 0, held_insurances: 0, total_assets: 0,
+  capital_spending: 0, net_cash_flow: 0, cash_in: 0, cash_out: 0,
+  operating_expense_breakdown: {}, capital_breakdown: {},
+  unclassified_purchases: { count: 0, total: 0 },
+  assets: { dresses: 0, materials_stock: 0, work_in_progress: 0, total: 0 },
+  payables: { suppliers: 0, dress_purchases: 0, workers: 0, total: 0 },
+};
+
+// Transaction classes listed under each summary card ('' = every row: the cash box)
+const STAT_CLASSES = {
+  net_revenue: ['income'],
+  net_expense: ['operating'],
+  net_profit: ['income', 'operating'],
+  capital_spending: ['capital'],
+  net_cash_flow: [''],
+  held_insurances: ['insurance'],
+};
+
+const money = (v) => `${(Number(v) || 0).toLocaleString()} ج.م`;
 
 export default function FinancePage() {
   // Current page of transactions (filtered, searched and paginated on the server)
@@ -180,6 +190,8 @@ export default function FinancePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  // unclassified: narrows the log to the old purchases waiting to be classified
+  const [classFilter, setClassFilter] = useState('');
 
   // Date range filter & presets ('all' | 'today' | 'this_month' | 'last_3_months' | 'custom')
   const [filterStart, setFilterStart] = useState('');
@@ -203,7 +215,6 @@ export default function FinancePage() {
   // Stats Details Modal State
   const [selectedStatModalType, setSelectedStatModalType] = useState(null);
   const [dressesForStatModal, setDressesForStatModal] = useState([]);
-  const [heldInsurancesForStatModal, setHeldInsurancesForStatModal] = useState([]);
   const [statModalTransactions, setStatModalTransactions] = useState([]);
 
   // Stats modal data is loaded only when its modal is opened
@@ -212,26 +223,6 @@ export default function FinancePage() {
       apiClient.get('/dresses?per_page=1000').then((res) => {
         const list = Array.isArray(res) ? res : res?.data || [];
         setDressesForStatModal(list);
-      }).catch(() => {});
-    } else if (selectedStatModalType === 'held_insurances') {
-      apiClient.get('/clients?per_page=1000').then((res) => {
-        const list = Array.isArray(res) ? res : res?.data || [];
-        const held = [];
-        list.forEach((c) => {
-          const b = c.bookings?.[0];
-          const ins = parseFloat(b?.insurance_amount || 0);
-          if (b && ins > 0 && ['confirmed', 'picked_up'].includes(b.status)) {
-            held.push({
-              brideName: c.name,
-              bridePhone: c.phone,
-              dressName: b.dress?.name || c.latest_dress_name || 'فستان',
-              insuranceAmount: ins,
-              eventDate: b.event_date || c.wedding_date,
-              stage: c.current_stage || b.status
-            });
-          }
-        });
-        setHeldInsurancesForStatModal(held);
       }).catch(() => {});
     }
   }, [selectedStatModalType]);
@@ -243,7 +234,7 @@ export default function FinancePage() {
   }, [searchQuery]);
 
   // Go back to page 1 whenever a filter changes (in the same render, so only one request is sent)
-  const filterKey = [activeTab, activePaymentFilter, debouncedSearch, filterStart, filterEnd].join('|');
+  const filterKey = [activeTab, activePaymentFilter, debouncedSearch, filterStart, filterEnd, classFilter].join('|');
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -352,14 +343,8 @@ export default function FinancePage() {
   const [editingTxOriginalType, setEditingTxOriginalType] = useState(null);
 
 
-  // Numeric totals from backend
-  const [totals, setTotals] = useState({ 
-    net_revenue: 0, 
-    net_expense: 0, 
-    net_profit: 0, 
-    held_insurances: 0, 
-    total_assets: 0 
-  });
+  // Every figure is computed by the backend (/finance/summary)
+  const [totals, setTotals] = useState(EMPTY_SUMMARY);
 
   const buildQS = useCallback(() => {
     const p = {};
@@ -374,8 +359,9 @@ export default function FinancePage() {
     if (activeTab !== 'all') p.set('tab', activeTab);
     if (activePaymentFilter) p.set('payment_method', activePaymentFilter);
     if (debouncedSearch) p.set('search', debouncedSearch);
+    if (classFilter) p.set('class', classFilter);
     return p.toString();
-  }, [buildQS, activeTab, activePaymentFilter, debouncedSearch]);
+  }, [buildQS, activeTab, activePaymentFilter, debouncedSearch, classFilter]);
 
   // Payment method cards follow the date range, tab and search (not the payment method filter itself)
   const loadPaymentBreakdown = useCallback(async () => {
@@ -394,15 +380,7 @@ export default function FinancePage() {
   const loadSummary = useCallback(async () => {
     try {
       const summaryRes = await apiClient.get(`/finance/summary?${buildQS()}`);
-      if (summaryRes) {
-        setTotals({
-          net_revenue: summaryRes.net_revenue || 0,
-          net_expense: summaryRes.net_expense || 0,
-          net_profit: summaryRes.net_profit || 0,
-          held_insurances: summaryRes.held_insurances || 0,
-          total_assets: summaryRes.total_assets || 0,
-        });
-      }
+      if (summaryRes) setTotals({ ...EMPTY_SUMMARY, ...summaryRes });
     } catch (e) {
       console.error('Failed to load finance summary:', e);
     }
@@ -450,15 +428,26 @@ export default function FinancePage() {
     return rows.map(mapTransaction);
   }, [buildTransactionsQS]);
 
+  // The rows behind a summary figure, for the same date range (the backend decides which rows count)
   useEffect(() => {
-    if (!['net_profit', 'net_revenue', 'net_expense'].includes(selectedStatModalType)) return;
+    const classes = STAT_CLASSES[selectedStatModalType];
+    if (!classes) return;
     let cancelled = false;
     setStatModalTransactions([]);
-    fetchAllFilteredTransactions()
-      .then((rows) => {if (!cancelled) setStatModalTransactions(rows);})
+    Promise.all(classes.map((cls) => {
+      const p = new URLSearchParams(buildQS());
+      if (cls) p.set('class', cls);
+      return getAllPages(`/finance/transactions?${p.toString()}`);
+    }))
+      .then((lists) => {
+        if (cancelled) return;
+        const rows = lists.flat().map(mapTransaction);
+        rows.sort((a, b) => (b.rawDate || '').localeCompare(a.rawDate || ''));
+        setStatModalTransactions(rows);
+      })
       .catch((e) => console.error('Failed to load transactions for stats modal:', e));
     return () => {cancelled = true;};
-  }, [selectedStatModalType, fetchAllFilteredTransactions]);
+  }, [selectedStatModalType, buildQS]);
 
 
   // Employees for the salary expense picker, loaded the first time it is needed
@@ -484,8 +473,7 @@ export default function FinancePage() {
     if (tx.isRevenue) {
        if (tx.backendCategory === 'deposit') frontendCat = 'shop';
     } else {
-       if (tx.backendCategory === 'purchase') frontendCat = 'operational';
-       else if (tx.backendCategory === 'maintenance') frontendCat = 'utilities';
+       if (tx.backendCategory === 'maintenance') frontendCat = 'utilities';
        else frontendCat = tx.backendCategory || 'other';
     }
     setNewCategory(frontendCat);
@@ -561,7 +549,7 @@ export default function FinancePage() {
         }
       } else {
         let backendCat = 'other';
-        if (newCategory === 'operational') backendCat = 'purchase';else
+        if (['operational', 'purchase', 'dress_purchase'].includes(newCategory)) backendCat = newCategory;else
         if (newCategory === 'utilities') backendCat = 'maintenance';else
         if (isSalary) backendCat = 'salary';else
         if (isFabrics) backendCat = 'fabrics';
@@ -703,11 +691,14 @@ export default function FinancePage() {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const summaryCards = [
-    { type: 'net_profit', label: 'صافي الأرباح', value: `${totals.net_profit.toLocaleString()} ج.م`, icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
-    { type: 'net_revenue', label: 'المبيعات / الإيرادات', value: `${totals.net_revenue.toLocaleString()} ج.م`, icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
-    { type: 'net_expense', label: 'المصروفات التشغيلية', value: `${totals.net_expense.toLocaleString()} ج.م`, icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
-    { type: 'total_assets', label: 'إجمالي الأصول (الفساتين)', value: `${totals.total_assets.toLocaleString()} ج.م`, icon: Building2, colorClass: 'text-sky-600', bgClass: 'bg-sky-50' },
-    { type: 'held_insurances', label: 'التأمينات المحتجزة (أمانات)', value: `${totals.held_insurances.toLocaleString()} ج.م`, icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' },
+    { type: 'net_profit', label: 'الربح التشغيلي', hint: 'الإيرادات − المصروفات التشغيلية', value: money(totals.net_profit), icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
+    { type: 'net_revenue', label: 'المبيعات / الإيرادات', hint: 'بدون التأمينات والمناقلات', value: money(totals.net_revenue), icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
+    { type: 'net_expense', label: 'المصروفات التشغيلية', hint: 'تكاليف تشغيل المحل', value: money(totals.net_expense), icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
+    { type: 'capital_spending', label: 'شراء أصول', hint: 'فساتين وخامات — لا تُخصم من الربح', value: money(totals.capital_spending), icon: ShoppingBag, colorClass: 'text-violet-600', bgClass: 'bg-violet-50' },
+    { type: 'net_cash_flow', label: 'صافي حركة الخزينة', hint: 'كل ما دخل − كل ما خرج', value: money(totals.net_cash_flow), icon: Wallet, colorClass: totals.net_cash_flow >= 0 ? 'text-teal-600' : 'text-rose-600', bgClass: totals.net_cash_flow >= 0 ? 'bg-teal-50' : 'bg-rose-50' },
+    { type: 'total_assets', label: 'إجمالي الأصول (حالياً)', hint: 'فساتين + خامات + تحت التصنيع', value: money(totals.assets.total), icon: Building2, colorClass: 'text-sky-600', bgClass: 'bg-sky-50' },
+    { type: 'payables', label: 'المستحق علينا (حالياً)', hint: 'موردين + فساتين + عمال', value: money(totals.payables.total), icon: Receipt, colorClass: 'text-orange-600', bgClass: 'bg-orange-50' },
+    { type: 'held_insurances', label: 'التأمينات المحتجزة (أمانات)', hint: 'فلوس العرايس طرفنا', value: money(totals.held_insurances), icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' },
   ];
 
 
@@ -832,8 +823,8 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* KPI Cards (2 Columns on Mobile, 5 Columns on Desktop) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 flex-shrink-0">
+      {/* KPI Cards (2 columns on mobile, 4 on desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 flex-shrink-0">
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
@@ -851,10 +842,11 @@ export default function FinancePage() {
                   عرض التفاصيل ←
                 </span>
               </div>
-              <div className={`text-sm sm:text-xl font-extrabold ${card.colorClass} truncate`}>{card.value}</div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-1 truncate group-hover:text-slate-600 transition-colors">
+              <div className={`text-sm sm:text-lg font-extrabold ${card.colorClass} break-words leading-tight`}>{card.value}</div>
+              <div className="text-[10px] sm:text-[11px] text-slate-600 font-extrabold mt-1 truncate">
                 {card.label}
               </div>
+              <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-0.5 truncate">{card.hint}</div>
             </div>
           );
         })}
@@ -932,6 +924,30 @@ export default function FinancePage() {
         }
         </div>
       }
+
+      {totals.unclassified_purchases.count > 0 &&
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-extrabold text-amber-800">
+                {totals.unclassified_purchases.count} مصروف قديم من نوع "مشتريات" ({money(totals.unclassified_purchases.total)}) يحتاج تصنيف
+              </p>
+              <p className="text-[11px] font-bold text-amber-700 mt-0.5">
+                غير محسوبة في الربح لحد ما تحدد كل واحد: شراء فستان (أصل) ولا مصروف تشغيلي. افتح المعاملة واضغط تعديل.
+              </p>
+            </div>
+          </div>
+          <button
+          type="button"
+          onClick={() => {setActiveTab('all');setClassFilter(classFilter === 'unclassified' ? '' : 'unclassified');}}
+          className="px-3.5 py-2 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-extrabold cursor-pointer whitespace-nowrap">
+            {classFilter === 'unclassified' ? 'عرض كل المعاملات' : 'عرض المصروفات غير المصنفة'}
+          </button>
+        </div>
+      }
+
+      <DressPurchasesSection onChanged={loadData} />
 
       <SupplierBalancesCard />
 
@@ -1413,8 +1429,15 @@ export default function FinancePage() {
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700">
                   
+                    {/* An old unclassified purchase is classified here: a dress purchase (asset) or an operating expense */}
+                    {['purchase', 'dress_purchase'].includes(newCategory) && editingTxOriginalType === 'expense' &&
+                    <>
+                        {newCategory === 'purchase' && <option value="purchase">مشتريات قديمة — اختر التصنيف</option>}
+                        <option value="dress_purchase">شراء فستان (أصل — لا يُخصم من الربح)</option>
+                      </>
+                    }
                     <option value="shop">مبيعات وحجوزات المحل</option>
-                    <option value="operational">المشتريات والرواتب</option>
+                    <option value="operational">المشتريات والرواتب (مصروف تشغيلي)</option>
                     <option value="utilities">المرافق والخدمات</option>
                     {newType !== 'إيراد' && <option value="salary">رواتب موظفين</option>}
                     {newType !== 'إيراد' && <option value="fabrics">خامات وأقمشة</option>}
@@ -1923,7 +1946,6 @@ export default function FinancePage() {
         totals={totals}
         transactions={statModalTransactions}
         dresses={dressesForStatModal}
-        heldInsurancesList={heldInsurancesForStatModal}
       />
     </div>
   );
