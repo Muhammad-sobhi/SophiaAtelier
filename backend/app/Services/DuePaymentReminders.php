@@ -13,11 +13,18 @@ class DuePaymentReminders
 {
     public const TYPES = ['dress_payment_due_soon', 'dress_payment_due', 'dress_payment_overdue'];
     public const RELATED_TYPE = 'dress_purchase_payment';
+    /** Due dates are Cairo days: "today" / "tomorrow" / overdue follow the shop's clock, not the app's UTC */
+    public const TIMEZONE = 'Africa/Cairo';
+
+    public static function today(): string
+    {
+        return now(self::TIMEZONE)->toDateString();
+    }
 
     public function generate(): int
     {
-        $today = now()->toDateString();
-        $tomorrow = now()->addDay()->toDateString();
+        $today = self::today();
+        $tomorrow = now(self::TIMEZONE)->addDay()->toDateString();
         $created = 0;
 
         $payments = DressPurchasePayment::with('purchase:id,dress_id,type,partner_name,supplier_id', 'purchase.dress:id,name,deleted_at', 'purchase.supplier:id,name')
@@ -37,7 +44,7 @@ class DuePaymentReminders
                 ->where('type', $type)
                 ->where('related_type', self::RELATED_TYPE)
                 ->where('related_id', $payment->id)
-                ->when($oncePerDay, fn ($q) => $q->whereDate('created_at', $today))
+                ->when($oncePerDay, fn ($q) => $q->where('created_at', '>=', now(self::TIMEZONE)->startOfDay()->utc()))
                 ->exists();
             if ($exists) {
                 continue;
