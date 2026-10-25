@@ -12,3 +12,6 @@ Artisan::command('inspire', function () {
 // Automatically prune activity logs older than 6 months (180 days) every day at midnight
 Schedule::command('activity-logs:prune --days=180')->dailyAt('00:00');
 
+
+// Dress purchase installments due tomorrow / today / overdue (also checked whenever notifications are loaded)
+Schedule::command('dress-payments:remind')->dailyAt('08:00');

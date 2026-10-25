@@ -11,6 +11,11 @@ use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
+    /** Categories staff enter here; the other categories are written by their own pages */
+    private const CATEGORIES = ['salary', 'loan', 'operational', 'maintenance', 'cleaning', 'fabrics', 'other'];
+    /** Old unclassified "purchase" entries and the dress purchase they may be moved to */
+    private const LEGACY_CATEGORIES = ['purchase', 'dress_purchase'];
+
     // Material purchases (خامات وأقمشة): what was bought, how much, and the price per unit
     private const MATERIAL_RULES = [
         'material_name' => 'nullable|required_if:category,fabrics|string|max:255',
@@ -54,7 +59,7 @@ class ExpenseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,fabrics,other',
+            'category' => 'nullable|in:' . implode(',', self::CATEGORIES),
             'amount' => 'required_unless:category,fabrics|nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'description' => 'nullable|string',
@@ -95,8 +100,16 @@ class ExpenseController extends Controller
         if (EmployeeLoan::where('expense_id', $expense->id)->exists()) {
             return response()->json(['message' => 'هذا المصروف مسجل من سلف الموظفين — عدّله أو احذفه من صفحة الحضور والرواتب'], 422);
         }
+        if (\App\Services\DressPurchaseService::ownsExpense($expense)) {
+            return response()->json(['message' => 'هذا المصروف دفعة من شراء فستان — عدّله أو ألغِه من مشتريات الفساتين'], 422);
+        }
+        // An old "purchase" entry (recorded before dress purchases were split from operating costs) keeps its
+        // category until the admin classifies it as a dress purchase or an operating expense
+        $categories = in_array($expense->category, self::LEGACY_CATEGORIES, true)
+            ? array_merge(self::CATEGORIES, self::LEGACY_CATEGORIES)
+            : self::CATEGORIES;
         $validated = $request->validate([
-            'category' => 'nullable|in:salary,loan,purchase,maintenance,cleaning,fabrics,other',
+            'category' => 'nullable|in:' . implode(',', $categories),
             'amount' => 'sometimes|required_unless:category,fabrics|nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'description' => 'nullable|string',
@@ -131,6 +144,9 @@ class ExpenseController extends Controller
         }
         if (EmployeeLoan::where('expense_id', $expense->id)->exists()) {
             return response()->json(['message' => 'هذا المصروف مسجل من سلف الموظفين — عدّله أو احذفه من صفحة الحضور والرواتب'], 422);
+        }
+        if (\App\Services\DressPurchaseService::ownsExpense($expense)) {
+            return response()->json(['message' => 'هذا المصروف دفعة من شراء فستان — عدّله أو ألغِه من مشتريات الفساتين'], 422);
         }
         $expense->delete();
 

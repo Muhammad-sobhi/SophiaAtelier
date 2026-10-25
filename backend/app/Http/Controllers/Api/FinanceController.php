@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Expense;
 use App\Models\FinanceTransaction;
 use App\Models\Revenue;
+use App\Services\FinanceService;
 use App\Services\ManufacturingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class FinanceController extends Controller
     private const REVENUE_TABS = ['transfers' => ['transfer_in', 'capital_deposit']];
     private const REVENUE_DEFAULT_TAB = 'shop';
     private const EXPENSE_TABS = [
-        'operational' => ['salary', 'loan', 'purchase'],
+        'operational' => ['salary', 'loan', 'operational', 'purchase', 'dress_purchase'],
         'utilities' => ['cleaning', 'maintenance'],
         'transfers' => ['transfer_out', 'owner_withdrawal'],
         'manufacturing' => ManufacturingService::EXPENSE_CATEGORIES,
@@ -81,6 +82,8 @@ class FinanceController extends Controller
                 if (!$revenue) return null;
                 return array_merge($revenue->withoutRelations()->toArray(), [
                     'kind' => 'revenue',
+                    'tab' => self::tabOf($revenue->type, self::REVENUE_TABS, self::REVENUE_DEFAULT_TAB),
+                    'finance_class' => FinanceService::revenueClass($revenue->type),
                     'client_name' => $revenue->booking?->client?->name ?? $revenue->visit?->client?->name,
                     'dress_names' => $revenue->booking
                         ? collect([$revenue->booking->dress, $revenue->booking->dress2, $revenue->booking->dress3])->filter()->pluck('name')->values()
@@ -90,7 +93,11 @@ class FinanceController extends Controller
                 ]);
             }
             $expense = $expenseModels->get($row->id);
-            return $expense ? array_merge($expense->toArray(), ['kind' => 'expense']) : null;
+            return $expense ? array_merge($expense->toArray(), [
+                'kind' => 'expense',
+                'tab' => self::tabOf($expense->category, self::EXPENSE_TABS, self::EXPENSE_DEFAULT_TAB),
+                'finance_class' => FinanceService::expenseClass($expense->category),
+            ]) : null;
         })->filter()->values();
 
         return response()->json([
@@ -108,6 +115,8 @@ class FinanceController extends Controller
         'tab' => 'nullable|string|in:all,shop,operational,utilities,transfers,manufacturing,fabrics,other',
         'payment_method' => 'nullable|string|max:50',
         'search' => 'nullable|string|max:100',
+        // income | insurance | operating | capital | unclassified (see FinanceService): the rows behind each summary figure
+        'class' => 'nullable|string|in:income,insurance,operating,capital,unclassified',
     ];
 
     /**
@@ -136,6 +145,17 @@ class FinanceController extends Controller
         if ($tab !== 'all') {
             $this->whereTab($revenues, 'type', self::REVENUE_TABS, self::REVENUE_DEFAULT_TAB, $tab);
             $this->whereTab($expenses, 'category', self::EXPENSE_TABS, self::EXPENSE_DEFAULT_TAB, $tab);
+        }
+
+        if (!empty($filters['class'])) {
+            // income / insurance rows are revenues only; the expense classes are expenses only
+            if (in_array($filters['class'], ['income', 'insurance'], true)) {
+                FinanceService::whereRevenueClass($revenues, $filters['class']);
+                $expenses->whereRaw('1 = 0');
+            } else {
+                FinanceService::whereExpenseClass($expenses, $filters['class']);
+                $revenues->whereRaw('1 = 0');
+            }
         }
 
         if ($search !== '') {
@@ -170,6 +190,16 @@ class FinanceController extends Controller
         }
 
         return response()->json(['payment_breakdown' => $paymentBreakdown]);
+    }
+
+    private static function tabOf(?string $value, array $map, string $defaultTab): string
+    {
+        foreach ($map as $tab => $values) {
+            if (in_array($value, $values, true)) {
+                return $tab;
+            }
+        }
+        return $defaultTab;
     }
 
     private function whereTab($query, string $column, array $map, string $defaultTab, string $tab): void
@@ -369,40 +399,13 @@ class FinanceController extends Controller
         ], 201);
     }
 
-    public function summary(Request $request): JsonResponse
+    public function summary(Request $request, FinanceService $finance): JsonResponse
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-
-        // Insurance is held money, not income: its refunds reduce the held amount instead of revenue
-        $revQuery = Revenue::whereNotIn('type', ['insurance', 'security_deposit', 'insurance_refund', 'transfer_in', 'capital_deposit']);
-        $expQuery = Expense::whereNotIn('category', ['owner_withdrawal', 'transfer_out', 'purchase']);
-        $insQuery = Revenue::whereIn('type', ['insurance', 'security_deposit', 'insurance_refund']);
-
-        if ($startDate) {
-            $revQuery->where('payment_date', '>=', $startDate);
-            $expQuery->where('date', '>=', $startDate);
-            $insQuery->where('payment_date', '>=', $startDate);
-        }
-
-        if ($endDate) {
-            $revQuery->where('payment_date', '<=', $endDate);
-            $expQuery->where('date', '<=', $endDate);
-            $insQuery->where('payment_date', '<=', $endDate);
-        }
-
-        $netRevenue = $revQuery->sum('amount');
-        $netExpense = $expQuery->sum('amount');
-        $heldInsurances = $insQuery->sum('amount');
-        $totalAssets = \App\Models\Dress::sum('purchase_price');
-        $netProfit = $netRevenue - $netExpense;
-
-        return response()->json([
-            'net_revenue' => round($netRevenue, 2),
-            'net_expense' => round($netExpense, 2),
-            'net_profit' => round($netProfit, 2),
-            'held_insurances' => round($heldInsurances, 2),
-            'total_assets' => round($totalAssets, 2),
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
         ]);
+
+        return response()->json($finance->summary($validated['start_date'] ?? null, $validated['end_date'] ?? null));
     }
 }

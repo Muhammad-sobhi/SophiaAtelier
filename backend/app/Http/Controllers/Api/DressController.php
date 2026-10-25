@@ -20,6 +20,10 @@ class DressController extends Controller
         if ($request->boolean('with_bookings') && auth('sanctum')->check()) {
             $query->with($this->bookingsWithClients());
         }
+        // has_purchase: the dress cost is managed from its dress purchase (finance page)
+        if (auth('sanctum')->check()) {
+            $query->withExists('purchase as has_purchase');
+        }
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);
@@ -192,6 +196,7 @@ class DressController extends Controller
             ...$this->bookingsWithClients(),
         ]);
         $this->hideClientAppendedRelations(collect([$dress]));
+        $dress->loadExists('purchase as has_purchase');
 
         return response()->json($dress);
     }
@@ -241,6 +246,11 @@ class DressController extends Controller
             'is_best_seller' => 'nullable|boolean',
             'best_seller_sort' => 'nullable|integer',
         ]);
+
+        // A recorded purchase owns the dress cost: change it from the dress purchase instead
+        if ($dress->purchase()->exists()) {
+            unset($validated['purchase_price'], $validated['purchase_date']);
+        }
 
         $dress->update($validated);
 

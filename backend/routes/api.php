@@ -133,8 +133,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('offers', OfferController::class)->middleware('permission:/dashboard/offers');
 
     // Manufacturing: suppliers, materials stock, purchases, workshop workers and manufacturing orders
+    // The finance page lists suppliers and adds one while recording a dress purchase
+    Route::apiResource('suppliers', \App\Http\Controllers\Api\SupplierController::class)->only(['index', 'store'])
+        ->middleware('permission:/dashboard/manufacturing,/dashboard/finance');
     Route::middleware('permission:/dashboard/manufacturing')->group(function () {
-        Route::apiResource('suppliers', \App\Http\Controllers\Api\SupplierController::class);
+        Route::apiResource('suppliers', \App\Http\Controllers\Api\SupplierController::class)->except(['index', 'store']);
         Route::post('/suppliers/{supplier}/payments', [\App\Http\Controllers\Api\SupplierController::class, 'storePayment']);
         Route::delete('/suppliers/{supplier}/payments/{payment}', [\App\Http\Controllers\Api\SupplierController::class, 'destroyPayment']);
         Route::get('/materials/movements', [\App\Http\Controllers\Api\MaterialController::class, 'movements']);
@@ -177,6 +180,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/finance/summary', [FinanceController::class, 'summary']);
         Route::get('/finance/transactions', [FinanceController::class, 'transactions']);
         Route::get('/finance/payment-breakdown', [FinanceController::class, 'paymentBreakdown']);
+    });
+
+    // Dress purchases (bought, or our share of a dress bought with a bride) and their payment schedule
+    Route::middleware('permission:/dashboard/finance')->group(function () {
+        Route::get('/dress-purchases/due-payments', [\App\Http\Controllers\Api\DressPurchaseController::class, 'duePayments']);
+        Route::get('/dress-purchases/pending-dresses', [\App\Http\Controllers\Api\DressPurchaseController::class, 'pendingDresses']);
+        Route::post('/dress-purchase-payments/{payment}/pay', [\App\Http\Controllers\Api\DressPurchaseController::class, 'pay']);
+        Route::delete('/dress-purchase-payments/{payment}/pay', [\App\Http\Controllers\Api\DressPurchaseController::class, 'unpay']);
+        Route::apiResource('dress-purchases', \App\Http\Controllers\Api\DressPurchaseController::class);
     });
 
     // Employee routes (staff & admin)

@@ -53,7 +53,7 @@ class SupplierController extends Controller
 
     public function destroy(Supplier $supplier): JsonResponse
     {
-        if ($supplier->purchases()->exists() || $supplier->payments()->exists()) {
+        if ($supplier->purchases()->exists() || $supplier->payments()->exists() || $supplier->dressPurchases()->exists()) {
             return response()->json(['message' => 'لا يمكن حذف مورد له فواتير أو دفعات مسجلة'], 422);
         }
         $supplier->delete();

@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
   X, Search, Download, TrendingUp, TrendingDown,
-  DollarSign, Building2, Shield, FileSpreadsheet, Calendar
+  DollarSign, Building2, Shield, FileSpreadsheet, Calendar, ShoppingBag, Wallet, Receipt
 } from 'lucide-react';
 import { getStorageUrl } from '@/lib/api-client';
+
+const money = (v) => `${(Number(v) || 0).toLocaleString()} ج.م`;
 
 // The early return lives in this wrapper: hooks must run in the same order on every render
 export function FinanceStatsDetailModal(props) {
@@ -13,11 +15,10 @@ export function FinanceStatsDetailModal(props) {
 
 function FinanceStatsDetailModalContent({
   onClose,
-  statType, // 'net_profit' | 'net_revenue' | 'net_expense' | 'total_assets' | 'held_insurances'
+  statType, // a summary card: net_profit | net_revenue | net_expense | capital_spending | net_cash_flow | total_assets | payables | held_insurances
   totals = {},
   transactions = [],
   dresses = [],
-  heldInsurancesList = [],
 }) {
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,7 +43,7 @@ function FinanceStatsDetailModalContent({
     },
     net_expense: {
       title: 'تفاصيل المصروفات التشغيلية',
-      subtitle: 'كشف بنود الصرف والمصروفات التشغيلية والمشتريات',
+      subtitle: 'تكاليف تشغيل المحل — شراء الفساتين والخامات مش منها',
       icon: TrendingDown,
       color: 'rose',
       value: `${(totals.net_expense || 0).toLocaleString()} ج.م`,
@@ -52,11 +53,32 @@ function FinanceStatsDetailModalContent({
       subtitle: 'قائمة الفساتين وتكلفة وتاريخ شراء كل فستان وحالته الحالية',
       icon: Building2,
       color: 'sky',
-      value: `${(totals.total_assets || 0).toLocaleString()} ج.م`,
+      value: money(totals.assets?.total),
+    },
+    capital_spending: {
+      title: 'تفاصيل شراء الأصول',
+      subtitle: 'فلوس خرجت لشراء فساتين وخامات وأجر قطع التصنيع — بتتحول لأصول ومش بتتخصم من الربح',
+      icon: ShoppingBag,
+      color: 'violet',
+      value: money(totals.capital_spending),
+    },
+    net_cash_flow: {
+      title: 'تفاصيل حركة الخزينة',
+      subtitle: 'كل فلوس دخلت أو خرجت في الفترة، بما فيها التأمينات والمناقلات والسحب',
+      icon: Wallet,
+      color: 'teal',
+      value: money(totals.net_cash_flow),
+    },
+    payables: {
+      title: 'المستحق علينا',
+      subtitle: 'الفلوس اللي لسه علينا حتى النهارده',
+      icon: Receipt,
+      color: 'orange',
+      value: money(totals.payables?.total),
     },
     held_insurances: {
       title: 'تفاصيل التأمينات المحتجزة (أمانات)',
-      subtitle: 'مبالغ التأمين المودعة طرف الأتيليه للعقود النشطة وقيد الاستلام',
+      subtitle: 'مبالغ التأمين المستلمة ناقص المردود في الفترة',
       icon: Shield,
       color: 'amber',
       value: `${(totals.held_insurances || 0).toLocaleString()} ج.م`,
@@ -73,23 +95,28 @@ function FinanceStatsDetailModalContent({
 
   // Compile items depending on selected statType
   const rawItems = useMemo(() => {
-    if (statType === 'net_revenue') {
-      return transactions.filter(t => t.isRevenue);
-    }
-    if (statType === 'net_expense') {
-      return transactions.filter(t => !t.isRevenue);
-    }
-    if (statType === 'net_profit') {
-      return transactions;
-    }
-    if (statType === 'total_assets') {
-      return dresses;
-    }
-    if (statType === 'held_insurances') {
-      return heldInsurancesList;
-    }
-    return [];
-  }, [statType, transactions, dresses, heldInsurancesList]);
+    // The backend already picked the rows behind each figure
+    if (statType === 'total_assets') return dresses;
+    if (statType === 'payables') return [];
+    return transactions;
+  }, [statType, transactions, dresses]);
+
+  // How each figure is made up (all values from /finance/summary)
+  const ob = totals.operating_expense_breakdown || {};
+  const cb = totals.capital_breakdown || {};
+  const breakdown = {
+    net_profit: [['الإيرادات', totals.net_revenue], ['المصروفات التشغيلية', -(totals.net_expense || 0)]],
+    net_expense: [
+      ['مصروفات مدفوعة', ob.cash],
+      ['خامات من المخزن لصيانة الفساتين', ob.stock_maintenance],
+      ['فروق جرد الخامات', ob.stock_adjustments],
+      ['خامات أوامر تصنيع ملغاة', ob.stock_cancelled_orders],
+    ],
+    capital_spending: [['دفعات شراء فساتين', cb.dresses], ['شراء خامات ودفعات موردين', cb.materials], ['أجر قطع التصنيع', cb.manufacturing_piece]],
+    net_cash_flow: [['كل ما دخل', totals.cash_in], ['كل ما خرج', -(totals.cash_out || 0)]],
+    total_assets: [['الفساتين (بتكلفة الشراء)', totals.assets?.dresses], ['خامات في المخزن', totals.assets?.materials_stock], ['قطع تحت التصنيع', totals.assets?.work_in_progress]],
+    payables: [['للموردين (فواتير خامات)', totals.payables?.suppliers], ['باقي شراء فساتين', totals.payables?.dress_purchases], ['أجر قطع مستحق للعمال', totals.payables?.workers]],
+  }[statType];
 
   // Search filter
   const filteredItems = useMemo(() => {
@@ -103,13 +130,6 @@ function FinanceStatsDetailModalContent({
           (item.name || '').toLowerCase().includes(q) ||
           (item.code || '').toLowerCase().includes(q) ||
           (item.category?.name || '').toLowerCase().includes(q)
-        );
-      }
-      if (statType === 'held_insurances') {
-        return (
-          (item.brideName || '').toLowerCase().includes(q) ||
-          (item.bridePhone || '').includes(q) ||
-          (item.dressName || '').toLowerCase().includes(q)
         );
       }
       // General transactions
@@ -169,16 +189,6 @@ function FinanceStatsDetailModalContent({
         d.status || 'ready'
       ]);
       rows.push(['', 'الإجمالي', '', assetsCostTotal, '', '']);
-    } else if (statType === 'held_insurances') {
-      headers = ['اسم العروس', 'الهاتف', 'الفستان', 'مبلغ التأمين', 'تاريخ المناسبة', 'حالة العقد'];
-      rows = filteredItems.map(h => [
-        h.brideName || '-',
-        h.bridePhone || '-',
-        h.dressName || '-',
-        h.insuranceAmount || 0,
-        h.eventDate || '-',
-        h.stage || '-'
-      ]);
     } else {
       headers = ['التاريخ', 'البيان / العميل', 'النوع', 'المبلغ', 'طريقة الدفع', 'الملاحظات'];
       rows = filteredItems.map(t => [
@@ -243,7 +253,24 @@ function FinanceStatsDetailModalContent({
           </div>
         </div>
 
+        {breakdown && (
+          <div className="p-3 sm:p-4 border-b border-slate-100 bg-white grid grid-cols-1 sm:grid-cols-2 gap-2 flex-shrink-0">
+            {breakdown.map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">{label}</span>
+                <span className={`font-mono text-xs font-black ${(Number(value) || 0) < 0 ? 'text-rose-600' : 'text-slate-800'}`}>{money(value)}</span>
+              </div>
+            ))}
+            {statType === 'net_expense' && (
+              <p className="sm:col-span-2 text-[11px] font-bold text-slate-400">
+                بنود الخامات المصروفة من المخزن بتتحسب من حركات المخزن، فمش بتظهر في الجدول تحت.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Search & Count Bar */}
+        {statType !== 'payables' && <>
         <div className="p-3 sm:p-4 border-b border-slate-100 bg-white flex items-center justify-between gap-3 flex-shrink-0 flex-wrap sm:flex-nowrap">
           <div className="relative flex-1 min-w-[220px]">
             <input
@@ -303,15 +330,6 @@ function FinanceStatsDetailModalContent({
                         <th className="pb-3 text-center">تاريخ الشراء</th>
                         <th className="pb-3 text-left pl-2">الحالة</th>
                       </>
-                    ) : statType === 'held_insurances' ? (
-                      <>
-                        <th className="pb-3 pr-2">اسم العروس</th>
-                        <th className="pb-3">الهاتف</th>
-                        <th className="pb-3">الفستان المحجوز</th>
-                        <th className="pb-3 text-center">مبلغ التأمين</th>
-                        <th className="pb-3 text-center">تاريخ المناسبة</th>
-                        <th className="pb-3 text-left pl-2">المرحلة</th>
-                      </>
                     ) : (
                       <>
                         <th className="pb-3 pr-2">التاريخ</th>
@@ -345,25 +363,6 @@ function FinanceStatsDetailModalContent({
                             }`}>
                               {item.status === 'ready' ? 'جاهز' :
                                item.status === 'out' ? 'مستلم' : item.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    if (statType === 'held_insurances') {
-                      return (
-                        <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 pr-2 font-black text-slate-800">{item.brideName}</td>
-                          <td className="py-3 font-mono text-slate-500">{item.bridePhone || '—'}</td>
-                          <td className="py-3 text-slate-700">{item.dressName}</td>
-                          <td className="py-3 text-center font-mono font-black text-amber-700">
-                            {parseFloat(item.insuranceAmount || 5000).toLocaleString()} ج.م
-                          </td>
-                          <td className="py-3 text-center font-mono text-slate-500">{item.eventDate || '—'}</td>
-                          <td className="py-3 text-left pl-2">
-                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
-                              تأمين محتجز
                             </span>
                           </td>
                         </tr>
@@ -420,6 +419,8 @@ function FinanceStatsDetailModalContent({
             </div>
           )}
         </div>
+
+        </>}
 
         {/* Pagination Footer */}
         {totalPages > 1 && (

@@ -49,6 +49,8 @@ export default function DressesPage() {
   const [newDesignerAr, setNewDesignerAr] = useState('');
   const [newPurchasePrice, setNewPurchasePrice] = useState('');
   const [newPurchaseDate, setNewPurchaseDate] = useState('');
+  // The cost of a dress with a recorded purchase follows that purchase (finance page)
+  const purchaseLocked = Boolean(editingDress?.has_purchase);
   const [newRentalCost, setNewRentalCost] = useState('');
   const [newTryingFee, setNewTryingFee] = useState('');
   const [newSize, setNewSize] = useState('');
@@ -1460,8 +1462,10 @@ export default function DressesPage() {
                       placeholder="15000"
                       value={newPurchasePrice}
                       onChange={(e) => setNewPurchasePrice(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      disabled={purchaseLocked}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 disabled:bg-slate-100 disabled:text-slate-500"
                     />
+                    {purchaseLocked && <p className="text-[10px] font-bold text-violet-600">بتتعدل من مشتريات الفساتين في المالية</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -1470,7 +1474,8 @@ export default function DressesPage() {
                       type="date"
                       value={newPurchaseDate}
                       onChange={(e) => setNewPurchaseDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700"
+                      disabled={purchaseLocked}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 disabled:bg-slate-100 disabled:text-slate-500"
                     />
                   </div>
 

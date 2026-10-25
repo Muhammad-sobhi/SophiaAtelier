@@ -69,6 +69,12 @@ class NotificationController extends Controller
             \Log::error('Failed to generate pickup reminders: ' . $e->getMessage());
         }
 
+        try {
+            app(\App\Services\DuePaymentReminders::class)->generate();
+        } catch (\Exception $e) {
+            \Log::error('Failed to generate dress payment reminders: ' . $e->getMessage());
+        }
+
         // Read/deleted state is per employee
         $query = Notification::query()
             ->leftJoin('notification_user as nu', function ($join) use ($request) {
@@ -78,6 +84,11 @@ class NotificationController extends Controller
             ->whereNull('nu.deleted_at')
             ->select('notifications.*', DB::raw('nu.read_at IS NOT NULL as is_read'));
 
+        // Payment reminders carry purchase amounts: finance staff only
+        if (!$request->user()->hasPermission('/dashboard/finance')) {
+            $query->whereNotIn('notifications.type', \App\Services\DuePaymentReminders::TYPES);
+        }
+
         if ($request->input('unread_only')) {
             $query->whereNull('nu.read_at');
         }
@@ -85,8 +96,11 @@ class NotificationController extends Controller
         return response()->json($query->latest('notifications.created_at')->paginate($request->input('per_page', 20)));
     }
 
-    public function show(Notification $notification)
+    public function show(Request $request, Notification $notification)
     {
+        abort_if(in_array($notification->type, \App\Services\DuePaymentReminders::TYPES, true)
+            && !$request->user()->hasPermission('/dashboard/finance'), 404);
+
         return response()->json($notification);
     }
 
