@@ -359,4 +359,31 @@ class FinanceAccountingTest extends TestCase
         $this->getJson('/api/dress-purchases')->assertForbidden();
         Carbon::setTestNow();
     }
+
+    public function test_reminder_days_follow_cairo_time()
+    {
+        // 22:30 UTC on 10 June is already 11 June in Cairo
+        Carbon::setTestNow('2026-06-10 22:30:00');
+        $dress = Dress::factory()->create();
+        $this->postJson('/api/dress-purchases', $this->purchasePayload($dress, [
+            'amount' => 2000,
+            'payments' => [
+                ['amount' => 1000, 'due_date' => '2026-06-11', 'paid' => false],
+                ['amount' => 1000, 'due_date' => '2026-06-10', 'paid' => false],
+            ],
+        ]))->assertCreated();
+
+        $this->artisan('dress-payments:remind')->assertSuccessful();
+        $this->assertSame(['dress_payment_due', 'dress_payment_overdue'], Notification::orderBy('type')->pluck('type')->all());
+
+        $due = $this->getJson('/api/dress-purchases/due-payments?days=0')->assertOk();
+        $this->assertEquals(2000, $due->json('total'));
+        $this->assertEquals(1000, $due->json('overdue_total'));
+
+        // A new Cairo day: the overdue one is reminded again
+        Carbon::setTestNow('2026-06-11 21:30:00');
+        $this->artisan('dress-payments:remind')->assertSuccessful();
+        $this->assertSame(3, Notification::withTrashed()->where('type', 'dress_payment_overdue')->count());
+        Carbon::setTestNow();
+    }
 }

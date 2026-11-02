@@ -47,8 +47,9 @@ function CollectionsContent() {
 
   const sortOptions = [
     { label: t.collections.allCategories || 'All', value: 'featured' },
-    { label: t.collections.sortPriceLow || 'Price: Low to High', value: 'price-asc' },
-    { label: t.collections.sortPriceHigh || 'Price: High to Low', value: 'price-desc' },
+    { label: t.collections.sortOldest || 'Oldest to Newest', value: 'oldest' },
+    { label: t.collections.sortNewestFirst || 'Newest to Oldest', value: 'newest' },
+    { label: t.collections.sortNewCollection || 'New Collection', value: 'new-collection' },
   ];
 
   useEffect(() => {
@@ -83,6 +84,10 @@ function CollectionsContent() {
       result = result.filter((p) => p.collection?.toLowerCase() === collection.toLowerCase());
     }
 
+    if (sort === 'new-collection') {
+      result = result.filter((p) => p.new_collection);
+    }
+
     switch (sort) {
       case 'price-asc':
         result.sort((a, b) => a.priceNum - b.priceNum);
@@ -95,6 +100,9 @@ function CollectionsContent() {
         break;
       case 'newest':
         result.sort((a, b) => b.id - a.id);
+        break;
+      case 'oldest':
+        result.sort((a, b) => a.id - b.id);
         break;
       default:
         break;

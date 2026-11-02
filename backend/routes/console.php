@@ -14,4 +14,4 @@ Schedule::command('activity-logs:prune --days=180')->dailyAt('00:00');
 
 
 // Dress purchase installments due tomorrow / today / overdue (also checked whenever notifications are loaded)
-Schedule::command('dress-payments:remind')->dailyAt('08:00');
+Schedule::command('dress-payments:remind')->dailyAt('08:00')->timezone('Africa/Cairo');

@@ -9,6 +9,7 @@ use App\Models\DressPurchase;
 use App\Models\DressPurchasePayment;
 use App\Models\ManufacturingOrder;
 use App\Services\DressPurchaseService;
+use App\Services\DuePaymentReminders;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -86,11 +87,11 @@ class DressPurchaseController extends Controller
     public function duePayments(Request $request): JsonResponse
     {
         $days = (int) ($request->validate(['days' => 'nullable|integer|min:0|max:365'])['days'] ?? 7);
-        $today = now()->toDateString();
+        $today = DuePaymentReminders::today();
 
         $payments = DressPurchasePayment::with('purchase:id,dress_id,type,partner_name,supplier_id', 'purchase.dress:id,code,name,deleted_at', 'purchase.supplier:id,name')
             ->whereNull('paid_date')
-            ->where('due_date', '<=', now()->addDays($days)->toDateString())
+            ->where('due_date', '<=', now(DuePaymentReminders::TIMEZONE)->addDays($days)->toDateString())
             ->orderBy('due_date')->orderBy('id')
             ->get()
             ->each(fn ($p) => $p->setAttribute('is_overdue', $p->due_date->toDateString() < $today));
