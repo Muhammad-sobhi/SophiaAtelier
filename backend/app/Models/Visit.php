@@ -23,6 +23,11 @@ class Visit extends Model
     /** A visit may be at most this many months before the wedding */
     public const MAX_MONTHS_BEFORE_WEDDING = 4;
 
+    /** Weddings in this range may book a visit any time before the wedding (a one-off exception to the 4-month rule) */
+    public const OPEN_WEDDINGS_FROM = '2027-03-01';
+
+    public const OPEN_WEDDINGS_UNTIL = '2027-03-31';
+
     protected $fillable = [
         'client_id', 'visit_date', 'status', 'source', 'notes', 'time_slot', 'trying_fee', 'sales_name',
         'confirmed_at', 'confirmed_by', 'auto_confirmed', 'confirmation_sent_at', 'previous_visit_id',
@@ -57,11 +62,17 @@ class Visit extends Model
     /**
      * Null when the visit date is allowed for the wedding date (or either is missing), otherwise
      * ['earliest_visit_date' => Y-m-d, 'message' => Arabic error]. Counted by day; a shorter month clamps to its last day.
-     * An offer with a wedding range may allow an earlier visit for its dresses (Offer::openingVisitWindow).
+     * A wedding in the open range (OPEN_WEDDINGS_FROM..OPEN_WEDDINGS_UNTIL) has no limit, and an offer with a
+     * wedding range may allow an earlier visit for its dresses (Offer::openingVisitWindow).
      */
     public static function visitWindowError($visitDate, $weddingDate, array $dressIds = []): ?array
     {
         if (empty($visitDate) || empty($weddingDate)) {
+            return null;
+        }
+
+        $wedding = \Carbon\Carbon::parse($weddingDate)->toDateString();
+        if ($wedding >= self::OPEN_WEDDINGS_FROM && $wedding <= self::OPEN_WEDDINGS_UNTIL) {
             return null;
         }
 

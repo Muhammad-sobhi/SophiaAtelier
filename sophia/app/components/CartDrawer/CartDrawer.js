@@ -39,9 +39,13 @@ function shopNow() {
 
 /** Visits are allowed at most 4 months (by day) before the wedding; a shorter month clamps to its last day (same as the API) */
 const MAX_MONTHS_BEFORE_WEDDING = 4;
+/** Weddings in this range may book a visit any time before the wedding (one-off exception, same as the API) */
+const OPEN_WEDDINGS_FROM = '2027-03-01';
+const OPEN_WEDDINGS_UNTIL = '2027-03-31';
 function earliestVisitDate(weddingDate) {
   const m = String(weddingDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
+  if (weddingDate >= OPEN_WEDDINGS_FROM && weddingDate <= OPEN_WEDDINGS_UNTIL) return null;
   const total = Number(m[1]) * 12 + (Number(m[2]) - 1) - MAX_MONTHS_BEFORE_WEDDING;
   const year = Math.floor(total / 12);
   const month = (total % 12) + 1;

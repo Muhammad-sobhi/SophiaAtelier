@@ -41,7 +41,7 @@ class OfferWeddingRangeTest extends TestCase
             'ends_at' => '2026-11-08',
             'visible_from' => '2026-11-01',
             'wedding_from' => '2026-12-01',
-            'wedding_until' => '2027-03-31',
+            'wedding_until' => '2027-04-30',
         ], $overrides));
         $offer->dresses()->sync([$this->offerDress->id]);
 
@@ -71,27 +71,27 @@ class OfferWeddingRangeTest extends TestCase
             ->assertJsonCount(1)
             ->assertJsonPath('0.starts_at', '2026-11-06')
             ->assertJsonPath('0.wedding_from', '2026-12-01')
-            ->assertJsonPath('0.wedding_until', '2027-03-31')
+            ->assertJsonPath('0.wedding_until', '2027-04-30')
             ->assertJsonPath('0.terms_ar', "مسموح بدخول فردين فقط مع العروسة\nمسموح بالتصوير")
             ->assertJsonPath('0.dress_ids', [$this->offerDress->id]);
     }
 
-    public function test_offer_days_let_a_march_wedding_book_an_offer_dress(): void
+    public function test_offer_days_let_a_wedding_in_range_book_an_offer_dress(): void
     {
         $this->whiteFriday();
 
-        $this->assertNull(Visit::visitWindowError('2026-11-07', '2027-03-20', [$this->offerDress->id]));
-        $this->assertNotNull(Visit::visitWindowError('2026-11-07', '2027-03-20', [$this->otherDress->id]));
+        $this->assertNull(Visit::visitWindowError('2026-11-07', '2027-04-20', [$this->offerDress->id]));
+        $this->assertNotNull(Visit::visitWindowError('2026-11-07', '2027-04-20', [$this->otherDress->id]));
         // Outside the offer days, or a wedding after its range, keeps the 4-month rule
-        $this->assertNotNull(Visit::visitWindowError('2026-11-05', '2027-03-20', [$this->offerDress->id]));
-        $this->assertNotNull(Visit::visitWindowError('2026-11-07', '2027-04-10', [$this->offerDress->id]));
+        $this->assertNotNull(Visit::visitWindowError('2026-11-05', '2027-04-20', [$this->offerDress->id]));
+        $this->assertNotNull(Visit::visitWindowError('2026-11-07', '2027-05-10', [$this->offerDress->id]));
 
-        $this->websitePost($this->offerDress->id, '2026-11-07', '2027-03-20')->assertCreated();
-        $this->websitePost($this->otherDress->id, '2026-11-07', '2027-03-20')
+        $this->websitePost($this->offerDress->id, '2026-11-07', '2027-04-20')->assertCreated();
+        $this->websitePost($this->otherDress->id, '2026-11-07', '2027-04-20')
             ->assertStatus(422)->assertJsonPath('code', 'visit_too_early');
 
         $this->postJson('/api/public/availability', [
-            'dress_ids' => [$this->offerDress->id], 'visit_date' => '2026-11-08', 'wedding_date' => '2027-03-31',
+            'dress_ids' => [$this->offerDress->id], 'visit_date' => '2026-11-08', 'wedding_date' => '2027-04-30',
         ])->assertOk()->assertJsonPath('visit_window_error', null);
     }
 
@@ -100,7 +100,7 @@ class OfferWeddingRangeTest extends TestCase
         $this->whiteFriday(['is_active' => false]);
         $this->whiteFriday(['wedding_from' => null, 'wedding_until' => null]);
 
-        $this->assertNotNull(Visit::visitWindowError('2026-11-07', '2027-03-20', [$this->offerDress->id]));
+        $this->assertNotNull(Visit::visitWindowError('2026-11-07', '2027-04-20', [$this->offerDress->id]));
     }
 
     public function test_offer_discount_is_only_for_weddings_in_its_range(): void
@@ -122,7 +122,7 @@ class OfferWeddingRangeTest extends TestCase
         $this->assertSame(0, $november->bookings()->count());
 
         $march = Client::create(['name' => 'March Bride', 'phone' => '01055555552', 'city' => 'القاهرة']);
-        $book($march, '2027-03-20')->assertOk();
+        $book($march, '2027-04-20')->assertOk();
         $this->assertSame($offer->id, $march->bookings()->first()->offer_id);
     }
 
@@ -135,9 +135,9 @@ class OfferWeddingRangeTest extends TestCase
         ];
 
         $this->postJson('/api/offers', [...$base, 'visible_from' => '2026-11-07'])->assertJsonValidationErrors('visible_from');
-        $this->postJson('/api/offers', [...$base, 'wedding_from' => '2027-03-31', 'wedding_until' => '2026-12-01'])
+        $this->postJson('/api/offers', [...$base, 'wedding_from' => '2027-04-30', 'wedding_until' => '2026-12-01'])
             ->assertJsonValidationErrors('wedding_until');
-        $this->postJson('/api/offers', [...$base, 'visible_from' => '2026-11-01', 'wedding_until' => '2027-03-31'])
+        $this->postJson('/api/offers', [...$base, 'visible_from' => '2026-11-01', 'wedding_until' => '2027-04-30'])
             ->assertCreated()->assertJsonPath('visible_from', '2026-11-01')->assertJsonPath('status', 'scheduled')
             ->assertJsonPath('on_website', true);
     }

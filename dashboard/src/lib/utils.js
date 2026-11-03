@@ -71,6 +71,10 @@ export function calculateScheduledDates(weddingDate, city) {
 // A visit may be at most this many months before the wedding.
 // Keep in sync with Visit::MAX_MONTHS_BEFORE_WEDDING in the backend.
 export const MAX_MONTHS_BEFORE_WEDDING = 4;
+// Weddings in this range may book a visit any time before the wedding (one-off exception to the 4-month rule).
+// Keep in sync with Visit::OPEN_WEDDINGS_FROM / OPEN_WEDDINGS_UNTIL in the backend.
+const OPEN_WEDDINGS_FROM = '2027-03-01';
+const OPEN_WEDDINGS_UNTIL = '2027-03-31';
 
 /** Earliest allowed visit date for a wedding (by day; a shorter month clamps to its last day, like the backend) */
 export function earliestVisitDate(weddingDate) {
@@ -102,6 +106,8 @@ export function visitWindowError(visitDate, weddingDate, dressIds = [], offers =
   const visit = cleanDate(visitDate);
   const earliest = earliestVisitDate(weddingDate);
   if (!visit || !earliest || visit >= earliest) return '';
+  const wedding = cleanDate(weddingDate);
+  if (wedding >= OPEN_WEDDINGS_FROM && wedding <= OPEN_WEDDINGS_UNTIL) return '';
   if (offerOpeningVisitWindow(offers, visitDate, weddingDate, dressIds)) return '';
   return `لا يمكن حجز موعد زيارة قبل الفرح بأكثر من ${MAX_MONTHS_BEFORE_WEDDING} شهور. أقرب تاريخ مسموح للزيارة: ${formatDate(earliest)}`;
 }

@@ -40,10 +40,17 @@ test('visit at most 4 months before the wedding, counted by day', () => {
 });
 
 test('an offer with a wedding range opens the window on its days for its dresses', () => {
-  const offers = [{ starts_at: '2026-11-06', ends_at: '2026-11-08', wedding_from: '2026-12-01', wedding_until: '2027-03-31', dress_ids: [7] }];
-  assert.equal(visitWindowError('2026-11-07', '2027-03-20', ['7'], offers), '');
-  assert.notEqual(visitWindowError('2026-11-07', '2027-03-20', ['8'], offers), '');
-  assert.notEqual(visitWindowError('2026-11-05', '2027-03-20', ['7'], offers), '');
-  assert.notEqual(visitWindowError('2026-11-07', '2027-04-10', ['7'], offers), '');
-  assert.notEqual(visitWindowError('2026-11-07', '2027-03-20', ['7'], [{ ...offers[0], wedding_until: null }]), '');
+  const offers = [{ starts_at: '2026-11-06', ends_at: '2026-11-08', wedding_from: '2026-12-01', wedding_until: '2027-04-30', dress_ids: [7] }];
+  assert.equal(visitWindowError('2026-11-07', '2027-04-20', ['7'], offers), '');
+  assert.notEqual(visitWindowError('2026-11-07', '2027-04-20', ['8'], offers), '');
+  assert.notEqual(visitWindowError('2026-11-05', '2027-04-20', ['7'], offers), '');
+  assert.notEqual(visitWindowError('2026-11-07', '2027-05-10', ['7'], offers), '');
+  assert.notEqual(visitWindowError('2026-11-07', '2027-04-20', ['7'], [{ ...offers[0], wedding_until: null }]), '');
+});
+
+test('march 2027 weddings may book a visit any time before', () => {
+  assert.equal(visitWindowError('2026-11-05', '2027-03-01'), '');
+  assert.equal(visitWindowError('2026-11-05', '2027-03-31 00:00:00'), '');
+  assert.notEqual(visitWindowError('2026-11-05', '2027-04-01'), '');
+  assert.notEqual(visitWindowError('2026-10-01', '2027-02-28'), '');
 });
