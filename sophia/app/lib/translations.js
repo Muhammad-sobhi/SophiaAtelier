@@ -33,6 +33,15 @@ export const translations = {
       amountOff: (v) => `${v} EGP OFF`,
       sectionTitle: (name) => `${name} OFFERS`,
       close: 'Close offer',
+      startsIn: 'Starts in',
+      terms: 'Terms',
+      dressInOffer: (name) => `This dress is part of ${name}`,
+      forWeddings: (months) => `For weddings ${months}`,
+      visitInOffer: (name) => `Your visit is part of ${name}`,
+      limited: 'Limited time offer',
+      special: 'Special offer',
+      offerDays: 'Offer days',
+      viewDresses: 'See the offer dresses',
     },
     // Best Sellers
     bestSellers: {
@@ -398,6 +407,15 @@ export const translations = {
       amountOff: (v) => `خصم ${v} ج.م`,
       sectionTitle: (name) => `عروض ${name}`,
       close: 'إغلاق العرض',
+      startsIn: 'يبدأ خلال',
+      terms: 'الشروط',
+      dressInOffer: (name) => `هذا الفستان ضمن عرض ${name}`,
+      forWeddings: (months) => `لأفراح ${months}`,
+      visitInOffer: (name) => `موعدك متاح ضمن عرض ${name}`,
+      limited: 'عرض لفترة محدودة',
+      special: 'عرض خاص',
+      offerDays: 'أيام العرض',
+      viewDresses: 'تصفحي فساتين العرض',
     },
     // Best Sellers
     bestSellers: {

@@ -99,7 +99,7 @@ class BookingController extends Controller
 
         $validated = $this->withOffer($request, $validated, [
             $validated['dress_id'], $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
-        ], (float) $validated['total_amount']);
+        ], (float) $validated['total_amount'], $validated['event_date']);
 
         $status = $request->input('status', 'pending');
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
@@ -251,7 +251,8 @@ class BookingController extends Controller
         $dress2Id = $request->has('dress_2_id') ? $request->input('dress_2_id') : $booking->dress_2_id;
         $dress3Id = $request->has('dress_3_id') ? $request->input('dress_3_id') : $booking->dress_3_id;
         $validated = $this->withOffer($request, $validated, [$dressId, $dress2Id, $dress3Id],
-            (float) ($validated['total_amount'] ?? $booking->total_amount), $booking);
+            (float) ($validated['total_amount'] ?? $booking->total_amount),
+            $request->input('event_date', $booking->event_date), $booking);
         $eventDate = $request->input('event_date', $booking->event_date);
         $status = $request->input('status', $booking->status);
         $forceOverride = $request->boolean('force_override') || $request->boolean('is_override');
@@ -269,7 +270,8 @@ class BookingController extends Controller
             && \Carbon\Carbon::parse($validated['event_date'])->toDateString() !== $booking->event_date?->toDateString()) {
             $openVisit = \App\Models\Visit::where('client_id', $clientId)
                 ->whereIn('status', \App\Models\Visit::OPEN_STATUSES)->latest()->latest('id')->first();
-            \App\Models\Visit::assertVisitWindow($openVisit?->visit_date, $validated['event_date'], 'event_date');
+            \App\Models\Visit::assertVisitWindow($openVisit?->visit_date, $validated['event_date'], 'event_date',
+                [...($openVisit?->dressIds() ?? []), $dressId, $dress2Id, $dress3Id]);
         }
 
         // Availability only depends on the dresses, the wedding date and the status, so a price or
@@ -466,7 +468,7 @@ class BookingController extends Controller
      * Checks the offer applied in the form (only when the request sends offer_id; payment-only
      * edits leave the booking's offer untouched).
      */
-    private function withOffer(Request $request, array $validated, array $dressIds, float $netTotal, ?Booking $existing = null): array
+    private function withOffer(Request $request, array $validated, array $dressIds, float $netTotal, $weddingDate, ?Booking $existing = null): array
     {
         unset($validated['offer_id'], $validated['discount_amount']);
         if (! $request->has('offer_id')) {
@@ -478,6 +480,7 @@ class BookingController extends Controller
             (float) $request->input('discount_amount', 0),
             $netTotal,
             $dressIds,
+            $weddingDate,
             $existing
         )];
     }

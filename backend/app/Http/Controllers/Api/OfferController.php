@@ -25,11 +25,11 @@ class OfferController extends Controller
         return response()->json($offers->map(fn (Offer $offer) => $this->present($offer)));
     }
 
-    /** Running offers for the website: labels and covered dress ids only, never prices */
+    /** Announced and running offers for the website: labels, dates, terms and covered dress ids, never prices */
     public function publicIndex(): JsonResponse
     {
         $offers = Cache::remember(self::PUBLIC_CACHE_KEY, 300, function () {
-            return Offer::running()->orderByDesc('starts_at')->orderByDesc('id')->get()
+            return Offer::onWebsite()->orderBy('starts_at')->orderByDesc('id')->get()
                 ->map(fn (Offer $offer) => [
                     'id' => $offer->id,
                     'name' => $offer->name,
@@ -40,7 +40,12 @@ class OfferController extends Controller
                     'perk_ar' => $offer->perk_ar,
                     'banner_text' => $offer->banner_text,
                     'banner_text_ar' => $offer->banner_text_ar,
+                    'terms' => $offer->terms,
+                    'terms_ar' => $offer->terms_ar,
+                    'starts_at' => $offer->starts_at->toDateString(),
                     'ends_at' => $offer->ends_at->toDateString(),
+                    'wedding_from' => $offer->wedding_from?->toDateString(),
+                    'wedding_until' => $offer->wedding_until?->toDateString(),
                     'dress_ids' => $offer->coveredDressIds(),
                 ])->values()->all();
         });
@@ -101,6 +106,9 @@ class OfferController extends Controller
             ...$offer->only($offer->getFillable()),
             'starts_at' => $offer->starts_at?->toDateString(),
             'ends_at' => $offer->ends_at?->toDateString(),
+            'visible_from' => $offer->visible_from?->toDateString(),
+            'wedding_from' => $offer->wedding_from?->toDateString(),
+            'wedding_until' => $offer->wedding_until?->toDateString(),
             'dress_ids' => $offer->dresses()->pluck('dresses.id')->all(),
         ] : [];
         $input = array_merge($current, $request->only([...(new Offer)->getFillable(), 'dress_ids']));
@@ -125,8 +133,13 @@ class OfferController extends Controller
             'dress_ids.*' => 'integer|distinct|exists:dresses,id',
             'banner_text' => 'nullable|string|max:255',
             'banner_text_ar' => 'nullable|string|max:255',
+            'terms' => 'nullable|string|max:2000',
+            'terms_ar' => 'nullable|string|max:2000',
             'starts_at' => 'required|date',
             'ends_at' => 'required|date|after_or_equal:starts_at',
+            'visible_from' => 'nullable|date|before_or_equal:starts_at',
+            'wedding_from' => 'nullable|date',
+            'wedding_until' => 'nullable|date|after_or_equal:wedding_from',
             'is_active' => 'boolean',
         ], [
             'value.required_unless' => 'اكتبي قيمة الخصم',
@@ -135,6 +148,8 @@ class OfferController extends Controller
             'scope_id.required_if' => 'اختاري الفئة أو التشكيلة',
             'dress_ids.required_if' => 'اختاري فستانًا واحدًا على الأقل',
             'ends_at.after_or_equal' => 'تاريخ النهاية لازم يكون بعد البداية',
+            'visible_from.before_or_equal' => 'تاريخ الظهور على الموقع لازم يكون قبل بداية العرض أو في نفس اليوم',
+            'wedding_until.after_or_equal' => 'آخر تاريخ فرح لازم يكون بعد أول تاريخ فرح',
         ])->validate();
 
         $scope = $data['scope'];

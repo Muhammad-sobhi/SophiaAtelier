@@ -12,6 +12,7 @@ import BridesExcelImport from '@/components/BridesExcelImport';
 import { formatWhatsAppNumber } from '@/lib/whatsapp';
 import { cleanDate, calculateScheduledDates, isCairoCity, todayStr, visitWindowError } from '@/lib/utils';
 import { getDressConflict } from '@/components/bride-journey/UnifiedStageModal';
+import { useRunningOffers } from '@/lib/offers';
 import { PhoneWarning } from '@/components/ui/PhoneWarning';
 import { SalesCombobox } from '@/components/common/SalesCombobox';
 
@@ -102,6 +103,7 @@ export default function BridesPage() {
   const [fullyBookedSlots, setFullyBookedSlots] = useState([]);
 
   // Form fields
+  const websiteOffers = useRunningOffers();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -425,11 +427,12 @@ export default function BridesPage() {
   }, [brideDress3Obj, formData.wedding_date, editingBride?.id, formData.city]);
 
   // A new bride with dresses but no visit date gets a visit today (same as the backend)
+  const formDressIds = [formData.dress_id, formData.dress_2_id, formData.dress_3_id];
   const visitWindowWarning = editingBride
     ? ((cleanDate(formData.visit_date) !== initialDates.visit_date || cleanDate(formData.wedding_date) !== initialDates.wedding_date)
-      ? visitWindowError(formData.visit_date || initialDates.visit_date, formData.wedding_date)
+      ? visitWindowError(formData.visit_date || initialDates.visit_date, formData.wedding_date, formDressIds, websiteOffers)
       : '')
-    : visitWindowError(formData.visit_date || (formData.dress_id ? todayStr() : ''), formData.wedding_date);
+    : visitWindowError(formData.visit_date || (formData.dress_id ? todayStr() : ''), formData.wedding_date, formDressIds, websiteOffers);
 
   const handleSaveBride = async (e) => {
     e.preventDefault();
