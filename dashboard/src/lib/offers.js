@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
+import { cleanDate, todayStr } from '@/lib/utils';
 
-// Running offers change rarely; one request per page load is enough
+// Offers on the website (announced or running) change rarely; one request per page load is enough
 let runningOffersPromise = null;
 
 export function useRunningOffers() {
@@ -28,6 +29,18 @@ export function offerLabel(offer) {
   const value = Number(offer.value);
   return offer.type === 'percentage' ? `خصم ${value}%` : `خصم ${value.toLocaleString()} ج.م`;
 }
+
+/** Whether a wedding on this date may take the offer; without a wedding range every wedding may */
+export function offerCoversWedding(offer, weddingDate) {
+  if (!offer.wedding_from && !offer.wedding_until) return true;
+  const wedding = cleanDate(weddingDate);
+  if (!wedding) return false;
+  return (!offer.wedding_from || offer.wedding_from <= wedding) && (!offer.wedding_until || wedding <= offer.wedding_until);
+}
+
+/** Offers staff can apply to a booking: started (the website may announce one before) and for this wedding */
+export const bookableOffers = (offers, weddingDate) =>
+  offers.filter((o) => o.starts_at <= todayStr() && offerCoversWedding(o, weddingDate));
 
 export const offerCoversAny = (offer, dressIds) =>
   offer.dress_ids === null || dressIds.some((id) => offer.dress_ids.includes(Number(id)));

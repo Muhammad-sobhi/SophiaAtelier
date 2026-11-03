@@ -70,7 +70,11 @@ class BrideJourneyService
         $visit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
         Visit::assertVisitWindow(
             $request->input('visit_date') ?: ($visit?->visit_date ?? now()->toDateString()),
-            $request->input('event_date') ?: $client->wedding_date
+            $request->input('event_date') ?: $client->wedding_date,
+            'visit_date',
+            $request->hasAny(['dress_id', 'dress_2_id', 'dress_3_id'])
+                ? [$request->input('dress_id'), $request->input('dress_2_id'), $request->input('dress_3_id')]
+                : ($visit?->dressIds() ?? [])
         );
         $visitTime = $request->filled('visit_time') ? VisitController::normalizeTimeSlot($request->input('visit_time')) : null;
 
@@ -263,6 +267,7 @@ class BrideJourneyService
                 (float) $request->input('discount_amount', 0),
                 (float) $request->input('total_amount', 0),
                 [$dressId, $dress2Id, $dress3Id],
+                $eventDate,
                 $booking->exists ? $booking : null
             );
             $booking->offer_id = $offer['offer_id'];

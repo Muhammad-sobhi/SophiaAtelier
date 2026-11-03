@@ -330,7 +330,7 @@ class ClientController extends Controller
         ])));
 
         // A visit (dated today when only dresses are sent) may be at most 4 months before the wedding
-        Visit::assertVisitWindow($validated['visit_date'] ?? ($dressIds ? now()->toDateString() : null), $validated['wedding_date'] ?? null);
+        Visit::assertVisitWindow($validated['visit_date'] ?? ($dressIds ? now()->toDateString() : null), $validated['wedding_date'] ?? null, 'visit_date', $dressIds);
 
         // The public registration may not request a visit on a day closed by the admin
         if ($isPublic && \App\Models\ClosedDay::isClosed($validated['visit_date'] ?? null)) {
@@ -425,9 +425,12 @@ class ClientController extends Controller
         $newVisitDate = !empty($validated['visit_date'])
             && !$client->visits()->whereDate('visit_date', $validated['visit_date'])->exists();
         if ($weddingChanged || $newVisitDate) {
-            $visitDate = $validated['visit_date']
-                ?? $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first()?->visit_date;
-            Visit::assertVisitWindow($visitDate, $weddingDate, $newVisitDate ? 'visit_date' : 'wedding_date');
+            $openVisit = $client->visits()->whereIn('status', Visit::OPEN_STATUSES)->latest()->latest('id')->first();
+            $visitDate = $validated['visit_date'] ?? $openVisit?->visit_date;
+            Visit::assertVisitWindow($visitDate, $weddingDate, $newVisitDate ? 'visit_date' : 'wedding_date', [
+                ...($openVisit?->dressIds() ?? []),
+                $validated['dress_id'] ?? null, $validated['dress_2_id'] ?? null, $validated['dress_3_id'] ?? null,
+            ]);
         }
 
         $normalizedTimeSlot = null;

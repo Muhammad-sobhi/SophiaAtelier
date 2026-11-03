@@ -46,7 +46,7 @@ class WebsiteVisitService
             ]);
         }
 
-        if ($windowError = Visit::visitWindowError($bookingDate, $eventDate)) {
+        if ($windowError = Visit::visitWindowError($bookingDate, $eventDate, $dressIds)) {
             throw new ActionRejected([
                 'message' => $windowError['message'],
                 'code' => 'visit_too_early',

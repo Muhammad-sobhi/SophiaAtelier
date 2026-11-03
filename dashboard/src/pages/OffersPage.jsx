@@ -48,8 +48,13 @@ const emptyForm = () => ({
   dress_ids: [],
   banner_text: '',
   banner_text_ar: '',
+  terms: '',
+  terms_ar: '',
   starts_at: todayStr(),
   ends_at: addDays(todayStr(), 7),
+  visible_from: '',
+  wedding_from: '',
+  wedding_until: '',
   is_active: true,
 });
 
@@ -128,8 +133,13 @@ export default function OffersPage() {
       dress_ids: offer.dress_ids || [],
       banner_text: offer.banner_text || '',
       banner_text_ar: offer.banner_text_ar || '',
+      terms: offer.terms || '',
+      terms_ar: offer.terms_ar || '',
       starts_at: offer.starts_at,
       ends_at: offer.ends_at,
+      visible_from: offer.visible_from || '',
+      wedding_from: offer.wedding_from || '',
+      wedding_until: offer.wedding_until || '',
       is_active: offer.is_active,
     });
     setFormError('');
@@ -149,6 +159,8 @@ export default function OffersPage() {
     if (formData.scope === 'dresses' && formData.dress_ids.length === 0) return 'اختاري فستانًا واحدًا على الأقل';
     if (!formData.starts_at || !formData.ends_at) return 'حددي تاريخ البداية والنهاية';
     if (formData.ends_at < formData.starts_at) return 'تاريخ النهاية لازم يكون بعد البداية';
+    if (formData.visible_from && formData.visible_from > formData.starts_at) return 'تاريخ الظهور على الموقع لازم يكون قبل بداية العرض أو في نفس اليوم';
+    if (formData.wedding_from && formData.wedding_until && formData.wedding_until < formData.wedding_from) return 'آخر تاريخ فرح لازم يكون بعد أول تاريخ فرح';
     return '';
   };
 
@@ -165,6 +177,9 @@ export default function OffersPage() {
       ...formData,
       value: formData.type === 'perk' ? null : Number(formData.value),
       scope_id: formData.scope_id ? Number(formData.scope_id) : null,
+      visible_from: formData.visible_from || null,
+      wedding_from: formData.wedding_from || null,
+      wedding_until: formData.wedding_until || null,
     };
 
     try {
@@ -237,7 +252,7 @@ export default function OffersPage() {
       : [...formData.dress_ids, id]);
   };
 
-  const running = offers.filter((o) => o.status === 'running');
+  const onWebsite = offers.filter((o) => o.on_website);
   const totalBookings = offers.reduce((sum, o) => sum + (o.bookings_count || 0), 0);
   const totalDiscounts = offers.reduce((sum, o) => sum + (Number(o.discount_total) || 0), 0);
 
@@ -293,7 +308,7 @@ export default function OffersPage() {
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <span className="text-xs font-bold text-slate-400">العرض الظاهر على الموقع</span>
           <span className="text-lg font-extrabold text-emerald-600 mt-3 truncate">
-            {running.length > 0 ? running[0].name_ar || running[0].name : 'لا يوجد'}
+            {onWebsite.length > 0 ? onWebsite[0].name_ar || onWebsite[0].name : 'لا يوجد'}
           </span>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
@@ -332,6 +347,10 @@ export default function OffersPage() {
                     <span className="font-bold text-indigo-700">{offerLabel(offer)}</span>
                     <span>{scopeSummary(offer)}</span>
                     <span>{formatDate(offer.starts_at)} ← {formatDate(offer.ends_at)}</span>
+                    {offer.visible_from && <span>يظهر على الموقع من {formatDate(offer.visible_from)}</span>}
+                    {(offer.wedding_from || offer.wedding_until) && (
+                      <span>أفراح {offer.wedding_from ? `من ${formatDate(offer.wedding_from)}` : ''} {offer.wedding_until ? `إلى ${formatDate(offer.wedding_until)}` : ''}</span>
+                    )}
                   </p>
                 </div>
 
@@ -448,6 +467,24 @@ export default function OffersPage() {
                 </label>
               </div>
 
+              <label className="space-y-1.5 block sm:w-1/2">
+                <span className="text-xs font-extrabold text-slate-700">يظهر على الموقع من</span>
+                <input type="date" max={formData.starts_at} value={formData.visible_from} onChange={(e) => setField('visible_from', e.target.value)} className={inputClass} />
+              </label>
+              <p className="text-[11px] text-slate-400 -mt-3">عشان العرايس يحجزوا زيارة في أيام العرض قبل ما يبدأ. لو فاضي، العرض يظهر من أول يوم فيه.</p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="space-y-1.5 block">
+                  <span className="text-xs font-extrabold text-slate-700">أول تاريخ فرح مسموح</span>
+                  <input type="date" value={formData.wedding_from} onChange={(e) => setField('wedding_from', e.target.value)} className={inputClass} />
+                </label>
+                <label className="space-y-1.5 block">
+                  <span className="text-xs font-extrabold text-slate-700">آخر تاريخ فرح مسموح</span>
+                  <input type="date" min={formData.wedding_from || undefined} value={formData.wedding_until} onChange={(e) => setField('wedding_until', e.target.value)} className={inputClass} />
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-400 -mt-3">العرض يتطبق بس على الأفراح دي. ومع "آخر تاريخ فرح"، الزيارة في أيام العرض على فساتينه مسموحة حتى لو قبل الفرح بأكتر من 4 شهور.</p>
+
               <fieldset className="space-y-2">
                 <legend className="text-xs font-extrabold text-slate-700 mb-1.5">الفساتين المشمولة</legend>
                 <div className="flex flex-wrap gap-2">
@@ -510,6 +547,18 @@ export default function OffersPage() {
                 </label>
               </div>
               <p className="text-[11px] text-slate-400 -mt-3">لو سبتي نص الشريط فاضي، الموقع هيعرض اسم العرض.</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="space-y-1.5 block">
+                  <span className="text-xs font-extrabold text-slate-700">شروط العرض بالعربي</span>
+                  <textarea rows={4} placeholder={'مسموح بدخول فردين فقط مع العروسة\nمسموح بالتصوير'} value={formData.terms_ar} onChange={(e) => setField('terms_ar', e.target.value)} className={inputClass} />
+                </label>
+                <label className="space-y-1.5 block">
+                  <span className="text-xs font-extrabold text-slate-700">شروط العرض بالإنجليزي</span>
+                  <textarea rows={4} dir="ltr" placeholder={'Only two guests with the bride\nPhotos allowed'} value={formData.terms} onChange={(e) => setField('terms', e.target.value)} className={inputClass} />
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-400 -mt-3">كل شرط في سطر. بيظهر على الموقع تحت الشريط وفي صفحة الفستان.</p>
 
               <button
                 type="button"

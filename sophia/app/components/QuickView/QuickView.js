@@ -5,7 +5,7 @@ import Image from 'next/image';
 import LazyVideo from '../LazyVideo/LazyVideo';
 import { X, Heart, Star, ChevronLeft, ChevronRight, Sparkles, Shirt, Scale, Palette, Package } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { offerLabel, offerName } from '../../lib/offers';
+import { offerLabel, offerName, offerTerms, offerDays, offerWeddingMonths } from '../../lib/offers';
 import styles from './QuickView.module.css';
 
 export default function QuickView() {
@@ -156,6 +156,20 @@ export default function QuickView() {
 
             {/* Title */}
             <h2 className={styles.name}>{displayName}</h2>
+
+            {offer && (offerTerms(offer, lang).length > 0 || offerWeddingMonths(offer, lang)) && (
+              <div className={styles.offerBox}>
+                <strong>{t.offers.dressInOffer(offerName(offer, lang))}</strong>
+                <span className={styles.offerBoxMeta}>
+                  {[offerDays(offer, lang), offerWeddingMonths(offer, lang) && t.offers.forWeddings(offerWeddingMonths(offer, lang))].filter(Boolean).join(' · ')}
+                </span>
+                {offerTerms(offer, lang).length > 0 && (
+                  <ul className={styles.offerTerms}>
+                    {offerTerms(offer, lang).map((term) => <li key={term}>{term}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {/* Collection & Designer Sub-info */}
             {(displayCollection || displayDesigner) && (

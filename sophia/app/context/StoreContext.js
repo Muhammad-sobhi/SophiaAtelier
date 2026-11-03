@@ -182,8 +182,13 @@ export function StoreProvider({ children }) {
 
   // Offers expire, so they are fetched fresh and kept out of the catalog cache
   const [offers, setOffers] = useState([]);
+  // The offer popup shows first: 'pending' until the offers load, then 'open' or 'done' (other prompts wait)
+  const [offerPopup, setOfferPopup] = useState('pending');
   useEffect(() => {
-    fetchActiveOffers().then(setOffers);
+    fetchActiveOffers().then((list) => {
+      setOffers(list);
+      if (list.length === 0) setOfferPopup('done');
+    });
   }, []);
 
   /** The first running offer covering this dress (dress_ids null = every dress) */
@@ -267,7 +272,7 @@ export function StoreProvider({ children }) {
     weddingDate, setWeddingDate, catalogAvailability,
     wishlist, toggleWishlist, isWishlisted,
     dresses, categories, collections, clientGallery, loadingDresses, refreshData: loadApiData,
-    offers, offerForDress,
+    offers, offerForDress, offerPopup, setOfferPopup,
     brideUser, loginBride, registerBride, logoutBride,
     authModalOpen, setAuthModalOpen,
     quickViewProduct, openQuickView, closeQuickView,

@@ -17,9 +17,10 @@ class BookingOfferService
 
     /**
      * @param  array<int, int|string|null>  $dressIds
+     * @param  mixed  $weddingDate  the bride's wedding date, checked against the offer's wedding range
      * @return array{offer_id: int|null, discount_amount: float}
      */
-    public function resolve(?int $offerId, float $discount, float $netTotal, array $dressIds, ?Booking $existing = null): array
+    public function resolve(?int $offerId, float $discount, float $netTotal, array $dressIds, $weddingDate, ?Booking $existing = null): array
     {
         if (! $offerId) {
             return ['offer_id' => null, 'discount_amount' => 0.0];
@@ -39,6 +40,12 @@ class BookingOfferService
         $dressIds = array_map('intval', array_filter($dressIds));
         if ($covered !== null && ! array_intersect($dressIds, $covered)) {
             throw ValidationException::withMessages(['offer_id' => 'العرض لا يشمل الفساتين المختارة']);
+        }
+
+        if (! $offer->coversWedding($weddingDate)) {
+            throw ValidationException::withMessages(['offer_id' => 'العرض لأفراح من '
+                . ($offer->wedding_from?->format('d/m/Y') ?? 'أي تاريخ') . ' إلى '
+                . ($offer->wedding_until?->format('d/m/Y') ?? 'أي تاريخ') . ' فقط']);
         }
 
         if ($offer->type === 'perk') {

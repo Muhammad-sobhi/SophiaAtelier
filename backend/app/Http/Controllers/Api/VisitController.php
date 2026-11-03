@@ -83,7 +83,8 @@ class VisitController extends Controller
             'booked_dresses.*' => 'exists:dresses,id',
         ]);
 
-        Visit::assertVisitWindow($validated['visit_date'], Client::find($validated['client_id'])?->wedding_date);
+        Visit::assertVisitWindow($validated['visit_date'], Client::find($validated['client_id'])?->wedding_date, 'visit_date',
+            [...($validated['tried_dresses'] ?? []), ...($validated['booked_dresses'] ?? [])]);
 
         if (!empty($validated['time_slot'])) {
             $normalized = self::normalizeTimeSlot($validated['time_slot']);
@@ -134,7 +135,9 @@ class VisitController extends Controller
         if ($dateChanged || $clientChanged) {
             Visit::assertVisitWindow(
                 $validated['visit_date'] ?? $visit->visit_date,
-                Client::find($validated['client_id'] ?? $visit->client_id)?->wedding_date
+                Client::find($validated['client_id'] ?? $visit->client_id)?->wedding_date,
+                'visit_date',
+                $visit->dressIds()
             );
         }
 

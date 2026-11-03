@@ -15,7 +15,7 @@ import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { PhoneWarning } from '@/components/ui/PhoneWarning';
 import { SalesCombobox } from '@/components/common/SalesCombobox';
 import { OfferDiscountBox } from '@/components/OfferDiscountBox';
-import { useRunningOffers, resolveOfferDiscount } from '@/lib/offers';
+import { useRunningOffers, resolveOfferDiscount, bookableOffers } from '@/lib/offers';
 
 export const getDressConflict = (dress, targetDate, currentClientId = null, targetCity = 'القاهرة') => {
   if (!dress || !targetDate) return null;
@@ -222,7 +222,8 @@ function UnifiedStageModalContent({
       ? String(parseFloat(activeBooking.total_amount) + parseFloat(activeBooking.discount_amount || 0))
       : (prefillTotal > 0 ? String(prefillTotal) : '3500')
   );
-  const runningOffers = useRunningOffers();
+  const websiteOffers = useRunningOffers();
+  const runningOffers = bookableOffers(websiteOffers, bookingEventDate || weddingDate);
   const [bookingOfferId, setBookingOfferId] = useState(activeBooking?.offer_id || null);
   const bookingDiscount = resolveOfferDiscount({
     offers: runningOffers, offerId: bookingOfferId, gross: parseFloat(bookingTotalAmount || 0), savedBooking: activeBooking,
@@ -568,7 +569,8 @@ function UnifiedStageModalContent({
   const calculatedDeduction = returnRefundMode === 'deduction' ? Math.min(totalHeldInsurance, Math.max(0, parseFloat(damageDeduction || 0))) : 0;
   const netRefundAmount = Math.max(0, totalHeldInsurance - calculatedDeduction);
 
-  const visitTooEarly = visitWindowError(visitDate, weddingDate);
+  const visitTooEarly = visitWindowError(visitDate, weddingDate,
+    [visitDress1Id, visitHasDress2 && visitDress2Id, visitHasDress3 && visitDress3Id], websiteOffers);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

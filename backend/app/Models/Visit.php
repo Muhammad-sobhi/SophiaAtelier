@@ -57,15 +57,17 @@ class Visit extends Model
     /**
      * Null when the visit date is allowed for the wedding date (or either is missing), otherwise
      * ['earliest_visit_date' => Y-m-d, 'message' => Arabic error]. Counted by day; a shorter month clamps to its last day.
+     * An offer with a wedding range may allow an earlier visit for its dresses (Offer::openingVisitWindow).
      */
-    public static function visitWindowError($visitDate, $weddingDate): ?array
+    public static function visitWindowError($visitDate, $weddingDate, array $dressIds = []): ?array
     {
         if (empty($visitDate) || empty($weddingDate)) {
             return null;
         }
 
         $earliest = \Carbon\Carbon::parse($weddingDate)->startOfDay()->subMonthsNoOverflow(self::MAX_MONTHS_BEFORE_WEDDING);
-        if (\Carbon\Carbon::parse($visitDate)->startOfDay()->gte($earliest)) {
+        if (\Carbon\Carbon::parse($visitDate)->startOfDay()->gte($earliest)
+            || Offer::openingVisitWindow($visitDate, $weddingDate, $dressIds)) {
             return null;
         }
 
@@ -77,9 +79,9 @@ class Visit extends Model
     }
 
     /** Throws a 422 validation error on the given field when the visit is too far before the wedding */
-    public static function assertVisitWindow($visitDate, $weddingDate, string $field = 'visit_date'): void
+    public static function assertVisitWindow($visitDate, $weddingDate, string $field = 'visit_date', array $dressIds = []): void
     {
-        if ($error = self::visitWindowError($visitDate, $weddingDate)) {
+        if ($error = self::visitWindowError($visitDate, $weddingDate, $dressIds)) {
             throw \Illuminate\Validation\ValidationException::withMessages([$field => [$error['message']]]);
         }
     }
@@ -164,6 +166,12 @@ class Visit extends Model
     public function revenues(): HasMany
     {
         return $this->hasMany(Revenue::class);
+    }
+
+    /** Ids of every dress on the visit (requested, tried or booked) */
+    public function dressIds(): array
+    {
+        return $this->belongsToMany(Dress::class, 'visit_dresses')->pluck('dresses.id')->unique()->values()->all();
     }
 
     public function requestedDresses()

@@ -2,28 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { offerBannerText } from '../../lib/offers';
+import { offerBannerText, offerTerms, offerWeddingMonths, offerCountdown } from '../../lib/offers';
 import styles from './OfferBanner.module.css';
 
 const DISMISS_KEY = 'sophia_offer_dismissed';
 const BAR_HEIGHT = '38px';
 
-// Time left until the end of the offer's last day (visitor's local time)
-function timeLeft(endsAt) {
-  const ms = new Date(`${endsAt}T23:59:59`).getTime() - Date.now();
-  if (ms <= 0) return null;
-  const minutes = Math.floor(ms / 60000);
-  return { days: Math.floor(minutes / 1440), hours: Math.floor((minutes % 1440) / 60), minutes: minutes % 60 };
-}
-
-/** Thin bar above the navbar announcing the running offer, with a countdown */
+/**
+ * Thin bar above the navbar announcing the offer, with a countdown to its start (while announced
+ * before its days) or to its end, and its terms in a panel under the bar
+ */
 export default function OfferBanner() {
   const { offers, lang, t } = useStore();
   const offer = offers[0];
   const [dismissedId, setDismissedId] = useState(null);
   const [left, setLeft] = useState(null);
+  const [upcoming, setUpcoming] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
 
   useEffect(() => {
     try { setDismissedId(Number(sessionStorage.getItem(DISMISS_KEY)) || null); } catch (e) {}
@@ -31,7 +28,11 @@ export default function OfferBanner() {
 
   useEffect(() => {
     if (!offer) return undefined;
-    const tick = () => setLeft(timeLeft(offer.ends_at));
+    const tick = () => {
+      const countdown = offerCountdown(offer);
+      setUpcoming(Boolean(countdown?.upcoming));
+      setLeft(countdown?.left || null);
+    };
     tick();
     const id = setInterval(tick, 30000);
     return () => clearInterval(id);
@@ -54,16 +55,37 @@ export default function OfferBanner() {
     try { sessionStorage.setItem(DISMISS_KEY, String(offer.id)); } catch (e) {}
   };
 
+  const terms = offerTerms(offer, lang);
+  const weddingMonths = offerWeddingMonths(offer, lang);
+  if (weddingMonths) terms.push(t.offers.forWeddings(weddingMonths));
+  const countdownLabel = upcoming ? t.offers.startsIn : t.offers.endsIn;
+
   return (
     <div className={styles.bar} role="region" aria-label={offerBannerText(offer, lang)}>
       <span className={styles.text}>{offerBannerText(offer, lang)}</span>
-      <span className={styles.countdown} aria-label={t.offers.endsIn}>
-        <span className={styles.endsIn}>{t.offers.endsIn}</span>
+      <span className={styles.countdown} aria-label={countdownLabel}>
+        <span className={styles.endsIn}>{countdownLabel}</span>
         <span className={styles.unit}>{left.days} {t.offers.days}</span>
         <span className={styles.unit}>{left.hours} {t.offers.hours}</span>
         <span className={styles.unit}>{left.minutes} {t.offers.minutes}</span>
       </span>
       <Link href="/#appointment" className={styles.cta}>{t.offers.bookNow}</Link>
+      {terms.length > 0 && (
+        <button
+          type="button"
+          className={styles.termsBtn}
+          onClick={() => setTermsOpen((open) => !open)}
+          aria-expanded={termsOpen}
+          aria-controls="offer-terms"
+        >
+          {t.offers.terms} <ChevronDown size={12} className={termsOpen ? styles.chevronOpen : undefined} />
+        </button>
+      )}
+      {termsOpen && terms.length > 0 && (
+        <ul id="offer-terms" className={styles.terms}>
+          {terms.map((term) => <li key={term}>{term}</li>)}
+        </ul>
+      )}
       <button type="button" className={styles.close} onClick={dismiss} aria-label={t.offers.close}>
         <X size={14} />
       </button>

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { X, Trash2, Calendar, Clock, CheckCircle, AlertCircle, Heart, Loader2 } from 'lucide-react';
 import { useStore, MAX_BAG_DRESSES } from '../../context/StoreContext';
 import { checkAvailability, isVideoUrl } from '../../lib/api';
+import { offerForVisit, offerName } from '../../lib/offers';
 import styles from './CartDrawer.module.css';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -63,7 +64,7 @@ const inputStyle = { padding: '10px 12px', border: '1px solid #e2ddd5', borderRa
 export default function CartDrawer() {
   const {
     cart, cartOpen, setCartOpen, removeFromCart, clearCart, bagNotice, setBagNotice,
-    weddingDate, setWeddingDate, brideUser, setAuthModalOpen, t, lang,
+    weddingDate, setWeddingDate, brideUser, setAuthModalOpen, t, lang, offers,
   } = useStore();
   const router = useRouter();
   const a = t.availability;
@@ -164,7 +165,9 @@ export default function CartDrawer() {
   const hasVisitConflict = cart.some((item) => rowsById[item.id]?.visit_date && !rowsById[item.id].visit_date.available);
   const suggestedDate = availability.data?.suggested_visit_date;
   const earliestVisit = earliestVisitDate(weddingDate);
-  const visitTooEarly = Boolean(visitDate && earliestVisit && visitDate < earliestVisit);
+  // An offer with a wedding range lets its days take visits further before the wedding for its dresses
+  const visitOffer = offerForVisit(offers, visitDate, weddingDate, cart.map((x) => x.id));
+  const visitTooEarly = Boolean(visitDate && earliestVisit && visitDate < earliestVisit && !visitOffer?.wedding_until);
   const totalTryingFee = cart.reduce((sum, item) => sum + parseFloat(rowsById[item.id]?.trying_fee ?? item.trying_fee ?? 0), 0);
 
   const visitStatusText = (vd) => {
@@ -435,6 +438,12 @@ export default function CartDrawer() {
                     <button type="button" className={styles.suggestBtn} onClick={() => setVisitDate(earliestVisit)}>
                       <Calendar size={14} /> {a.useEarliestVisitDate(earliestVisit)}
                     </button>
+                  </div>
+                )}
+
+                {visitOffer && !visitTooEarly && (
+                  <div role="status" style={{ padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', fontSize: '11px', color: '#15803d', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle size={14} /> {t.offers.visitInOffer(offerName(visitOffer, lang))}
                   </div>
                 )}
 

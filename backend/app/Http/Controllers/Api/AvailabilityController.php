@@ -49,7 +49,7 @@ class AvailabilityController extends Controller
         }
 
         return response()->json(DressAvailabilityService::publicView($result) + [
-            'visit_window_error' => Visit::visitWindowError($validated['visit_date'] ?? null, $validated['wedding_date'] ?? null),
+            'visit_window_error' => Visit::visitWindowError($validated['visit_date'] ?? null, $validated['wedding_date'] ?? null, $validated['dress_ids'] ?? []),
         ]);
     }
 
@@ -74,7 +74,7 @@ class AvailabilityController extends Controller
             $validated['city'] ?? null,
             $validated['client_id'] ?? null
         ) + [
-            'visit_window_error' => Visit::visitWindowError($validated['visit_date'] ?? null, $validated['wedding_date'] ?? null),
+            'visit_window_error' => Visit::visitWindowError($validated['visit_date'] ?? null, $validated['wedding_date'] ?? null, $validated['dress_ids'] ?? []),
         ]);
     }
 }

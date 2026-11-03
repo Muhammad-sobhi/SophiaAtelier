@@ -83,10 +83,25 @@ export function earliestVisitDate(weddingDate) {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-/** Arabic error when the visit is more than 4 months before the wedding, otherwise '' */
-export function visitWindowError(visitDate, weddingDate) {
+/**
+ * The offer (from /public/offers) that allows a visit on its days, for its dresses, more than 4 months
+ * before a wedding in its wedding range. Same rule as Offer::openingVisitWindow in the backend.
+ */
+export function offerOpeningVisitWindow(offers, visitDate, weddingDate, dressIds) {
+  const visit = cleanDate(visitDate);
+  const wedding = cleanDate(weddingDate);
+  const ids = dressIds.filter(Boolean).map(Number);
+  if (!visit || !wedding || ids.length === 0) return null;
+  return offers.find((o) => o.wedding_until && o.starts_at <= visit && visit <= o.ends_at
+    && (!o.wedding_from || o.wedding_from <= wedding) && wedding <= o.wedding_until
+    && (o.dress_ids === null || ids.some((id) => o.dress_ids.includes(id)))) || null;
+}
+
+/** Arabic error when the visit is more than 4 months before the wedding (and no offer allows it), otherwise '' */
+export function visitWindowError(visitDate, weddingDate, dressIds = [], offers = []) {
   const visit = cleanDate(visitDate);
   const earliest = earliestVisitDate(weddingDate);
   if (!visit || !earliest || visit >= earliest) return '';
+  if (offerOpeningVisitWindow(offers, visitDate, weddingDate, dressIds)) return '';
   return `لا يمكن حجز موعد زيارة قبل الفرح بأكثر من ${MAX_MONTHS_BEFORE_WEDDING} شهور. أقرب تاريخ مسموح للزيارة: ${formatDate(earliest)}`;
 }

@@ -9,20 +9,22 @@ const DISMISS_KEY = 'sophia_wedding_prompt_dismissed';
 
 /** Asks the bride for her wedding date once, then shows it as a small pill she can change anytime */
 export default function WeddingDateWidget() {
-  const { weddingDate, setWeddingDate, t, lang } = useStore();
+  const { weddingDate, setWeddingDate, t, lang, offerPopup } = useStore();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const today = new Date().toISOString().split('T')[0];
 
-  // First visit without a date: open the question (unless she chose "later" this session)
+  // First visit without a date: open the question (unless she chose "later" this session),
+  // once the offer popup is out of the way
   useEffect(() => {
+    if (offerPopup !== 'done') return undefined;
     let dismissed = false;
     try { dismissed = sessionStorage.getItem(DISMISS_KEY) === '1'; } catch (e) {}
     const timer = setTimeout(() => {
       if (!localStorage.getItem('sophia_wedding_date') && !dismissed) setOpen(true);
     }, 1200);
     return () => clearTimeout(timer);
-  }, []);
+  }, [offerPopup]);
 
   useEffect(() => { if (open) setDraft(weddingDate || ''); }, [open, weddingDate]);
 
