@@ -83,8 +83,7 @@ export default function OfferPopup() {
         </button>
 
         <div className={styles.art}>
-          <Image src="/images/hero-bg.webp" alt="" fill sizes="(max-width: 640px) 100vw, 360px" className={styles.bg} />
-          <Image src="/images/hero-bride.webp" alt="" fill sizes="(max-width: 640px) 100vw, 360px" className={styles.bride} />
+          <Image src="/images/offer-bride.webp" alt="" fill sizes="(max-width: 640px) 100vw, 360px" className={styles.bride} />
           <span className={styles.ribbon}>{t.offers.limited}</span>
         </div>
 
