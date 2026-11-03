@@ -29,13 +29,9 @@
   overflow: hidden;
 }
 
-.bg {
-  object-fit: cover;
-}
-
 .bride {
   object-fit: cover;
-  object-position: top center;
+  object-position: center 20%;
 }
 
 .ribbon {
@@ -197,7 +193,7 @@
   }
 
   .art {
-    min-height: 240px;
+    min-height: 300px;
   }
 
   .content {
