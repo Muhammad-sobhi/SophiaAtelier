@@ -212,7 +212,7 @@ export default function DressPurchasesSection({ onChanged }) {
 
               {view === 'pending' && pendingCount > 0 && (
                 <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                  الفساتين دي ليها تكلفة ({formatMoney(pendingSummary.pending_cost)}) بس مالهاش بيانات شراء. حدد لكل فستان: مدفوع بالكامل قبل كده، ولا لسه عليه فلوس.
+                  الفساتين دي ليها تكلفة ({formatMoney(pendingSummary.pending_cost)}) بس مالهاش بيانات شراء. حدد لكل فستان فلوسه اتدفعت منين: زمان قبل الخزنة، ولا من الخزنة أو لسه هتتدفع.
                 </p>
               )}
 
