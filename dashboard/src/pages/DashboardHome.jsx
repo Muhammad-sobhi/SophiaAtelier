@@ -83,8 +83,7 @@ export default function DashboardPage() {
 
   const fetchBrides = async () => {
     try {
-      const res = await apiClient.get('/clients?per_page=1000&summary=1');
-      const list = Array.isArray(res) ? res : res.data || [];
+      const list = await apiClient.getAll('/clients', { summary: 1 });
       const mapped = list.map(mapBride);
       setBrides(mapped);
 
