@@ -153,6 +153,18 @@ class ApiClient {
     return this.request(endpoint, { ...options, method: 'GET' });
   }
 
+  /** Every row of a paginated list endpoint (the API caps per_page at 1000, so it reads all pages) */
+  async getAll(endpoint, params = {}) {
+    const query = { ...params, per_page: 1000 };
+    const first = await this.get(endpoint, { params: { ...query, page: 1 } });
+    if (Array.isArray(first)) return first;
+    const lastPage = Number(first?.last_page) || 1;
+    const rest = await Promise.all(
+      Array.from({ length: lastPage - 1 }, (_, i) => this.get(endpoint, { params: { ...query, page: i + 2 } }))
+    );
+    return [first, ...rest].flatMap((res) => res?.data || []);
+  }
+
   post(endpoint, data, options = {}) {
     return this.request(endpoint, {
       ...options,

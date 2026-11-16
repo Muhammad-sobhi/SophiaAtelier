@@ -204,8 +204,7 @@ export default function ShopGamePage() {
     setLoading(true);
     setLoadError('');
     try {
-      const res = await apiClient.get('/clients?per_page=1000');
-      const list = (Array.isArray(res) ? res : res.data || []).map(normalize);
+      const list = (await apiClient.getAll('/clients')).map(normalize);
       setBrides(list);
       syncWorld(list);
     } catch (e) {

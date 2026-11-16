@@ -41,11 +41,10 @@ export default function BookedDressesModal({
     if (!isOpen) return;
     let isMounted = true;
     apiClient
-      .get('/clients?per_page=1000')
-      .then((res) => {
+      .getAll('/clients')
+      .then((data) => {
         if (!isMounted) return;
-        const data = res?.data || res || [];
-        setInternalBrides(Array.isArray(data) ? data : []);
+        setInternalBrides(data);
       })
       .catch((err) => {
         console.error('Failed to load full clients in BookedDressesModal:', err);
