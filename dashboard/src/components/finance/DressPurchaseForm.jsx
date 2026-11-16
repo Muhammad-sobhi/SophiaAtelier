@@ -251,17 +251,21 @@ export default function DressPurchaseForm({ purchase = null, legacyDress = null,
         {/* Old dress: paid before recording, or still owed */}
         {isLegacy && (
           <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
-            <p className="text-[11px] font-bold text-amber-800">الفلوس اللي اتدفعت قبل التسجيل هنا مش هتتسجل مصروف جديد، عشان ما تتحسبش مرتين.</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[['paid', 'مدفوع بالكامل قبل كده'], ['owed', 'لسه عليه فلوس']].map(([id, label]) => (
-                <button key={id} type="button" onClick={() => setLegacyState(id)}
-                  className={`py-2 rounded-xl text-xs font-black border cursor-pointer ${legacyState === id ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-600 border-slate-200'}`}>
-                  {label}
+            <p className="text-xs font-black text-amber-900">فلوس الفستان ده اتدفعت منين؟</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                ['paid', 'اتدفعت زمان، قبل ما نسجّل الخزنة على النظام', 'مش هتتخصم من الخزنة ومش هتظهر في "شراء أصول"'],
+                ['owed', 'من الخزنة، أو لسه هتتدفع', 'كل دفعة تعلّم عليها "اتدفعت" هتتخصم من الخزنة وتظهر في "شراء أصول"'],
+              ].map(([id, label, hint]) => (
+                <button key={id} type="button" onClick={() => setLegacyState(id)} aria-pressed={legacyState === id}
+                  className={`p-2.5 rounded-xl border cursor-pointer text-start space-y-1 ${legacyState === id ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+                  <span className="block text-xs font-black">{label}</span>
+                  <span className={`block text-[10px] font-bold ${legacyState === id ? 'text-amber-50' : 'text-slate-400'}`}>{hint}</span>
                 </button>
               ))}
             </div>
             {legacyState === 'owed' && (
-              <Field label="اتدفع منه قبل كده">
+              <Field label="اتدفع منه زمان (قبل الخزنة)">
                 <input type="number" min="0" step="0.01" value={priorPaid} onChange={(e) => setPriorPaid(e.target.value)} className={inputClass} />
               </Field>
             )}
