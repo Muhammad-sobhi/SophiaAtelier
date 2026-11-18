@@ -123,12 +123,19 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      let msg = errorData.message || `Request failed with status ${response.status}`;
+      // Some actions (e.g. dress not available) send their reason as `error` rather than `message`
+      let msg = errorData.message || errorData.error || `Request failed with status ${response.status}`;
       if (errorData.errors && typeof errorData.errors === 'object') {
         const errorDetails = Object.values(errorData.errors).flat().join(' | ');
         if (errorDetails) {
           msg = `${msg}: ${errorDetails}`;
         }
+      }
+      if (Array.isArray(errorData.conflicts) && errorData.conflicts.length) {
+        const conflictDetails = errorData.conflicts
+          .map(c => `${c.client_name} (فرح ${String(c.event_date || '').slice(0, 10)})`)
+          .join(' | ');
+        msg = `${msg}: ${conflictDetails}`;
       }
       const error = new Error(msg);
       error.data = errorData;
