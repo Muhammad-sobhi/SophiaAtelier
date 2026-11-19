@@ -3,7 +3,7 @@ import { apiClient, getAllPages } from '@/lib/api-client';
 import {
   DollarSign, TrendingUp, TrendingDown, Shield, SlidersHorizontal,
   X, FileText, Image as ImageIcon, Plus, CreditCard, Banknote,
-  Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, Filter, Search,
+  Smartphone, Building2, Wallet, ChevronRight, ChevronLeft, ChevronDown, Filter, Search,
   Trash2, Paperclip, Download, FileSpreadsheet, ArrowLeftRight, ShoppingBag, Receipt, AlertTriangle
 } from 'lucide-react';
 import { MultiPaymentMethodInput } from '@/components/MultiPaymentMethodInput';
@@ -172,6 +172,18 @@ const STAT_CLASSES = {
 
 const money = (v) => `${(Number(v) || 0).toLocaleString()} ج.م`;
 
+const PAGE_TABS = [
+  { id: 'summary', label: 'الملخص' },
+  { id: 'transactions', label: 'المعاملات' },
+  { id: 'assets', label: 'الأصول والفساتين' },
+  { id: 'payables', label: 'المستحقات' },
+];
+
+const toBreakdownRows = (data) => paymentMethodKeys.map((key) => {
+  const { income = 0, outcome = 0, count = 0 } = data[key] || {};
+  return { key, label: paymentMethodLabels[key] || key, income, outcome, balance: income - outcome, count };
+});
+
 export default function FinancePage() {
   // Current page of transactions (filtered, searched and paginated on the server)
   const [transactions, setTransactions] = useState([]);
@@ -183,6 +195,11 @@ export default function FinancePage() {
   const breakdownRequestId = useRef(0);
   const [selectedTx, setSelectedTx] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
+  // Page section: summary | transactions | assets | payables
+  const [pageTab, setPageTab] = useState('summary');
+  const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
+  // Per payment method totals for the date range only (summary tab)
+  const [vaultBalances, setVaultBalances] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activePaymentFilter, setActivePaymentFilter] = useState(null);
 
@@ -366,6 +383,7 @@ export default function FinancePage() {
   // Payment method cards follow the date range, tab and search (not the payment method filter itself)
   const loadPaymentBreakdown = useCallback(async () => {
     const requestId = ++breakdownRequestId.current;
+    if (activeTab === 'all' && !debouncedSearch) return;
     const p = new URLSearchParams(buildQS());
     if (activeTab !== 'all') p.set('tab', activeTab);
     if (debouncedSearch) p.set('search', debouncedSearch);
@@ -377,13 +395,18 @@ export default function FinancePage() {
     }
   }, [buildQS, activeTab, debouncedSearch]);
 
+  const summaryRequestId = useRef(0);
   const loadSummary = useCallback(async () => {
-    try {
-      const summaryRes = await apiClient.get(`/finance/summary?${buildQS()}`);
-      if (summaryRes) setTotals({ ...EMPTY_SUMMARY, ...summaryRes });
-    } catch (e) {
-      console.error('Failed to load finance summary:', e);
-    }
+    const requestId = ++summaryRequestId.current;
+    const qs = buildQS();
+    await Promise.all([
+      apiClient.get(`/finance/summary?${qs}`)
+        .then((res) => {if (res && requestId === summaryRequestId.current) setTotals({ ...EMPTY_SUMMARY, ...res });})
+        .catch((e) => console.error('Failed to load finance summary:', e)),
+      apiClient.get(`/finance/payment-breakdown?${qs}`)
+        .then((res) => {if (requestId === summaryRequestId.current) setVaultBalances(res?.payment_breakdown || {});})
+        .catch((e) => console.error('Failed to load vault balances:', e)),
+    ]);
   }, [buildQS]);
 
   const loadTransactions = useCallback(async () => {
@@ -681,73 +704,165 @@ export default function FinancePage() {
     }
   };
 
-  // Payment method breakdown (totals come from /finance/summary)
-  const paymentBreakdown = paymentMethodKeys.map((key) => {
-    const { income = 0, outcome = 0, count = 0 } = paymentBreakdownData[key] || {};
-    return { key, label: paymentMethodLabels[key] || key, income, outcome, balance: income - outcome, count };
-  });
+  // Payment method totals (from /finance/payment-breakdown). The transactions tab cards follow its category/search filter.
+  const vaultBreakdown = toBreakdownRows(vaultBalances);
+  const paymentBreakdown = activeTab === 'all' && !debouncedSearch ? vaultBreakdown : toBreakdownRows(paymentBreakdownData);
+
+  const openNewTransaction = (type) => {
+    setIsModalOpen(true);
+    setEditingTxId(null);
+    setEditingTxOriginalType(null);
+    setNewDesc('');
+    setNewType(type);
+    setNewCategory('other');
+    setNewAmount('');
+    setRevenueSplitPayments([{ amount: '', payment_method: 'cash' }]);
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setNewPaymentMethod('cash');
+    setNewReceiptImage(null);
+    setNewEmployeeId('');
+    setNewMaterialName('');
+    setNewQuantity('');
+    setNewUnitPrice('');
+  };
+
+  const openVaultModal = () => {
+    setVaultTab('transfer');
+    setVaultFromMethod('instapay');
+    setVaultToMethod('cash');
+    setVaultAmount('');
+    setVaultNotes('');
+    setVaultReceipt(null);
+    setVaultDate(new Date().toISOString().split('T')[0]);
+    setIsVaultModalOpen(true);
+  };
+
+  // Summary tab shortcuts into the transactions log (clearing other filters so the numbers match)
+  const openVaultTransactions = (method) => {
+    setActiveTab('all');
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setClassFilter('');
+    setActivePaymentFilter(method);
+    setPageTab('transactions');
+  };
+
+  const openUnclassified = () => {
+    setActiveTab('all');
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setActivePaymentFilter(null);
+    setClassFilter('unclassified');
+    setPageTab('transactions');
+  };
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const summaryCards = [
-    { type: 'net_profit', label: 'الربح التشغيلي', hint: 'الإيرادات − المصروفات التشغيلية', value: money(totals.net_profit), icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
-    { type: 'net_revenue', label: 'المبيعات / الإيرادات', hint: 'بدون التأمينات والمناقلات', value: money(totals.net_revenue), icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
-    { type: 'net_expense', label: 'المصروفات التشغيلية', hint: 'تكاليف تشغيل المحل', value: money(totals.net_expense), icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
-    { type: 'capital_spending', label: 'شراء أصول', hint: 'فساتين وخامات — لا تُخصم من الربح', value: money(totals.capital_spending), icon: ShoppingBag, colorClass: 'text-violet-600', bgClass: 'bg-violet-50' },
+    { type: 'net_profit', label: 'الربح', hint: 'الإيرادات − المصروفات', value: money(totals.net_profit), icon: TrendingUp, colorClass: totals.net_profit >= 0 ? 'text-indigo-600' : 'text-rose-600', bgClass: totals.net_profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50' },
+    { type: 'net_revenue', label: 'الإيرادات', hint: 'بدون التأمينات والمناقلات', value: money(totals.net_revenue), icon: DollarSign, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
+    { type: 'net_expense', label: 'المصروفات', hint: 'تكاليف تشغيل المحل (بدون شراء الفساتين)', value: money(totals.net_expense), icon: TrendingDown, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
+    { type: 'capital_spending', label: 'شراء أصول (الفترة)', hint: 'فساتين وخامات — لا تُخصم من الربح', value: money(totals.capital_spending), icon: ShoppingBag, colorClass: 'text-violet-600', bgClass: 'bg-violet-50' },
     { type: 'net_cash_flow', label: 'صافي حركة الخزينة', hint: 'كل ما دخل − كل ما خرج', value: money(totals.net_cash_flow), icon: Wallet, colorClass: totals.net_cash_flow >= 0 ? 'text-teal-600' : 'text-rose-600', bgClass: totals.net_cash_flow >= 0 ? 'bg-teal-50' : 'bg-rose-50' },
     { type: 'total_assets', label: 'إجمالي الأصول (حالياً)', hint: 'فساتين + خامات + تحت التصنيع', value: money(totals.assets.total), icon: Building2, colorClass: 'text-sky-600', bgClass: 'bg-sky-50' },
     { type: 'payables', label: 'المستحق علينا (حالياً)', hint: 'موردين + فساتين + عمال', value: money(totals.payables.total), icon: Receipt, colorClass: 'text-orange-600', bgClass: 'bg-orange-50' },
-    { type: 'held_insurances', label: 'التأمينات المحتجزة (أمانات)', hint: 'فلوس العرايس طرفنا', value: money(totals.held_insurances), icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' },
+    { type: 'held_insurances', label: 'التأمينات المحتجزة', hint: 'أمانات العرايس في الفترة', value: money(totals.held_insurances), icon: Shield, colorClass: 'text-amber-600', bgClass: 'bg-amber-50' },
   ];
 
 
+  const cardsByType = Object.fromEntries(summaryCards.map((card) => [card.type, card]));
+
+  const renderStatCard = (card) => {
+    const Icon = card.icon;
+    return (
+      <button
+        type="button"
+        key={card.type}
+        onClick={() => setSelectedStatModalType(card.type)}
+        className="text-right bg-white rounded-2xl sm:rounded-3xl px-4 py-3 sm:p-5 border border-slate-150 hover:border-indigo-300 transition-all duration-300 cursor-pointer active:scale-98 group select-none"
+        title="عرض التفاصيل">
+        <div className="hidden sm:flex items-center justify-between mb-3">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${card.bgClass} ${card.colorClass}`}>
+            <Icon size={17} />
+          </div>
+          <span className="text-[10px] font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">
+            التفاصيل ←
+          </span>
+        </div>
+        <div className={`text-lg sm:text-xl font-extrabold ${card.colorClass} break-words leading-tight`}>{card.value}</div>
+        <div className="text-xs text-slate-700 font-extrabold mt-1.5">{card.label}</div>
+        <div className="text-[11px] text-slate-400 font-bold mt-0.5">{card.hint}</div>
+      </button>);
+  };
+
   return (
-    <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 text-right pb-12" dir="rtl">
+    <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5 text-right pb-12" dir="rtl">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
-        <div>
-          <h1 className="text-lg sm:text-xl font-extrabold text-slate-800">المركز المالي والحسابات</h1>
-          <p className="text-xs text-slate-400 font-bold mt-0.5">مراقبة المقبوضات وصافي الأرباح وإدارة المصروفات التشغيلية.</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-3 flex-shrink-0">
+        <h1 className="text-lg sm:text-xl font-extrabold text-slate-800">المالية</h1>
+        <div className="flex items-center gap-2">
+          {pageTab === 'transactions' &&
           <button
             onClick={handleExportCSV}
             type="button"
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl transition-all text-xs font-bold shadow-xs active:scale-95 cursor-pointer w-full sm:w-auto"
-            title="تصدير كشف المعاملات إلى ملف Excel"
-          >
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl transition-all text-xs font-extrabold cursor-pointer"
+            title="تصدير المعاملات المعروضة إلى ملف Excel">
             <FileSpreadsheet size={15} className="text-emerald-600" />
-            <span>تصدير Excel</span>
+            <span className="hidden sm:inline">تصدير Excel</span>
           </button>
-          <button
-            onClick={() => {
-              setIsModalOpen(true);
-              setEditingTxId(null);
-              setEditingTxOriginalType(null);
-              setNewDesc('');
-              setNewType('مصروف');
-              setNewCategory('other');
-              setNewAmount('');
-              setRevenueSplitPayments([{ amount: '', payment_method: 'cash' }]);
-              setNewDate(new Date().toISOString().split('T')[0]);
-              setNewPaymentMethod('cash');
-              setNewReceiptImage(null);
-              setNewEmployeeId('');
-              setNewMaterialName('');
-              setNewQuantity('');
-              setNewUnitPrice('');
-            }}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-300 text-xs font-bold shadow-md shadow-indigo-600/10 active:scale-95 cursor-pointer w-full sm:w-auto"
-          >
-            <Plus size={16} />
-            <span>إضافة معاملة مالية</span>
-          </button>
+          }
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsNewMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={isNewMenuOpen}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all text-xs font-extrabold cursor-pointer">
+              <Plus size={16} />
+              <span>جديد</span>
+              <ChevronDown size={14} />
+            </button>
+            {isNewMenuOpen &&
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setIsNewMenuOpen(false)} />
+              <div role="menu" className="absolute left-0 mt-2 w-52 bg-white border border-slate-100 rounded-2xl shadow-lg z-40 p-1.5">
+                {[
+                { label: 'إيراد', icon: TrendingUp, color: 'text-emerald-600', onClick: () => openNewTransaction('إيراد') },
+                { label: 'مصروف', icon: TrendingDown, color: 'text-rose-600', onClick: () => openNewTransaction('مصروف') },
+                { label: 'مناقلة / سحب / إيداع', icon: ArrowLeftRight, color: 'text-indigo-600', onClick: openVaultModal }].
+                map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button key={item.label} type="button" role="menuitem"
+                    onClick={() => {setIsNewMenuOpen(false);item.onClick();}}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-extrabold text-slate-700 hover:bg-slate-50 cursor-pointer text-right">
+                      <Icon size={15} className={item.color} />
+                      {item.label}
+                    </button>);
+                })}
+              </div>
+            </>
+            }
+          </div>
         </div>
       </div>
 
-      {/* Date Range Filter with Quick Presets */}
+      {/* Page sections */}
+      <div role="tablist" className="flex gap-1 border-b border-slate-200 overflow-x-auto scrollbar-none -mx-1 px-1">
+        {PAGE_TABS.map((tab) =>
+        <button key={tab.id} type="button" role="tab" aria-selected={pageTab === tab.id}
+        onClick={() => setPageTab(tab.id)}
+        className={`px-3.5 sm:px-4 py-2.5 -mb-px border-b-2 text-xs sm:text-sm font-extrabold whitespace-nowrap transition-colors cursor-pointer ${
+        pageTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            {tab.label}
+          </button>
+        )}
+      </div>
+
+      {/* Date Range Filter with Quick Presets (payables are as of today, so no range there) */}
+      {pageTab !== 'payables' &&
       <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 shadow-xs flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 ml-1">
@@ -817,41 +932,65 @@ export default function FinancePage() {
               )}
             </div>
           )}
+          {pageTab === 'transactions' &&
           <span className="text-[10px] font-extrabold text-indigo-500 bg-indigo-50 px-2.5 py-1.5 rounded-xl border border-indigo-100">
             {totalCount} معاملة
           </span>
+          }
         </div>
       </div>
+      }
 
-      {/* KPI Cards (2 columns on mobile, 4 on desktop) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 flex-shrink-0">
-        {summaryCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={card.label}
-              onClick={() => setSelectedStatModalType(card.type)}
-              className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 border border-slate-150 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_12px_40px_rgba(79,70,229,0.08)] hover:border-indigo-300 transition-all duration-300 cursor-pointer active:scale-98 group select-none"
-              title="انقر لعرض كافة تفاصيل هذا الإحصاء"
-            >
-              <div className="flex items-center justify-between mb-2 sm:mb-3.5">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center ${card.bgClass} ${card.colorClass}`}>
-                  <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-                </div>
-                <span className="text-[9px] font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 hidden sm:inline">
-                  عرض التفاصيل ←
-                </span>
-              </div>
-              <div className={`text-sm sm:text-lg font-extrabold ${card.colorClass} break-words leading-tight`}>{card.value}</div>
-              <div className="text-[10px] sm:text-[11px] text-slate-600 font-extrabold mt-1 truncate">
-                {card.label}
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-0.5 truncate">{card.hint}</div>
+      {pageTab === 'summary' &&
+      <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            {['net_revenue', 'net_expense', 'net_profit'].map((t) => renderStatCard(cardsByType[t]))}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <Wallet size={15} className="text-indigo-500" />
+              <h2 className="text-xs font-extrabold text-slate-700">الخزائن (حركة الفترة)</h2>
             </div>
-          );
-        })}
-      </div>
+            <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-100">
+              {vaultBreakdown.map((pm) => {
+                const Icon = pmIcons[pm.key] || Wallet;
+                return (
+                  <button key={pm.key} type="button" onClick={() => openVaultTransactions(pm.key)}
+                  title="عرض معاملات هذه الخزنة"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer text-right">
+                    <span className="flex items-center gap-2.5 text-xs font-extrabold text-slate-700">
+                      <Icon size={15} className="text-indigo-500" />
+                      {pm.label}
+                      <span className="text-[10px] font-bold text-slate-400">{pm.count} معاملة</span>
+                    </span>
+                    <span className={`text-sm font-black ${pm.balance >= 0 ? 'text-slate-800' : 'text-rose-600'}`}>{money(pm.balance)}</span>
+                  </button>);
+              })}
+              <button type="button" onClick={() => setSelectedStatModalType('net_cash_flow')}
+              title="عرض تفاصيل حركة الخزينة"
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50/60 hover:bg-slate-100 transition-colors cursor-pointer rounded-b-2xl text-right">
+                <span className="text-xs font-extrabold text-slate-800">صافي حركة الخزينة</span>
+                <span className={`text-sm font-black ${totals.net_cash_flow >= 0 ? 'text-teal-600' : 'text-rose-600'}`}>{money(totals.net_cash_flow)}</span>
+              </button>
+            </div>
+          </div>
 
+          {totals.unclassified_purchases.count > 0 &&
+        <button type="button" onClick={openUnclassified}
+        className="w-full flex items-center justify-between gap-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-2xl px-4 py-3 text-right cursor-pointer transition-colors">
+              <span className="flex items-center gap-2 text-xs font-extrabold text-amber-800">
+                <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
+                {totals.unclassified_purchases.count} مصروف قديم يحتاج تصنيف ({money(totals.unclassified_purchases.total)})
+              </span>
+              <span className="text-xs font-extrabold text-amber-700 whitespace-nowrap">راجعها ←</span>
+            </button>
+        }
+        </>
+      }
+
+      {pageTab === 'transactions' &&
+      <>
       {/* Payment Method Breakdown */}
       {paymentBreakdown.length > 0 &&
       <div className="flex-shrink-0">
@@ -866,23 +1005,6 @@ export default function FinancePage() {
                 </span>
               }
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setVaultTab('transfer');
-                setVaultFromMethod('instapay');
-                setVaultToMethod('cash');
-                setVaultAmount('');
-                setVaultNotes('');
-                setVaultReceipt(null);
-                setVaultDate(new Date().toISOString().split('T')[0]);
-                setIsVaultModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-2xs active:scale-95"
-            >
-              <ArrowLeftRight size={13} className="text-indigo-600" />
-              <span>مناقلة / سحب وإيداع 🔄</span>
-            </button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
             {paymentBreakdown.map((pm) => {
@@ -946,10 +1068,6 @@ export default function FinancePage() {
           </button>
         </div>
       }
-
-      <DressPurchasesSection onChanged={loadData} />
-
-      <SupplierBalancesCard />
 
       {/* Section Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none flex-shrink-0 -mx-1 px-1">
@@ -1221,6 +1339,26 @@ export default function FinancePage() {
           </>
         )}
       </div>
+        </>
+      }
+
+      {pageTab === 'assets' &&
+      <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            {['total_assets', 'capital_spending', 'held_insurances'].map((t) => renderStatCard(cardsByType[t]))}
+          </div>
+          <DressPurchasesSection onChanged={loadData} />
+        </>
+      }
+
+      {pageTab === 'payables' &&
+      <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            {renderStatCard(cardsByType.payables)}
+          </div>
+          <SupplierBalancesCard />
+        </>
+      }
 
       {/* Transaction details popup */}
       {selectedTx &&
